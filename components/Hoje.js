@@ -22,13 +22,14 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, se
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 13, color: C.muted }}>{weekday(todayISO())}, {fmtDate(todayISO())}</div>
-          <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>Bom dia, Karen 👑</div>
+          <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>Bom dia, Karen</div>
+          <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 2, fontWeight: 700 }}>CEO</div>
           <div style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>Seu resumo de {mesLabel(mes)}.</div>
         </div>
         <button onClick={() => setMostrarValores((v) => !v)}
           title={mostrarValores ? 'Ocultar valores' : 'Mostrar valores'}
           style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-          {mostrarValores ? '🙈 Ocultar' : '👁 Mostrar'}
+          {mostrarValores ? '👁 Ocultar' : '👁 Mostrar'}
         </button>
       </div>
 
