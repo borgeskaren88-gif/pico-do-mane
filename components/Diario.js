@@ -50,7 +50,7 @@ export default function Diario({ dados, onChange }) {
         </div>
         {ticket > 0 && <div style={{ fontSize: 13, color: C.accent, margin: '-4px 0 12px', fontWeight: 600 }}>Ticket médio: {brl(ticket)}</div>}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Fiado do dia (R$)"><NumInput value={form.fiado} onChange={set('fiado')} /></Field>
+          <Field label="Nº de pedidos fiados"><NumInput value={form.fiado} onChange={set('fiado')} placeholder="0" /></Field>
           <Field label="Caixa fechou certo?"><Select value={form.caixaFechou} onChange={set('caixaFechou')} options={['Sim', 'Não']} /></Field>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -81,6 +81,7 @@ export default function Diario({ dados, onChange }) {
               <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap', fontVariantNumeric: 'tabular-nums' }}>
                 <span style={{ color: C.green, fontWeight: 700 }}>{brl(num(d.receita))}</span>
                 {num(d.nPedidos) > 0 && <span style={{ color: C.muted, fontSize: 13 }}>{d.nPedidos} pedidos · tkt {brl(num(d.receita) / num(d.nPedidos))}</span>}
+                {num(d.fiado) > 0 && <span style={{ color: C.amber, fontSize: 13 }}>{d.fiado} fiado{num(d.fiado) > 1 ? 's' : ''}</span>}
                 {d.nota && <span style={{ color: C.accent, fontSize: 13 }}>Nota {d.nota}</span>}
               </div>
               {d.problema && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}><b style={{ color: C.faint }}>Problema:</b> {d.problema}</div>}
