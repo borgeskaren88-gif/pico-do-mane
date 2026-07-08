@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
-import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, montarParcelas, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 const compraVazia = () => ({
   data: todayISO(), produto: '', fornecedor: '', quantidade: '', valorUnit: '', categoria: '',
@@ -10,6 +10,8 @@ const compraVazia = () => ({
 export default function Compras({ dados, cotacoes, onChange }) {
   const [form, setForm] = useState(compraVazia());
   const [editId, setEditId] = useState(null);
+  const [numParcelas, setNumParcelas] = useState('1');
+  const [parcelasList, setParcelasList] = useState([]);
   const [filtroMes, setFiltroMes] = useState(ymOf(todayISO()));
   const [busca, setBusca] = useState('');
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
@@ -26,17 +28,44 @@ export default function Compras({ dados, cotacoes, onChange }) {
   const difVsCot = menorCot ? (num(form.valorUnit) - menorCot.menor) : 0;
   const impacto = difVsCot * num(form.quantidade);
 
+  const parcelado = !editId && form.formaPagto === 'Prazo' && (parseInt(numParcelas, 10) || 1) > 1;
+  const mudarParcelas = (v) => {
+    setNumParcelas(v);
+    setParcelasList((prev) => montarParcelas(v, totalItem, form.data, prev));
+  };
+  const recalcularParcelas = () => setParcelasList((prev) => montarParcelas(numParcelas, totalItem, form.data, prev));
+  const setParcelaCampo = (i, campo) => (v) =>
+    setParcelasList((prev) => prev.map((p, idx) => (idx === i ? { ...p, [campo]: v } : p)));
+  const somaParcelas = parcelasList.reduce((s, p) => s + num(p.valor), 0);
+  const somaBate = Math.abs(somaParcelas - totalItem) < 0.005;
+
+  const limpar = () => { setForm(compraVazia()); setEditId(null); setNumParcelas('1'); setParcelasList([]); };
+
   const salvar = () => {
     if (!form.produto || !form.fornecedor || !form.valorUnit) return;
+
+    if (parcelado) {
+      const n = parcelasList.length;
+      const novas = parcelasList.map((p, i) => ({
+        id: uid(), data: form.data, produto: form.produto, fornecedor: form.fornecedor,
+        categoria: form.categoria, quantidade: '1', valorUnit: p.valor || '0',
+        formaPagto: 'Prazo', prazoDias: '', vencimento: p.vencimento, pago: 'Não',
+        dataPagamento: '', obs: [`Parcela ${i + 1}/${n}`, form.obs].filter(Boolean).join(' · '),
+      }));
+      onChange([...novas, ...dados]);
+      limpar();
+      return;
+    }
+
     let venc = form.vencimento;
     if (!venc && form.formaPagto === 'Prazo' && form.prazoDias) venc = addDays(form.data, form.prazoDias);
     if (!venc && form.formaPagto === 'À vista') venc = form.data;
     const rec = { ...form, vencimento: venc };
     if (editId) onChange(dados.map((d) => d.id === editId ? { ...rec, id: editId } : d));
     else onChange([{ ...rec, id: uid() }, ...dados]);
-    setForm(compraVazia()); setEditId(null);
+    limpar();
   };
-  const editar = (d) => { setForm(d); setEditId(d.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const editar = (d) => { setForm(d); setEditId(d.id); setNumParcelas('1'); setParcelasList([]); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const excluir = (id) => onChange(dados.filter((d) => d.id !== id));
 
   const mesesDisp = [...new Set(dados.map((d) => ymOf(d.data)))].sort().reverse();
@@ -82,19 +111,42 @@ export default function Compras({ dados, cotacoes, onChange }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Forma de pagamento"><Select value={form.formaPagto} onChange={set('formaPagto')} options={['À vista', 'Prazo']} /></Field>
           {form.formaPagto === 'Prazo'
-            ? <Field label="Prazo (dias)"><NumInput value={form.prazoDias} onChange={set('prazoDias')} /></Field>
+            ? <Field label="Nº de parcelas"><NumInput value={numParcelas} onChange={mudarParcelas} placeholder="1" /></Field>
             : <Field label="Já foi pago?"><Select value={form.pago} onChange={set('pago')} options={['Sim', 'Não']} /></Field>}
         </div>
-        {form.formaPagto === 'Prazo' && (
+
+        {form.formaPagto === 'Prazo' && !parcelado && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="Vencimento (opcional)"><TextInput type="date" value={form.vencimento} onChange={set('vencimento')} /></Field>
             <Field label="Já foi pago?"><Select value={form.pago} onChange={set('pago')} options={['Sim', 'Não']} /></Field>
           </div>
         )}
+
+        {parcelado && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.06em', color: C.muted, fontWeight: 600 }}>Datas e valores das parcelas</div>
+              <Btn kind="ghost" small onClick={recalcularParcelas}>Recalcular</Btn>
+            </div>
+            {parcelasList.map((p, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 13, color: C.faint, fontWeight: 700, width: 22 }}>{i + 1}ª</div>
+                <TextInput type="date" value={p.vencimento} onChange={setParcelaCampo(i, 'vencimento')} />
+                <NumInput value={p.valor} onChange={setParcelaCampo(i, 'valor')} />
+              </div>
+            ))}
+            <div style={{ fontSize: 13, marginTop: 2, color: somaBate ? C.green : C.amber, fontWeight: 600 }}>
+              Soma das parcelas: {brl(somaParcelas)}
+              {totalItem > 0 && !somaBate && <span> · não bate com o total ({brl(totalItem)})</span>}
+              {totalItem > 0 && somaBate && <span> ✓</span>}
+            </div>
+          </div>
+        )}
+
         <Field label="Observação"><TextInput value={form.obs} onChange={set('obs')} placeholder="Boleto, nota…" /></Field>
         <div style={{ display: 'flex', gap: 10 }}>
-          <Btn onClick={salvar}>{editId ? 'Salvar compra' : 'Registrar compra'}</Btn>
-          {editId && <Btn kind="ghost" onClick={() => { setForm(compraVazia()); setEditId(null); }}>Cancelar</Btn>}
+          <Btn onClick={salvar}>{editId ? 'Salvar compra' : (parcelado ? `Registrar ${parcelasList.length} parcelas` : 'Registrar compra')}</Btn>
+          {editId && <Btn kind="ghost" onClick={limpar}>Cancelar</Btn>}
         </div>
       </Card>
 
@@ -119,8 +171,10 @@ export default function Compras({ dados, cotacoes, onChange }) {
                   <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{d.fornecedor} · {fmtDate(d.data)}</div>
                   <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
                     {num(d.quantidade)} × {brl(num(d.valorUnit))} · {d.formaPagto}
+                    {d.vencimento && d.formaPagto === 'Prazo' ? ` · vence ${fmtDate(d.vencimento)}` : ''}
                     {aberto ? <span style={{ color: C.amber }}> · em aberto</span> : <span style={{ color: C.green }}> · pago</span>}
                   </div>
+                  {d.obs && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{d.obs}</div>}
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(tot)}</div>
@@ -136,4 +190,3 @@ export default function Compras({ dados, cotacoes, onChange }) {
     </div>
   );
 }
-
