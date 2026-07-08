@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Pico do Mané — Central de Gestão',
-  description: 'Painel de gestão do Pico do Mané',
+  title: 'PicoOs — Central de Gestão',
+  description: 'Painel de gestão do PicoOs',
 };
 
 export default function RootLayout({ children }) {
