@@ -26,7 +26,7 @@ código fica guardado) e **Vercel** (onde o site fica no ar). Siga na ordem.
    - Isso cria a "tabela" onde os dados do painel vão morar
 6. Agora vá em **Project Settings** (ícone de engrenagem) → **API**
 7. Guarde em algum lugar (um bloco de notas, por exemplo) estes dois valores:
-   - **Project URL** (algo como `https://xxxxx.supabase.co`)
+   - **Project URL** (algo como `(https://qdjpeggwnskuenwkghxg.supabase.co)`)
    - **service_role key** (uma chave longa, em "Project API keys" — ⚠️ essa
      chave é secreta, não compartilhe nem coloque em lugar público)
 
