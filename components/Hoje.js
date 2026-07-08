@@ -4,6 +4,8 @@ import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Res
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Hoje({ diario, receitas, despesas, compras, garrafas, setTab }) {
+  const [mostrarValores, setMostrarValores] = useState(true);
+  const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
   const mes = ymOf(todayISO());
   const rec = receitas.filter((r) => ymOf(r.data) === mes).reduce((s, r) => s + num(r.valor), 0);
   const desp = despesas.filter((d) => ymOf(d.data) === mes).reduce((s, d) => s + num(d.valor), 0);
@@ -17,17 +19,24 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, se
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: C.muted }}>{weekday(todayISO())}, {fmtDate(todayISO())}</div>
-        <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>Bom dia, Karen 👑</div>
-        <div style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>Seu resumo de {mesLabel(mes)}.</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 13, color: C.muted }}>{weekday(todayISO())}, {fmtDate(todayISO())}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>Bom dia, Karen 👑</div>
+          <div style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>Seu resumo de {mesLabel(mes)}.</div>
+        </div>
+        <button onClick={() => setMostrarValores((v) => !v)}
+          title={mostrarValores ? 'Ocultar valores' : 'Mostrar valores'}
+          style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {mostrarValores ? '🙈 Ocultar' : '👁 Mostrar'}
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-        <KPI titulo="Receita do mês" valor={brl(rec)} cor={C.green} />
-        <KPI titulo="Despesas do mês" valor={brl(desp)} cor={C.red} />
-        <KPI titulo="Lucro operacional" valor={brl(lucro)} cor={lucro >= 0 ? C.accent : C.red} />
-        <KPI titulo="Margem" valor={margem.toFixed(1) + '%'} cor={margem >= 0 ? C.accent : C.red} />
+        <KPI titulo="Receita do mês" valor={oculto(brl(rec))} cor={C.green} />
+        <KPI titulo="Despesas do mês" valor={oculto(brl(desp))} cor={C.red} />
+        <KPI titulo="Lucro operacional" valor={oculto(brl(lucro))} cor={lucro >= 0 ? C.accent : C.red} />
+        <KPI titulo="Margem" valor={mostrarValores ? margem.toFixed(1) + '%' : '••••'} cor={margem >= 0 ? C.accent : C.red} />
       </div>
 
       {abertas.length > 0 && (
@@ -35,7 +44,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, se
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 600 }}>Contas a pagar em aberto</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: C.red, marginTop: 4 }}>{brl(totalPagar)}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: C.red, marginTop: 4 }}>{oculto(brl(totalPagar))}</div>
               <div style={{ fontSize: 12, color: vencidas.length ? C.red : C.faint, marginTop: 2 }}>{abertas.length} conta(s){vencidas.length ? ` · ${vencidas.length} vencida(s)` : ''}</div>
             </div>
             <Btn kind="ghost" small onClick={() => setTab('pagar')}>Ver</Btn>
