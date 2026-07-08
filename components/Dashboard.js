@@ -104,9 +104,9 @@ export default function Dashboard() {
       <div style={{ padding: '18px 16px 12px', borderBottom: `1px solid ${C.line}`, background: `linear-gradient(180deg, ${C.panel} 0%, ${C.ink} 100%)` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: `linear-gradient(135deg, ${C.accent}, ${C.accent2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#06101F', fontSize: 18, flexShrink: 0 }}>PM</div>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: `linear-gradient(135deg, ${C.accent}, ${C.accent2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#06101F', fontSize: 18, flexShrink: 0 }}>PO</div>
             <div>
-              <div style={{ fontSize: 19, fontWeight: 900, letterSpacing: '.02em', lineHeight: 1 }}>PICO DO MANÉ</div>
+              <div style={{ fontSize: 19, fontWeight: 900, letterSpacing: '.02em', lineHeight: 1 }}>PicoOs</div>
               <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 3, fontWeight: 600 }}>Central de Gestão</div>
             </div>
           </div>
