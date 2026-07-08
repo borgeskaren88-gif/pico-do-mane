@@ -1,28 +1,10 @@
 'use client';
 import React, { useState } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, SecTitle } from './ui';
-import { brl, num, todayISO, fmtDate, addDays, uid, CATEGORIAS_PRODUTO } from '../lib/util';
+import { brl, num, todayISO, fmtDate, addDays, uid, montarParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
 
 const formVazio = () => ({ fornecedor: '', descricao: '', categoria: '', valorTotal: '', parcelas: '1' });
 const linhaVazia = () => [{ vencimento: todayISO(), valor: '' }];
-
-// Gera as linhas de parcela: divide o total em N partes (ajustando os
-// centavos na última) e espaça os vencimentos de 7 em 7 dias por padrão.
-// Preserva datas/valores já digitados quando possível.
-function montarParcelas(n, total, prev = []) {
-  n = Math.max(1, Math.min(36, parseInt(n, 10) || 1));
-  const t = num(total);
-  const base = Math.floor((t / n) * 100) / 100;
-  const linhas = [];
-  for (let i = 0; i < n; i++) {
-    const valorNum = i === n - 1 ? +(t - base * (n - 1)).toFixed(2) : base;
-    linhas.push({
-      vencimento: prev[i]?.vencimento || addDays(todayISO(), 7 * i),
-      valor: t > 0 ? valorNum.toFixed(2).replace('.', ',') : (prev[i]?.valor || ''),
-    });
-  }
-  return linhas;
-}
 
 export default function ContasPagar({ dados, onChange }) {
   const hoje = todayISO();
@@ -32,11 +14,11 @@ export default function ContasPagar({ dados, onChange }) {
 
   const setNumParcelas = (v) => {
     setForm((f) => ({ ...f, parcelas: v }));
-    setParcelas((prev) => montarParcelas(v, form.valorTotal, prev));
+    setParcelas((prev) => montarParcelas(v, form.valorTotal, hoje, prev));
   };
   const setValorTotal = (v) => {
     setForm((f) => ({ ...f, valorTotal: v }));
-    setParcelas((prev) => montarParcelas(form.parcelas, v, prev));
+    setParcelas((prev) => montarParcelas(form.parcelas, v, hoje, prev));
   };
   const setParcelaCampo = (i, campo) => (v) =>
     setParcelas((prev) => prev.map((p, idx) => (idx === i ? { ...p, [campo]: v } : p)));
