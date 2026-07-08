@@ -113,7 +113,7 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
       {diarioMes.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <KPI titulo="Nota média do mês" valor={notaMedia.toFixed(1)} cor={C.accent} sub={`${diarioMes.length} dias`} />
-          <KPI titulo="Fiado no mês" valor={brl(fiadoMes)} cor={C.accent2} />
+          <KPI titulo="Pedidos fiados no mês" valor={fiadoMes} cor={C.accent2} />
         </div>
       )}
     </div>

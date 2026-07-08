@@ -28,7 +28,7 @@ export default function Backup({ all, restore }) {
     all.cotacoes.forEach((r) => L.push([r.data, r.produto, r.fornecedor, r.preco, r.categoria].map(q).join(',')));
     L.push('', '=== GARRAFAS ===', 'Produto,Volume(ml),Dose(ml),Abertura,Término,Drinks,Obs');
     all.garrafas.forEach((r) => L.push([r.produto, r.volume, r.dose, r.dataAbertura, r.dataTermino, r.drinks, r.obs].map(q).join(',')));
-    L.push('', '=== DIÁRIO ===', 'Data,Clima,Evento,Receita,Pedidos,Fiado,Nota,Problema,Decisão,Aprendizado,Prioridade');
+    L.push('', '=== DIÁRIO ===', 'Data,Clima,Evento,Receita,Pedidos,PedidosFiados,Nota,Problema,Decisão,Aprendizado,Prioridade');
     all.diario.forEach((r) => L.push([r.data, r.clima, r.evento, r.receita, r.nPedidos, r.fiado, r.nota, r.problema, r.decisao, r.aprendizado, r.prioridade].map(q).join(',')));
     baixar('\ufeff' + L.join('\n'), `pico-do-mane-${todayISO()}.csv`, 'text/csv;charset=utf-8');
   };
