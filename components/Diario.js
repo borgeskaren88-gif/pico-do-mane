@@ -8,10 +8,24 @@ const diarioVazio = () => ({
   caixaFechou: '', diferenca: '', comprasEmerg: '', estoqueCritico: '',
   problema: '', decisao: '', aprendizado: '', prioridade: '', nota: '',
 });
-export default function Diario({ dados, onChange }) {
+export default function Diario({ dados, onChange, tarefas = [], onTarefas }) {
   const [form, setForm] = useState(diarioVazio());
   const [editId, setEditId] = useState(null);
+  const [novaTarefa, setNovaTarefa] = useState('');
+  const [verConcluidas, setVerConcluidas] = useState(false);
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const tarefasAbertas = tarefas.filter((t) => !t.feito);
+  const tarefasFeitas = tarefas.filter((t) => t.feito);
+  const addTarefa = () => {
+    const txt = novaTarefa.trim();
+    if (!txt || !onTarefas) return;
+    onTarefas([{ id: uid(), texto: txt, feito: false, criadoEm: Date.now() }, ...tarefas]);
+    setNovaTarefa('');
+  };
+  const toggleTarefa = (id) => onTarefas(tarefas.map((t) => t.id === id ? { ...t, feito: !t.feito, feitoEm: !t.feito ? Date.now() : null } : t));
+  const removerTarefa = (id) => onTarefas(tarefas.filter((t) => t.id !== id));
+  const limparConcluidas = () => onTarefas(tarefas.filter((t) => !t.feito));
   const ticket = num(form.receita) && num(form.nPedidos) ? num(form.receita) / num(form.nPedidos) : 0;
   const salvar = () => {
     if (!form.data) return;
@@ -28,6 +42,50 @@ export default function Diario({ dados, onChange }) {
 
   return (
     <div>
+      {onTarefas && (
+        <Card style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 17, fontWeight: 800 }}>✓ Checklist do bar</div>
+            {tarefasAbertas.length > 0 && <div style={{ fontSize: 13, color: C.muted }}>{tarefasAbertas.length} pendente{tarefasAbertas.length > 1 ? 's' : ''}</div>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: tarefasAbertas.length || tarefasFeitas.length ? 12 : 0 }}>
+            <input value={novaTarefa} onChange={(e) => setNovaTarefa(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addTarefa(); }}
+              placeholder="Nova tarefa… (ex: comprar gelo)" style={{ ...inputStyle, flex: 1 }} />
+            <Btn small onClick={addTarefa}>Adicionar</Btn>
+          </div>
+
+          {tarefasAbertas.length === 0 && tarefasFeitas.length === 0 && (
+            <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '10px 0 2px' }}>Nenhuma tarefa. Anote o que precisa fazer no bar.</div>
+          )}
+
+          {tarefasAbertas.map((t) => (
+            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
+              <button onClick={() => toggleTarefa(t.id)} aria-label="Concluir" style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${C.line}`, background: 'transparent', cursor: 'pointer', flexShrink: 0 }} />
+              <div style={{ flex: 1, fontSize: 14, color: C.text }}>{t.texto}</div>
+              <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
+            </div>
+          ))}
+
+          {tarefasFeitas.length > 0 && (
+            <div style={{ marginTop: 12, borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button onClick={() => setVerConcluidas((v) => !v)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: 0 }}>
+                  {verConcluidas ? '▾' : '▸'} Concluídas ({tarefasFeitas.length})
+                </button>
+                <button onClick={limparConcluidas} style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>limpar concluídas</button>
+              </div>
+              {verConcluidas && tarefasFeitas.map((t) => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
+                  <button onClick={() => toggleTarefa(t.id)} aria-label="Reabrir" style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${C.green}`, background: C.green, color: '#052014', cursor: 'pointer', flexShrink: 0, fontWeight: 900, fontSize: 13, lineHeight: 1 }}>✓</button>
+                  <div style={{ flex: 1, fontSize: 14, color: C.faint, textDecoration: 'line-through' }}>{t.texto}</div>
+                  <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       <Resumo items={[
         { t: 'Dias registrados', v: dados.length },
         { t: 'Nota média', v: media ? media.toFixed(1) : '—', c: C.accent },
