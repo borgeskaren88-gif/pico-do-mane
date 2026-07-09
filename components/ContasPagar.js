@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, SecTitle } from './ui';
 import { brl, num, todayISO, fmtDate, addDays, uid, montarParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
 
@@ -41,18 +41,35 @@ export default function ContasPagar({ dados, onChange }) {
     setParcelas(linhaVazia());
   };
 
-  const abertas = dados.filter((d) => d.pago !== 'Sim').sort((a, b) => (a.vencimento || '9999').localeCompare(b.vencimento || '9999'));
+  const abertas = dados.filter((d) => d.pago !== 'Sim');
   const total = abertas.reduce((s, d) => s + num(d.quantidade) * num(d.valorUnit), 0);
-  const vencidas = abertas.filter((d) => d.vencimento && d.vencimento < hoje);
-  const proximas = abertas.filter((d) => d.vencimento && d.vencimento >= hoje && d.vencimento <= addDays(hoje, 7));
-  const totalVenc = vencidas.reduce((s, d) => s + num(d.quantidade) * num(d.valorUnit), 0);
-  const pagar = (d) => onChange(dados.map((x) => x.id === d.id ? { ...x, pago: 'Sim', dataPagamento: hoje } : x));
+
+  // Agrupa itens que compartilham a mesma "nota/boleto" (mesmo fornecedor)
+  // num único pagamento. Itens sem nota ficam individuais.
+  const grupos = useMemo(() => {
+    const map = new Map();
+    for (const d of abertas) {
+      const notaTrim = (d.nota || '').trim();
+      const chave = notaTrim ? `n:${notaTrim}|${(d.fornecedor || '').trim().toLowerCase()}` : `i:${d.id}`;
+      let g = map.get(chave);
+      if (!g) { g = { chave, nota: notaTrim, fornecedor: d.fornecedor, formaPagto: d.formaPagto, itens: [], total: 0, vencimento: '' }; map.set(chave, g); }
+      g.itens.push(d);
+      g.total += num(d.quantidade) * num(d.valorUnit);
+      if (d.vencimento && (!g.vencimento || d.vencimento < g.vencimento)) g.vencimento = d.vencimento;
+    }
+    return [...map.values()].sort((a, b) => (a.vencimento || '9999').localeCompare(b.vencimento || '9999'));
+  }, [abertas]);
+
+  const vencidasGrupos = grupos.filter((g) => g.vencimento && g.vencimento < hoje);
+  const totalVenc = vencidasGrupos.reduce((s, g) => s + g.total, 0);
+  const proximas = grupos.filter((g) => g.vencimento && g.vencimento >= hoje && g.vencimento <= addDays(hoje, 7));
+  const pagarGrupo = (g) => { const ids = new Set(g.itens.map((x) => x.id)); onChange(dados.map((x) => ids.has(x.id) ? { ...x, pago: 'Sim', dataPagamento: hoje } : x)); };
 
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-        <KPI titulo="Total em aberto" valor={brl(total)} cor={C.red} sub={`${abertas.length} conta(s)`} />
-        <KPI titulo="Vencidas" valor={brl(totalVenc)} cor={vencidas.length ? C.red : C.faint} sub={`${vencidas.length} vencida(s)`} />
+        <KPI titulo="Total em aberto" valor={brl(total)} cor={C.red} sub={`${grupos.length} conta(s)`} />
+        <KPI titulo="Vencidas" valor={brl(totalVenc)} cor={vencidasGrupos.length ? C.red : C.faint} sub={`${vencidasGrupos.length} vencida(s)`} />
       </div>
 
       <Card style={{ marginBottom: 18 }}>
@@ -99,26 +116,31 @@ export default function ContasPagar({ dados, onChange }) {
         </Card>
       )}
 
-      <SecTitle>Contas em aberto ({abertas.length})</SecTitle>
-      {abertas.length === 0 ? <Empty>Nenhuma conta em aberto. 🎉<br />Tudo pago por aqui.</Empty> :
-        abertas.map((d) => {
-          const tot = num(d.quantidade) * num(d.valorUnit);
-          const vencida = d.vencimento && d.vencimento < hoje;
-          const proxima = d.vencimento && d.vencimento >= hoje && d.vencimento <= addDays(hoje, 7);
+      <SecTitle>Contas em aberto ({grupos.length})</SecTitle>
+      {grupos.length === 0 ? <Empty>Nenhuma conta em aberto. 🎉<br />Tudo pago por aqui.</Empty> :
+        grupos.map((g) => {
+          const vencida = g.vencimento && g.vencimento < hoje;
+          const proxima = g.vencimento && g.vencimento >= hoje && g.vencimento <= addDays(hoje, 7);
           const cor = vencida ? C.red : proxima ? C.amber : C.line;
+          const agrupado = g.itens.length > 1;
+          const primeiro = g.itens[0];
+          const titulo = g.fornecedor || primeiro.produto || 'Conta';
+          const subtitulo = agrupado
+            ? `${g.nota ? g.nota + ' · ' : ''}${g.itens.length} itens: ${g.itens.map((i) => i.produto).filter(Boolean).join(', ')}`
+            : [primeiro.produto, g.nota && `Nota: ${g.nota}`, primeiro.obs].filter(Boolean).join(' · ');
           return (
-            <Card key={d.id} style={{ marginBottom: 8, padding: '12px 14px', borderColor: cor }}>
+            <Card key={g.chave} style={{ marginBottom: 8, padding: '12px 14px', borderColor: cor }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15 }}>{d.fornecedor}</div>
-                  <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{d.produto}{d.obs ? ` · ${d.obs}` : ''}</div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{titulo}</div>
+                  {subtitulo && <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{subtitulo}</div>}
                   <div style={{ fontSize: 12, marginTop: 3, color: vencida ? C.red : proxima ? C.amber : C.faint, fontWeight: vencida || proxima ? 700 : 400 }}>
-                    {d.vencimento ? `Vence ${fmtDate(d.vencimento)}${vencida ? ' · VENCIDA' : ''}` : 'Sem vencimento'} · {d.formaPagto}
+                    {g.vencimento ? `Vence ${fmtDate(g.vencimento)}${vencida ? ' · VENCIDA' : ''}` : 'Sem vencimento'} · {g.formaPagto}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(tot)}</div>
-                  <div style={{ marginTop: 8 }}><Btn kind="ok" small onClick={() => pagar(d)}>Marcar pago</Btn></div>
+                  <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(g.total)}</div>
+                  <div style={{ marginTop: 8 }}><Btn kind="ok" small onClick={() => pagarGrupo(g)}>Marcar pago</Btn></div>
                 </div>
               </div>
             </Card>
