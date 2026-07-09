@@ -44,6 +44,7 @@ export default function Dashboard() {
   const [compras, setCompras] = useState([]);
   const [cotacoes, setCotacoes] = useState([]);
   const [garrafas, setGarrafas] = useState([]);
+  const [tarefas, setTarefas] = useState([]);
   const [mes, setMes] = useState(ymOf(todayISO()));
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function Dashboard() {
       };
       setDiario(dados.diario); setReceitas(dados.receitas); setDespesas(dados.despesas);
       setCompras(dados.compras); setCotacoes(dados.cotacoes); setGarrafas(dados.garrafas);
+      setTarefas((salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : []);
       if (vazio) await apiSalvar(dados);
       setLoaded(true);
     })();
@@ -70,6 +72,7 @@ export default function Dashboard() {
       diario: parcial.diario ?? diario, receitas: parcial.receitas ?? receitas,
       despesas: parcial.despesas ?? despesas, compras: parcial.compras ?? compras,
       cotacoes: parcial.cotacoes ?? cotacoes, garrafas: parcial.garrafas ?? garrafas,
+      tarefas: parcial.tarefas ?? tarefas,
     };
     apiSalvar(dados);
   };
@@ -81,6 +84,7 @@ export default function Dashboard() {
     compras: (v) => { setCompras(v); salvarTudo({ compras: v }); },
     cotacoes: (v) => { setCotacoes(v); salvarTudo({ cotacoes: v }); },
     garrafas: (v) => { setGarrafas(v); salvarTudo({ garrafas: v }); },
+    tarefas: (v) => { setTarefas(v); salvarTudo({ tarefas: v }); },
   };
 
   const sair = async () => {
@@ -127,7 +131,7 @@ export default function Dashboard() {
 
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '18px 16px 60px' }}>
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} setTab={setTab} />}
-        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} />}
+        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} onChange={upd.compras} />}
@@ -135,13 +139,15 @@ export default function Dashboard() {
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
-        {tab === 'backup' && <Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas }} restore={(d) => {
+        {tab === 'backup' && <Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
             compras: d.compras || compras, cotacoes: d.cotacoes || cotacoes, garrafas: d.garrafas || garrafas,
+            tarefas: d.tarefas || tarefas,
           };
           setDiario(dados.diario); setReceitas(dados.receitas); setDespesas(dados.despesas);
           setCompras(dados.compras); setCotacoes(dados.cotacoes); setGarrafas(dados.garrafas);
+          setTarefas(dados.tarefas);
           apiSalvar(dados);
         }} />}
       </div>
