@@ -5,7 +5,7 @@ import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, mon
 
 const compraVazia = () => ({
   data: todayISO(), produto: '', fornecedor: '', quantidade: '', valorUnit: '', categoria: '',
-  formaPagto: 'À vista', prazoDias: '', vencimento: '', pago: 'Não', dataPagamento: '', obs: '',
+  formaPagto: 'À vista', prazoDias: '', vencimento: '', pago: 'Não', dataPagamento: '', obs: '', nota: '',
 });
 export default function Compras({ dados, cotacoes, onChange }) {
   const [form, setForm] = useState(compraVazia());
@@ -40,6 +40,13 @@ export default function Compras({ dados, cotacoes, onChange }) {
   const somaBate = Math.abs(somaParcelas - totalItem) < 0.005;
 
   const limpar = () => { setForm(compraVazia()); setEditId(null); setNumParcelas('1'); setParcelasList([]); };
+  // Após registrar um item, mantém os dados do "boleto" (fornecedor, data,
+  // forma, vencimento e nota) preenchidos para agilizar adicionar o próximo
+  // item da mesma nota; limpa só os campos do produto.
+  const proximoItem = () => {
+    setForm((f) => ({ ...compraVazia(), data: f.data, fornecedor: f.fornecedor, formaPagto: f.formaPagto, vencimento: f.vencimento, nota: f.nota }));
+    setEditId(null); setNumParcelas('1'); setParcelasList([]);
+  };
 
   const salvar = () => {
     if (!form.produto || !form.fornecedor || !form.valorUnit) return;
@@ -50,7 +57,7 @@ export default function Compras({ dados, cotacoes, onChange }) {
         id: uid(), data: form.data, produto: form.produto, fornecedor: form.fornecedor,
         categoria: form.categoria, quantidade: '1', valorUnit: p.valor || '0',
         formaPagto: 'Prazo', prazoDias: '', vencimento: p.vencimento, pago: 'Não',
-        dataPagamento: '', obs: [`Parcela ${i + 1}/${n}`, form.obs].filter(Boolean).join(' · '),
+        dataPagamento: '', obs: [`Parcela ${i + 1}/${n}`, form.obs].filter(Boolean).join(' · '), nota: form.nota,
       }));
       onChange([...novas, ...dados]);
       limpar();
@@ -61,9 +68,8 @@ export default function Compras({ dados, cotacoes, onChange }) {
     if (!venc && form.formaPagto === 'Prazo' && form.prazoDias) venc = addDays(form.data, form.prazoDias);
     if (!venc && form.formaPagto === 'À vista') venc = form.data;
     const rec = { ...form, vencimento: venc };
-    if (editId) onChange(dados.map((d) => d.id === editId ? { ...rec, id: editId } : d));
-    else onChange([{ ...rec, id: uid() }, ...dados]);
-    limpar();
+    if (editId) { onChange(dados.map((d) => d.id === editId ? { ...rec, id: editId } : d)); limpar(); }
+    else { onChange([{ ...rec, id: uid() }, ...dados]); proximoItem(); }
   };
   const editar = (d) => { setForm(d); setEditId(d.id); setNumParcelas('1'); setParcelasList([]); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const excluir = (id) => onChange(dados.filter((d) => d.id !== id));
@@ -143,6 +149,10 @@ export default function Compras({ dados, cotacoes, onChange }) {
           </div>
         )}
 
+        <Field label="Nota / boleto (opcional)"><TextInput value={form.nota} onChange={set('nota')} placeholder="ex: NF 4567, Boleto Ambev jul" /></Field>
+        <div style={{ fontSize: 12, color: C.faint, margin: '-8px 0 14px', lineHeight: 1.4 }}>
+          Comprou vários produtos num boleto só? Use a <b>mesma nota/boleto</b> em cada item — a aba A Pagar junta todos num pagamento único.
+        </div>
         <Field label="Observação"><TextInput value={form.obs} onChange={set('obs')} placeholder="Boleto, nota…" /></Field>
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvar}>{editId ? 'Salvar compra' : (parcelado ? `Registrar ${parcelasList.length} parcelas` : 'Registrar compra')}</Btn>
@@ -174,7 +184,7 @@ export default function Compras({ dados, cotacoes, onChange }) {
                     {d.vencimento && d.formaPagto === 'Prazo' ? ` · vence ${fmtDate(d.vencimento)}` : ''}
                     {aberto ? <span style={{ color: C.amber }}> · em aberto</span> : <span style={{ color: C.green }}> · pago</span>}
                   </div>
-                  {d.obs && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{d.obs}</div>}
+                  {(d.nota || d.obs) && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{[d.nota && `Nota: ${d.nota}`, d.obs].filter(Boolean).join(' · ')}</div>}
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(tot)}</div>
