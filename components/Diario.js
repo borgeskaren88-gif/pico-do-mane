@@ -8,7 +8,7 @@ const diarioVazio = () => ({
   caixaFechou: '', diferenca: '', comprasEmerg: '', estoqueCritico: '',
   problema: '', decisao: '', aprendizado: '', prioridade: '', nota: '',
 });
-export default function Diario({ dados, onChange, tarefas = [], onTarefas }) {
+export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [] }) {
   const [form, setForm] = useState(diarioVazio());
   const [editId, setEditId] = useState(null);
   const [novaTarefa, setNovaTarefa] = useState('');
@@ -26,11 +26,25 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas }) {
   const toggleTarefa = (id) => onTarefas(tarefas.map((t) => t.id === id ? { ...t, feito: !t.feito, feitoEm: !t.feito ? Date.now() : null } : t));
   const removerTarefa = (id) => onTarefas(tarefas.filter((t) => t.id !== id));
   const limparConcluidas = () => onTarefas(tarefas.filter((t) => !t.feito));
-  const ticket = num(form.receita) && num(form.nPedidos) ? num(form.receita) / num(form.nPedidos) : 0;
+  // Receita do dia = soma de TUDO que foi lançado em Receitas naquela data
+  // (todas as fontes, inclusive Recebimento Atrasado). Para dias antigos sem
+  // nada lançado em Receitas, mantém o valor que já estava salvo no diário.
+  const receitasDoDia = (data) => receitas.filter((r) => r.data === data);
+  const totalReceitasDia = (data) => receitasDoDia(data).reduce((s, r) => s + num(r.valor), 0);
+  const receitaExibida = (d) => { const rd = totalReceitasDia(d.data); return rd > 0 ? rd : num(d.receita); };
+
+  const recForm = receitasDoDia(form.data);
+  const totalRecForm = recForm.reduce((s, r) => s + num(r.valor), 0);
+  const porFonteForm = recForm.reduce((m, r) => { const k = r.categoria || 'Outros'; m[k] = (m[k] || 0) + num(r.valor); return m; }, {});
+  const receitaForm = totalRecForm > 0 ? totalRecForm : num(form.receita);
+  const ticket = receitaForm && num(form.nPedidos) ? receitaForm / num(form.nPedidos) : 0;
+
   const salvar = () => {
     if (!form.data) return;
-    if (editId) onChange(dados.map((d) => d.id === editId ? { ...form, id: editId } : d));
-    else onChange([{ ...form, id: uid() }, ...dados]);
+    const recCalc = totalReceitasDia(form.data);
+    const registro = { ...form, receita: recCalc > 0 ? recCalc.toFixed(2).replace('.', ',') : form.receita };
+    if (editId) onChange(dados.map((d) => d.id === editId ? { ...registro, id: editId } : d));
+    else onChange([{ ...registro, id: uid() }, ...dados]);
     setForm(diarioVazio()); setEditId(null);
   };
   const editar = (d) => { setForm(d); setEditId(d.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
@@ -38,7 +52,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas }) {
   const ordenado = [...dados].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   const notas = dados.map((d) => num(d.nota)).filter((n) => n > 0);
   const media = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : 0;
-  const receitaTotal = dados.reduce((s, d) => s + num(d.receita), 0);
+  const receitaTotal = dados.reduce((s, d) => s + receitaExibida(d), 0);
 
   return (
     <div>
@@ -102,10 +116,15 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas }) {
           <Field label="Clima"><TextInput value={form.clima} onChange={set('clima')} placeholder="Sol, muito frio…" /></Field>
           <Field label="Evento"><TextInput value={form.evento} onChange={set('evento')} placeholder="Copa, ao vivo…" /></Field>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Receita do dia (R$)"><NumInput value={form.receita} onChange={set('receita')} /></Field>
-          <Field label="Nº de pedidos"><NumInput value={form.nPedidos} onChange={set('nPedidos')} /></Field>
-        </div>
+        <Field label="Receita do dia (puxada das Receitas)">
+          <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: '11px 12px' }}>
+            <div style={{ fontSize: 19, fontWeight: 800, color: totalRecForm > 0 ? C.green : C.faint, fontVariantNumeric: 'tabular-nums' }}>{brl(totalRecForm)}</div>
+            {recForm.length > 0
+              ? <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{Object.entries(porFonteForm).map(([f, v]) => `${f}: ${brl(v)}`).join(' · ')}</div>
+              : <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>Nada lançado em Receitas nesse dia. Lance na aba <b>Receitas</b> que aparece aqui automaticamente (soma todas as fontes, inclusive recebimentos atrasados).</div>}
+          </div>
+        </Field>
+        <Field label="Nº de pedidos"><NumInput value={form.nPedidos} onChange={set('nPedidos')} /></Field>
         {ticket > 0 && <div style={{ fontSize: 13, color: C.accent, margin: '-4px 0 12px', fontWeight: 600 }}>Ticket médio: {brl(ticket)}</div>}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Nº de pedidos fiados"><NumInput value={form.fiado} onChange={set('fiado')} placeholder="0" /></Field>
@@ -137,8 +156,8 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas }) {
               <div style={{ fontWeight: 700 }}>{fmtDate(d.data)} · {weekday(d.data)}</div>
               <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{d.clima && <span>{d.clima} · </span>}{d.evento || 'Sem evento'}</div>
               <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap', fontVariantNumeric: 'tabular-nums' }}>
-                <span style={{ color: C.green, fontWeight: 700 }}>{brl(num(d.receita))}</span>
-                {num(d.nPedidos) > 0 && <span style={{ color: C.muted, fontSize: 13 }}>{d.nPedidos} pedidos · tkt {brl(num(d.receita) / num(d.nPedidos))}</span>}
+                <span style={{ color: C.green, fontWeight: 700 }}>{brl(receitaExibida(d))}</span>
+                {num(d.nPedidos) > 0 && <span style={{ color: C.muted, fontSize: 13 }}>{d.nPedidos} pedidos · tkt {brl(receitaExibida(d) / num(d.nPedidos))}</span>}
                 {num(d.fiado) > 0 && <span style={{ color: C.amber, fontSize: 13 }}>{d.fiado} fiado{num(d.fiado) > 1 ? 's' : ''}</span>}
                 {d.nota && <span style={{ color: C.accent, fontSize: 13 }}>Nota {d.nota}</span>}
               </div>
