@@ -131,7 +131,7 @@ export default function Dashboard() {
 
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '18px 16px 60px' }}>
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} setTab={setTab} />}
-        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} />}
+        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} onChange={upd.compras} />}
