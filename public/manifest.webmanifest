@@ -1,7 +1,7 @@
 {
-  "name": "PicoOs — Central de Gestão",
-  "short_name": "PicoOs",
-  "description": "Painel de gestão do PicoOs: receitas, despesas, compras e relatórios.",
+  "name": "PicoOS — Central de Gestão",
+  "short_name": "PicoOS",
+  "description": "Painel de gestão do PicoOS: receitas, despesas, compras e relatórios.",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",

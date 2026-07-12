@@ -1,11 +1,11 @@
 export const metadata = {
-  title: 'PicoOs — Central de Gestão',
-  description: 'Painel de gestão do PicoOs',
+  title: 'PicoOS — Central de Gestão',
+  description: 'Painel de gestão do PicoOS',
   manifest: '/manifest.webmanifest',
-  applicationName: 'PicoOs',
+  applicationName: 'PicoOS',
   appleWebApp: {
     capable: true,
-    title: 'PicoOs',
+    title: 'PicoOS',
     statusBarStyle: 'black-translucent',
   },
   icons: {

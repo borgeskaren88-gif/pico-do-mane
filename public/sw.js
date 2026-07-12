@@ -1,4 +1,4 @@
-// Service worker enxuto do PicoOs.
+// Service worker enxuto do PicoOS.
 // Estratégia conservadora: SEMPRE tenta a rede primeiro (assim o site nunca
 // "trava" numa versão antiga) e só cai no cache quando está offline / sem
 // internet. As chamadas de dados (/api/...) nunca são cacheadas, pra não
