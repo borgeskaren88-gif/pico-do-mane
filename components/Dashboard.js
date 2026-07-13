@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { C, LogoMark } from './ui';
+import { C, LogoMark, pageBg } from './ui';
 import { ymOf, todayISO } from '../lib/util';
 import SEED_DATA from '../data/seed.json';
 
@@ -104,8 +104,8 @@ export default function Dashboard() {
   );
 
   return (
-    <div style={{ minHeight: '100vh', background: C.ink, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <div style={{ padding: '18px 16px 12px', borderBottom: `1px solid ${C.line}`, background: `linear-gradient(180deg, ${C.panel} 0%, ${C.ink} 100%)` }}>
+    <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <div style={{ padding: '18px 16px 12px', borderBottom: `1px solid ${C.line}55`, background: 'transparent' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <LogoMark size={42} radius={12} />
@@ -118,7 +118,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 16px', position: 'sticky', top: 0, background: C.ink, zIndex: 10, borderBottom: `1px solid ${C.line}` }}>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 16px', position: 'sticky', top: 0, background: 'rgba(8,13,24,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', zIndex: 10, borderBottom: `1px solid ${C.line}55` }}>
         {tabs.map(([id, nome]) => (
           <button key={id} onClick={() => setTab(id)} style={{
             flexShrink: 0, padding: '8px 15px', borderRadius: 999, fontSize: 14, fontWeight: 700, cursor: 'pointer',

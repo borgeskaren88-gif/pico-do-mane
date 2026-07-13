@@ -1,9 +1,14 @@
 export const C = {
-  ink: '#0A1220', panel: '#101B2E', panel2: '#17263F', raised: '#1D2E4B',
-  line: '#27395B', accent: '#4C93F5', accent2: '#7FB2FA',
+  ink: '#080D18', panel: '#0F1A2E', panel2: '#16243D', raised: '#1E2F4D',
+  line: '#243651', accent: '#3B86F5', accent2: '#6FB0FA',
   text: '#E9F0FB', muted: '#94A8C7', faint: '#5E7391',
   green: '#5BC98D', red: '#E9765C', amber: '#E7B24D',
 };
+
+// Fundo da página com profundidade: um brilho azul no topo por cima de um
+// leve degradê escuro, dando cara mais moderna que o preto chapado. O
+// cabeçalho translúcido deixa esse brilho aparecer atrás do logo.
+export const pageBg = `radial-gradient(1000px 560px at 50% -4%, rgba(59,134,245,0.30), rgba(59,134,245,0) 58%), linear-gradient(180deg, #0B1526 0%, ${C.ink} 55%)`;
 
 // Marca do app: mesma seta de crescimento em degradê azul do ícone da tela
 // inicial. `size` em px; `radius` é o arredondamento em px do quadrado.
