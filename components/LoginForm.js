@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { C, Card, Field, inputStyle, LogoMark } from './ui';
+import { C, Card, Field, inputStyle, LogoMark, pageBg } from './ui';
 
 export default function LoginForm() {
   const router = useRouter();
@@ -34,7 +34,7 @@ export default function LoginForm() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: C.ink, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ width: '100%', maxWidth: 360 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ width: 56, margin: '0 auto 14px' }}><LogoMark size={56} radius={16} /></div>
