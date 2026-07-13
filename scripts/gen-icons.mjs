@@ -18,10 +18,11 @@ const root = path.resolve(__dirname, '..');
 const outIcons = path.join(root, 'public', 'icons');
 fs.mkdirSync(outIcons, { recursive: true });
 
-// Ícone de gestão: fundo em degradê azul moderno + gráfico de barras em
-// crescimento com uma seta de tendência pra cima. Desenhado num quadro
-// 0..100 e escalado pro tamanho pedido. `maskable` reduz o símbolo pra
-// caber na "safe zone" (o launcher do Android recorta as bordas).
+// Ícone de gestão minimalista: fundo em degradê azul moderno (full-bleed —
+// o próprio sistema arredonda os cantos) + uma seta de crescimento pra cima.
+// Desenhado num quadro 0..100 e escalado pro tamanho pedido. `maskable`
+// reduz o símbolo pra caber na "safe zone" (o launcher do Android recorta
+// as bordas).
 const svg = (size, { maskable = false } = {}) => {
   const g = maskable
     ? 'translate(50 50) scale(0.78) translate(-50 -50)'
@@ -34,28 +35,18 @@ const svg = (size, { maskable = false } = {}) => {
       <stop offset="1"    stop-color="#38D2F0"/>
     </linearGradient>
     <radialGradient id="gloss" cx="0.28" cy="0.20" r="0.9">
-      <stop offset="0"   stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="0"   stop-color="#FFFFFF" stop-opacity="0.20"/>
       <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="1"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.80"/>
-    </linearGradient>
   </defs>
 
   <rect width="100" height="100" fill="url(#bg)"/>
   <rect width="100" height="100" fill="url(#gloss)"/>
 
-  <g transform="${g}" fill="url(#bar)">
-    <rect x="24" y="52" width="13" height="18" rx="3"/>
-    <rect x="43.5" y="42" width="13" height="28" rx="3"/>
-    <rect x="63" y="30" width="13" height="40" rx="3"/>
-  </g>
-
-  <g transform="${g}" fill="none" stroke="#FFFFFF" stroke-width="4"
+  <g transform="${g}" fill="none" stroke="#FFFFFF" stroke-width="9"
      stroke-linecap="round" stroke-linejoin="round">
-    <path d="M22 50 L44 40 L78 22"/>
-    <path d="M66 22 L78 22 L78 34"/>
+    <path d="M26 70 L74 30"/>
+    <path d="M58 30 L74 30 L74 46"/>
   </g>
 </svg>`;
 };
