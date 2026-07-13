@@ -5,6 +5,33 @@ export const C = {
   green: '#5BC98D', red: '#E9765C', amber: '#E7B24D',
 };
 
+// Marca do app: mesma seta de crescimento em degradê azul do ícone da tela
+// inicial. `size` em px; `radius` é o arredondamento em px do quadrado.
+export function LogoMark({ size = 42, radius = 12 }) {
+  const rx = (radius * 100) / size; // converte px -> unidades do viewBox 0..100
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" style={{ flexShrink: 0, display: 'block' }} aria-hidden="true">
+      <defs>
+        <linearGradient id="lm-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#1652E8" />
+          <stop offset="0.55" stopColor="#2C86F5" />
+          <stop offset="1" stopColor="#38D2F0" />
+        </linearGradient>
+        <radialGradient id="lm-gloss" cx="0.28" cy="0.2" r="0.9">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.2" />
+          <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="100" height="100" rx={rx} fill="url(#lm-bg)" />
+      <rect width="100" height="100" rx={rx} fill="url(#lm-gloss)" />
+      <g fill="none" stroke="#FFFFFF" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M26 70 L74 30" />
+        <path d="M58 30 L74 30 L74 46" />
+      </g>
+    </svg>
+  );
+}
+
 export const inputStyle = {
   width: '100%', background: C.panel2, border: `1px solid ${C.line}`, color: C.text,
   borderRadius: 10, padding: '11px 12px', fontSize: 15, outline: 'none', boxSizing: 'border-box',
