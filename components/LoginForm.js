@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { C, Card, Field, inputStyle } from './ui';
+import { C, Card, Field, inputStyle, LogoMark } from './ui';
 
 export default function LoginForm() {
   const router = useRouter();
@@ -37,7 +37,7 @@ export default function LoginForm() {
     <div style={{ minHeight: '100vh', background: C.ink, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ width: '100%', maxWidth: 360 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 16, background: `linear-gradient(135deg, ${C.accent}, ${C.accent2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#06101F', fontSize: 22, margin: '0 auto 14px' }}>PO</div>
+          <div style={{ width: 56, margin: '0 auto 14px' }}><LogoMark size={56} radius={16} /></div>
           <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '.02em' }}>PicoOS</div>
           <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 4, fontWeight: 600 }}>Central de Gestão</div>
         </div>
