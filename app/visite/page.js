@@ -53,6 +53,29 @@ const DESTAQUES = [
   { emoji: '⚽', nome: 'Todos os Jogos', desc: 'Telão ligado nos grandes jogos, com promoção rolando.' },
 ];
 
+// Blocos "foto + texto" da seção O Pico (edite os textos à vontade)
+const FEATURES = [
+  {
+    titulo: 'Sobe no Pico! 🌅',
+    texto:
+      'Se é pra curtir, que seja lá no alto. Chopp gelado, drink caprichado, ' +
+      'petisco na régua e a vista da baía que transforma qualquer fim de tarde ' +
+      'em história 🍻✨',
+    foto: '/galeria/fim-de-tarde.jpg',
+    alt: 'Fim de tarde no Pico do Mané com vista pra baía',
+  },
+  {
+    titulo: 'Aqui é Bar Favela 🇧🇷',
+    texto:
+      'Mais que um bar, o Pico é ponto de encontro. Arte de rua, música ao vivo, ' +
+      'futebol no telão e a energia da favela lá no alto — a verdadeira essência ' +
+      'de Floripa, do começo ao fim ✨',
+    foto: '/galeria/bar-favela.jpg',
+    alt: 'Arte de rua — a alma do Bar Favela',
+    rev: true,
+  },
+];
+
 // Fotos da galeria (troque/adicione arquivos em public/galeria e edite aqui)
 const GALERIA = [
   { src: '/galeria/por-do-sol.jpg', alt: 'Pôr do sol com taça na varanda do Pico do Mané' },
@@ -163,6 +186,22 @@ const css = `
   .pv .story-text p { color: var(--muted); font-size: 18px; margin-bottom: 18px; }
   .pv .story-text p:first-child { color: var(--ink); font-size: 22px; font-weight: 700; }
   @media (max-width: 760px) { .pv .story { grid-template-columns: 1fr; gap: 8px; } }
+
+  /* BLOCOS FOTO + TEXTO (estilo alternado) */
+  .pv .features { margin-top: 40px; }
+  .pv .feature { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+  .pv .feature + .feature { margin-top: 60px; }
+  .pv .feature .fphoto { border-radius: 22px; overflow: hidden; box-shadow: var(--shadow); aspect-ratio: 4/5; }
+  .pv .feature .fphoto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pv .feature h3 { font-size: clamp(26px, 4vw, 38px); font-weight: 900; color: var(--accent); line-height: 1.06; letter-spacing: -0.01em; }
+  .pv .feature p { color: var(--muted); font-size: 18px; line-height: 1.6; margin-top: 16px; }
+  .pv .feature.rev .fphoto { order: 2; }
+  @media (max-width: 760px) {
+    .pv .feature { grid-template-columns: 1fr; gap: 22px; }
+    .pv .feature + .feature { margin-top: 44px; }
+    .pv .feature.rev .fphoto { order: 0; }
+    .pv .feature .fphoto { aspect-ratio: 16/11; }
+  }
 
   /* DESTAQUES GRID */
   .pv .grid { display: grid; gap: 18px; margin-top: 40px; }
@@ -285,15 +324,19 @@ export default function Visite() {
       {/* O PICO / HISTÓRIA */}
       <section id="o-pico" style={{ background: 'var(--bg2)' }}>
         <div className="wrap">
-          <div className="story">
-            <div className="story-side">
-              <div className="kicker">O Pico</div>
-              <h2>Nossa história</h2>
-              <div className="shot story-photo"><img src="/galeria/bar-favela.jpg" alt="Arte de rua — a alma do Bar Favela" loading="lazy" /></div>
-            </div>
-            <div className="story-text">
-              {BAR.historia.map((p, i) => <p key={i}>{p}</p>)}
-            </div>
+          <div className="kicker">O Pico</div>
+          <h2>Nossa história</h2>
+          <p className="lead">{BAR.historia[0]}</p>
+          <div className="features">
+            {FEATURES.map((f) => (
+              <div className={`feature${f.rev ? ' rev' : ''}`} key={f.titulo}>
+                <div className="fphoto"><img src={f.foto} alt={f.alt} loading="lazy" /></div>
+                <div className="ftext">
+                  <h3>{f.titulo}</h3>
+                  <p>{f.texto}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
