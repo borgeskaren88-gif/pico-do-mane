@@ -77,6 +77,8 @@ const css = `
     --bg: #15110C; --bg2: #1E1810; --card: #241D14; --line: #3A2F1F;
     --gold: #E7B24D; --gold2: #F5CC6E; --cream: #F6EEE0; --muted: #C3B199; --faint: #8A7A62;
     --coral: #E9765C;
+    /* Azul do Pico (mesma cor do app PicoOS) — usado nos botões de ação */
+    --blue: #2C86F5; --blue2: #1652E8;
     background: var(--bg); color: var(--cream);
     font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     line-height: 1.5; -webkit-font-smoothing: antialiased;
@@ -101,7 +103,7 @@ const css = `
   .pv .navlinks { display: flex; gap: 22px; font-size: 14px; font-weight: 600; color: var(--muted); }
   .pv .navlinks a:hover { color: var(--gold); }
   .pv .navcta {
-    background: var(--gold); color: #241800; font-weight: 800; font-size: 13px;
+    background: linear-gradient(135deg, var(--blue2), var(--blue)); color: #fff; font-weight: 800; font-size: 13px;
     padding: 9px 16px; border-radius: 999px; white-space: nowrap;
   }
   @media (max-width: 720px) { .pv .navlinks { display: none; } }
@@ -130,7 +132,7 @@ const css = `
     transition: transform .12s ease;
   }
   .pv .btn:hover { transform: translateY(-2px); }
-  .pv .btn-gold { background: var(--gold); color: #241800; }
+  .pv .btn-gold { background: linear-gradient(135deg, var(--blue2), var(--blue)); color: #fff; box-shadow: 0 6px 20px rgba(44,134,245,0.35); }
   .pv .btn-ghost { background: transparent; color: var(--cream); border-color: var(--line); }
   .pv .btn-whats { background: #25D366; color: #062b12; }
 
