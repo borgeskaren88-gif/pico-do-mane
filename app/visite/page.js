@@ -94,12 +94,8 @@ const css = `
     border-bottom: 1px solid var(--line);
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
   }
-  .pv .brand { display: flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: .01em; }
-  .pv .brand .mark {
-    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
-    background: linear-gradient(135deg, var(--gold), var(--gold2));
-    display: flex; align-items: center; justify-content: center; font-size: 18px;
-  }
+  .pv .brand { display: flex; align-items: center; }
+  .pv .nav-logo { height: 30px; width: auto; display: block; }
   .pv .navlinks { display: flex; gap: 22px; font-size: 14px; font-weight: 600; color: var(--muted); }
   .pv .navlinks a:hover { color: var(--gold); }
   .pv .navcta {
@@ -113,18 +109,16 @@ const css = `
     position: relative; min-height: 82vh; display: flex; align-items: center;
     padding: 80px 0 64px;
     background:
-      radial-gradient(900px 500px at 70% 10%, rgba(231,178,77,0.18), transparent 60%),
-      linear-gradient(180deg, rgba(21,17,12,0.35) 0%, rgba(21,17,12,0.9) 85%, var(--bg) 100%),
-      repeating-linear-gradient(135deg, #241D14 0 22px, #201A11 22px 44px);
+      linear-gradient(180deg, rgba(12,9,6,0.42) 0%, rgba(12,9,6,0.68) 68%, var(--bg) 100%),
+      url('/hero-vista.jpg') center 32% / cover no-repeat;
     text-align: center;
   }
   .pv .hero .eyebrow {
     color: var(--gold); font-weight: 800; letter-spacing: .22em; text-transform: uppercase;
-    font-size: 13px; margin-bottom: 18px;
+    font-size: 13px; margin-bottom: 22px;
   }
-  .pv .hero h1 { font-size: clamp(44px, 11vw, 92px); font-weight: 900; line-height: 0.98; letter-spacing: -0.02em; }
-  .pv .hero h1 span { color: var(--gold); display: block; }
-  .pv .hero p.sub { color: var(--muted); font-size: clamp(16px, 2.4vw, 21px); margin: 20px auto 0; max-width: 620px; }
+  .pv .hero-logo { width: min(560px, 86vw); height: auto; filter: drop-shadow(0 8px 30px rgba(0,0,0,0.6)); }
+  .pv .hero p.sub { color: var(--cream); font-size: clamp(17px, 2.4vw, 22px); margin: 22px auto 0; max-width: 620px; text-shadow: 0 2px 12px rgba(0,0,0,0.6); }
   .pv .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 34px; }
   .pv .btn {
     padding: 14px 26px; border-radius: 999px; font-weight: 800; font-size: 15px;
@@ -200,7 +194,7 @@ const css = `
     border-top: 1px solid var(--line); padding: 48px 0 calc(40px + env(safe-area-inset-bottom));
     text-align: center; color: var(--faint);
   }
-  .pv footer .fbrand { font-size: 24px; font-weight: 900; color: var(--cream); }
+  .pv footer .foot-logo { height: 56px; width: auto; }
   .pv footer .social { display: flex; gap: 14px; justify-content: center; margin: 20px 0; }
   .pv footer .social a { color: var(--muted); font-weight: 700; font-size: 14px; border: 1px solid var(--line); padding: 9px 16px; border-radius: 999px; }
   .pv footer .social a:hover { color: var(--gold); border-color: var(--gold); }
@@ -217,7 +211,7 @@ export default function Visite() {
       {/* NAV */}
       <nav>
         <a className="brand" href="#topo">
-          <span className="mark">🍻</span> {BAR.nome}
+          <img className="nav-logo" src="/logo-pico.png" alt="Pico do Mané — Bar Favela" />
         </a>
         <div className="navlinks">
           <a href="#o-pico">O Pico</a>
@@ -231,9 +225,9 @@ export default function Visite() {
       {/* HERO */}
       <header className="hero" id="topo">
         <div className="wrap">
-          <div className="eyebrow">Bar · Chopp · Petiscos · Ao vivo</div>
-          <h1>{BAR.nome}<span>é aqui.</span></h1>
-          <p className="sub">{BAR.tagline}. {BAR.descricao}</p>
+          <div className="eyebrow">Florianópolis · Vista pra baía</div>
+          <img className="hero-logo" src="/logo-pico.png" alt="Pico do Mané — Bar Favela" />
+          <p className="sub">{BAR.tagline}.</p>
           <div className="cta-row">
             <a className="btn btn-gold" href="#cardapio">Ver o cardápio</a>
             <a className="btn btn-whats" href={linkWhats} target="_blank" rel="noopener">💬 Reservar no WhatsApp</a>
@@ -339,7 +333,7 @@ export default function Visite() {
       {/* FOOTER */}
       <footer>
         <div className="wrap">
-          <div className="fbrand">🍻 {BAR.nome}</div>
+          <img className="foot-logo" src="/logo-pico.png" alt="Pico do Mané — Bar Favela" />
           <div className="social">
             <a href={linkInsta} target="_blank" rel="noopener">Instagram @{BAR.instagram}</a>
             <a href={linkWhats} target="_blank" rel="noopener">WhatsApp</a>
