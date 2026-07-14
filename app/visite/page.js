@@ -195,6 +195,28 @@ const css = `
   .pv .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
   @media (max-width: 560px) { .pv .gallery { grid-template-columns: 1fr 1fr; } }
 
+  /* CAPA DA GALERIA — clique para abrir ("Viva Florianópolis...") */
+  .pv .viva-wrap { margin-top: 36px; }
+  .pv .viva-wrap > summary { list-style: none; cursor: pointer; }
+  .pv .viva-wrap > summary::-webkit-details-marker { display: none; }
+  .pv .viva {
+    position: relative; border-radius: 24px; overflow: hidden;
+    min-height: 340px; display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 56px 24px; box-shadow: var(--shadow);
+    transition: filter .2s ease;
+    background:
+      linear-gradient(180deg, rgba(8,7,10,0.30) 0%, rgba(8,7,10,0.64) 100%),
+      url('/galeria/floripa-noite.jpg') center 42% / cover no-repeat;
+  }
+  .pv .viva:hover { filter: brightness(1.07); }
+  .pv .viva .k { color: #FFE39A; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; font-size: 12px; margin-bottom: 14px; }
+  .pv .viva h3 { color: #fff; font-size: clamp(26px, 4.6vw, 42px); font-weight: 900; letter-spacing: -0.01em; line-height: 1.1; max-width: 640px; margin: 0 auto; text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
+  .pv .viva-cta { display: inline-block; margin-top: 22px; background: rgba(255,255,255,0.92); color: #23201C; font-weight: 800; font-size: 14px; padding: 11px 22px; border-radius: 999px; }
+  .pv .viva-cta::after { content: 'Ver a galeria  ↓'; }
+  .pv .viva-wrap[open] .viva-cta::after { content: 'Fechar galeria  ↑'; }
+  .pv .viva-wrap[open] .viva { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .pv .viva-wrap[open] .gallery { margin-top: 14px; }
+
   /* VISITE (info) */
   .pv .info { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 40px; }
   .pv .panel { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 28px; box-shadow: var(--shadow); }
@@ -311,13 +333,24 @@ export default function Visite() {
           <div className="kicker">Fotos</div>
           <h2>Um lugar pra ficar até tarde</h2>
           <p className="lead">Fotos do bar, dos drinks e das noites de música ao vivo.</p>
-          <div className="gallery">
-            {GALERIA.map((g) => (
-              <div className="shot" key={g.src}>
-                <img src={g.src} alt={g.alt} loading="lazy" />
+          <details className="viva-wrap">
+            <summary>
+              <div className="viva">
+                <div>
+                  <div className="k">Do alto do Pico</div>
+                  <h3>Viva Florianópolis de outra perspectiva</h3>
+                  <span className="viva-cta" aria-hidden="true"></span>
+                </div>
               </div>
-            ))}
-          </div>
+            </summary>
+            <div className="gallery">
+              {GALERIA.map((g) => (
+                <div className="shot" key={g.src}>
+                  <img src={g.src} alt={g.alt} loading="lazy" />
+                </div>
+              ))}
+            </div>
+          </details>
         </div>
       </section>
 
