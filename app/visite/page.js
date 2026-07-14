@@ -53,6 +53,16 @@ const DESTAQUES = [
   { emoji: '⚽', nome: 'Todos os Jogos', desc: 'Telão ligado nos grandes jogos, com promoção rolando.' },
 ];
 
+// Fotos da galeria (troque/adicione arquivos em public/galeria e edite aqui)
+const GALERIA = [
+  { src: '/galeria/por-do-sol.jpg', alt: 'Pôr do sol com taça na varanda do Pico do Mané' },
+  { src: '/galeria/fim-de-tarde.jpg', alt: 'Fim de tarde no Pico do Mané com vista pra baía' },
+  { src: '/galeria/a-galera.jpg', alt: 'Amigas curtindo o dia no Pico do Mané' },
+  { src: '/galeria/floripa-noite.jpg', alt: 'Vista de Florianópolis e a ponte Hercílio Luz à noite' },
+  { src: '/hero-vista.jpg', alt: 'A vista da baía a partir do Pico' },
+  { src: '/galeria/bar-favela.jpg', alt: 'Arte de rua — a alma do Bar Favela' },
+];
+
 // Promoções recorrentes (edite à vontade)
 const PROMOS = [
   { nome: 'Chopp em Dobro', quando: 'Pergunte o dia' },
@@ -179,12 +189,10 @@ const css = `
   /* GALERIA */
   .pv .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 40px; }
   .pv .shot {
-    aspect-ratio: 1/1; border-radius: 20px; border: 1px solid var(--line);
-    background: #F1ECE3;
-    display: flex; align-items: center; justify-content: center; text-align: center;
-    color: var(--faint); font-size: 13px; font-weight: 600; padding: 12px; box-shadow: var(--shadow);
+    position: relative; aspect-ratio: 1/1; border-radius: 20px; overflow: hidden;
+    background: #F1ECE3; box-shadow: var(--shadow);
   }
-  .pv .shot span { font-size: 30px; display: block; margin-bottom: 8px; }
+  .pv .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
   @media (max-width: 560px) { .pv .gallery { grid-template-columns: 1fr 1fr; } }
 
   /* VISITE (info) */
@@ -259,7 +267,7 @@ export default function Visite() {
             <div className="story-side">
               <div className="kicker">O Pico</div>
               <h2>Nossa história</h2>
-              <div className="shot story-photo"><div><span>📸</span>Foto do bar / equipe</div></div>
+              <div className="shot story-photo"><img src="/galeria/bar-favela.jpg" alt="Arte de rua — a alma do Bar Favela" loading="lazy" /></div>
             </div>
             <div className="story-text">
               {BAR.historia.map((p, i) => <p key={i}>{p}</p>)}
@@ -304,9 +312,9 @@ export default function Visite() {
           <h2>Um lugar pra ficar até tarde</h2>
           <p className="lead">Fotos do bar, dos drinks e das noites de música ao vivo.</p>
           <div className="gallery">
-            {['Fachada / ambiente', 'Chopp & drinks', 'Petiscos', 'Música ao vivo', 'A galera', 'Noite de jogo'].map((label) => (
-              <div className="shot" key={label}>
-                <div><span>📸</span>{label}</div>
+            {GALERIA.map((g) => (
+              <div className="shot" key={g.src}>
+                <img src={g.src} alt={g.alt} loading="lazy" />
               </div>
             ))}
           </div>
