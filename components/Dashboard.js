@@ -87,6 +87,14 @@ export default function Dashboard() {
     tarefas: (v) => { setTarefas(v); salvarTudo({ tarefas: v }); },
   };
 
+  // Aplica mudanças em compras E despesas numa tacada só (usado ao marcar/
+  // desfazer pagamento de contas), pra um save não sobrescrever o outro.
+  const aplicarComprasDespesas = (novasCompras, novasDespesas) => {
+    setCompras(novasCompras);
+    setDespesas(novasDespesas);
+    salvarTudo({ compras: novasCompras, despesas: novasDespesas });
+  };
+
   const sair = async () => {
     await fetch('/api/logout', { method: 'POST' });
     router.push('/');
@@ -135,7 +143,7 @@ export default function Dashboard() {
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} onChange={upd.compras} />}
-        {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} />}
+        {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}

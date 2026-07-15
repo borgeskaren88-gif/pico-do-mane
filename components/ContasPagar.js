@@ -6,7 +6,7 @@ import { brl, num, todayISO, fmtDate, addDays, uid, montarParcelas, CATEGORIAS_P
 const formVazio = () => ({ fornecedor: '', descricao: '', categoria: '', valorTotal: '', parcelas: '1' });
 const linhaVazia = () => [{ vencimento: todayISO(), valor: '' }];
 
-export default function ContasPagar({ dados, onChange }) {
+export default function ContasPagar({ dados, onChange, despesas = [], onPagamento }) {
   const hoje = todayISO();
   const [form, setForm] = useState(formVazio());
   const [parcelas, setParcelas] = useState(linhaVazia());
@@ -63,7 +63,49 @@ export default function ContasPagar({ dados, onChange }) {
   const vencidasGrupos = grupos.filter((g) => g.vencimento && g.vencimento < hoje);
   const totalVenc = vencidasGrupos.reduce((s, g) => s + g.total, 0);
   const proximas = grupos.filter((g) => g.vencimento && g.vencimento >= hoje && g.vencimento <= addDays(hoje, 7));
-  const pagarGrupo = (g) => { const ids = new Set(g.itens.map((x) => x.id)); onChange(dados.map((x) => ids.has(x.id) ? { ...x, pago: 'Sim', dataPagamento: hoje } : x)); };
+
+  // Marcar como pago: baixa a conta E lança a despesa automaticamente (pra não
+  // esquecer de anotar). Guarda o id da despesa em cada item, pra permitir
+  // desfazer depois removendo exatamente essa despesa.
+  const pagarGrupo = (g) => {
+    const ids = new Set(g.itens.map((x) => x.id));
+    const despId = uid();
+    const despesa = {
+      id: despId, data: hoje, categoria: 'Fornecedores de insumo',
+      descricao: [g.fornecedor, g.nota && `Nota ${g.nota}`].filter(Boolean).join(' · ') || (g.itens[0].produto || 'Conta paga'),
+      valor: g.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      obs: 'Baixa de conta a pagar' + (g.itens.length > 1 ? ` · ${g.itens.length} itens` : ''),
+      origem: 'conta-a-pagar',
+    };
+    const novasCompras = dados.map((x) => ids.has(x.id) ? { ...x, pago: 'Sim', dataPagamento: hoje, despesaId: despId } : x);
+    onPagamento(novasCompras, [despesa, ...despesas]);
+  };
+
+  // Desfazer: volta a conta pra "em aberto" e remove a despesa lançada
+  // automaticamente (se houver).
+  const desfazerGrupo = (g) => {
+    const ids = new Set(g.itens.map((x) => x.id));
+    const despIds = new Set(g.itens.map((x) => x.despesaId).filter(Boolean));
+    const novasCompras = dados.map((x) => ids.has(x.id) ? { ...x, pago: 'Não', dataPagamento: '', despesaId: '' } : x);
+    const novasDespesas = despIds.size ? despesas.filter((d) => !despIds.has(d.id)) : despesas;
+    onPagamento(novasCompras, novasDespesas);
+  };
+
+  // Contas já pagas, agrupadas e mais recentes primeiro (pra desfazer).
+  const pagosGrupos = useMemo(() => {
+    const map = new Map();
+    for (const d of dados) {
+      if (d.pago !== 'Sim') continue;
+      const chave = d.despesaId ? `d:${d.despesaId}` : `p:${d.dataPagamento || ''}|${(d.fornecedor || '').trim().toLowerCase()}|${(d.nota || '').trim()}`;
+      let g = map.get(chave);
+      if (!g) { g = { chave, fornecedor: d.fornecedor, nota: (d.nota || '').trim(), dataPagamento: d.dataPagamento, itens: [], total: 0, despesaIds: new Set(), auto: false }; map.set(chave, g); }
+      g.itens.push(d);
+      g.total += num(d.quantidade) * num(d.valorUnit);
+      if (d.despesaId) { g.despesaIds.add(d.despesaId); g.auto = true; }
+      if (d.dataPagamento && (!g.dataPagamento || d.dataPagamento > g.dataPagamento)) g.dataPagamento = d.dataPagamento;
+    }
+    return [...map.values()].sort((a, b) => (b.dataPagamento || '').localeCompare(a.dataPagamento || ''));
+  }, [dados]);
 
   return (
     <div>
@@ -117,6 +159,9 @@ export default function ContasPagar({ dados, onChange }) {
       )}
 
       <SecTitle>Contas em aberto ({grupos.length})</SecTitle>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: -6, marginBottom: 10 }}>
+        Ao marcar como pago, a conta também é lançada automaticamente em Despesas.
+      </div>
       {grupos.length === 0 ? <Empty>Nenhuma conta em aberto. 🎉<br />Tudo pago por aqui.</Empty> :
         grupos.map((g) => {
           const vencida = g.vencimento && g.vencimento < hoje;
@@ -146,6 +191,36 @@ export default function ContasPagar({ dados, onChange }) {
             </Card>
           );
         })}
+
+      {pagosGrupos.length > 0 && (
+        <details style={{ marginTop: 20 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 600, padding: '4px 0' }}>
+            Contas pagas ({pagosGrupos.length}) — toque para ver / desfazer
+          </summary>
+          <div style={{ marginTop: 12 }}>
+            {pagosGrupos.slice(0, 30).map((g) => (
+              <Card key={g.chave} style={{ marginBottom: 8, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{g.fornecedor || g.itens[0].produto || 'Conta'}</div>
+                    <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                      {g.itens.length > 1 ? `${g.itens.length} itens` : (g.itens[0].produto || '')}{g.nota ? ` · Nota ${g.nota}` : ''}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
+                      {g.dataPagamento ? `Pago em ${fmtDate(g.dataPagamento)}` : 'Pago'}{g.auto ? ' · lançado em Despesas' : ''}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(g.total)}</div>
+                    <div style={{ marginTop: 8 }}><Btn kind="ghost" small onClick={() => desfazerGrupo(g)}>↩ Desfazer</Btn></div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+            {pagosGrupos.length > 30 && <div style={{ fontSize: 12, color: C.faint, textAlign: 'center', marginTop: 6 }}>Mostrando as 30 mais recentes.</div>}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
