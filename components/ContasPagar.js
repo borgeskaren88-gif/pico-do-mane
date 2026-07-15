@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, SecTitle } from './ui';
-import { brl, num, todayISO, fmtDate, addDays, uid, montarParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
+import { brl, num, todayISO, fmtDate, addDays, uid, limparNome, montarParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
 
 const formVazio = () => ({ fornecedor: '', descricao: '', categoria: '', valorTotal: '', parcelas: '1' });
 const linhaVazia = () => [{ vencimento: todayISO(), valor: '' }];
@@ -31,7 +31,7 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
   const registrar = () => {
     if (!form.fornecedor || !form.descricao) return;
     const novas = parcelas.map((p, i) => ({
-      id: uid(), data: hoje, produto: form.descricao, fornecedor: form.fornecedor,
+      id: uid(), data: hoje, produto: limparNome(form.descricao), fornecedor: limparNome(form.fornecedor),
       categoria: form.categoria, quantidade: '1', valorUnit: p.valor || '0',
       formaPagto: 'Prazo', prazoDias: '', vencimento: p.vencimento, pago: 'Não',
       dataPagamento: '', obs: nParcelas > 1 ? `Parcela ${i + 1}/${nParcelas}` : '',
