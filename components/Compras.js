@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
-import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, montarParcelas, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, limparNome, montarParcelas, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 const compraVazia = () => ({
   data: todayISO(), produto: '', fornecedor: '', quantidade: '', valorUnit: '', categoria: '',
@@ -54,7 +54,7 @@ export default function Compras({ dados, cotacoes, onChange }) {
     if (parcelado) {
       const n = parcelasList.length;
       const novas = parcelasList.map((p, i) => ({
-        id: uid(), data: form.data, produto: form.produto, fornecedor: form.fornecedor,
+        id: uid(), data: form.data, produto: limparNome(form.produto), fornecedor: limparNome(form.fornecedor),
         categoria: form.categoria, quantidade: '1', valorUnit: p.valor || '0',
         formaPagto: 'Prazo', prazoDias: '', vencimento: p.vencimento, pago: 'Não',
         dataPagamento: '', obs: [`Parcela ${i + 1}/${n}`, form.obs].filter(Boolean).join(' · '), nota: form.nota,
@@ -67,7 +67,7 @@ export default function Compras({ dados, cotacoes, onChange }) {
     let venc = form.vencimento;
     if (!venc && form.formaPagto === 'Prazo' && form.prazoDias) venc = addDays(form.data, form.prazoDias);
     if (!venc && form.formaPagto === 'À vista') venc = form.data;
-    const rec = { ...form, vencimento: venc };
+    const rec = { ...form, produto: limparNome(form.produto), fornecedor: limparNome(form.fornecedor), vencimento: venc };
     if (editId) { onChange(dados.map((d) => d.id === editId ? { ...rec, id: editId } : d)); limpar(); }
     else { onChange([{ ...rec, id: uid() }, ...dados]); proximoItem(); }
   };
@@ -178,7 +178,7 @@ export default function Compras({ dados, cotacoes, onChange }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 15 }}>{d.produto}</div>
-                  <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{d.fornecedor} · {fmtDate(d.data)}</div>
+                  <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{limparNome(d.fornecedor)} · {fmtDate(d.data)}</div>
                   <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
                     {num(d.quantidade)} × {brl(num(d.valorUnit))} · {d.formaPagto}
                     {d.vencimento && d.formaPagto === 'Prazo' ? ` · vence ${fmtDate(d.vencimento)}` : ''}

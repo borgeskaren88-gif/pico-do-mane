@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { C, Card, Btn, KPI, Area, inputStyle } from './ui';
-import { todayISO, num, brl, ymOf, mesLabel, weekday, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
+import { todayISO, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
 import SEED_DATA from '../data/seed.json';
 
 // Monta um relatório em texto (Markdown) para análise: um RESUMO com os
@@ -59,7 +59,7 @@ function montarAnalise(all) {
 
   // Maiores fornecedores (compras)
   const fMap = new Map();
-  for (const c of all.compras) fMap.set(c.fornecedor || 'Sem fornecedor', (fMap.get(c.fornecedor || 'Sem fornecedor') || 0) + totalCompra(c));
+  for (const c of all.compras) { const f = limparNome(c.fornecedor) || 'Sem fornecedor'; fMap.set(f, (fMap.get(f) || 0) + totalCompra(c)); }
   L.push('### Maiores fornecedores (por compras)', '', '| Fornecedor | Total |', '|---|---|');
   for (const [k, v] of [...fMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)) L.push(`| ${k} | ${brl(v)} |`);
   L.push('');
