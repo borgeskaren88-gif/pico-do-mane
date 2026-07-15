@@ -56,20 +56,20 @@ const DESTAQUES = [
 // Blocos "foto + texto" da seção O Pico (edite os textos à vontade)
 const FEATURES = [
   {
-    titulo: 'Sobe no Pico! 🌅',
+    titulo: 'Sobe no Pico!',
     texto:
       'Se é pra curtir, que seja lá no alto. Chopp gelado, drink caprichado, ' +
       'petisco na régua e a vista da baía que transforma qualquer fim de tarde ' +
-      'em história 🍻✨',
+      'em história.',
     foto: '/galeria/fim-de-tarde.jpg',
     alt: 'Fim de tarde no Pico do Mané com vista pra baía',
   },
   {
-    titulo: 'Aqui é Bar Favela 🇧🇷',
+    titulo: 'Aqui é Bar Favela',
     texto:
       'Mais que um bar, o Pico é ponto de encontro. Arte de rua, música ao vivo, ' +
       'futebol no telão e a energia da favela lá no alto — a verdadeira essência ' +
-      'de Floripa, do começo ao fim ✨',
+      'de Floripa, do começo ao fim.',
     foto: '/galeria/bar-favela.jpg',
     alt: 'Arte de rua — a alma do Bar Favela',
     rev: true,
@@ -193,8 +193,8 @@ const css = `
   .pv .feature + .feature { margin-top: 60px; }
   .pv .feature .fphoto { border-radius: 22px; overflow: hidden; box-shadow: var(--shadow); aspect-ratio: 4/5; }
   .pv .feature .fphoto img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .pv .feature h3 { font-size: clamp(26px, 4vw, 38px); font-weight: 900; color: var(--accent); line-height: 1.06; letter-spacing: -0.01em; }
-  .pv .feature p { color: var(--muted); font-size: 18px; line-height: 1.6; margin-top: 16px; }
+  .pv .feature h3 { font-size: clamp(28px, 4.4vw, 42px); font-weight: 900; color: var(--accent); line-height: 1.06; letter-spacing: -0.01em; }
+  .pv .feature p { color: var(--muted); font-size: 21px; line-height: 1.62; margin-top: 18px; }
   .pv .feature.rev .fphoto { order: 2; }
   @media (max-width: 760px) {
     .pv .feature { grid-template-columns: 1fr; gap: 22px; }
