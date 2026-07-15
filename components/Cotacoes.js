@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
-import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, limparNome, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Cotacoes({ dados, onChange }) {
   const vazio = { data: todayISO(), produto: '', fornecedor: '', preco: '', categoria: '' };
@@ -10,7 +10,7 @@ export default function Cotacoes({ dados, onChange }) {
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
   const salvar = () => {
     if (!form.produto || !form.fornecedor || !form.preco) return;
-    onChange([{ ...form, id: uid() }, ...dados]);
+    onChange([{ ...form, produto: limparNome(form.produto), fornecedor: limparNome(form.fornecedor), id: uid() }, ...dados]);
     setForm({ ...vazio, produto: form.produto, categoria: form.categoria });
   };
   const excluir = (id) => onChange(dados.filter((d) => d.id !== id));
@@ -18,8 +18,8 @@ export default function Cotacoes({ dados, onChange }) {
   const grupos = useMemo(() => {
     const g = {};
     dados.forEach((d) => {
-      const key = d.produto.trim().toLowerCase();
-      if (!g[key]) g[key] = { nome: d.produto, categoria: d.categoria, registros: [] };
+      const key = limparNome(d.produto).toLowerCase();
+      if (!g[key]) g[key] = { nome: limparNome(d.produto), categoria: d.categoria, registros: [] };
       g[key].registros.push(d);
     });
     return Object.values(g).map((grp) => {
@@ -27,7 +27,7 @@ export default function Cotacoes({ dados, onChange }) {
       const menor = Math.min(...precos), maior = Math.max(...precos);
       const melhor = grp.registros.find((r) => num(r.preco) === menor);
       const variacao = menor ? ((maior - menor) / menor) * 100 : 0;
-      return { ...grp, menor, maior, variacao, melhorFornecedor: melhor?.fornecedor };
+      return { ...grp, menor, maior, variacao, melhorFornecedor: limparNome(melhor?.fornecedor) };
     }).filter((grp) => grp.nome.toLowerCase().includes(busca.toLowerCase())).sort((a, b) => b.variacao - a.variacao);
   }, [dados, busca]);
 
@@ -70,7 +70,7 @@ export default function Cotacoes({ dados, onChange }) {
             <div style={{ marginTop: 10, borderTop: `1px solid ${C.line}`, paddingTop: 8 }}>
               {grp.registros.sort((a, b) => num(a.preco) - num(b.preco)).map((r) => (
                 <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '3px 0', color: C.muted }}>
-                  <span>{r.fornecedor} <span style={{ color: C.faint }}>· {fmtDate(r.data)}</span></span>
+                  <span>{limparNome(r.fornecedor)} <span style={{ color: C.faint }}>· {fmtDate(r.data)}</span></span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <b style={{ color: num(r.preco) === grp.menor ? C.green : C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(num(r.preco))}</b>
                     <button onClick={() => excluir(r.id)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 15 }}>×</button>

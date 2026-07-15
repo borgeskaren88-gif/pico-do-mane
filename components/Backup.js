@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { C, Card, Btn, KPI, Area, inputStyle } from './ui';
-import { todayISO, num, brl, ymOf, mesLabel, weekday, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
+import { todayISO, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
 import SEED_DATA from '../data/seed.json';
 
 // Monta um relatório em texto (Markdown) para análise: um RESUMO com os
@@ -59,7 +59,7 @@ function montarAnalise(all) {
 
   // Maiores fornecedores (compras)
   const fMap = new Map();
-  for (const c of all.compras) fMap.set(c.fornecedor || 'Sem fornecedor', (fMap.get(c.fornecedor || 'Sem fornecedor') || 0) + totalCompra(c));
+  for (const c of all.compras) { const f = limparNome(c.fornecedor) || 'Sem fornecedor'; fMap.set(f, (fMap.get(f) || 0) + totalCompra(c)); }
   L.push('### Maiores fornecedores (por compras)', '', '| Fornecedor | Total |', '|---|---|');
   for (const [k, v] of [...fMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)) L.push(`| ${k} | ${brl(v)} |`);
   L.push('');
@@ -156,6 +156,27 @@ export default function Backup({ all, restore }) {
     try { restore(JSON.parse(importText)); setMsg('Dados restaurados com sucesso.'); setImportText(''); }
     catch { setMsg('JSON inválido. Cole exatamente o conteúdo de um backup.'); }
   };
+  // Restaurar escolhendo o arquivo .json direto (sem precisar copiar e colar).
+  const escolherArquivo = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const texto = String(reader.result || '');
+      try {
+        const dados = JSON.parse(texto);
+        const n = ['diario', 'receitas', 'despesas', 'compras', 'cotacoes', 'garrafas']
+          .reduce((s, k) => s + (Array.isArray(dados[k]) ? dados[k].length : 0), 0);
+        setImportText(texto);
+        setMsg(`Arquivo "${file.name}" carregado (${n} registros). Confira e clique em "Restaurar dados".`);
+      } catch {
+        setMsg('Esse arquivo não é um backup válido (JSON). Verifique se escolheu o arquivo certo.');
+      }
+    };
+    reader.onerror = () => setMsg('Não consegui ler o arquivo. Tente de novo.');
+    reader.readAsText(file);
+    e.target.value = '';
+  };
   const [confirmarRecarregar, setConfirmarRecarregar] = useState(false);
   const recarregarOriginais = () => {
     if (!confirmarRecarregar) { setConfirmarRecarregar(true); return; }
@@ -235,9 +256,18 @@ export default function Backup({ all, restore }) {
 
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>Restaurar backup</div>
-        <div style={{ fontSize: 13, color: C.muted, marginBottom: 10 }}>Cole o conteúdo de um backup JSON. Atenção: substitui os dados atuais.</div>
-        <Area value={importText} onChange={setImportText} rows={4} placeholder='{ "diario": [...], "receitas": [...] }' />
-        <div style={{ marginTop: 10 }}><Btn kind="ghost" onClick={importar}>Restaurar dados</Btn></div>
+        <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>O jeito fácil: escolha o arquivo <b>.json</b> do backup. Atenção: substitui os dados atuais.</div>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: C.accent, color: '#06101F', borderRadius: 10, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+          📂 Escolher arquivo de backup
+          <input type="file" accept=".json,application/json" onChange={escolherArquivo} style={{ display: 'none' }} />
+        </label>
+        <details style={{ marginTop: 12 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, color: C.muted, fontWeight: 600 }}>Ou colar o conteúdo manualmente</summary>
+          <div style={{ marginTop: 10 }}>
+            <Area value={importText} onChange={setImportText} rows={4} placeholder='{ "diario": [...], "receitas": [...] }' />
+          </div>
+        </details>
+        <div style={{ marginTop: 12 }}><Btn onClick={importar}>Restaurar dados</Btn></div>
       </Card>
 
       <details style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 16 }}>

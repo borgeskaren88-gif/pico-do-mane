@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, LogoMark, pageBg } from './ui';
-import { ymOf, todayISO } from '../lib/util';
+import { ymOf, todayISO, limparNome } from '../lib/util';
 import SEED_DATA from '../data/seed.json';
 
 import Hoje from './Hoje';
@@ -34,6 +34,24 @@ async function apiSalvar(dados) {
   }
 }
 
+// Passa um "trim" em produto/fornecedor de compras e cotações. Retorna os
+// dados possivelmente ajustados e se algo mudou (pra salvar só quando precisa).
+function normalizarNomes(dados) {
+  let mudou = false;
+  const limpaLista = (lista) => (lista || []).map((item) => {
+    let novo = item;
+    for (const campo of ['produto', 'fornecedor']) {
+      const v = item[campo];
+      if (typeof v === 'string') {
+        const limpo = limparNome(v);
+        if (limpo !== v) { if (novo === item) novo = { ...item }; novo[campo] = limpo; mudou = true; }
+      }
+    }
+    return novo;
+  });
+  return { dados: { ...dados, compras: limpaLista(dados.compras), cotacoes: limpaLista(dados.cotacoes) }, mudou };
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [tab, setTab] = useState('hoje');
@@ -59,10 +77,13 @@ export default function Dashboard() {
         cotacoes: (salvo.cotacoes && salvo.cotacoes.length) ? salvo.cotacoes : SEED_DATA.cotacoes,
         garrafas: (salvo.garrafas && salvo.garrafas.length) ? salvo.garrafas : SEED_DATA.garrafas,
       };
-      setDiario(dados.diario); setReceitas(dados.receitas); setDespesas(dados.despesas);
-      setCompras(dados.compras); setCotacoes(dados.cotacoes); setGarrafas(dados.garrafas);
+      // Limpa nomes de produto/fornecedor (espaços sobrando) uma vez, ao abrir.
+      // Assim "Copal " vira "Copal" nos dados já salvos e para de duplicar.
+      const { dados: limpos, mudou } = normalizarNomes(dados);
+      setDiario(limpos.diario); setReceitas(limpos.receitas); setDespesas(limpos.despesas);
+      setCompras(limpos.compras); setCotacoes(limpos.cotacoes); setGarrafas(limpos.garrafas);
       setTarefas((salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : []);
-      if (vazio) await apiSalvar(dados);
+      if (vazio || mudou) await apiSalvar({ ...limpos, tarefas: (salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : [] });
       setLoaded(true);
     })();
   }, []);
