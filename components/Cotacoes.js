@@ -69,7 +69,8 @@ export default function Cotacoes({ dados, onChange }) {
         </div>
       </Card>
 
-      <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="🔎 Buscar produto…" /></div>
+      <div style={{ marginBottom: 8 }}><TextInput value={busca} onChange={setBusca} placeholder="🔎 Buscar produto…" /></div>
+      <div style={{ fontSize: 12, color: C.faint, marginBottom: 12, lineHeight: 1.4 }}>💡 Toque em <b style={{ color: C.accent }}>Editar</b> num preço para corrigir nome, valor, fornecedor ou data.</div>
 
       {grupos.length === 0 ? <Empty>Nenhum produto cadastrado ainda.<br />Comece adicionando um preço.</Empty> :
         grupos.map((grp) => (
@@ -87,10 +88,10 @@ export default function Cotacoes({ dados, onChange }) {
               {grp.registros.sort((a, b) => num(a.preco) - num(b.preco)).map((r) => (
                 <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '3px 0', color: C.muted }}>
                   <span>{limparNome(r.fornecedor)} <span style={{ color: C.faint }}>· {fmtDate(r.data)}</span></span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <b style={{ color: num(r.preco) === grp.menor ? C.green : C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(num(r.preco))}</b>
-                    <button onClick={() => editar(r)} title="Editar" style={{ background: 'none', border: 'none', color: editId === r.id ? C.accent : C.muted, cursor: 'pointer', fontSize: 14 }}>✎</button>
-                    <button onClick={() => excluir(r.id)} title="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 15 }}>×</button>
+                    <button onClick={() => editar(r)} style={{ background: editId === r.id ? C.accent : 'transparent', color: editId === r.id ? '#06101F' : C.accent, border: `1px solid ${C.accent}`, borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '4px 10px' }}>Editar</button>
+                    <button onClick={() => excluir(r.id)} title="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}>×</button>
                   </span>
                 </div>
               ))}
