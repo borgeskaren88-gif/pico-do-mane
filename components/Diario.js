@@ -12,16 +12,24 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
   const [form, setForm] = useState(diarioVazio());
   const [editId, setEditId] = useState(null);
   const [novaTarefa, setNovaTarefa] = useState('');
+  const [novaTarefaData, setNovaTarefaData] = useState('');
   const [verConcluidas, setVerConcluidas] = useState(false);
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const tarefasAbertas = tarefas.filter((t) => !t.feito);
+  // Tarefas em aberto: as COM data primeiro (mais próximas no topo), depois as
+  // sem data (mais recentes primeiro).
+  const tarefasAbertas = tarefas.filter((t) => !t.feito).sort((a, b) => {
+    if (a.data && b.data) return a.data.localeCompare(b.data);
+    if (a.data) return -1;
+    if (b.data) return 1;
+    return (b.criadoEm || 0) - (a.criadoEm || 0);
+  });
   const tarefasFeitas = tarefas.filter((t) => t.feito);
   const addTarefa = () => {
     const txt = novaTarefa.trim();
     if (!txt || !onTarefas) return;
-    onTarefas([{ id: uid(), texto: txt, feito: false, criadoEm: Date.now() }, ...tarefas]);
-    setNovaTarefa('');
+    onTarefas([{ id: uid(), texto: txt, data: novaTarefaData || '', feito: false, criadoEm: Date.now() }, ...tarefas]);
+    setNovaTarefa(''); setNovaTarefaData('');
   };
   const toggleTarefa = (id) => onTarefas(tarefas.map((t) => t.id === id ? { ...t, feito: !t.feito, feitoEm: !t.feito ? Date.now() : null } : t));
   const removerTarefa = (id) => onTarefas(tarefas.filter((t) => t.id !== id));
@@ -62,9 +70,11 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
             <div style={{ fontSize: 17, fontWeight: 800 }}>✓ Checklist do bar</div>
             {tarefasAbertas.length > 0 && <div style={{ fontSize: 13, color: C.muted }}>{tarefasAbertas.length} pendente{tarefasAbertas.length > 1 ? 's' : ''}</div>}
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: tarefasAbertas.length || tarefasFeitas.length ? 12 : 0 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: tarefasAbertas.length || tarefasFeitas.length ? 12 : 0 }}>
             <input value={novaTarefa} onChange={(e) => setNovaTarefa(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addTarefa(); }}
-              placeholder="Nova tarefa… (ex: comprar gelo)" style={{ ...inputStyle, flex: 1 }} />
+              placeholder="Nova tarefa… (ex: pagar boleto Ambev)" style={{ ...inputStyle, flex: '1 1 100%' }} />
+            <input type="date" value={novaTarefaData} onChange={(e) => setNovaTarefaData(e.target.value)}
+              title="Data (opcional) — pra receber aviso no dia" style={{ ...inputStyle, flex: '1 1 150px' }} />
             <Btn small onClick={addTarefa}>Adicionar</Btn>
           </div>
 
@@ -72,13 +82,24 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
             <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '10px 0 2px' }}>Nenhuma tarefa. Anote o que precisa fazer no bar.</div>
           )}
 
-          {tarefasAbertas.map((t) => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
-              <button onClick={() => toggleTarefa(t.id)} aria-label="Concluir" style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${C.line}`, background: 'transparent', cursor: 'pointer', flexShrink: 0 }} />
-              <div style={{ flex: 1, fontSize: 14, color: C.text }}>{t.texto}</div>
-              <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
-            </div>
-          ))}
+          {tarefasAbertas.map((t) => {
+            const atrasada = t.data && t.data < todayISO();
+            const venceHoje = t.data === todayISO();
+            return (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
+                <button onClick={() => toggleTarefa(t.id)} aria-label="Concluir" style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${C.line}`, background: 'transparent', cursor: 'pointer', flexShrink: 0 }} />
+                <div style={{ flex: 1, fontSize: 14, color: C.text }}>
+                  {t.texto}
+                  {t.data && (
+                    <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: atrasada ? C.red : venceHoje ? C.amber : C.faint, whiteSpace: 'nowrap' }}>
+                      {atrasada ? `⏰ ${fmtDate(t.data)}` : venceHoje ? '📅 hoje' : `📅 ${fmtDate(t.data)}`}
+                    </span>
+                  )}
+                </div>
+                <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
+              </div>
+            );
+          })}
 
           {tarefasFeitas.length > 0 && (
             <div style={{ marginTop: 12, borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
