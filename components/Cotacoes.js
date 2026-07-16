@@ -6,14 +6,27 @@ import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, lim
 export default function Cotacoes({ dados, onChange }) {
   const vazio = { data: todayISO(), produto: '', fornecedor: '', preco: '', categoria: '' };
   const [form, setForm] = useState(vazio);
+  const [editId, setEditId] = useState(null);
   const [busca, setBusca] = useState('');
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
   const salvar = () => {
     if (!form.produto || !form.fornecedor || !form.preco) return;
-    onChange([{ ...form, produto: limparNome(form.produto), fornecedor: limparNome(form.fornecedor), id: uid() }, ...dados]);
-    setForm({ ...vazio, produto: form.produto, categoria: form.categoria });
+    const limpo = { ...form, produto: limparNome(form.produto), fornecedor: limparNome(form.fornecedor) };
+    if (editId) {
+      onChange(dados.map((d) => (d.id === editId ? { ...limpo, id: editId } : d)));
+      setForm(vazio); setEditId(null);
+    } else {
+      onChange([{ ...limpo, id: uid() }, ...dados]);
+      setForm({ ...vazio, produto: form.produto, categoria: form.categoria });
+    }
   };
-  const excluir = (id) => onChange(dados.filter((d) => d.id !== id));
+  const editar = (d) => {
+    setForm({ data: d.data || todayISO(), produto: d.produto || '', fornecedor: d.fornecedor || '', preco: d.preco || '', categoria: d.categoria || '' });
+    setEditId(d.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const cancelar = () => { setForm(vazio); setEditId(null); };
+  const excluir = (id) => { if (id === editId) cancelar(); onChange(dados.filter((d) => d.id !== id)); };
 
   const grupos = useMemo(() => {
     const g = {};
@@ -39,8 +52,8 @@ export default function Cotacoes({ dados, onChange }) {
       ]} />
 
       <Card style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>Comparação de fornecedores</div>
-        <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>Cadastre cada preço que você vê. O painel calcula sozinho o menor, o maior, a variação % e o melhor fornecedor por produto.</div>
+        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? '✏️ Editar cotação' : 'Comparação de fornecedores'}</div>
+        <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>{editId ? 'Ajuste os dados e salve. Corrija o nome (ex.: 750ml), o preço, o fornecedor ou a data.' : 'Cadastre cada preço que você vê. O painel calcula sozinho o menor, o maior, a variação % e o melhor fornecedor por produto.'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
           <Field label="Produto"><TextInput value={form.produto} onChange={set('produto')} placeholder="Original 600ml…" /></Field>
           <Field label="Preço (R$)"><NumInput value={form.preco} onChange={set('preco')} /></Field>
@@ -50,7 +63,10 @@ export default function Cotacoes({ dados, onChange }) {
           <Field label="Data"><TextInput type="date" value={form.data} onChange={set('data')} /></Field>
         </div>
         <Field label="Categoria"><Select value={form.categoria} onChange={set('categoria')} options={CATEGORIAS_PRODUTO} /></Field>
-        <Btn onClick={salvar}>Adicionar preço</Btn>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Btn onClick={salvar}>{editId ? 'Salvar alteração' : 'Adicionar preço'}</Btn>
+          {editId && <Btn kind="ghost" onClick={cancelar}>Cancelar</Btn>}
+        </div>
       </Card>
 
       <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="🔎 Buscar produto…" /></div>
@@ -71,9 +87,10 @@ export default function Cotacoes({ dados, onChange }) {
               {grp.registros.sort((a, b) => num(a.preco) - num(b.preco)).map((r) => (
                 <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '3px 0', color: C.muted }}>
                   <span>{limparNome(r.fornecedor)} <span style={{ color: C.faint }}>· {fmtDate(r.data)}</span></span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <b style={{ color: num(r.preco) === grp.menor ? C.green : C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(num(r.preco))}</b>
-                    <button onClick={() => excluir(r.id)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 15 }}>×</button>
+                    <button onClick={() => editar(r)} title="Editar" style={{ background: 'none', border: 'none', color: editId === r.id ? C.accent : C.muted, cursor: 'pointer', fontSize: 14 }}>✎</button>
+                    <button onClick={() => excluir(r.id)} title="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 15 }}>×</button>
                   </span>
                 </div>
               ))}
