@@ -18,6 +18,10 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const vencidas = abertas.filter((c) => c.vencimento && c.vencimento < hoje);
   const garrafasEmUso = garrafas.filter((g) => g.dataAbertura && !g.dataTermino);
 
+  // Saudação conforme a hora: manhã (5–11), tarde (12–17), noite (demais).
+  const horaAgora = new Date().getHours();
+  const saudacao = (horaAgora >= 5 && horaAgora < 12) ? 'Bom dia' : (horaAgora >= 12 && horaAgora < 18) ? 'Boa tarde' : 'Boa noite';
+
   // Avisos do dia
   const boletosHoje = abertas.filter((c) => c.vencimento === hoje);
   const totalBoletosHoje = boletosHoje.reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
@@ -32,7 +36,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 13, color: C.muted }}>{weekday(todayISO())}, {fmtDate(todayISO())}</div>
-          <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>Bom dia, Karen</div>
+          <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>{saudacao}, Karen</div>
           <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 2, fontWeight: 700 }}>CEO</div>
           <div style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>Seu resumo de {mesLabel(mes)}.</div>
         </div>
