@@ -128,6 +128,13 @@ export default function Dashboard() {
     ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
 
+  // Selos das abas: boletos que vencem hoje ou já vencidos (A Pagar) e tarefas
+  // com data até hoje ainda não feitas (Diário).
+  const hojeIso = todayISO();
+  const boletosAlerta = compras.filter((c) => c.pago !== 'Sim' && c.vencimento && c.vencimento <= hojeIso).length;
+  const tarefasAlerta = tarefas.filter((t) => !t.feito && t.data && t.data <= hojeIso).length;
+  const badges = { pagar: boletosAlerta, diario: tarefasAlerta };
+
   if (!loaded) return (
     <div style={{ minHeight: '100vh', background: C.ink, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>Carregando seus dados…</div>
   );
@@ -154,12 +161,22 @@ export default function Dashboard() {
             border: `1px solid ${tab === id ? C.accent : C.line}`,
             background: tab === id ? C.accent : 'transparent',
             color: tab === id ? '#06101F' : C.muted,
-          }}>{nome}</button>
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            {nome}
+            {badges[id] > 0 && (
+              <span style={{
+                background: C.red, color: '#fff', fontSize: 11, fontWeight: 800, lineHeight: 1,
+                minWidth: 18, height: 18, borderRadius: 999, padding: '0 5px',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              }}>{badges[id]}</span>
+            )}
+          </button>
         ))}
       </div>
 
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
-        {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} setTab={setTab} />}
+        {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={setTab} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}

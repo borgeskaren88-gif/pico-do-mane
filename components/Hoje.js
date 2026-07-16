@@ -3,26 +3,40 @@ import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
-export default function Hoje({ diario, receitas, despesas, compras, garrafas, setTab }) {
+export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], setTab }) {
   const [mostrarValores, setMostrarValores] = useState(true);
   const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
-  const mes = ymOf(todayISO());
+  const hoje = todayISO();
+  const mes = ymOf(hoje);
   const rec = receitas.filter((r) => ymOf(r.data) === mes).reduce((s, r) => s + num(r.valor), 0);
   const desp = despesas.filter((d) => ymOf(d.data) === mes).reduce((s, d) => s + num(d.valor), 0);
   const lucro = rec - desp;
   const margem = rec ? (lucro / rec) * 100 : 0;
-  const jaTem = diario.some((d) => d.data === todayISO());
+  const jaTem = diario.some((d) => d.data === hoje);
   const abertas = compras.filter((c) => c.pago !== 'Sim');
   const totalPagar = abertas.reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
-  const vencidas = abertas.filter((c) => c.vencimento && c.vencimento < todayISO());
+  const vencidas = abertas.filter((c) => c.vencimento && c.vencimento < hoje);
   const garrafasEmUso = garrafas.filter((g) => g.dataAbertura && !g.dataTermino);
+
+  // Saudação conforme a hora: manhã (5–11), tarde (12–17), noite (demais).
+  const horaAgora = new Date().getHours();
+  const saudacao = (horaAgora >= 5 && horaAgora < 12) ? 'Bom dia' : (horaAgora >= 12 && horaAgora < 18) ? 'Boa tarde' : 'Boa noite';
+
+  // Avisos do dia
+  const boletosHoje = abertas.filter((c) => c.vencimento === hoje);
+  const totalBoletosHoje = boletosHoje.reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
+  const totalVencidas = vencidas.reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
+  const tarefasHoje = tarefas.filter((t) => !t.feito && t.data === hoje);
+  const tarefasAtrasadas = tarefas.filter((t) => !t.feito && t.data && t.data < hoje);
+  const temAviso = boletosHoje.length || vencidas.length || tarefasHoje.length || tarefasAtrasadas.length;
+  const avisoUrgente = boletosHoje.length || vencidas.length;
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 13, color: C.muted }}>{weekday(todayISO())}, {fmtDate(todayISO())}</div>
-          <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>Bom dia, Karen</div>
+          <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>{saudacao}, Karen</div>
           <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 2, fontWeight: 700 }}>CEO</div>
           <div style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>Seu resumo de {mesLabel(mes)}.</div>
         </div>
@@ -32,6 +46,36 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, se
           {mostrarValores ? '👁 Ocultar' : '👁 Mostrar'}
         </button>
       </div>
+
+      {temAviso ? (
+        <Card style={{ marginBottom: 12, borderColor: avisoUrgente ? C.red : C.amber, background: C.raised }}>
+          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: avisoUrgente ? C.red : C.amber, fontWeight: 700, marginBottom: 10 }}>🔔 Avisos de hoje</div>
+          {boletosHoje.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+              <div style={{ fontSize: 14 }}>💸 <b>{boletosHoje.length} boleto{boletosHoje.length > 1 ? 's' : ''}</b> vence{boletosHoje.length > 1 ? 'm' : ''} hoje — <b style={{ color: C.red }}>{oculto(brl(totalBoletosHoje))}</b></div>
+              <Btn kind="ghost" small onClick={() => setTab('pagar')}>Ver</Btn>
+            </div>
+          )}
+          {vencidas.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+              <div style={{ fontSize: 14 }}>⚠️ <b>{vencidas.length} conta{vencidas.length > 1 ? 's' : ''}</b> vencida{vencidas.length > 1 ? 's' : ''} — <b style={{ color: C.red }}>{oculto(brl(totalVencidas))}</b></div>
+              <Btn kind="ghost" small onClick={() => setTab('pagar')}>Ver</Btn>
+            </div>
+          )}
+          {tarefasHoje.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+              <div style={{ fontSize: 14 }}>📋 <b>{tarefasHoje.length} tarefa{tarefasHoje.length > 1 ? 's' : ''}</b> para hoje</div>
+              <Btn kind="ghost" small onClick={() => setTab('diario')}>Ver</Btn>
+            </div>
+          )}
+          {tarefasAtrasadas.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+              <div style={{ fontSize: 14 }}>⏰ <b>{tarefasAtrasadas.length} tarefa{tarefasAtrasadas.length > 1 ? 's' : ''}</b> atrasada{tarefasAtrasadas.length > 1 ? 's' : ''}</div>
+              <Btn kind="ghost" small onClick={() => setTab('diario')}>Ver</Btn>
+            </div>
+          )}
+        </Card>
+      ) : null}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
         <KPI titulo="Receita do mês" valor={oculto(brl(rec))} cor={C.green} />
