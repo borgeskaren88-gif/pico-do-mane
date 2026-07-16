@@ -6,6 +6,7 @@ import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, lim
 const compraVazia = () => ({
   data: todayISO(), produto: '', fornecedor: '', quantidade: '', valorUnit: '', categoria: '',
   formaPagto: 'À vista', prazoDias: '', vencimento: '', pago: 'Não', dataPagamento: '', obs: '', nota: '',
+  frete: '', impostoST: '',
 });
 export default function Compras({ dados, cotacoes, onChange }) {
   const [form, setForm] = useState(compraVazia());
@@ -68,10 +69,30 @@ export default function Compras({ dados, cotacoes, onChange }) {
     if (!venc && form.formaPagto === 'Prazo' && form.prazoDias) venc = addDays(form.data, form.prazoDias);
     if (!venc && form.formaPagto === 'À vista') venc = form.data;
     const rec = { ...form, produto: limparNome(form.produto), fornecedor: limparNome(form.fornecedor), vencimento: venc };
-    if (editId) { onChange(dados.map((d) => d.id === editId ? { ...rec, id: editId } : d)); limpar(); }
-    else { onChange([{ ...rec, id: uid() }, ...dados]); proximoItem(); }
+    delete rec.frete; delete rec.impostoST;
+    if (editId) { onChange(dados.map((d) => d.id === editId ? { ...rec, id: editId } : d)); limpar(); return; }
+
+    // Frete e Imposto ST da nota viram uma linha separada, na mesma nota, pra o
+    // total em A Pagar bater com o boleto.
+    const novos = [{ ...rec, id: uid() }];
+    const extra = num(form.frete) + num(form.impostoST);
+    if (extra > 0) {
+      const partes = [];
+      if (num(form.frete) > 0) partes.push('Frete');
+      if (num(form.impostoST) > 0) partes.push('Imposto ST');
+      novos.push({
+        id: uid(), data: form.data, produto: partes.join(' + '), fornecedor: limparNome(form.fornecedor),
+        categoria: '', quantidade: '1',
+        valorUnit: extra.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        formaPagto: form.formaPagto, prazoDias: form.prazoDias, vencimento: venc, pago: form.pago,
+        dataPagamento: '', nota: form.nota,
+        obs: [num(form.frete) > 0 ? `Frete ${brl(num(form.frete))}` : '', num(form.impostoST) > 0 ? `Imposto ST ${brl(num(form.impostoST))}` : ''].filter(Boolean).join(' · '),
+      });
+    }
+    onChange([...novos, ...dados]);
+    proximoItem();
   };
-  const editar = (d) => { setForm(d); setEditId(d.id); setNumParcelas('1'); setParcelasList([]); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const editar = (d) => { setForm({ ...compraVazia(), ...d }); setEditId(d.id); setNumParcelas('1'); setParcelasList([]); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const excluir = (id) => onChange(dados.filter((d) => d.id !== id));
 
   const mesesDisp = [...new Set(dados.map((d) => ymOf(d.data)))].sort().reverse();
@@ -153,6 +174,25 @@ export default function Compras({ dados, cotacoes, onChange }) {
         <div style={{ fontSize: 12, color: C.faint, margin: '-8px 0 14px', lineHeight: 1.4 }}>
           Comprou vários produtos num boleto só? Use a <b>mesma nota/boleto</b> em cada item — a aba A Pagar junta todos num pagamento único.
         </div>
+
+        {!editId && (
+          <details style={{ marginBottom: 14 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, color: C.muted, fontWeight: 600, padding: '2px 0' }}>+ Frete e imposto ST da nota (opcional)</summary>
+            <div style={{ marginTop: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Field label="Frete (R$)"><NumInput value={form.frete} onChange={set('frete')} /></Field>
+                <Field label="Imposto ST (R$)"><NumInput value={form.impostoST} onChange={set('impostoST')} /></Field>
+              </div>
+              <div style={{ fontSize: 12, color: C.faint, margin: '-4px 0 0', lineHeight: 1.4 }}>
+                Preencha <b>uma vez por nota</b>. Ao registrar, viram uma linha <b>“Frete + Imposto ST”</b> na mesma nota — aí o total em A Pagar bate com o boleto.
+              </div>
+              {(num(form.frete) + num(form.impostoST)) > 0 && (
+                <div style={{ fontSize: 13, color: C.text, marginTop: 8 }}>Frete + Imposto ST: <b>{brl(num(form.frete) + num(form.impostoST))}</b>{totalItem > 0 && <span style={{ color: C.muted }}> · com este produto: {brl(totalItem + num(form.frete) + num(form.impostoST))}</span>}</div>
+              )}
+            </div>
+          </details>
+        )}
+
         <Field label="Observação"><TextInput value={form.obs} onChange={set('obs')} placeholder="Boleto, nota…" /></Field>
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvar}>{editId ? 'Salvar compra' : (parcelado ? `Registrar ${parcelasList.length} parcelas` : 'Registrar compra')}</Btn>
