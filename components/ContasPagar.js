@@ -6,11 +6,13 @@ import CalendarioFluxo from './CalendarioFluxo';
 
 const formVazio = () => ({ fornecedor: '', descricao: '', categoria: '', valorTotal: '', parcelas: '1' });
 const linhaVazia = () => [{ vencimento: todayISO(), valor: '' }];
+const nfVazia = () => ({ produtos: '', icmsST: '', ipi: '', outros: '' });
 
 export default function ContasPagar({ dados, onChange, despesas = [], onPagamento }) {
   const hoje = todayISO();
   const [form, setForm] = useState(formVazio());
   const [parcelas, setParcelas] = useState(linhaVazia());
+  const [notaFiscal, setNotaFiscal] = useState(nfVazia());
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   const setNumParcelas = (v) => {
@@ -24,6 +26,17 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
   const setParcelaCampo = (i, campo) => (v) =>
     setParcelas((prev) => prev.map((p, idx) => (idx === i ? { ...p, [campo]: v } : p)));
 
+  // Impostos da nota: soma produtos + ICMS ST + IPI + outros e joga no "Valor
+  // total" automaticamente, pra bater com o boleto sem o dono ter que somar.
+  const impostosNota = num(notaFiscal.icmsST) + num(notaFiscal.ipi) + num(notaFiscal.outros);
+  const totalNota = num(notaFiscal.produtos) + impostosNota;
+  const setNF = (k) => (v) => {
+    const nf = { ...notaFiscal, [k]: v };
+    setNotaFiscal(nf);
+    const t = num(nf.produtos) + num(nf.icmsST) + num(nf.ipi) + num(nf.outros);
+    setValorTotal(t > 0 ? t.toFixed(2).replace('.', ',') : '');
+  };
+
   const nParcelas = parcelas.length;
   const somaParcelas = parcelas.reduce((s, p) => s + num(p.valor), 0);
   const totalDigitado = num(form.valorTotal);
@@ -31,15 +44,18 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
 
   const registrar = () => {
     if (!form.fornecedor || !form.descricao) return;
+    const notaObs = num(notaFiscal.produtos) > 0 && impostosNota > 0
+      ? `Produtos ${brl(num(notaFiscal.produtos))} + impostos ${brl(impostosNota)}` : '';
     const novas = parcelas.map((p, i) => ({
       id: uid(), data: hoje, produto: limparNome(form.descricao), fornecedor: limparNome(form.fornecedor),
       categoria: form.categoria, quantidade: '1', valorUnit: p.valor || '0',
       formaPagto: 'Prazo', prazoDias: '', vencimento: p.vencimento, pago: 'Não',
-      dataPagamento: '', obs: nParcelas > 1 ? `Parcela ${i + 1}/${nParcelas}` : '',
+      dataPagamento: '', obs: [nParcelas > 1 ? `Parcela ${i + 1}/${nParcelas}` : '', notaObs].filter(Boolean).join(' · '),
     }));
     onChange([...novas, ...dados]);
     setForm(formVazio());
     setParcelas(linhaVazia());
+    setNotaFiscal(nfVazia());
   };
 
   const abertas = dados.filter((d) => d.pago !== 'Sim');
@@ -129,6 +145,25 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
           <Field label="Valor total (R$)"><NumInput value={form.valorTotal} onChange={setValorTotal} /></Field>
           <Field label="Nº de parcelas"><NumInput value={form.parcelas} onChange={setNumParcelas} placeholder="1" /></Field>
         </div>
+
+        <details style={{ marginBottom: 14 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, color: C.muted, fontWeight: 600, padding: '2px 0' }}>+ Calcular pelo valor da nota (produtos + impostos)</summary>
+          <div style={{ marginTop: 10, padding: 12, background: C.raised, borderRadius: 10 }}>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Digite o valor dos produtos e os impostos da nota (ICMS ST, IPI…). O <b>Valor total</b> acima é somado sozinho, batendo com o boleto.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Produtos (R$)"><NumInput value={notaFiscal.produtos} onChange={setNF('produtos')} /></Field>
+              <Field label="ICMS ST (R$)"><NumInput value={notaFiscal.icmsST} onChange={setNF('icmsST')} /></Field>
+              <Field label="IPI (R$)"><NumInput value={notaFiscal.ipi} onChange={setNF('ipi')} /></Field>
+              <Field label="Outros impostos (R$)"><NumInput value={notaFiscal.outros} onChange={setNF('outros')} /></Field>
+            </div>
+            {totalNota > 0 && (
+              <div style={{ fontSize: 14, color: C.text, marginTop: 4 }}>
+                Total da nota: <b style={{ color: C.accent }}>{brl(totalNota)}</b>
+                {impostosNota > 0 && <span style={{ color: C.muted, fontSize: 12 }}> · produtos {brl(num(notaFiscal.produtos))} + impostos {brl(impostosNota)}</span>}
+              </div>
+            )}
+          </div>
+        </details>
 
         <div style={{ marginBottom: 6, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.06em', color: C.muted, fontWeight: 600 }}>
           {nParcelas > 1 ? 'Datas e valores das parcelas' : 'Vencimento e valor'}
