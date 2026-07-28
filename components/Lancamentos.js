@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
-import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, limparNome, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Lancamentos({ tipo, dados, onChange }) {
   const isReceita = tipo === 'receita';
@@ -19,6 +19,16 @@ export default function Lancamentos({ tipo, dados, onChange }) {
     else onChange([{ ...form, id: uid() }, ...dados]);
     setForm(vazio); setEditId(null);
   };
+  // Alerta de possível duplicata: mesmo dia + mesmo valor + mesmo fornecedor
+  // (descrição). Não bloqueia — só avisa, pra evitar lançar a mesma conta duas
+  // vezes sem querer. Ignora o próprio item quando está editando.
+  const chaveDup = (d) => `${d.data}|${num(d.valor).toFixed(2)}|${limparNome(d.descricao).toLowerCase()}`;
+  const duplicata = useMemo(() => {
+    if (!form.data || num(form.valor) <= 0 || !limparNome(form.descricao)) return null;
+    const chave = chaveDup(form);
+    return dados.find((d) => d.id !== editId && chaveDup(d) === chave) || null;
+  }, [form, dados, editId]);
+
   const editar = (d) => { setForm(d); setEditId(d.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const excluir = (id) => onChange(dados.filter((d) => d.id !== id));
   const mesesDisponiveis = [...new Set(dados.map((d) => ymOf(d.data)))].sort().reverse();
@@ -42,8 +52,20 @@ export default function Lancamentos({ tipo, dados, onChange }) {
         <Field label={catLabel}><Select value={form.categoria} onChange={set('categoria')} options={catOptions} /></Field>
         <Field label="Descrição"><TextInput value={form.descricao} onChange={set('descricao')} placeholder={isReceita ? 'Sexta-feira, Sábado…' : 'Fornecedor / item…'} /></Field>
         <Field label="Observação"><TextInput value={form.obs} onChange={set('obs')} placeholder="Opcional" /></Field>
+
+        {duplicata && !editId && (
+          <div style={{ background: C.raised, border: `1px solid ${C.amber}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+            <div style={{ fontSize: 13, color: C.amber, fontWeight: 800, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>Possível duplicata</div>
+            <div style={{ fontSize: 13, color: C.text }}>Já existe um lançamento com a mesma data, valor e {isReceita ? 'descrição' : 'fornecedor'}:</div>
+            <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+              {fmtDate(duplicata.data)} · {duplicata.categoria}{duplicata.descricao ? ' · ' + limparNome(duplicata.descricao) : ''} · <b style={{ color: cor }}>{brl(num(duplicata.valor))}</b>
+            </div>
+            <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>Se for outra compra igual, pode lançar mesmo assim.</div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 10 }}>
-          <Btn onClick={salvar}>{editId ? 'Salvar' : 'Lançar'}</Btn>
+          <Btn onClick={salvar}>{editId ? 'Salvar' : (duplicata ? 'Lançar mesmo assim' : 'Lançar')}</Btn>
           {editId && <Btn kind="ghost" onClick={() => { setForm(vazio); setEditId(null); }}>Cancelar</Btn>}
         </div>
       </Card>
