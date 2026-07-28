@@ -145,7 +145,7 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
           <div style={{ fontSize: 13, marginTop: 4, marginBottom: 12, color: somaBate ? C.green : C.amber, fontWeight: 600 }}>
             Soma das parcelas: {brl(somaParcelas)}
             {totalDigitado > 0 && !somaBate && <span> · não bate com o total ({brl(totalDigitado)})</span>}
-            {totalDigitado > 0 && somaBate && <span> ✓</span>}
+            {totalDigitado > 0 && somaBate && <span> confere</span>}
           </div>
         )}
 
@@ -165,7 +165,7 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
       <div style={{ fontSize: 12, color: C.muted, marginTop: -6, marginBottom: 10 }}>
         Ao marcar como pago, a conta também é lançada automaticamente em Despesas.
       </div>
-      {grupos.length === 0 ? <Empty>Nenhuma conta em aberto. 🎉<br />Tudo pago por aqui.</Empty> :
+      {grupos.length === 0 ? <Empty>Nenhuma conta em aberto.<br />Tudo pago por aqui.</Empty> :
         grupos.map((g) => {
           const vencida = g.vencimento && g.vencimento < hoje;
           const proxima = g.vencimento && g.vencimento >= hoje && g.vencimento <= addDays(hoje, 7);
@@ -215,7 +215,7 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(g.total)}</div>
-                    <div style={{ marginTop: 8 }}><Btn kind="ghost" small onClick={() => desfazerGrupo(g)}>↩ Desfazer</Btn></div>
+                    <div style={{ marginTop: 8 }}><Btn kind="ghost" small onClick={() => desfazerGrupo(g)}>Desfazer</Btn></div>
                   </div>
                 </div>
               </Card>
