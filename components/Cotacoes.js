@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
+import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, limparNome, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Cotacoes({ dados, onChange }) {
@@ -46,6 +46,7 @@ export default function Cotacoes({ dados, onChange }) {
 
   return (
     <div>
+      <PageTitle sub="Compare preços entre fornecedores">Cotações</PageTitle>
       <Resumo items={[
         { t: 'Produtos', v: grupos.length },
         { t: 'Preços cadastrados', v: dados.length },

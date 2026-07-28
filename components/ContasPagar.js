@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, SecTitle } from './ui';
+import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle } from './ui';
 import { brl, num, todayISO, fmtDate, addDays, uid, limparNome, montarParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
 import CalendarioFluxo from './CalendarioFluxo';
 
@@ -126,7 +126,7 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
 
   return (
     <div>
-      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>Contas a Pagar</div>
+      <PageTitle sub="Boletos e contas em aberto">Contas a Pagar</PageTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
         <KPI titulo="Total em aberto" valor={brl(total)} cor={C.red} sub={`${grupos.length} conta(s)`} />
         <KPI titulo="Vencidas" valor={brl(totalVenc)} cor={vencidasGrupos.length ? C.red : C.faint} sub={`${vencidasGrupos.length} vencida(s)`} />

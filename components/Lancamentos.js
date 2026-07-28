@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
+import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, limparNome, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Lancamentos({ tipo, dados, onChange }) {
@@ -38,6 +38,7 @@ export default function Lancamentos({ tipo, dados, onChange }) {
 
   return (
     <div>
+      <PageTitle sub={isReceita ? 'Tudo que entra no caixa' : 'Tudo que sai, por categoria'}>{isReceita ? 'Receitas' : 'Despesas'}</PageTitle>
       <Resumo items={[
         { t: isReceita ? 'Receitas lançadas' : 'Despesas lançadas', v: dados.length },
         { t: 'Total acumulado', v: brl(totalGeral), c: cor },
