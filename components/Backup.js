@@ -204,7 +204,7 @@ export default function Backup({ all, restore }) {
           Este painel já veio populado com o que estava nas suas 3 planilhas (DRE, Cotação de Fornecedores e Diário do Gestor) de maio a julho/2026, transcrito exatamente como estava lá. Uma única exceção: no Diário do dia 05/07, os campos de texto (problema, decisão, aprendizado, prioridade e nota) vieram corrompidos no PDF exportado — o texto original ficou sobreposto e ilegível, então não preenchi para não inventar dado. Vale conferir e completar esse dia manualmente.
         </div>
         {!confirmarRecarregar ? (
-          <Btn kind="ghost" small onClick={recarregarOriginais}>↺ Recarregar dados originais das planilhas</Btn>
+          <Btn kind="ghost" small onClick={recarregarOriginais}>Recarregar dados originais das planilhas</Btn>
         ) : (
           <div>
             <div style={{ fontSize: 13, color: C.amber, marginBottom: 8, fontWeight: 600 }}>Isso substitui TUDO que está no painel agora pelos dados originais das planilhas. Confirma?</div>
@@ -236,8 +236,8 @@ export default function Backup({ all, restore }) {
           Gera um relatório com os números já calculados (receita, despesa, lucro e margem por mês, despesas por categoria, maiores fornecedores, contas a pagar e receita por dia da semana) seguido dos dados completos organizados. É só copiar e colar no chat comigo.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Btn onClick={copiarAnalise}>📋 Copiar resumo + dados para análise</Btn>
-          <Btn kind="ghost" onClick={() => baixar(analise, `pico-do-mane-analise-${todayISO()}.md`, 'text/markdown;charset=utf-8')}>⬇ Baixar relatório de análise (.md)</Btn>
+          <Btn onClick={copiarAnalise}>Copiar resumo + dados para análise</Btn>
+          <Btn kind="ghost" onClick={() => baixar(analise, `pico-do-mane-analise-${todayISO()}.md`, 'text/markdown;charset=utf-8')}>Baixar relatório de análise (.md)</Btn>
         </div>
         {msg && <div style={{ marginTop: 12, fontSize: 13, color: msg.startsWith('Não') ? C.amber : C.accent }}>{msg}</div>}
         <details style={{ marginTop: 12 }}>
@@ -249,8 +249,8 @@ export default function Backup({ all, restore }) {
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontWeight: 700, marginBottom: 12 }}>Backup e planilha</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Btn kind="ghost" onClick={() => baixar(jsonStr, `pico-do-mane-${todayISO()}.json`, 'application/json')}>⬇ Baixar backup completo (JSON)</Btn>
-          <Btn kind="ghost" onClick={baixarCSV}>⬇ Baixar planilha (CSV para Excel/Sheets)</Btn>
+          <Btn kind="ghost" onClick={() => baixar(jsonStr, `pico-do-mane-${todayISO()}.json`, 'application/json')}>Baixar backup completo (JSON)</Btn>
+          <Btn kind="ghost" onClick={baixarCSV}>Baixar planilha (CSV para Excel/Sheets)</Btn>
         </div>
       </Card>
 
@@ -258,7 +258,7 @@ export default function Backup({ all, restore }) {
         <div style={{ fontWeight: 700, marginBottom: 8 }}>Restaurar backup</div>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>O jeito fácil: escolha o arquivo <b>.json</b> do backup. Atenção: substitui os dados atuais.</div>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: C.accent, color: '#06101F', borderRadius: 10, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-          📂 Escolher arquivo de backup
+          Escolher arquivo de backup
           <input type="file" accept=".json,application/json" onChange={escolherArquivo} style={{ display: 'none' }} />
         </label>
         <details style={{ marginTop: 12 }}>

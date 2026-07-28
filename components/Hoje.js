@@ -43,13 +43,13 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
         <button onClick={() => setMostrarValores((v) => !v)}
           title={mostrarValores ? 'Ocultar valores' : 'Mostrar valores'}
           style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-          {mostrarValores ? '👁 Ocultar' : '👁 Mostrar'}
+          {mostrarValores ? 'Ocultar' : 'Mostrar'}
         </button>
       </div>
 
       {temAviso ? (
         <Card style={{ marginBottom: 12, borderColor: avisoUrgente ? C.red : C.amber, background: C.raised }}>
-          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: avisoUrgente ? C.red : C.amber, fontWeight: 700, marginBottom: 10 }}>🔔 Avisos de hoje</div>
+          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: avisoUrgente ? C.red : C.amber, fontWeight: 700, marginBottom: 10 }}>Avisos de hoje</div>
           {boletosHoje.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
               <div style={{ fontSize: 14 }}><b>{boletosHoje.length} boleto{boletosHoje.length > 1 ? 's' : ''}</b> vence{boletosHoje.length > 1 ? 'm' : ''} hoje — <b style={{ color: C.red }}>{oculto(brl(totalBoletosHoje))}</b></div>
@@ -58,19 +58,19 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           )}
           {vencidas.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
-              <div style={{ fontSize: 14 }}>⚠️ <b>{vencidas.length} conta{vencidas.length > 1 ? 's' : ''}</b> vencida{vencidas.length > 1 ? 's' : ''} — <b style={{ color: C.red }}>{oculto(brl(totalVencidas))}</b></div>
+              <div style={{ fontSize: 14 }}><b>{vencidas.length} conta{vencidas.length > 1 ? 's' : ''}</b> vencida{vencidas.length > 1 ? 's' : ''} — <b style={{ color: C.red }}>{oculto(brl(totalVencidas))}</b></div>
               <Btn kind="ghost" small onClick={() => setTab('pagar')}>Ver</Btn>
             </div>
           )}
           {tarefasHoje.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
-              <div style={{ fontSize: 14 }}>📋 <b>{tarefasHoje.length} tarefa{tarefasHoje.length > 1 ? 's' : ''}</b> para hoje</div>
+              <div style={{ fontSize: 14 }}><b>{tarefasHoje.length} tarefa{tarefasHoje.length > 1 ? 's' : ''}</b> para hoje</div>
               <Btn kind="ghost" small onClick={() => setTab('diario')}>Ver</Btn>
             </div>
           )}
           {tarefasAtrasadas.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
-              <div style={{ fontSize: 14 }}>⏰ <b>{tarefasAtrasadas.length} tarefa{tarefasAtrasadas.length > 1 ? 's' : ''}</b> atrasada{tarefasAtrasadas.length > 1 ? 's' : ''}</div>
+              <div style={{ fontSize: 14 }}><b>{tarefasAtrasadas.length} tarefa{tarefasAtrasadas.length > 1 ? 's' : ''}</b> atrasada{tarefasAtrasadas.length > 1 ? 's' : ''}</div>
               <Btn kind="ghost" small onClick={() => setTab('diario')}>Ver</Btn>
             </div>
           )}
@@ -110,7 +110,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
       )}
 
       <Card style={{ marginBottom: 12, background: jaTem ? C.panel : C.raised, borderColor: jaTem ? C.line : C.accent }}>
-        <div style={{ fontWeight: 700, fontSize: 15 }}>{jaTem ? '✅ Diário de hoje registrado' : '📓 Você ainda não fechou o dia de hoje'}</div>
+        <div style={{ fontWeight: 700, fontSize: 15 }}>{jaTem ? 'Diário de hoje registrado' : 'Você ainda não fechou o dia de hoje'}</div>
         <div style={{ fontSize: 13, color: C.muted, margin: '6px 0 12px' }}>{jaTem ? 'Bom trabalho. Você pode editar quando quiser no Diário.' : 'Registre o caixa, o clima, o que funcionou e a prioridade de amanhã.'}</div>
         <Btn kind={jaTem ? 'ghost' : 'primary'} small onClick={() => setTab('diario')}>{jaTem ? 'Ver diário' : 'Registrar o dia'}</Btn>
       </Card>

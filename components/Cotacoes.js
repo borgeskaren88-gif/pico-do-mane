@@ -52,7 +52,7 @@ export default function Cotacoes({ dados, onChange }) {
       ]} />
 
       <Card style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? '✏️ Editar cotação' : 'Comparação de fornecedores'}</div>
+        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar cotação' : 'Comparação de fornecedores'}</div>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>{editId ? 'Ajuste os dados e salve. Corrija o nome (ex.: 750ml), o preço, o fornecedor ou a data.' : 'Cadastre cada preço que você vê. O painel calcula sozinho o menor, o maior, a variação % e o melhor fornecedor por produto.'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
           <Field label="Produto"><TextInput value={form.produto} onChange={set('produto')} placeholder="Original 600ml…" /></Field>
@@ -69,7 +69,7 @@ export default function Cotacoes({ dados, onChange }) {
         </div>
       </Card>
 
-      <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="🔎 Buscar produto…" /></div>
+      <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar produto…" /></div>
 
       {grupos.length === 0 ? <Empty>Nenhum produto cadastrado ainda.<br />Comece adicionando um preço.</Empty> :
         grupos.map((grp) => (
@@ -89,7 +89,7 @@ export default function Cotacoes({ dados, onChange }) {
                   <span>{limparNome(r.fornecedor)} <span style={{ color: C.faint }}>· {fmtDate(r.data)}</span></span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <b style={{ color: num(r.preco) === grp.menor ? C.green : C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(num(r.preco))}</b>
-                    <button onClick={() => editar(r)} title="Editar" style={{ background: 'none', border: 'none', color: editId === r.id ? C.accent : C.muted, cursor: 'pointer', fontSize: 14 }}>✎</button>
+                    <button onClick={() => editar(r)} title="Editar" style={{ background: 'none', border: `1px solid ${C.line}`, color: editId === r.id ? C.accent : C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 700, borderRadius: 6, padding: '2px 8px' }}>Editar</button>
                     <button onClick={() => excluir(r.id)} title="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 15 }}>×</button>
                   </span>
                 </div>
