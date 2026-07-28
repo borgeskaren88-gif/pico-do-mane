@@ -52,7 +52,7 @@ export default function Cotacoes({ dados, onChange }) {
       ]} />
 
       <Card style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? '✏️ Editar cotação' : 'Comparação de fornecedores'}</div>
+        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar cotação' : 'Comparação de fornecedores'}</div>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>{editId ? 'Ajuste os dados e salve. Corrija o nome (ex.: 750ml), o preço, o fornecedor ou a data.' : 'Cadastre cada preço que você vê. O painel calcula sozinho o menor, o maior, a variação % e o melhor fornecedor por produto.'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
           <Field label="Produto"><TextInput value={form.produto} onChange={set('produto')} placeholder="Original 600ml…" /></Field>
@@ -69,8 +69,8 @@ export default function Cotacoes({ dados, onChange }) {
         </div>
       </Card>
 
-      <div style={{ marginBottom: 8 }}><TextInput value={busca} onChange={setBusca} placeholder="🔎 Buscar produto…" /></div>
-      <div style={{ fontSize: 12, color: C.faint, marginBottom: 12, lineHeight: 1.4 }}>💡 Toque em <b style={{ color: C.accent }}>Editar</b> num preço para corrigir nome, valor, fornecedor ou data.</div>
+      <div style={{ marginBottom: 8 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar produto…" /></div>
+      <div style={{ fontSize: 12, color: C.faint, marginBottom: 12, lineHeight: 1.4 }}>Toque em <b style={{ color: C.accent }}>Editar</b> num preço para corrigir nome, valor, fornecedor ou data.</div>
 
       {grupos.length === 0 ? <Empty>Nenhum produto cadastrado ainda.<br />Comece adicionando um preço.</Empty> :
         grupos.map((grp) => (

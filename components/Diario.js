@@ -67,7 +67,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
       {onTarefas && (
         <Card style={{ marginBottom: 18 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 17, fontWeight: 800 }}>✓ Checklist do bar</div>
+            <div style={{ fontSize: 17, fontWeight: 800 }}>Checklist do bar</div>
             {tarefasAbertas.length > 0 && <div style={{ fontSize: 13, color: C.muted }}>{tarefasAbertas.length} pendente{tarefasAbertas.length > 1 ? 's' : ''}</div>}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: tarefasAbertas.length || tarefasFeitas.length ? 12 : 0 }}>
@@ -92,7 +92,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
                   {t.texto}
                   {t.data && (
                     <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: atrasada ? C.red : venceHoje ? C.amber : C.faint, whiteSpace: 'nowrap' }}>
-                      {atrasada ? `⏰ ${fmtDate(t.data)}` : venceHoje ? '📅 hoje' : `📅 ${fmtDate(t.data)}`}
+                      {atrasada ? `atrasada · ${fmtDate(t.data)}` : venceHoje ? 'hoje' : fmtDate(t.data)}
                     </span>
                   )}
                 </div>
@@ -111,7 +111,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
               </div>
               {verConcluidas && tarefasFeitas.map((t) => (
                 <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-                  <button onClick={() => toggleTarefa(t.id)} aria-label="Reabrir" style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${C.green}`, background: C.green, color: '#052014', cursor: 'pointer', flexShrink: 0, fontWeight: 900, fontSize: 13, lineHeight: 1 }}>✓</button>
+                  <button onClick={() => toggleTarefa(t.id)} aria-label="Reabrir" style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${C.green}`, background: C.green, color: '#052014', cursor: 'pointer', flexShrink: 0, fontWeight: 900, fontSize: 13, lineHeight: 1 }} />
                   <div style={{ flex: 1, fontSize: 14, color: C.faint, textDecoration: 'line-through' }}>{t.texto}</div>
                   <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
                 </div>

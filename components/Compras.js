@@ -130,7 +130,7 @@ export default function Compras({ dados, cotacoes, onChange }) {
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginBottom: 14, fontSize: 13 }}>
             <div style={{ color: C.muted }}>Menor cotação: <b style={{ color: C.green }}>{brl(menorCot.menor)}</b> ({menorCot.forn})</div>
             <div style={{ marginTop: 4, color: difVsCot > 0 ? C.red : C.green, fontWeight: 700 }}>
-              {difVsCot > 0 ? `⚠ Pagando ${brl(difVsCot)} a mais por unidade` : difVsCot < 0 ? '✓ Abaixo da menor cotação' : '✓ No melhor preço'}
+              {difVsCot > 0 ? `Pagando ${brl(difVsCot)} a mais por unidade` : difVsCot < 0 ? 'Abaixo da menor cotação' : 'No melhor preço'}
               {impacto !== 0 && <span> · impacto total {brl(Math.abs(impacto))}</span>}
             </div>
           </div>
@@ -165,7 +165,7 @@ export default function Compras({ dados, cotacoes, onChange }) {
             <div style={{ fontSize: 13, marginTop: 2, color: somaBate ? C.green : C.amber, fontWeight: 600 }}>
               Soma das parcelas: {brl(somaParcelas)}
               {totalItem > 0 && !somaBate && <span> · não bate com o total ({brl(totalItem)})</span>}
-              {totalItem > 0 && somaBate && <span> ✓</span>}
+              {totalItem > 0 && somaBate && <span> confere</span>}
             </div>
           </div>
         )}
@@ -203,7 +203,7 @@ export default function Compras({ dados, cotacoes, onChange }) {
       <SecTitle>Histórico de compras</SecTitle>
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ flex: 1, minWidth: 120 }}><Select value={filtroMes} onChange={setFiltroMes} options={mesesDisp.length ? mesesDisp : [ymOf(todayISO())]} placeholder="Mês" /></div>
-        <div style={{ flex: 1, minWidth: 120 }}><TextInput value={busca} onChange={setBusca} placeholder="🔎 Produto/fornecedor" /></div>
+        <div style={{ flex: 1, minWidth: 120 }}><TextInput value={busca} onChange={setBusca} placeholder="Produto/fornecedor" /></div>
       </div>
       <div style={{ textAlign: 'right', marginBottom: 10, fontSize: 14 }}>
         <span style={{ color: C.muted }}>Total do mês: </span><b style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(totalMes)}</b>
