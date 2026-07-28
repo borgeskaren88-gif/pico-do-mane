@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, SecTitle } from './ui';
 import { brl, num, todayISO, fmtDate, addDays, uid, limparNome, montarParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
+import CalendarioFluxo from './CalendarioFluxo';
 
 const formVazio = () => ({ fornecedor: '', descricao: '', categoria: '', valorTotal: '', parcelas: '1' });
 const linhaVazia = () => [{ vencimento: todayISO(), valor: '' }];
@@ -113,6 +114,8 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
         <KPI titulo="Total em aberto" valor={brl(total)} cor={C.red} sub={`${grupos.length} conta(s)`} />
         <KPI titulo="Vencidas" valor={brl(totalVenc)} cor={vencidasGrupos.length ? C.red : C.faint} sub={`${vencidasGrupos.length} vencida(s)`} />
       </div>
+
+      <CalendarioFluxo contas={abertas} />
 
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>Registrar conta a pagar</div>
