@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle } from './ui';
+import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle } from './ui';
 import { brl, num, todayISO, ymOf, fmtDate, addDays, uid, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
 
 // Dados compartilhados da compra (valem pra todos os itens do carrinho).
@@ -120,6 +120,7 @@ export default function Compras({ dados, cotacoes, despesas = [], onChange, onRe
 
   return (
     <div>
+      <PageTitle sub="Itens comprados, com preço e fornecedor">Compras</PageTitle>
       <Resumo items={[
         { t: 'Compras', v: dados.length },
         { t: 'Total gasto', v: brl(gastoGeral), c: C.red },

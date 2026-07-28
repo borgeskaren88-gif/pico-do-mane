@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
+import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, daysBetween, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 const garrafaVazia = () => ({ produto: '', volume: '1000', dose: '50', dataAbertura: todayISO(), dataTermino: '', drinks: '', obs: '' });
@@ -59,10 +59,10 @@ export default function Garrafas({ dados, onChange }) {
         { t: 'Abertas agora', v: emUso.length, c: emUso.length ? C.accent : C.faint },
       ]} />
 
-      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>Controle de Garrafas</div>
+      <PageTitle sub="Garrafas, doses e rendimento">Controle de Garrafas</PageTitle>
 
       <Card style={{ marginBottom: 14, background: C.panel2 }}>
-        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.accent, fontWeight: 700, marginBottom: 8 }}>Garrafas, doses e rendimento</div>
+        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.accent, fontWeight: 700, marginBottom: 8 }}>Como funciona a conta</div>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
           Dose padrão de destilados: <b style={{ color: C.text }}>50 ml</b>. Uma garrafa de 1L rende <b style={{ color: C.text }}>20 doses</b>. Registre quando abrir e quando terminar para ver quanto tempo durou e a média de doses por dia.
         </div>

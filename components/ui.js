@@ -128,3 +128,13 @@ export function Resumo({ items }) {
 export function SecTitle({ children }) {
   return <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 600, margin: '4px 0 10px' }}>{children}</div>;
 }
+
+// Título grande no topo de cada aba, pra deixar o app com cara de sistema só.
+export function PageTitle({ children, sub }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.1 }}>{children}</div>
+      {sub && <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{sub}</div>}
+    </div>
+  );
+}

@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { C, Card, Btn, KPI, Area, inputStyle } from './ui';
+import { C, Card, Btn, KPI, Area, PageTitle, inputStyle } from './ui';
 import { todayISO, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
 import SEED_DATA from '../data/seed.json';
 
@@ -198,6 +198,7 @@ export default function Backup({ all, restore }) {
 
   return (
     <div>
+      <PageTitle sub="Salvar, restaurar e analisar seus dados">Backup</PageTitle>
       <Card style={{ marginBottom: 14, borderColor: C.accent }}>
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.accent, fontWeight: 700, marginBottom: 6 }}>Sobre os dados carregados</div>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
