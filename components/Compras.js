@@ -207,7 +207,7 @@ export default function Compras({ dados, cotacoes, despesas = [], onChange, onRe
                 <div style={{ fontSize: 12, color: C.faint, marginBottom: 12, lineHeight: 1.4 }}>
                   {compra.pago === 'Sim'
                     ? 'Compra paga: será lançada em Despesas automaticamente.'
-                    : 'Compra em aberto: vai para A Pagar; vira despesa quando você marcar como paga.'}
+                    : 'Compra em aberto: vai para Contas a Pagar; vira despesa quando você marcar como paga.'}
                 </div>
                 <Btn onClick={registrar}>Registrar compra ({brl(totalCarrinho)})</Btn>
               </div>
