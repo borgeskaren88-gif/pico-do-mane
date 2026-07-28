@@ -116,6 +116,17 @@ export default function Dashboard() {
     salvarTudo({ compras: novasCompras, despesas: novasDespesas });
   };
 
+  // Registro de compra que alimenta compras + cotações + despesas de uma vez
+  // (uma compra vira cotação de preço e, se paga, vira despesa), sem um save
+  // sobrescrever o outro. Só aplica as listas que vierem no objeto.
+  const aplicarCompra = ({ compras: nc, cotacoes: ncot, despesas: nd }) => {
+    const parcial = {};
+    if (nc) { setCompras(nc); parcial.compras = nc; }
+    if (ncot) { setCotacoes(ncot); parcial.cotacoes = ncot; }
+    if (nd) { setDespesas(nd); parcial.despesas = nd; }
+    salvarTudo(parcial);
+  };
+
   const sair = async () => {
     await fetch('/api/logout', { method: 'POST' });
     router.push('/');
@@ -180,7 +191,7 @@ export default function Dashboard() {
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
-        {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} onChange={upd.compras} />}
+        {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
         {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
