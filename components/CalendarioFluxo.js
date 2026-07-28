@@ -6,6 +6,11 @@ import { num, brl, todayISO, fmtDate, MESES } from '../lib/util';
 const pad = (n) => String(n).padStart(2, '0');
 const DIAS_CURTO = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
+// Bolinha colorida da legenda (substitui os quadradinhos coloridos).
+const Ponto = ({ cor }) => (
+  <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 999, background: cor, marginRight: 4, flexShrink: 0 }} />
+);
+
 // Calendário de fluxo de caixa: cruza as contas a pagar (abertas) com os dias de
 // vencimento, pintando cada dia pela soma a pagar e resumindo por semana — pra
 // ver de relance as semanas em que o dinheiro aperta.
@@ -53,7 +58,7 @@ export default function CalendarioFluxo({ contas }) {
   return (
     <Card style={{ marginBottom: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <div style={{ fontSize: 17, fontWeight: 800 }}>📅 Fluxo de caixa</div>
+        <div style={{ fontSize: 17, fontWeight: 800 }}>Fluxo de caixa</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button onClick={() => mudarMes(-1)} style={btn} aria-label="Mês anterior">‹</button>
           <div style={{ minWidth: 96, textAlign: 'center', fontWeight: 700, fontSize: 14 }}>{MESES[mes - 1]}/{ano}</div>
@@ -115,14 +120,16 @@ export default function CalendarioFluxo({ contas }) {
               </div>
             );
           })}
-          <div style={{ fontSize: 12, color: C.faint, marginTop: 6, lineHeight: 1.4 }}>
-            🟥 semana pesada · 🟧 média · 🟩 leve. As barras comparam as semanas entre si.
+          <div style={{ fontSize: 12, color: C.faint, marginTop: 6, lineHeight: 1.4, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px 4px' }}>
+            <Ponto cor={C.red} />semana pesada ·
+            <Ponto cor={C.amber} />média ·
+            <Ponto cor={C.green} />leve. As barras comparam as semanas entre si.
           </div>
         </div>
       )}
 
       {totalMes === 0 && (
-        <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '12px 0 2px' }}>Nenhuma conta a vencer neste mês. 🎉</div>
+        <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '12px 0 2px' }}>Nenhuma conta a vencer neste mês.</div>
       )}
     </Card>
   );
