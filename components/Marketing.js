@@ -55,13 +55,66 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
     const insta = dados.filter((d) => d.canal === 'Instagram' && num(d.seguidores) > 0).sort((a, b) => a.mes.localeCompare(b.mes));
     const seguidoresAtual = insta.length ? num(insta[insta.length - 1].seguidores) : 0;
 
-    return { meses, investidoMes, porCanal, investidoTotal, roasGeral, rep, avaliacoesAtual, notaAtual, insta, seguidoresAtual };
+    // Série de reputação do canal mais recente (pra comparar mês a mês o mesmo canal).
+    const repCanal = repAtual ? repAtual.canal : null;
+    const repSerie = repCanal ? rep.filter((d) => d.canal === repCanal) : [];
+    const segDelta = insta.length >= 2 ? num(insta[insta.length - 1].seguidores) - num(insta[insta.length - 2].seguidores) : null;
+    const avalDelta = repSerie.length >= 2 ? num(repSerie[repSerie.length - 1].avaliacoes) - num(repSerie[repSerie.length - 2].avaliacoes) : null;
+
+    // Análise automática em texto: se escreve sozinha conforme os lançamentos.
+    const linhas = [];
+    if (insta.length >= 2) {
+      const a = num(insta[insta.length - 1].seguidores), p = num(insta[insta.length - 2].seguidores), d = a - p;
+      linhas.push(d >= 0
+        ? `No Instagram você ganhou ${int(d)} seguidor${d === 1 ? '' : 'es'} em ${mesLabel(insta[insta.length - 1].mes)}, chegando a ${int(a)}.`
+        : `No Instagram você perdeu ${int(-d)} seguidor${-d === 1 ? '' : 'es'} em ${mesLabel(insta[insta.length - 1].mes)} (de ${int(p)} para ${int(a)}). Vale reforçar os posts.`);
+    } else if (insta.length === 1) {
+      linhas.push(`Instagram: marco inicial de ${int(num(insta[0].seguidores))} seguidores registrado.`);
+    }
+    if (repSerie.length >= 2) {
+      const a = num(repSerie[repSerie.length - 1].avaliacoes), p = num(repSerie[repSerie.length - 2].avaliacoes), d = a - p;
+      const nome = repCanal.replace(' (avaliações)', '');
+      linhas.push(d >= 0
+        ? `${nome}: +${int(d)} avaliaç${d === 1 ? 'ão' : 'ões'} em ${mesLabel(repSerie[repSerie.length - 1].mes)}, total de ${int(a)}.`
+        : `${nome}: o total de avaliações caiu de ${int(p)} para ${int(a)}.`);
+    } else if (repSerie.length === 1) {
+      linhas.push(`${repCanal.replace(' (avaliações)', '')}: marco inicial de ${int(num(repSerie[0].avaliacoes))} avaliações registrado.`);
+    }
+    if (insta.length >= 3) {
+      let melhor = null;
+      for (let i = 1; i < insta.length; i++) {
+        const d = num(insta[i].seguidores) - num(insta[i - 1].seguidores);
+        if (!melhor || d > melhor.d) melhor = { d, mes: insta[i].mes };
+      }
+      if (melhor && melhor.d > 0) linhas.push(`Seu melhor mês de crescimento no Instagram foi ${mesLabel(melhor.mes)} (+${int(melhor.d)}).`);
+    }
+    if (insta.length <= 1 && repSerie.length <= 1 && linhas.length > 0) {
+      linhas.push('Lance esses números de novo no próximo mês pra o app calcular o quanto você cresceu.');
+    }
+
+    return { meses, investidoMes, porCanal, investidoTotal, roasGeral, rep, avaliacoesAtual, notaAtual, insta, seguidoresAtual, segDelta, avalDelta, linhas };
   }, [dados, receitas]);
 
   const maxInvRec = Math.max(1, ...an.meses.map((m) => Math.max(an.investidoMes(m), receitaMes(m))));
   const maxCanal = Math.max(1, ...Object.values(an.porCanal));
   const maxSeg = Math.max(1, ...an.insta.map((d) => num(d.seguidores)));
   const maxAval = Math.max(1, ...an.rep.map((d) => num(d.avaliacoes)));
+
+  // Sub do KPI: variação vs. mês anterior (verde sobe, vermelho cai).
+  const deltaSub = (d) => {
+    if (d === null || d === undefined) return null;
+    if (d === 0) return <span style={{ color: C.faint }}>estável</span>;
+    return <span style={{ color: d > 0 ? C.green : C.red, fontWeight: 700 }}>{d > 0 ? '+' : ''}{int(d)} no mês</span>;
+  };
+  const temAds = an.investidoTotal > 0;
+  const resumoItems = [
+    { t: 'Seguidores', v: an.seguidoresAtual ? int(an.seguidoresAtual) : '—', c: C.accent, s: deltaSub(an.segDelta) },
+    { t: 'Avaliações', v: an.avaliacoesAtual ? int(an.avaliacoesAtual) : '—', c: C.accent, s: deltaSub(an.avalDelta) },
+    ...(temAds ? [
+      { t: 'Investido total', v: brl(an.investidoTotal), c: C.red },
+      { t: 'Receita ÷ investido', v: an.roasGeral ? an.roasGeral.toFixed(1) + 'x' : '—', c: an.roasGeral >= 1 ? C.green : C.amber },
+    ] : []),
+  ];
 
   const c = form.canal;
   const mostra = (campo) => {
@@ -74,18 +127,24 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
     <div>
       <PageTitle sub="Crescimento e retorno dos canais">Marketing</PageTitle>
 
-      <Resumo items={[
-        { t: 'Seguidores', v: an.seguidoresAtual ? int(an.seguidoresAtual) : '—', c: C.accent },
-        { t: 'Avaliações', v: an.avaliacoesAtual ? int(an.avaliacoesAtual) : '—', c: C.accent },
-        { t: 'Investido total', v: brl(an.investidoTotal), c: C.red },
-        { t: 'Receita ÷ investido', v: an.roasGeral ? an.roasGeral.toFixed(1) + 'x' : '—', c: an.roasGeral >= 1 ? C.green : C.amber },
-      ]} />
+      <Resumo items={resumoItems} />
 
       {dados.length === 0 ? (
         <Empty>Ainda sem dados de marketing.<br />Cadastre os números de cada canal por mês pra ver os gráficos de crescimento.</Empty>
       ) : (
         <>
-          {an.meses.some((m) => an.investidoMes(m) > 0 || receitaMes(m) > 0) && (
+          {an.linhas.length > 0 && (
+            <Card style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>Como está o crescimento</div>
+              {an.linhas.map((l, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, fontSize: 13.5, color: C.text, lineHeight: 1.5, marginBottom: 6 }}>
+                  <span style={{ color: C.accent, flexShrink: 0 }}>•</span><span>{l}</span>
+                </div>
+              ))}
+            </Card>
+          )}
+
+          {an.investidoTotal > 0 && (
             <Card style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Investimento × Receita por mês</div>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>O "retorno" é a receita do mês dividida pelo que você investiu — uma referência do peso do anúncio, não atribuição exata.</div>
@@ -117,15 +176,17 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
           {an.rep.length > 0 && (
             <Card style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>Reputação — avaliações</div>
-              {an.rep.map((d) => {
+              {an.rep.map((d, i) => {
                 const aval = num(d.avaliacoes), nota = num(d.nota);
                 const texto = [aval > 0 ? `${int(aval)} avaliações` : '', nota > 0 ? `${nota.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}/5` : ''].filter(Boolean).join(' · ');
                 const larg = aval > 0 ? Math.max(3, (aval / maxAval) * 100) : (nota / 5) * 100;
+                const prev = an.rep.slice(0, i).reverse().find((x) => x.canal === d.canal);
+                const dd = prev && aval > 0 ? aval - num(prev.avaliacoes) : null;
                 return (
                   <div key={d.id} style={{ marginBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, marginBottom: 3 }}>
                       <span style={{ color: C.muted }}>{d.canal.replace(' (avaliações)', '')} · {mesLabel(d.mes)}</span>
-                      <b style={{ color: C.accent }}>{texto}</b>
+                      <b style={{ color: C.accent }}>{texto}{dd !== null && dd !== 0 && <span style={{ color: dd > 0 ? C.green : C.red, fontWeight: 700, fontSize: 12, marginLeft: 6 }}>{dd > 0 ? '+' : ''}{int(dd)}</span>}</b>
                     </div>
                     <div style={{ height: 8, borderRadius: 999, background: `${C.line}55`, overflow: 'hidden' }}>
                       <div style={{ width: `${larg}%`, height: '100%', background: C.green, borderRadius: 999 }} />
@@ -139,9 +200,21 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
           {an.insta.length > 0 && (
             <Card style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>Instagram — seguidores</div>
-              {an.insta.map((d) => (
-                <Barra key={d.id} label={mesLabel(d.mes)} valor={num(d.seguidores)} max={maxSeg} cor={C.accent} texto={int(num(d.seguidores))} />
-              ))}
+              {an.insta.map((d, i) => {
+                const v = num(d.seguidores);
+                const dd = i > 0 ? v - num(an.insta[i - 1].seguidores) : null;
+                return (
+                  <div key={d.id} style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, marginBottom: 3 }}>
+                      <span style={{ color: C.muted }}>{mesLabel(d.mes)}</span>
+                      <b style={{ color: C.accent, fontVariantNumeric: 'tabular-nums' }}>{int(v)}{dd !== null && dd !== 0 && <span style={{ color: dd > 0 ? C.green : C.red, fontWeight: 700, fontSize: 12, marginLeft: 6 }}>{dd > 0 ? '+' : ''}{int(dd)}</span>}</b>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 999, background: `${C.line}55`, overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.max(3, (v / maxSeg) * 100)}%`, height: '100%', background: C.accent, borderRadius: 999 }} />
+                    </div>
+                  </div>
+                );
+              })}
             </Card>
           )}
         </>
