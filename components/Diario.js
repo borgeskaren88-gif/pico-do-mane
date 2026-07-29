@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import CalendarioPedidos from './CalendarioPedidos';
 
 const diarioVazio = () => ({
   data: todayISO(), clima: '', evento: '', receita: '', nPedidos: '', fiado: '',
@@ -65,18 +66,20 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
   return (
     <div>
       <PageTitle sub="Checklist do bar e fechamento do dia">Diário</PageTitle>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 18 }}>
       {onTarefas && (
-        <Card style={{ marginBottom: 18 }}>
+        <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+        <Card style={{ marginBottom: 0, padding: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 17, fontWeight: 800 }}>Checklist do bar</div>
-            {tarefasAbertas.length > 0 && <div style={{ fontSize: 13, color: C.muted }}>{tarefasAbertas.length} pendente{tarefasAbertas.length > 1 ? 's' : ''}</div>}
+            <div style={{ fontSize: 15, fontWeight: 800 }}>Checklist</div>
+            {tarefasAbertas.length > 0 && <div style={{ fontSize: 12, color: C.muted }}>{tarefasAbertas.length} pend.</div>}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: tarefasAbertas.length || tarefasFeitas.length ? 12 : 0 }}>
             <input value={novaTarefa} onChange={(e) => setNovaTarefa(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addTarefa(); }}
               placeholder="Nova tarefa… (ex: pagar boleto Ambev)" style={{ ...inputStyle, flex: '1 1 100%' }} />
             <input type="date" value={novaTarefaData} onChange={(e) => setNovaTarefaData(e.target.value)}
-              title="Data (opcional) — pra receber aviso no dia" style={{ ...inputStyle, flex: '1 1 150px' }} />
-            <Btn small onClick={addTarefa}>Adicionar</Btn>
+              title="Data (opcional) — pra receber aviso no dia" style={{ ...inputStyle, flex: '1 1 110px' }} />
+            <Btn small onClick={addTarefa}>Add</Btn>
           </div>
 
           {tarefasAbertas.length === 0 && tarefasFeitas.length === 0 && (
@@ -120,7 +123,12 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
             </div>
           )}
         </Card>
+        </div>
       )}
+        <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+          <CalendarioPedidos dados={dados} />
+        </div>
+      </div>
 
       <Resumo items={[
         { t: 'Dias registrados', v: dados.length },
