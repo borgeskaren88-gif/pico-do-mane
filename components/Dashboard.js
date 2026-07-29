@@ -134,7 +134,7 @@ export default function Dashboard() {
   };
 
   const tabs = [
-    ['hoje', 'Hoje'], ['diario', 'Diário'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
+    ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
     ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
     ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
