@@ -3,7 +3,8 @@ import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle } from './ui';
 import { brl, num, todayISO, ymOf, mesLabel, uid } from '../lib/util';
 
-const CANAIS = ['Meta Ads', 'Google Ads', 'Instagram', 'TripAdvisor', 'Outro'];
+const CANAIS = ['Meta Ads', 'Google Ads', 'Instagram', 'Google (avaliações)', 'TripAdvisor', 'Outro'];
+const REPUT = ['Google (avaliações)', 'TripAdvisor']; // canais de reputação (nota + avaliações)
 const vazio = () => ({ mes: ymOf(todayISO()), canal: 'Meta Ads', investido: '', alcance: '', cliques: '', seguidores: '', nota: '', avaliacoes: '', obs: '' });
 const int = (n) => Math.round(n).toLocaleString('pt-BR');
 
@@ -47,23 +48,26 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
     const receitaComInv = meses.filter((m) => investidoMes(m) > 0).reduce((s, m) => s + receitaMes(m), 0);
     const roasGeral = investidoTotal > 0 ? receitaComInv / investidoTotal : 0;
 
-    const ta = dados.filter((d) => d.canal === 'TripAdvisor' && (num(d.nota) > 0 || num(d.avaliacoes) > 0)).sort((a, b) => a.mes.localeCompare(b.mes));
-    const notaAtual = ta.length ? num(ta[ta.length - 1].nota) : 0;
+    const rep = dados.filter((d) => REPUT.includes(d.canal) && (num(d.nota) > 0 || num(d.avaliacoes) > 0)).sort((a, b) => a.mes.localeCompare(b.mes));
+    const repAtual = rep.length ? rep[rep.length - 1] : null;
+    const avaliacoesAtual = repAtual ? num(repAtual.avaliacoes) : 0;
+    const notaAtual = repAtual ? num(repAtual.nota) : 0;
     const insta = dados.filter((d) => d.canal === 'Instagram' && num(d.seguidores) > 0).sort((a, b) => a.mes.localeCompare(b.mes));
     const seguidoresAtual = insta.length ? num(insta[insta.length - 1].seguidores) : 0;
 
-    return { meses, investidoMes, porCanal, investidoTotal, roasGeral, ta, notaAtual, insta, seguidoresAtual };
+    return { meses, investidoMes, porCanal, investidoTotal, roasGeral, rep, avaliacoesAtual, notaAtual, insta, seguidoresAtual };
   }, [dados, receitas]);
 
   const maxInvRec = Math.max(1, ...an.meses.map((m) => Math.max(an.investidoMes(m), receitaMes(m))));
   const maxCanal = Math.max(1, ...Object.values(an.porCanal));
   const maxSeg = Math.max(1, ...an.insta.map((d) => num(d.seguidores)));
+  const maxAval = Math.max(1, ...an.rep.map((d) => num(d.avaliacoes)));
 
   const c = form.canal;
   const mostra = (campo) => {
-    if (c === 'TripAdvisor') return ['nota', 'avaliacoes'].includes(campo);
+    if (REPUT.includes(c)) return ['nota', 'avaliacoes'].includes(campo);
     if (c === 'Instagram') return ['investido', 'alcance', 'seguidores'].includes(campo);
-    return ['investido', 'alcance', 'cliques'].includes(campo); // Meta/Google/Outro
+    return ['investido', 'alcance', 'cliques'].includes(campo); // Meta Ads / Google Ads / Outro
   };
 
   return (
@@ -71,10 +75,10 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
       <PageTitle sub="Crescimento e retorno dos canais">Marketing</PageTitle>
 
       <Resumo items={[
+        { t: 'Seguidores', v: an.seguidoresAtual ? int(an.seguidoresAtual) : '—', c: C.accent },
+        { t: 'Avaliações', v: an.avaliacoesAtual ? int(an.avaliacoesAtual) : '—', c: C.accent },
         { t: 'Investido total', v: brl(an.investidoTotal), c: C.red },
         { t: 'Receita ÷ investido', v: an.roasGeral ? an.roasGeral.toFixed(1) + 'x' : '—', c: an.roasGeral >= 1 ? C.green : C.amber },
-        { t: 'Nota TripAdvisor', v: an.notaAtual ? an.notaAtual.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—', c: C.accent },
-        { t: 'Seguidores', v: an.seguidoresAtual ? int(an.seguidoresAtual) : '—', c: C.accent },
       ]} />
 
       {dados.length === 0 ? (
@@ -110,20 +114,25 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
             </Card>
           )}
 
-          {an.ta.length > 0 && (
+          {an.rep.length > 0 && (
             <Card style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>Reputação — TripAdvisor</div>
-              {an.ta.map((d) => (
-                <div key={d.id} style={{ marginBottom: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, marginBottom: 3 }}>
-                    <span style={{ color: C.muted }}>{mesLabel(d.mes)}</span>
-                    <b style={{ color: C.accent }}>{num(d.nota).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} / 5 {num(d.avaliacoes) > 0 ? `· ${int(num(d.avaliacoes))} avaliações` : ''}</b>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>Reputação — avaliações</div>
+              {an.rep.map((d) => {
+                const aval = num(d.avaliacoes), nota = num(d.nota);
+                const texto = [aval > 0 ? `${int(aval)} avaliações` : '', nota > 0 ? `${nota.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}/5` : ''].filter(Boolean).join(' · ');
+                const larg = aval > 0 ? Math.max(3, (aval / maxAval) * 100) : (nota / 5) * 100;
+                return (
+                  <div key={d.id} style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, marginBottom: 3 }}>
+                      <span style={{ color: C.muted }}>{d.canal.replace(' (avaliações)', '')} · {mesLabel(d.mes)}</span>
+                      <b style={{ color: C.accent }}>{texto}</b>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 999, background: `${C.line}55`, overflow: 'hidden' }}>
+                      <div style={{ width: `${larg}%`, height: '100%', background: C.green, borderRadius: 999 }} />
+                    </div>
                   </div>
-                  <div style={{ height: 8, borderRadius: 999, background: `${C.line}55`, overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min(100, (num(d.nota) / 5) * 100)}%`, height: '100%', background: C.green, borderRadius: 999 }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </Card>
           )}
 
