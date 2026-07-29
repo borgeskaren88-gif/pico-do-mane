@@ -108,6 +108,36 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
     onPagamento(novasCompras, novasDespesas);
   };
 
+  // Editar uma conta em aberto (fornecedor/categoria em comum + cada parcela).
+  const [editChave, setEditChave] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const setEditField = (k) => (v) => setEditForm((f) => ({ ...f, [k]: v }));
+  const setEditItem = (i, campo) => (v) => setEditForm((f) => ({ ...f, itens: f.itens.map((it, idx) => (idx === i ? { ...it, [campo]: v } : it)) }));
+  const abrirEdicao = (g) => {
+    setEditChave(g.chave);
+    setEditForm({
+      fornecedor: g.fornecedor || '',
+      categoria: g.itens[0].categoria || '',
+      itens: g.itens.map((it) => ({ id: it.id, produto: it.produto || '', vencimento: it.vencimento || '', valor: it.valorUnit || '' })),
+    });
+  };
+  const cancelarEdicao = () => { setEditChave(null); setEditForm(null); };
+  const salvarEdicao = () => {
+    const m = new Map(editForm.itens.map((it) => [it.id, it]));
+    onChange(dados.map((x) => {
+      if (!m.has(x.id)) return x;
+      const e = m.get(x.id);
+      return { ...x, fornecedor: limparNome(editForm.fornecedor), categoria: editForm.categoria, produto: limparNome(e.produto), vencimento: e.vencimento, valorUnit: e.valor || '0' };
+    }));
+    cancelarEdicao();
+  };
+  const excluirGrupo = (g) => {
+    if (typeof window !== 'undefined' && !window.confirm('Excluir esta conta em aberto? O lançamento será removido.')) return;
+    const ids = new Set(g.itens.map((x) => x.id));
+    if (editChave === g.chave) cancelarEdicao();
+    onChange(dados.filter((x) => !ids.has(x.id)));
+  };
+
   // Contas já pagas, agrupadas e mais recentes primeiro (pra desfazer).
   const pagosGrupos = useMemo(() => {
     const map = new Map();
@@ -212,6 +242,29 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
           const subtitulo = agrupado
             ? `${g.nota ? g.nota + ' · ' : ''}${g.itens.length} itens: ${g.itens.map((i) => i.produto).filter(Boolean).join(', ')}`
             : [primeiro.produto, g.nota && `Nota: ${g.nota}`, primeiro.obs].filter(Boolean).join(' · ');
+          if (editChave === g.chave) {
+            return (
+              <Card key={g.chave} style={{ marginBottom: 8, padding: '14px', borderColor: C.accent }}>
+                <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>Editar conta</div>
+                <Field label="Fornecedor / conta"><TextInput value={editForm.fornecedor} onChange={setEditField('fornecedor')} /></Field>
+                <Field label="Categoria"><Select value={editForm.categoria} onChange={setEditField('categoria')} options={CATEGORIAS_PRODUTO} /></Field>
+                {editForm.itens.map((it, i) => (
+                  <div key={it.id} style={{ marginBottom: 6, paddingTop: editForm.itens.length > 1 && i > 0 ? 10 : 0, borderTop: editForm.itens.length > 1 && i > 0 ? `1px solid ${C.line}` : 'none' }}>
+                    {editForm.itens.length > 1 && <div style={{ fontSize: 12, color: C.faint, fontWeight: 700, marginBottom: 6 }}>{i + 1}ª parcela</div>}
+                    <Field label="Descrição"><TextInput value={it.produto} onChange={setEditItem(i, 'produto')} /></Field>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <Field label="Vencimento"><TextInput type="date" value={it.vencimento} onChange={setEditItem(i, 'vencimento')} /></Field>
+                      <Field label="Valor (R$)"><NumInput value={it.valor} onChange={setEditItem(i, 'valor')} /></Field>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                  <Btn onClick={salvarEdicao}>Salvar</Btn>
+                  <Btn kind="ghost" onClick={cancelarEdicao}>Cancelar</Btn>
+                </div>
+              </Card>
+            );
+          }
           return (
             <Card key={g.chave} style={{ marginBottom: 8, padding: '12px 14px', borderColor: cor }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
@@ -222,10 +275,12 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
                     {g.vencimento ? `Vence ${fmtDate(g.vencimento)}${vencida ? ' · VENCIDA' : ''}` : 'Sem vencimento'} · {g.formaPagto}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(g.total)}</div>
-                  <div style={{ marginTop: 8 }}><Btn kind="ok" small onClick={() => pagarGrupo(g)}>Marcar pago</Btn></div>
-                </div>
+                <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(g.total)}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 10 }}>
+                <Btn kind="ghost" small onClick={() => abrirEdicao(g)}>Editar</Btn>
+                <Btn kind="ok" small onClick={() => pagarGrupo(g)}>Marcar pago</Btn>
+                <Btn kind="danger" small onClick={() => excluirGrupo(g)}>Excluir</Btn>
               </div>
             </Card>
           );
