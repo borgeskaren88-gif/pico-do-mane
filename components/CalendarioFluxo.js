@@ -44,6 +44,10 @@ export default function CalendarioFluxo({ contas }) {
   const totalSemana = (sem) => sem.reduce((s, d) => s + totalDia(d), 0);
   const maxSemana = Math.max(1, ...semanas.map(totalSemana));
   const totalMes = celulas.reduce((s, d) => s + totalDia(d), 0);
+  const diasComConta = celulas.filter((d) => totalDia(d) > 0).length;
+  const mediaDia = diasComConta ? totalMes / diasComConta : 0;
+  const semanasComConta = semanas.filter((s) => totalSemana(s) > 0).length;
+  const mediaSemana2 = semanasComConta ? totalMes / semanasComConta : 0;
 
   const mudarMes = (delta) => {
     let a = ano, m = mes + delta;
@@ -51,8 +55,22 @@ export default function CalendarioFluxo({ contas }) {
     setRef(`${a}-${pad(m)}`);
   };
 
+  // Nível de "aperto" comparado ao dia (ou semana) típico do mês: verde = leve,
+  // amarelo = médio, vermelho = pesa de verdade. Assim o calendário não fica
+  // sempre vermelho — o vermelho fica reservado pros dias que realmente pesam.
+  const nivel = (valor, media) => {
+    if (valor <= 0) return null;
+    if (!media) return C.green;
+    const r = valor / media;
+    return r <= 0.7 ? C.green : r <= 1.4 ? C.amber : C.red;
+  };
+  const rgbDe = (cor) => (cor === C.green ? '91,201,141' : cor === C.amber ? '231,178,77' : '233,118,92');
   const compacto = (n) => (n >= 1000 ? (n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'k' : String(Math.round(n)));
-  const corDia = (t) => (t <= 0 ? 'transparent' : `rgba(233,118,92,${(0.16 + 0.55 * (t / maxDia)).toFixed(2)})`);
+  const corDia = (t) => {
+    if (t <= 0) return 'rgba(91,201,141,0.08)'; // sem conta = tranquilo (verde bem suave)
+    const alpha = (0.30 + 0.45 * (t / maxDia)).toFixed(2);
+    return `rgba(${rgbDe(nivel(t, mediaDia))},${alpha})`;
+  };
   const btn = { background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 16, fontWeight: 800, lineHeight: 1 };
 
   return (
@@ -66,7 +84,7 @@ export default function CalendarioFluxo({ contas }) {
         </div>
       </div>
       <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>
-        A pagar no mês: <b style={{ color: totalMes > 0 ? C.red : C.faint }}>{brl(totalMes)}</b> · quanto mais escuro o dia, mais pesa.
+        A pagar no mês: <b style={{ color: totalMes > 0 ? C.text : C.faint }}>{brl(totalMes)}</b> · a cor mostra o quanto o dia aperta.
       </div>
 
       {/* Cabeçalho dos dias da semana */}
@@ -97,6 +115,12 @@ export default function CalendarioFluxo({ contas }) {
         })}
       </div>
 
+      {totalMes > 0 && (
+        <div style={{ fontSize: 12, color: C.faint, marginTop: 8, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px 4px' }}>
+          <Ponto cor={C.green} />leve · <Ponto cor={C.amber} />médio · <Ponto cor={C.red} />pesado — comparado a um dia normal do mês.
+        </div>
+      )}
+
       {/* Resumo por semana */}
       {totalMes > 0 && (
         <div style={{ marginTop: 16 }}>
@@ -107,7 +131,7 @@ export default function CalendarioFluxo({ contas }) {
             const dias = sem.filter(Boolean);
             const ini = dias[0], fim = dias[dias.length - 1];
             const ratio = t / maxSemana;
-            const cor = ratio > 0.66 ? C.red : ratio > 0.33 ? C.amber : C.green;
+            const cor = nivel(t, mediaSemana2) || C.green;
             return (
               <div key={i} style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, marginBottom: 4 }}>
@@ -120,10 +144,8 @@ export default function CalendarioFluxo({ contas }) {
               </div>
             );
           })}
-          <div style={{ fontSize: 12, color: C.faint, marginTop: 6, lineHeight: 1.4, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px 4px' }}>
-            <Ponto cor={C.red} />semana pesada ·
-            <Ponto cor={C.amber} />média ·
-            <Ponto cor={C.green} />leve. As barras comparam as semanas entre si.
+          <div style={{ fontSize: 12, color: C.faint, marginTop: 6, lineHeight: 1.4 }}>
+            A cor mostra o quanto a semana pesa; a barra compara as semanas entre si.
           </div>
         </div>
       )}
