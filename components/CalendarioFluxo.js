@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, NumInput } from './ui';
-import { num, brl, todayISO, fmtDate, MESES } from '../lib/util';
+import { num, brl, todayISO, fmtDate, limparNome, MESES } from '../lib/util';
 
 const pad = (n) => String(n).padStart(2, '0');
 const DIAS_CURTO = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
@@ -25,6 +25,9 @@ export default function CalendarioFluxo({ contas }) {
   const setLimite = (v) => { setLimiteStr(v); try { localStorage.setItem('pdm_fluxoLimite', v); } catch { } };
   const limite = num(limiteStr);
 
+  // Dia selecionado (ao tocar num dia com boleto, mostra os fornecedores).
+  const [selecionado, setSelecionado] = useState(null);
+
   const porDia = useMemo(() => {
     const m = {};
     for (const c of contas) {
@@ -33,6 +36,29 @@ export default function CalendarioFluxo({ contas }) {
     }
     return m;
   }, [contas]);
+
+  // Itens agrupados por dia, pra mostrar os nomes ao tocar num dia.
+  const itensPorDia = useMemo(() => {
+    const m = {};
+    for (const c of contas) {
+      if (!c.vencimento) continue;
+      (m[c.vencimento] = m[c.vencimento] || []).push(c);
+    }
+    return m;
+  }, [contas]);
+
+  // Fornecedores do dia selecionado (soma itens do mesmo fornecedor).
+  const detalhe = useMemo(() => {
+    if (!selecionado) return null;
+    const map = new Map();
+    for (const c of (itensPorDia[selecionado] || [])) {
+      const nome = limparNome(c.fornecedor) || limparNome(c.produto) || 'Conta';
+      const g = map.get(nome) || { nome, total: 0, nota: (c.nota || '').trim() };
+      g.total += num(c.quantidade) * num(c.valorUnit);
+      map.set(nome, g);
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }, [selecionado, itensPorDia]);
 
   const [ano, mes] = ref.split('-').map(Number); // mes 1-12
   const primeiroDiaSemana = new Date(ano, mes - 1, 1).getDay(); // 0=Dom
@@ -60,6 +86,7 @@ export default function CalendarioFluxo({ contas }) {
     let a = ano, m = mes + delta;
     if (m < 1) { m = 12; a--; } else if (m > 12) { m = 1; a++; }
     setRef(`${a}-${pad(m)}`);
+    setSelecionado(null);
   };
 
   // Nível de "aperto" comparado ao dia (ou semana) típico do mês: verde = leve,
@@ -116,18 +143,40 @@ export default function CalendarioFluxo({ contas }) {
           const iso = isoDe(d);
           const ehHoje = iso === hoje;
           const vencido = t > 0 && iso < hoje;
+          const temConta = t > 0;
+          const sel = selecionado === iso;
           return (
-            <div key={i} style={{
-              aspectRatio: '1 / 1', borderRadius: 8, background: corDia(t),
-              border: ehHoje ? `2px solid ${C.accent}` : vencido ? `1px solid ${C.red}` : `1px solid ${C.line}44`,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 2, minWidth: 0,
-            }}>
+            <div key={i}
+              onClick={temConta ? () => setSelecionado((s) => (s === iso ? null : iso)) : undefined}
+              style={{
+                aspectRatio: '1 / 1', borderRadius: 8, background: corDia(t),
+                border: ehHoje ? `2px solid ${C.accent}` : vencido ? `1px solid ${C.red}` : `1px solid ${C.line}44`,
+                boxShadow: sel ? `0 0 0 2px ${C.accent2}` : 'none',
+                cursor: temConta ? 'pointer' : 'default',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 2, minWidth: 0,
+              }}>
               <div style={{ fontSize: 11, color: ehHoje ? C.accent : C.muted, fontWeight: ehHoje ? 800 : 500, lineHeight: 1 }}>{d}</div>
               {t > 0 && <div style={{ fontSize: 9, fontWeight: 800, color: C.text, marginTop: 2, whiteSpace: 'nowrap' }}>{compacto(t)}</div>}
             </div>
           );
         })}
       </div>
+
+      {/* Detalhe do dia tocado: nomes dos fornecedores + valor */}
+      {selecionado && detalhe && detalhe.length > 0 && (
+        <div style={{ marginTop: 12, padding: '10px 12px', background: C.raised, borderRadius: 10, border: `1px solid ${C.line}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ fontSize: 12, color: C.muted, fontWeight: 700 }}>Vence {fmtDate(selecionado)}</div>
+            <button onClick={() => setSelecionado(null)} aria-label="Fechar" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 17, lineHeight: 1, padding: 0 }}>×</button>
+          </div>
+          {detalhe.map((g, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, fontSize: 13, padding: '2px 0' }}>
+              <span style={{ color: C.text, minWidth: 0 }}>{g.nome}{g.nota ? <span style={{ color: C.faint, fontSize: 12 }}> · {g.nota}</span> : null}</span>
+              <b style={{ color: C.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(g.total)}</b>
+            </div>
+          ))}
+        </div>
+      )}
 
       {totalMes > 0 && (
         <div style={{ fontSize: 12, color: C.faint, marginTop: 8, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px 4px' }}>
