@@ -1,6 +1,6 @@
 'use client';
-import React, { useState, useMemo } from 'react';
-import { C, Card } from './ui';
+import React, { useState, useMemo, useEffect } from 'react';
+import { C, Card, NumInput } from './ui';
 import { num, brl, todayISO, fmtDate, MESES } from '../lib/util';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -17,6 +17,13 @@ const Ponto = ({ cor }) => (
 export default function CalendarioFluxo({ contas }) {
   const hoje = todayISO();
   const [ref, setRef] = useState(hoje.slice(0, 7)); // 'YYYY-MM'
+
+  // Limite (R$) definido pela dona pra quando o dia fica vermelho. Fica salvo
+  // no aparelho. Vazio/0 = automático (compara com o dia típico do mês).
+  const [limiteStr, setLimiteStr] = useState('');
+  useEffect(() => { try { const v = localStorage.getItem('pdm_fluxoLimite'); if (v != null) setLimiteStr(v); } catch { } }, []);
+  const setLimite = (v) => { setLimiteStr(v); try { localStorage.setItem('pdm_fluxoLimite', v); } catch { } };
+  const limite = num(limiteStr);
 
   const porDia = useMemo(() => {
     const m = {};
@@ -65,11 +72,18 @@ export default function CalendarioFluxo({ contas }) {
     return r <= 0.7 ? C.green : r <= 1.4 ? C.amber : C.red;
   };
   const rgbDe = (cor) => (cor === C.green ? '91,201,141' : cor === C.amber ? '231,178,77' : '233,118,92');
+  // Nível do dia: se você definir um limite (R$), vira absoluto — vermelho só
+  // acima dele e amarelo a partir da metade; senão, compara ao dia típico do mês.
+  const nivelDia = (t) => {
+    if (t <= 0) return null;
+    if (limite > 0) return t >= limite ? C.red : t >= limite / 2 ? C.amber : C.green;
+    return nivel(t, mediaDia);
+  };
   const compacto = (n) => (n >= 1000 ? (n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'k' : String(Math.round(n)));
   const corDia = (t) => {
     if (t <= 0) return 'rgba(91,201,141,0.08)'; // sem conta = tranquilo (verde bem suave)
     const alpha = (0.30 + 0.45 * (t / maxDia)).toFixed(2);
-    return `rgba(${rgbDe(nivel(t, mediaDia))},${alpha})`;
+    return `rgba(${rgbDe(nivelDia(t))},${alpha})`;
   };
   const btn = { background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 16, fontWeight: 800, lineHeight: 1 };
 
@@ -117,9 +131,19 @@ export default function CalendarioFluxo({ contas }) {
 
       {totalMes > 0 && (
         <div style={{ fontSize: 12, color: C.faint, marginTop: 8, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px 4px' }}>
-          <Ponto cor={C.green} />leve · <Ponto cor={C.amber} />médio · <Ponto cor={C.red} />pesado — comparado a um dia normal do mês.
+          <Ponto cor={C.green} />leve · <Ponto cor={C.amber} />médio · <Ponto cor={C.red} />pesado — {limite > 0 ? <>vermelho a partir de {brl(limite)}.</> : 'comparado a um dia normal do mês.'}
         </div>
       )}
+
+      <details style={{ marginTop: 10 }}>
+        <summary style={{ cursor: 'pointer', fontSize: 12, color: C.muted, fontWeight: 600 }}>Ajustar cores</summary>
+        <div style={{ marginTop: 8, padding: 10, background: C.raised, borderRadius: 10 }}>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, lineHeight: 1.4 }}>
+            Ficar <b style={{ color: C.red }}>vermelho</b> a partir de (R$) — o <b style={{ color: C.amber }}>amarelo</b> começa na metade. Deixe <b>0</b> (ou vazio) para automático, comparando com o dia típico do mês.
+          </div>
+          <div style={{ maxWidth: 170 }}><NumInput value={limiteStr} onChange={setLimite} placeholder="0 = automático" /></div>
+        </div>
+      </details>
 
       {/* Resumo por semana */}
       {totalMes > 0 && (
