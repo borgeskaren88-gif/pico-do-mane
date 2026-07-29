@@ -7,6 +7,7 @@ import SEED_DATA from '../data/seed.json';
 
 import Hoje from './Hoje';
 import Diario from './Diario';
+import Marketing from './Marketing';
 import Lancamentos from './Lancamentos';
 import Compras from './Compras';
 import ContasPagar from './ContasPagar';
@@ -63,6 +64,7 @@ export default function Dashboard() {
   const [cotacoes, setCotacoes] = useState([]);
   const [garrafas, setGarrafas] = useState([]);
   const [tarefas, setTarefas] = useState([]);
+  const [marketing, setMarketing] = useState([]);
   const [mes, setMes] = useState(ymOf(todayISO()));
 
   useEffect(() => {
@@ -83,6 +85,7 @@ export default function Dashboard() {
       setDiario(limpos.diario); setReceitas(limpos.receitas); setDespesas(limpos.despesas);
       setCompras(limpos.compras); setCotacoes(limpos.cotacoes); setGarrafas(limpos.garrafas);
       setTarefas((salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : []);
+      setMarketing((salvo && Array.isArray(salvo.marketing)) ? salvo.marketing : []);
       if (vazio || mudou) await apiSalvar({ ...limpos, tarefas: (salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : [] });
       setLoaded(true);
     })();
@@ -93,7 +96,7 @@ export default function Dashboard() {
       diario: parcial.diario ?? diario, receitas: parcial.receitas ?? receitas,
       despesas: parcial.despesas ?? despesas, compras: parcial.compras ?? compras,
       cotacoes: parcial.cotacoes ?? cotacoes, garrafas: parcial.garrafas ?? garrafas,
-      tarefas: parcial.tarefas ?? tarefas,
+      tarefas: parcial.tarefas ?? tarefas, marketing: parcial.marketing ?? marketing,
     };
     apiSalvar(dados);
   };
@@ -106,6 +109,7 @@ export default function Dashboard() {
     cotacoes: (v) => { setCotacoes(v); salvarTudo({ cotacoes: v }); },
     garrafas: (v) => { setGarrafas(v); salvarTudo({ garrafas: v }); },
     tarefas: (v) => { setTarefas(v); salvarTudo({ tarefas: v }); },
+    marketing: (v) => { setMarketing(v); salvarTudo({ marketing: v }); },
   };
 
   // Aplica mudanças em compras E despesas numa tacada só (usado ao marcar/
@@ -136,7 +140,7 @@ export default function Dashboard() {
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
     ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
-    ['relatorios', 'Relatórios'], ['backup', 'Backup'],
+    ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
 
   // Selos das abas: boletos que vencem hoje ou já vencidos (A Pagar) e tarefas
@@ -195,16 +199,17 @@ export default function Dashboard() {
         {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
+        {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
-        {tab === 'backup' && <Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas }} restore={(d) => {
+        {tab === 'backup' && <Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
             compras: d.compras || compras, cotacoes: d.cotacoes || cotacoes, garrafas: d.garrafas || garrafas,
-            tarefas: d.tarefas || tarefas,
+            tarefas: d.tarefas || tarefas, marketing: d.marketing || marketing,
           };
           setDiario(dados.diario); setReceitas(dados.receitas); setDespesas(dados.despesas);
           setCompras(dados.compras); setCotacoes(dados.cotacoes); setGarrafas(dados.garrafas);
-          setTarefas(dados.tarefas);
+          setTarefas(dados.tarefas); setMarketing(dados.marketing);
           apiSalvar(dados);
         }} />}
       </div>
