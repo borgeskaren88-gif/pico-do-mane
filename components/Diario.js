@@ -65,7 +65,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
 
   return (
     <div>
-      <PageTitle sub="Checklist do bar e fechamento do dia">Diário</PageTitle>
+      <PageTitle sub="Checklist do bar e fechamento do dia">Log Operacional</PageTitle>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 18 }}>
       {onTarefas && (
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>

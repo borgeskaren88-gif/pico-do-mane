@@ -110,7 +110,7 @@ function montarAnalise(all) {
     g.dataAbertura && `aberto ${g.dataAbertura}`, g.dataTermino && `fim ${g.dataTermino}`,
     g.drinks && `${g.drinks} drinks`, g.obs,
   ]));
-  secao('Diário', porData(all.diario), (d) => clean([
+  secao('Log Operacional', porData(all.diario), (d) => clean([
     d.data, d.clima, d.evento && `evento: ${d.evento}`, d.receita && `receita ${d.receita}`,
     d.nPedidos && `${d.nPedidos} pedidos`, d.fiado && `${d.fiado} fiado`, d.nota && `nota ${d.nota}`,
     d.problema, d.decisao, d.aprendizado, d.prioridade,
@@ -222,7 +222,7 @@ export default function Backup({ all, restore }) {
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>Seus dados</div>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>Tudo é salvo automaticamente e continua aqui quando você voltar. Guarde um backup de vez em quando e use "Copiar" quando quiser que eu analise seus números.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-          <KPI titulo="Diário" valor={all.diario.length} />
+          <KPI titulo="Log Operacional" valor={all.diario.length} />
           <KPI titulo="Receitas" valor={all.receitas.length} />
           <KPI titulo="Despesas" valor={all.despesas.length} />
           <KPI titulo="Compras" valor={all.compras.length} />
