@@ -3,13 +3,14 @@ import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import CalendarioPedidos from './CalendarioPedidos';
+import Visitantes from './Visitantes';
 
 const diarioVazio = () => ({
   data: todayISO(), clima: '', evento: '', receita: '', nPedidos: '', fiado: '',
   caixaFechou: '', diferenca: '', comprasEmerg: '', estoqueCritico: '',
   problema: '', decisao: '', aprendizado: '', prioridade: '', nota: '',
 });
-export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [] }) {
+export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [], visitantes = [], onVisitantes }) {
   const [form, setForm] = useState(diarioVazio());
   const [editId, setEditId] = useState(null);
   const [novaTarefa, setNovaTarefa] = useState('');
@@ -177,6 +178,8 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
           {editId && <Btn kind="ghost" onClick={() => { setForm(diarioVazio()); setEditId(null); }}>Cancelar</Btn>}
         </div>
       </Card>
+
+      {onVisitantes && <Visitantes dados={visitantes} onChange={onVisitantes} />}
 
       <SecTitle>Histórico ({dados.length})</SecTitle>
       {ordenado.length === 0 ? <Empty>Nenhum dia registrado ainda.<br />Comece fechando o caixa de hoje.</Empty> :
