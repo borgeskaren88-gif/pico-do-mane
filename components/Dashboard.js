@@ -143,12 +143,10 @@ export default function Dashboard() {
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
 
-  // Selos das abas: boletos que vencem hoje ou já vencidos (A Pagar) e tarefas
-  // com data até hoje ainda não feitas (Diário).
+  // Selo do Diário: tarefas com data até hoje ainda não feitas.
   const hojeIso = todayISO();
-  const boletosAlerta = compras.filter((c) => c.pago !== 'Sim' && c.vencimento && c.vencimento <= hojeIso).length;
   const tarefasAlerta = tarefas.filter((t) => !t.feito && t.data && t.data <= hojeIso).length;
-  const badges = { pagar: boletosAlerta, diario: tarefasAlerta };
+  const badges = { diario: tarefasAlerta };
 
   if (!loaded) return (
     <div style={{ minHeight: '100vh', background: C.ink, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>Carregando seus dados…</div>
