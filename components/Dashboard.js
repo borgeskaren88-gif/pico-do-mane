@@ -8,6 +8,7 @@ import SEED_DATA from '../data/seed.json';
 import Hoje from './Hoje';
 import Diario from './Diario';
 import Marketing from './Marketing';
+import ListaCompras from './ListaCompras';
 import Lancamentos from './Lancamentos';
 import Compras from './Compras';
 import ContasPagar from './ContasPagar';
@@ -66,6 +67,8 @@ export default function Dashboard() {
   const [tarefas, setTarefas] = useState([]);
   const [marketing, setMarketing] = useState([]);
   const [visitantes, setVisitantes] = useState([]);
+  const [listaCompras, setListaCompras] = useState([]);
+  const [listasModelo, setListasModelo] = useState([]);
   const [mes, setMes] = useState(ymOf(todayISO()));
 
   useEffect(() => {
@@ -88,6 +91,8 @@ export default function Dashboard() {
       setTarefas((salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : []);
       setMarketing((salvo && Array.isArray(salvo.marketing)) ? salvo.marketing : []);
       setVisitantes((salvo && Array.isArray(salvo.visitantes)) ? salvo.visitantes : []);
+      setListaCompras((salvo && Array.isArray(salvo.listaCompras)) ? salvo.listaCompras : []);
+      setListasModelo((salvo && Array.isArray(salvo.listasModelo)) ? salvo.listasModelo : []);
       if (vazio || mudou) await apiSalvar({ ...limpos, tarefas: (salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : [] });
       setLoaded(true);
     })();
@@ -100,6 +105,7 @@ export default function Dashboard() {
       cotacoes: parcial.cotacoes ?? cotacoes, garrafas: parcial.garrafas ?? garrafas,
       tarefas: parcial.tarefas ?? tarefas, marketing: parcial.marketing ?? marketing,
       visitantes: parcial.visitantes ?? visitantes,
+      listaCompras: parcial.listaCompras ?? listaCompras, listasModelo: parcial.listasModelo ?? listasModelo,
     };
     apiSalvar(dados);
   };
@@ -135,6 +141,17 @@ export default function Dashboard() {
     salvarTudo(parcial);
   };
 
+  // Lista de compras: um único save aplica listaCompras/modelos e, quando um
+  // item é "lançado", também compras/despesas/cotações — sem corrida de estado.
+  const aplicarLista = (parcial) => {
+    if (parcial.listaCompras) setListaCompras(parcial.listaCompras);
+    if (parcial.listasModelo) setListasModelo(parcial.listasModelo);
+    if (parcial.compras) setCompras(parcial.compras);
+    if (parcial.despesas) setDespesas(parcial.despesas);
+    if (parcial.cotacoes) setCotacoes(parcial.cotacoes);
+    salvarTudo(parcial);
+  };
+
   const sair = async () => {
     await fetch('/api/logout', { method: 'POST' });
     router.push('/');
@@ -143,7 +160,7 @@ export default function Dashboard() {
 
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
-    ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
+    ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
 
@@ -199,19 +216,22 @@ export default function Dashboard() {
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
         {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
+        {tab === 'lista' && <ListaCompras itens={listaCompras} modelos={listasModelo} cotacoes={cotacoes} compras={compras} despesas={despesas} onAplicar={aplicarLista} />}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
-        {tab === 'backup' && <Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes }} restore={(d) => {
+        {tab === 'backup' && <Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
             compras: d.compras || compras, cotacoes: d.cotacoes || cotacoes, garrafas: d.garrafas || garrafas,
             tarefas: d.tarefas || tarefas, marketing: d.marketing || marketing, visitantes: d.visitantes || visitantes,
+            listaCompras: d.listaCompras || listaCompras, listasModelo: d.listasModelo || listasModelo,
           };
           setDiario(dados.diario); setReceitas(dados.receitas); setDespesas(dados.despesas);
           setCompras(dados.compras); setCotacoes(dados.cotacoes); setGarrafas(dados.garrafas);
           setTarefas(dados.tarefas); setMarketing(dados.marketing); setVisitantes(dados.visitantes);
+          setListaCompras(dados.listaCompras); setListasModelo(dados.listasModelo);
           apiSalvar(dados);
         }} />}
       </div>
