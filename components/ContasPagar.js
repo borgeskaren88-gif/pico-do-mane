@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle } from './ui';
-import { brl, num, todayISO, fmtDate, addDays, uid, limparNome, montarParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
+import { brl, num, todayISO, fmtDate, addDays, uid, limparNome, montarParcelas, agruparContasAbertas, CATEGORIAS_PRODUTO } from '../lib/util';
 import CalendarioFluxo from './CalendarioFluxo';
 
 const formVazio = () => ({ fornecedor: '', descricao: '', categoria: '', valorTotal: '', parcelas: '1' });
@@ -61,21 +61,10 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
   const abertas = dados.filter((d) => d.pago !== 'Sim');
   const total = abertas.reduce((s, d) => s + num(d.quantidade) * num(d.valorUnit), 0);
 
-  // Agrupa itens que compartilham a mesma "nota/boleto" (mesmo fornecedor)
-  // num único pagamento. Itens sem nota ficam individuais.
-  const grupos = useMemo(() => {
-    const map = new Map();
-    for (const d of abertas) {
-      const notaTrim = (d.nota || '').trim();
-      const chave = notaTrim ? `n:${notaTrim}|${(d.fornecedor || '').trim().toLowerCase()}` : `i:${d.id}`;
-      let g = map.get(chave);
-      if (!g) { g = { chave, nota: notaTrim, fornecedor: d.fornecedor, formaPagto: d.formaPagto, itens: [], total: 0, vencimento: '' }; map.set(chave, g); }
-      g.itens.push(d);
-      g.total += num(d.quantidade) * num(d.valorUnit);
-      if (d.vencimento && (!g.vencimento || d.vencimento < g.vencimento)) g.vencimento = d.vencimento;
-    }
-    return [...map.values()].sort((a, b) => (a.vencimento || '9999').localeCompare(b.vencimento || '9999'));
-  }, [abertas]);
+  // Agrupa itens que compartilham a mesma "nota/boleto" (mesmo fornecedor) num
+  // único pagamento. Itens sem nota ficam individuais. (Helper compartilhado com
+  // a tela Hoje, pra os dois contarem boletos igual.)
+  const grupos = useMemo(() => agruparContasAbertas(abertas), [abertas]);
 
   const vencidasGrupos = grupos.filter((g) => g.vencimento && g.vencimento < hoje);
   const totalVenc = vencidasGrupos.reduce((s, g) => s + g.total, 0);

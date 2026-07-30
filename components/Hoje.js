@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
-import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], setTab }) {
   const [mostrarValores, setMostrarValores] = useState(true);
@@ -15,7 +15,10 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const jaTem = diario.some((d) => d.data === hoje);
   const abertas = compras.filter((c) => c.pago !== 'Sim');
   const totalPagar = abertas.reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
-  const vencidas = abertas.filter((c) => c.vencimento && c.vencimento < hoje);
+  // Agrupa por nota/boleto pra contar "boletos", não itens soltos (igual à aba
+  // Contas a Pagar) — uma nota com vários produtos é um boleto só.
+  const gruposAbertos = agruparContasAbertas(abertas);
+  const vencidas = gruposAbertos.filter((g) => g.vencimento && g.vencimento < hoje);
   const garrafasEmUso = garrafas.filter((g) => g.dataAbertura && !g.dataTermino);
 
   // Saudação conforme a hora: manhã (5–11), tarde (12–17), noite (demais).
@@ -23,9 +26,9 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const saudacao = (horaAgora >= 5 && horaAgora < 12) ? 'Bom dia' : (horaAgora >= 12 && horaAgora < 18) ? 'Boa tarde' : 'Boa noite';
 
   // Avisos do dia
-  const boletosHoje = abertas.filter((c) => c.vencimento === hoje);
-  const totalBoletosHoje = boletosHoje.reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
-  const totalVencidas = vencidas.reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
+  const boletosHoje = gruposAbertos.filter((g) => g.vencimento === hoje);
+  const totalBoletosHoje = boletosHoje.reduce((s, g) => s + g.total, 0);
+  const totalVencidas = vencidas.reduce((s, g) => s + g.total, 0);
   const tarefasHoje = tarefas.filter((t) => !t.feito && t.data === hoje);
   const tarefasAtrasadas = tarefas.filter((t) => !t.feito && t.data && t.data < hoje);
   const temAviso = boletosHoje.length || vencidas.length || tarefasHoje.length || tarefasAtrasadas.length;
@@ -90,7 +93,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
             <div>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 600 }}>Contas a pagar em aberto</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: C.red, marginTop: 4 }}>{oculto(brl(totalPagar))}</div>
-              <div style={{ fontSize: 12, color: vencidas.length ? C.red : C.faint, marginTop: 2 }}>{abertas.length} conta(s){vencidas.length ? ` · ${vencidas.length} vencida(s)` : ''}</div>
+              <div style={{ fontSize: 12, color: vencidas.length ? C.red : C.faint, marginTop: 2 }}>{gruposAbertos.length} conta(s){vencidas.length ? ` · ${vencidas.length} vencida(s)` : ''}</div>
             </div>
             <Btn kind="ghost" small onClick={() => setTab('pagar')}>Ver</Btn>
           </div>
