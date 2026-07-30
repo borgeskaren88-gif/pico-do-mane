@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
+import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import CalendarioPedidos from './CalendarioPedidos';
 import Visitantes from './Visitantes';
@@ -169,10 +169,10 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
           <Field label="Compras emergenciais?"><Select value={form.comprasEmerg} onChange={set('comprasEmerg')} options={['Sim', 'Não']} /></Field>
           <Field label="Estoque crítico?"><Select value={form.estoqueCritico} onChange={set('estoqueCritico')} options={['Sim', 'Não']} /></Field>
         </div>
-        <Field label="Problema do dia"><Area value={form.problema} onChange={set('problema')} placeholder="O que travou?" /></Field>
-        <Field label="Melhor decisão"><Area value={form.decisao} onChange={set('decisao')} placeholder="O que você fez de certo?" /></Field>
-        <Field label="Aprendizado"><Area value={form.aprendizado} onChange={set('aprendizado')} placeholder="O que fica pra próxima?" /></Field>
-        <Field label="Prioridade de amanhã"><Area value={form.prioridade} onChange={set('prioridade')} placeholder="Foco nº 1 do próximo dia" /></Field>
+        <Field label="Problema do dia"><AreaVoz value={form.problema} onChange={set('problema')} placeholder="O que travou?" /></Field>
+        <Field label="Melhor decisão"><AreaVoz value={form.decisao} onChange={set('decisao')} placeholder="O que você fez de certo?" /></Field>
+        <Field label="Aprendizado"><AreaVoz value={form.aprendizado} onChange={set('aprendizado')} placeholder="O que fica pra próxima?" /></Field>
+        <Field label="Prioridade de amanhã"><AreaVoz value={form.prioridade} onChange={set('prioridade')} placeholder="Foco nº 1 do próximo dia" /></Field>
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvar}>{editId ? 'Salvar alterações' : 'Registrar dia'}</Btn>
           {editId && <Btn kind="ghost" onClick={() => { setForm(diarioVazio()); setEditId(null); }}>Cancelar</Btn>}

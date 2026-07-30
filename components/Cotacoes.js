@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, limparNome, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import MicBtn from './MicBtn';
 
 export default function Cotacoes({ dados, onChange }) {
   const vazio = { data: todayISO(), produto: '', fornecedor: '', preco: '', categoria: '' };
@@ -56,11 +57,21 @@ export default function Cotacoes({ dados, onChange }) {
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar cotação' : 'Comparação de fornecedores'}</div>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>{editId ? 'Ajuste os dados e salve. Corrija o nome (ex.: 750ml), o preço, o fornecedor ou a data.' : 'Cadastre cada preço que você vê. O painel calcula sozinho o menor, o maior, a variação % e o melhor fornecedor por produto.'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
-          <Field label="Produto"><TextInput value={form.produto} onChange={set('produto')} placeholder="Original 600ml…" /></Field>
+          <Field label="Produto">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}><TextInput value={form.produto} onChange={set('produto')} placeholder="Original 600ml…" /></div>
+              <MicBtn value={form.produto} onChange={set('produto')} />
+            </div>
+          </Field>
           <Field label="Preço (R$)"><NumInput value={form.preco} onChange={set('preco')} /></Field>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Fornecedor"><TextInput value={form.fornecedor} onChange={set('fornecedor')} placeholder="Ambev, Komprão…" /></Field>
+          <Field label="Fornecedor">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}><TextInput value={form.fornecedor} onChange={set('fornecedor')} placeholder="Ambev, Komprão…" /></div>
+              <MicBtn value={form.fornecedor} onChange={set('fornecedor')} />
+            </div>
+          </Field>
           <Field label="Data"><TextInput type="date" value={form.data} onChange={set('data')} /></Field>
         </div>
         <Field label="Categoria"><Select value={form.categoria} onChange={set('categoria')} options={CATEGORIAS_PRODUTO} /></Field>
