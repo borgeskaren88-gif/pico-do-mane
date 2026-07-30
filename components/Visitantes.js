@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, Field, TextInput, NumInput, Select, Area, Empty } from './ui';
+import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty } from './ui';
 import { num, todayISO, ymOf, fmtDate, mesLabel, uid } from '../lib/util';
+import AreaVoz from './AreaVoz';
 
 const CANAIS = ['Instagram', 'Google', 'TripAdvisor', 'Indicação', 'Passando na rua', 'Já é cliente', 'Outro'];
 const vazio = () => ({ data: todayISO(), pessoas: '', origem: '', comoConheceu: 'Instagram', obs: '' });
@@ -66,7 +67,7 @@ export default function Visitantes({ dados = [], onChange }) {
             <Field label="De onde vieram"><TextInput value={form.origem} onChange={set('origem')} placeholder="João Pessoa/PB…" /></Field>
             <Field label="Como conheceram"><Select value={form.comoConheceu} onChange={set('comoConheceu')} options={CANAIS} /></Field>
           </div>
-          <Field label="História / observação"><Area value={form.obs} onChange={set('obs')} placeholder="De passagem por Floripa, viram no Instagram e o Pico foi o 1º lugar que visitaram na cidade." /></Field>
+          <Field label="História / observação"><AreaVoz value={form.obs} onChange={set('obs')} placeholder="De passagem por Floripa, viram no Instagram e o Pico foi o 1º lugar que visitaram na cidade." /></Field>
           <div style={{ display: 'flex', gap: 10 }}>
             <Btn onClick={salvar}>{editId ? 'Salvar' : 'Registrar'}</Btn>
             <Btn kind="ghost" onClick={() => { setForm(vazio()); setEditId(null); setAberto(false); }}>Cancelar</Btn>
