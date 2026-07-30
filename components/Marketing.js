@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle } from './ui';
 import { brl, num, todayISO, ymOf, mesLabel, uid } from '../lib/util';
 
@@ -23,10 +23,43 @@ function Barra({ label, valor, max, cor, texto }) {
   );
 }
 
+// Barra de progresso rumo a uma meta (verde quando bate).
+function MetaBar({ label, atual, meta }) {
+  const pct = meta > 0 ? Math.min(100, (atual / meta) * 100) : 0;
+  const batida = meta > 0 && atual >= meta;
+  const cor = batida ? C.green : C.accent;
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, marginBottom: 4 }}>
+        <span style={{ color: C.muted }}>{label}</span>
+        <b style={{ color: cor, fontVariantNumeric: 'tabular-nums' }}>{int(atual)} / {int(meta)} · {Math.round(pct)}%{batida ? ' — batida!' : ''}</b>
+      </div>
+      <div style={{ height: 10, borderRadius: 999, background: `${C.line}55`, overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: cor, borderRadius: 999 }} />
+      </div>
+    </div>
+  );
+}
+
 export default function Marketing({ dados, onChange, receitas = [] }) {
   const [form, setForm] = useState(vazio());
   const [editId, setEditId] = useState(null);
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // As metas ficam guardadas num registro especial (tipo: 'metas') dentro do
+  // próprio array; 'regs' são os lançamentos reais, sem esse registro.
+  const regs = useMemo(() => dados.filter((d) => d.tipo !== 'metas'), [dados]);
+  const metasRec = dados.find((d) => d.tipo === 'metas');
+  const [metaForm, setMetaForm] = useState({ seguidores: '', avaliacoes: '' });
+  useEffect(() => {
+    setMetaForm({ seguidores: metasRec?.seguidores || '', avaliacoes: metasRec?.avaliacoes || '' });
+  }, [metasRec?.id]);
+  const setMeta = (k) => (v) => setMetaForm((f) => ({ ...f, [k]: v }));
+  const salvarMetas = () => {
+    const payload = { seguidores: metaForm.seguidores, avaliacoes: metaForm.avaliacoes };
+    if (metasRec) onChange(dados.map((d) => (d.tipo === 'metas' ? { ...d, ...payload } : d)));
+    else onChange([{ id: uid(), tipo: 'metas', ...payload }, ...dados]);
+  };
 
   const salvar = () => {
     if (!form.mes || !form.canal) return;
@@ -40,19 +73,19 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
   const receitaMes = (m) => receitas.filter((r) => ymOf(r.data) === m).reduce((s, r) => s + num(r.valor), 0);
 
   const an = useMemo(() => {
-    const meses = [...new Set(dados.map((d) => d.mes).filter(Boolean))].sort();
-    const investidoMes = (m) => dados.filter((d) => d.mes === m).reduce((s, d) => s + num(d.investido), 0);
+    const meses = [...new Set(regs.map((d) => d.mes).filter(Boolean))].sort();
+    const investidoMes = (m) => regs.filter((d) => d.mes === m).reduce((s, d) => s + num(d.investido), 0);
     const porCanal = {};
-    for (const d of dados) porCanal[d.canal] = (porCanal[d.canal] || 0) + num(d.investido);
-    const investidoTotal = dados.reduce((s, d) => s + num(d.investido), 0);
+    for (const d of regs) porCanal[d.canal] = (porCanal[d.canal] || 0) + num(d.investido);
+    const investidoTotal = regs.reduce((s, d) => s + num(d.investido), 0);
     const receitaComInv = meses.filter((m) => investidoMes(m) > 0).reduce((s, m) => s + receitaMes(m), 0);
     const roasGeral = investidoTotal > 0 ? receitaComInv / investidoTotal : 0;
 
-    const rep = dados.filter((d) => REPUT.includes(d.canal) && (num(d.nota) > 0 || num(d.avaliacoes) > 0)).sort((a, b) => a.mes.localeCompare(b.mes));
+    const rep = regs.filter((d) => REPUT.includes(d.canal) && (num(d.nota) > 0 || num(d.avaliacoes) > 0)).sort((a, b) => a.mes.localeCompare(b.mes));
     const repAtual = rep.length ? rep[rep.length - 1] : null;
     const avaliacoesAtual = repAtual ? num(repAtual.avaliacoes) : 0;
     const notaAtual = repAtual ? num(repAtual.nota) : 0;
-    const insta = dados.filter((d) => d.canal === 'Instagram' && num(d.seguidores) > 0).sort((a, b) => a.mes.localeCompare(b.mes));
+    const insta = regs.filter((d) => d.canal === 'Instagram' && num(d.seguidores) > 0).sort((a, b) => a.mes.localeCompare(b.mes));
     const seguidoresAtual = insta.length ? num(insta[insta.length - 1].seguidores) : 0;
 
     // Série de reputação do canal mais recente (pra comparar mês a mês o mesmo canal).
@@ -93,7 +126,7 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
     }
 
     return { meses, investidoMes, porCanal, investidoTotal, roasGeral, rep, avaliacoesAtual, notaAtual, insta, seguidoresAtual, segDelta, avalDelta, linhas };
-  }, [dados, receitas]);
+  }, [regs, receitas]);
 
   const maxInvRec = Math.max(1, ...an.meses.map((m) => Math.max(an.investidoMes(m), receitaMes(m))));
   const maxCanal = Math.max(1, ...Object.values(an.porCanal));
@@ -116,6 +149,10 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
     ] : []),
   ];
 
+  const metaSegV = metasRec ? num(metasRec.seguidores) : 0;
+  const metaAvalV = metasRec ? num(metasRec.avaliacoes) : 0;
+  const temMeta = metaSegV > 0 || metaAvalV > 0;
+
   const c = form.canal;
   const mostra = (campo) => {
     if (REPUT.includes(c)) return ['nota', 'avaliacoes'].includes(campo);
@@ -129,7 +166,25 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
 
       <Resumo items={resumoItems} />
 
-      {dados.length === 0 ? (
+      <Card style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: temMeta ? 12 : 8 }}>Metas</div>
+        {metaSegV > 0 && <MetaBar label="Seguidores" atual={an.seguidoresAtual} meta={metaSegV} />}
+        {metaAvalV > 0 && <MetaBar label="Avaliações" atual={an.avaliacoesAtual} meta={metaAvalV} />}
+        {!temMeta && <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}>Defina um objetivo (ex.: chegar a 30 mil seguidores) pra acompanhar seu progresso mês a mês.</div>}
+        <details>
+          <summary style={{ cursor: 'pointer', fontSize: 13, color: C.muted, fontWeight: 600, padding: '4px 0' }}>{temMeta ? 'Editar metas' : 'Definir metas'}</summary>
+          <div style={{ marginTop: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Meta de seguidores"><NumInput value={metaForm.seguidores} onChange={setMeta('seguidores')} /></Field>
+              <Field label="Meta de avaliações"><NumInput value={metaForm.avaliacoes} onChange={setMeta('avaliacoes')} /></Field>
+            </div>
+            <div style={{ fontSize: 12, color: C.faint, marginBottom: 10 }}>Deixe em branco (ou 0) para não acompanhar aquela meta.</div>
+            <Btn onClick={salvarMetas}>Salvar metas</Btn>
+          </div>
+        </details>
+      </Card>
+
+      {regs.length === 0 ? (
         <Empty>Ainda sem dados de marketing.<br />Cadastre os números de cada canal por mês pra ver os gráficos de crescimento.</Empty>
       ) : (
         <>
@@ -241,10 +296,10 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
         </div>
       </Card>
 
-      {dados.length > 0 && (
+      {regs.length > 0 && (
         <>
-          <SecTitle>Registros ({dados.length})</SecTitle>
-          {[...dados].sort((a, b) => (b.mes || '').localeCompare(a.mes || '')).map((d) => (
+          <SecTitle>Registros ({regs.length})</SecTitle>
+          {[...regs].sort((a, b) => (b.mes || '').localeCompare(a.mes || '')).map((d) => (
             <Card key={d.id} style={{ marginBottom: 8, padding: '12px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ minWidth: 0 }}>
