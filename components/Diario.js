@@ -4,6 +4,7 @@ import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, S
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import CalendarioPedidos from './CalendarioPedidos';
 import Visitantes from './Visitantes';
+import AreaVoz from './AreaVoz';
 
 const diarioVazio = () => ({
   data: todayISO(), clima: '', evento: '', receita: '', nPedidos: '', fiado: '',
