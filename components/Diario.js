@@ -9,8 +9,18 @@ import AreaVoz from './AreaVoz';
 const diarioVazio = () => ({
   data: todayISO(), clima: '', evento: '', receita: '', nPedidos: '', fiado: '',
   caixaFechou: '', diferenca: '', comprasEmerg: '', estoqueCritico: '',
-  problema: '', decisao: '', aprendizado: '', prioridade: '', nota: '',
+  relato: '', prioridade: '', nota: '',
 });
+// Junta os campos antigos (problema/decisão/aprendizado) num texto só, pra
+// migrar registros já salvos para o novo campo "relato" sem perder nada.
+const migrarRelato = (d) => {
+  if (d.relato) return d.relato;
+  return [
+    d.problema && `Problema: ${d.problema}`,
+    d.decisao && `Melhor decisão: ${d.decisao}`,
+    d.aprendizado && `Aprendizado: ${d.aprendizado}`,
+  ].filter(Boolean).join('\n');
+};
 export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [], visitantes = [], onVisitantes }) {
   const [form, setForm] = useState(diarioVazio());
   const [editId, setEditId] = useState(null);
@@ -58,7 +68,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
     else onChange([{ ...registro, id: uid() }, ...dados]);
     setForm(diarioVazio()); setEditId(null);
   };
-  const editar = (d) => { setForm(d); setEditId(d.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const editar = (d) => { setForm({ ...diarioVazio(), ...d, relato: migrarRelato(d) }); setEditId(d.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const excluir = (id) => onChange(dados.filter((d) => d.id !== id));
   const ordenado = [...dados].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   const notas = dados.map((d) => num(d.nota)).filter((n) => n > 0);
@@ -170,9 +180,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
           <Field label="Compras emergenciais?"><Select value={form.comprasEmerg} onChange={set('comprasEmerg')} options={['Sim', 'Não']} /></Field>
           <Field label="Estoque crítico?"><Select value={form.estoqueCritico} onChange={set('estoqueCritico')} options={['Sim', 'Não']} /></Field>
         </div>
-        <Field label="Problema do dia"><AreaVoz value={form.problema} onChange={set('problema')} placeholder="O que travou?" /></Field>
-        <Field label="Melhor decisão"><AreaVoz value={form.decisao} onChange={set('decisao')} placeholder="O que você fez de certo?" /></Field>
-        <Field label="Aprendizado"><AreaVoz value={form.aprendizado} onChange={set('aprendizado')} placeholder="O que fica pra próxima?" /></Field>
+        <Field label="Relatório do dia"><AreaVoz value={form.relato} onChange={set('relato')} placeholder="Relato livre do dia: movimento, o que funcionou, o que faltou, clientes, equipe, imprevistos…" rows={6} /></Field>
         <Field label="Prioridade de amanhã"><AreaVoz value={form.prioridade} onChange={set('prioridade')} placeholder="Foco nº 1 do próximo dia" /></Field>
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvar}>{editId ? 'Salvar alterações' : 'Registrar dia'}</Btn>
@@ -195,7 +203,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
                 {num(d.fiado) > 0 && <span style={{ color: C.amber, fontSize: 13 }}>{d.fiado} fiado{num(d.fiado) > 1 ? 's' : ''}</span>}
                 {d.nota && <span style={{ color: C.accent, fontSize: 13 }}>Nota {d.nota}</span>}
               </div>
-              {d.problema && <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}><b style={{ color: C.faint }}>Problema:</b> {d.problema}</div>}
+              {migrarRelato(d) && <div style={{ fontSize: 13, color: C.muted, marginTop: 8, whiteSpace: 'pre-wrap' }}><b style={{ color: C.faint }}>Relatório:</b> {migrarRelato(d)}</div>}
               {d.prioridade && <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}><b style={{ color: C.faint }}>Amanhã:</b> {d.prioridade}</div>}
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
