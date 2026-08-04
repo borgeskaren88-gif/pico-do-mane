@@ -5,6 +5,7 @@ import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, FON
 import CalendarioPedidos from './CalendarioPedidos';
 import Visitantes from './Visitantes';
 import AreaVoz from './AreaVoz';
+import MicBtn from './MicBtn';
 
 const diarioVazio = () => ({
   data: todayISO(), clima: '', evento: '', receita: '', nPedidos: '', fiado: '',
@@ -21,12 +22,14 @@ const migrarRelato = (d) => {
     d.aprendizado && `Aprendizado: ${d.aprendizado}`,
   ].filter(Boolean).join('\n');
 };
-export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [], visitantes = [], onVisitantes }) {
+export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [], visitantes = [], onVisitantes, onRepor }) {
   const [form, setForm] = useState(diarioVazio());
   const [editId, setEditId] = useState(null);
   const [novaTarefa, setNovaTarefa] = useState('');
   const [novaTarefaData, setNovaTarefaData] = useState('');
   const [verConcluidas, setVerConcluidas] = useState(false);
+  const [faltou, setFaltou] = useState('');
+  const [msgFaltou, setMsgFaltou] = useState('');
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   // Tarefas em aberto: as COM data primeiro (mais próximas no topo), depois as
@@ -70,6 +73,18 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
   };
   const editar = (d) => { setForm({ ...diarioVazio(), ...d, relato: migrarRelato(d) }); setEditId(d.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const excluir = (id) => onChange(dados.filter((d) => d.id !== id));
+
+  // Estoque crítico → Lista de Compras: manda os itens que faltaram direto para
+  // a lista de reposição (separados por vírgula).
+  const addFaltou = () => {
+    const nomes = faltou.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!nomes.length || !onRepor) return;
+    const itens = nomes.map((n) => ({ id: uid(), nome: n, quantidade: '', categoria: '', comprado: false, criadoEm: Date.now() }));
+    const add = onRepor(itens);
+    setMsgFaltou(add === 0 ? 'já estavam na lista' : `${add} item(ns) adicionado(s) à Lista de Compras`);
+    setFaltou('');
+    setTimeout(() => setMsgFaltou(''), 4000);
+  };
   const ordenado = [...dados].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   const notas = dados.map((d) => num(d.nota)).filter((n) => n > 0);
   const media = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : 0;
@@ -154,10 +169,6 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
           <Field label="Data"><TextInput type="date" value={form.data} onChange={set('data')} /></Field>
           <Field label="Dia da semana"><TextInput value={weekday(form.data)} onChange={() => { }} /></Field>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Clima"><TextInput value={form.clima} onChange={set('clima')} placeholder="Sol, muito frio…" /></Field>
-          <Field label="Evento"><TextInput value={form.evento} onChange={set('evento')} placeholder="Copa, ao vivo…" /></Field>
-        </div>
         <Field label="Receita do dia (puxada das Receitas)">
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: '11px 12px' }}>
             <div style={{ fontSize: 19, fontWeight: 800, color: totalRecForm > 0 ? C.green : C.faint, fontVariantNumeric: 'tabular-nums' }}>{brl(totalRecForm)}</div>
@@ -168,20 +179,43 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
         </Field>
         <Field label="Nº de pedidos"><NumInput value={form.nPedidos} onChange={set('nPedidos')} /></Field>
         {ticket > 0 && <div style={{ fontSize: 13, color: C.accent, margin: '-4px 0 12px', fontWeight: 600 }}>Ticket médio: {brl(ticket)}</div>}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Nº de pedidos fiados"><NumInput value={form.fiado} onChange={set('fiado')} placeholder="0" /></Field>
-          <Field label="Caixa fechou certo?"><Select value={form.caixaFechou} onChange={set('caixaFechou')} options={['Sim', 'Não']} /></Field>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Diferença de caixa (R$)"><NumInput value={form.diferenca} onChange={set('diferenca')} /></Field>
-          <Field label="Nota do dia (1-10)"><NumInput value={form.nota} onChange={set('nota')} /></Field>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Compras emergenciais?"><Select value={form.comprasEmerg} onChange={set('comprasEmerg')} options={['Sim', 'Não']} /></Field>
-          <Field label="Estoque crítico?"><Select value={form.estoqueCritico} onChange={set('estoqueCritico')} options={['Sim', 'Não']} /></Field>
-        </div>
         <Field label="Relatório do dia"><AreaVoz value={form.relato} onChange={set('relato')} placeholder="Relato livre do dia: movimento, o que funcionou, o que faltou, clientes, equipe, imprevistos…" rows={6} /></Field>
         <Field label="Prioridade de amanhã"><AreaVoz value={form.prioridade} onChange={set('prioridade')} placeholder="Foco nº 1 do próximo dia" /></Field>
+
+        <details style={{ margin: '2px 0 16px' }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, color: C.muted, fontWeight: 600, padding: '4px 0' }}>+ Mais detalhes (opcional)</summary>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Clima"><TextInput value={form.clima} onChange={set('clima')} placeholder="Sol, muito frio…" /></Field>
+              <Field label="Evento"><TextInput value={form.evento} onChange={set('evento')} placeholder="Copa, ao vivo…" /></Field>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Nº de pedidos fiados"><NumInput value={form.fiado} onChange={set('fiado')} placeholder="0" /></Field>
+              <Field label="Caixa fechou certo?"><Select value={form.caixaFechou} onChange={set('caixaFechou')} options={['Sim', 'Não']} /></Field>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Diferença de caixa (R$)"><NumInput value={form.diferenca} onChange={set('diferenca')} /></Field>
+              <Field label="Nota do dia (1-10)"><NumInput value={form.nota} onChange={set('nota')} /></Field>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Compras emergenciais?"><Select value={form.comprasEmerg} onChange={set('comprasEmerg')} options={['Sim', 'Não']} /></Field>
+              <Field label="Estoque crítico?"><Select value={form.estoqueCritico} onChange={set('estoqueCritico')} options={['Sim', 'Não']} /></Field>
+            </div>
+            {form.estoqueCritico === 'Sim' && onRepor && (
+              <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>O que faltou? Já jogo na Lista de Compras.</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}><TextInput value={faltou} onChange={setFaltou} placeholder="Gelo, limão, gin… (separe por vírgula)" /></div>
+                  <MicBtn value={faltou} onChange={setFaltou} />
+                </div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8 }}>
+                  <Btn small onClick={addFaltou}>Adicionar à lista</Btn>
+                  {msgFaltou && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>{msgFaltou}</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvar}>{editId ? 'Salvar alterações' : 'Registrar dia'}</Btn>
           {editId && <Btn kind="ghost" onClick={() => { setForm(diarioVazio()); setEditId(null); }}>Cancelar</Btn>}

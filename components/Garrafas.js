@@ -4,9 +4,10 @@ import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Res
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, daysBetween, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 const garrafaVazia = () => ({ produto: '', volume: '1000', dose: '50', dataAbertura: todayISO(), dataTermino: '', drinks: '', obs: '' });
-export default function Garrafas({ dados, onChange }) {
+export default function Garrafas({ dados, onChange, onRepor }) {
   const [form, setForm] = useState(garrafaVazia());
   const [editId, setEditId] = useState(null);
+  const [reporSugestao, setReporSugestao] = useState(null);
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   const dosesTeoricas = (g) => num(g.dose) ? Math.round(num(g.volume) / num(g.dose)) : 0;
@@ -21,7 +22,15 @@ export default function Garrafas({ dados, onChange }) {
   };
   const editar = (d) => { setForm(d); setEditId(d.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const excluir = (id) => onChange(dados.filter((d) => d.id !== id));
-  const finalizar = (d) => onChange(dados.map((x) => x.id === d.id ? { ...x, dataTermino: todayISO() } : x));
+  const finalizar = (d) => {
+    onChange(dados.map((x) => x.id === d.id ? { ...x, dataTermino: todayISO() } : x));
+    if (onRepor && d.produto) setReporSugestao(d);
+  };
+  const reporAgora = () => {
+    const add = onRepor([{ id: uid(), nome: reporSugestao.produto, quantidade: '', categoria: 'Bebida alcoólica', comprado: false, criadoEm: Date.now() }]);
+    setReporSugestao({ ...reporSugestao, feito: add === 0 ? 'já estava na lista' : 'adicionado à Lista de Compras' });
+    setTimeout(() => setReporSugestao(null), 2500);
+  };
 
   const emUso = dados.filter((g) => g.dataAbertura && !g.dataTermino);
   const finalizadas = dados.filter((g) => g.dataTermino).sort((a, b) => (b.dataTermino || '').localeCompare(a.dataTermino || ''));
@@ -60,6 +69,22 @@ export default function Garrafas({ dados, onChange }) {
       ]} />
 
       <PageTitle sub="Garrafas, doses e rendimento">Controle de Garrafas</PageTitle>
+
+      {reporSugestao && (
+        <Card style={{ marginBottom: 14, borderColor: C.accent }}>
+          {reporSugestao.feito ? (
+            <div style={{ fontSize: 14, color: C.green, fontWeight: 700 }}>{reporSugestao.produto}: {reporSugestao.feito}.</div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 14 }}>Garrafa de <b>{reporSugestao.produto}</b> encerrada. Repor na Lista de Compras?</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Btn small onClick={reporAgora}>Adicionar à lista</Btn>
+                <Btn kind="ghost" small onClick={() => setReporSugestao(null)}>Agora não</Btn>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card style={{ marginBottom: 14, background: C.panel2 }}>
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.accent, fontWeight: 700, marginBottom: 8 }}>Como funciona a conta</div>

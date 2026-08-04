@@ -152,6 +152,16 @@ export default function Dashboard() {
     salvarTudo(parcial);
   };
 
+  // Repor na Lista de Compras a partir de outras abas (estoque crítico no
+  // fechamento, garrafa encerrada no Controle). Ignora itens que já estão na
+  // lista em aberto e devolve quantos foram realmente adicionados.
+  const reporLista = (itens) => {
+    const existentes = new Set(listaCompras.filter((i) => !i.comprado).map((i) => (i.nome || '').trim().toLowerCase()));
+    const novos = itens.filter((i) => !existentes.has((i.nome || '').trim().toLowerCase()));
+    if (novos.length) upd.listaCompras([...novos, ...listaCompras]);
+    return novos.length;
+  };
+
   const sair = async () => {
     await fetch('/api/logout', { method: 'POST' });
     router.push('/');
@@ -211,13 +221,13 @@ export default function Dashboard() {
 
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={setTab} />}
-        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} visitantes={visitantes} onVisitantes={upd.visitantes} />}
+        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
         {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
         {tab === 'lista' && <ListaCompras itens={listaCompras} modelos={listasModelo} cotacoes={cotacoes} compras={compras} despesas={despesas} onAplicar={aplicarLista} />}
-        {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} />}
+        {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
