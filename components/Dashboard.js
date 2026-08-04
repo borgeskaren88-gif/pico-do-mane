@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, LogoMark, pageBg } from './ui';
 import { ymOf, todayISO, limparNome } from '../lib/util';
@@ -70,6 +70,7 @@ export default function Dashboard() {
   const [visitantes, setVisitantes] = useState([]);
   const [listaCompras, setListaCompras] = useState([]);
   const [listasModelo, setListasModelo] = useState([]);
+  const [googleOn, setGoogleOn] = useState(false);
   const [mes, setMes] = useState(ymOf(todayISO()));
 
   useEffect(() => {
@@ -99,6 +100,14 @@ export default function Dashboard() {
     })();
   }, []);
 
+  // Descobre se o Google Agenda já está conectado, pra ligar a sincronização
+  // automática quando boletos/tarefas mudarem.
+  useEffect(() => {
+    (async () => {
+      try { const r = await fetch('/api/google/status', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setGoogleOn(!!j.conectado); } catch { /* ignora */ }
+    })();
+  }, []);
+
   const salvarTudo = (parcial) => {
     const dados = {
       diario: parcial.diario ?? diario, receitas: parcial.receitas ?? receitas,
@@ -111,14 +120,24 @@ export default function Dashboard() {
     apiSalvar(dados);
   };
 
+  // Se o Google Agenda estiver conectado, sincroniza (com um pequeno atraso pra
+  // agrupar várias mudanças seguidas num só envio). Chamado quando boletos ou
+  // tarefas mudam.
+  const googleSyncTimer = useRef(null);
+  const syncGoogle = () => {
+    if (!googleOn) return;
+    clearTimeout(googleSyncTimer.current);
+    googleSyncTimer.current = setTimeout(() => { fetch('/api/google/sync', { method: 'POST' }).catch(() => { }); }, 2500);
+  };
+
   const upd = {
     diario: (v) => { setDiario(v); salvarTudo({ diario: v }); },
     receitas: (v) => { setReceitas(v); salvarTudo({ receitas: v }); },
     despesas: (v) => { setDespesas(v); salvarTudo({ despesas: v }); },
-    compras: (v) => { setCompras(v); salvarTudo({ compras: v }); },
+    compras: (v) => { setCompras(v); salvarTudo({ compras: v }); syncGoogle(); },
     cotacoes: (v) => { setCotacoes(v); salvarTudo({ cotacoes: v }); },
     garrafas: (v) => { setGarrafas(v); salvarTudo({ garrafas: v }); },
-    tarefas: (v) => { setTarefas(v); salvarTudo({ tarefas: v }); },
+    tarefas: (v) => { setTarefas(v); salvarTudo({ tarefas: v }); syncGoogle(); },
     marketing: (v) => { setMarketing(v); salvarTudo({ marketing: v }); },
     visitantes: (v) => { setVisitantes(v); salvarTudo({ visitantes: v }); },
   };
@@ -129,6 +148,7 @@ export default function Dashboard() {
     setCompras(novasCompras);
     setDespesas(novasDespesas);
     salvarTudo({ compras: novasCompras, despesas: novasDespesas });
+    syncGoogle();
   };
 
   // Registro de compra que alimenta compras + cotações + despesas de uma vez
@@ -140,6 +160,7 @@ export default function Dashboard() {
     if (ncot) { setCotacoes(ncot); parcial.cotacoes = ncot; }
     if (nd) { setDespesas(nd); parcial.despesas = nd; }
     salvarTudo(parcial);
+    if (nc) syncGoogle();
   };
 
   // Lista de compras: um único save aplica listaCompras/modelos e, quando um
@@ -151,6 +172,7 @@ export default function Dashboard() {
     if (parcial.despesas) setDespesas(parcial.despesas);
     if (parcial.cotacoes) setCotacoes(parcial.cotacoes);
     salvarTudo(parcial);
+    if (parcial.compras) syncGoogle();
   };
 
   // Repor na Lista de Compras a partir de outras abas (estoque crítico no
