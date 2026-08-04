@@ -77,8 +77,8 @@ function montarICS(dados) {
     'METHOD:PUBLISH',
     'X-WR-CALNAME:PicoOS — Pico do Mané',
     'X-WR-TIMEZONE:America/Sao_Paulo',
-    'REFRESH-INTERVAL;VALUE=DURATION:PT6H',
-    'X-PUBLISHED-TTL:PT6H',
+    'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
+    'X-PUBLISHED-TTL:PT1H',
     ...eventos,
     'END:VCALENDAR',
   ].join('\r\n');
