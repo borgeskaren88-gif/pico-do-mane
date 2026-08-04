@@ -177,7 +177,10 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
               : <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>Nada lançado em Receitas nesse dia. Lance na aba <b>Receitas</b> que aparece aqui automaticamente (soma todas as fontes, inclusive recebimentos atrasados).</div>}
           </div>
         </Field>
-        <Field label="Nº de pedidos"><NumInput value={form.nPedidos} onChange={set('nPedidos')} /></Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Nº de pedidos"><NumInput value={form.nPedidos} onChange={set('nPedidos')} /></Field>
+          <Field label="Nº de pedidos fiados"><NumInput value={form.fiado} onChange={set('fiado')} placeholder="0" /></Field>
+        </div>
         {ticket > 0 && <div style={{ fontSize: 13, color: C.accent, margin: '-4px 0 12px', fontWeight: 600 }}>Ticket médio: {brl(ticket)}</div>}
         <Field label="Relatório do dia"><AreaVoz value={form.relato} onChange={set('relato')} placeholder="Relato livre do dia: movimento, o que funcionou, o que faltou, clientes, equipe, imprevistos…" rows={6} /></Field>
         <Field label="Prioridade de amanhã"><AreaVoz value={form.prioridade} onChange={set('prioridade')} placeholder="Foco nº 1 do próximo dia" /></Field>
@@ -190,17 +193,14 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
               <Field label="Evento"><TextInput value={form.evento} onChange={set('evento')} placeholder="Copa, ao vivo…" /></Field>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="Nº de pedidos fiados"><NumInput value={form.fiado} onChange={set('fiado')} placeholder="0" /></Field>
               <Field label="Caixa fechou certo?"><Select value={form.caixaFechou} onChange={set('caixaFechou')} options={['Sim', 'Não']} /></Field>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="Diferença de caixa (R$)"><NumInput value={form.diferenca} onChange={set('diferenca')} /></Field>
-              <Field label="Nota do dia (1-10)"><NumInput value={form.nota} onChange={set('nota')} /></Field>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="Compras emergenciais?"><Select value={form.comprasEmerg} onChange={set('comprasEmerg')} options={['Sim', 'Não']} /></Field>
               <Field label="Estoque crítico?"><Select value={form.estoqueCritico} onChange={set('estoqueCritico')} options={['Sim', 'Não']} /></Field>
             </div>
+            <Field label="Nota do dia (1-10)"><NumInput value={form.nota} onChange={set('nota')} /></Field>
             {form.estoqueCritico === 'Sim' && onRepor && (
               <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>O que faltou? Já jogo na Lista de Compras.</div>
