@@ -9,6 +9,7 @@ import Hoje from './Hoje';
 import Diario from './Diario';
 import Marketing from './Marketing';
 import ListaCompras from './ListaCompras';
+import AgendaCalendario from './AgendaCalendario';
 import Lancamentos from './Lancamentos';
 import Compras from './Compras';
 import ContasPagar from './ContasPagar';
@@ -231,7 +232,7 @@ export default function Dashboard() {
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
-        {tab === 'backup' && <Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo }} restore={(d) => {
+        {tab === 'backup' && (<><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
             compras: d.compras || compras, cotacoes: d.cotacoes || cotacoes, garrafas: d.garrafas || garrafas,
@@ -243,7 +244,7 @@ export default function Dashboard() {
           setTarefas(dados.tarefas); setMarketing(dados.marketing); setVisitantes(dados.visitantes);
           setListaCompras(dados.listaCompras); setListasModelo(dados.listasModelo);
           apiSalvar(dados);
-        }} />}
+        }} /><AgendaCalendario /></>)}
       </div>
     </div>
   );
