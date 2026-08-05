@@ -38,7 +38,8 @@ export async function GET() {
     const { data, error } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
     if (error) throw error;
     const blob = data?.valor || {};
-    const lista = Array.isArray(blob.listaCompras) ? blob.listaCompras.filter((i) => !i.comprado) : [];
+    // A cozinha tem a lista dela (listaCozinha), separada da lista da dona.
+    const lista = Array.isArray(blob.listaCozinha) ? blob.listaCozinha.filter((i) => !i.comprado) : [];
     const tarefas = Array.isArray(blob.tarefasCozinha) ? blob.tarefasCozinha : [];
     return NextResponse.json({ ok: true, listaCompras: lista, tarefas });
   } catch (e) {
@@ -60,11 +61,11 @@ export async function POST(request) {
     if (error) throw error;
     const blob = data?.valor || {};
     const novoBlob = { ...blob };
-    // Lista de compras: só mexe se veio no corpo. Preserva os itens já comprados
-    // (histórico da dona) e substitui só os itens em aberto pelo que veio.
+    // Lista da cozinha: só mexe se veio no corpo. Preserva os itens já comprados
+    // (histórico) e substitui só os itens em aberto pelo que veio.
     if (Array.isArray(body?.listaCompras)) {
-      const comprados = Array.isArray(blob.listaCompras) ? blob.listaCompras.filter((i) => i.comprado) : [];
-      novoBlob.listaCompras = [...limparItens(body.listaCompras), ...comprados];
+      const comprados = Array.isArray(blob.listaCozinha) ? blob.listaCozinha.filter((i) => i.comprado) : [];
+      novoBlob.listaCozinha = [...limparItens(body.listaCompras), ...comprados];
     }
     // Marcar/desmarcar tarefa como feita: só troca o "feito" de tarefas que já
     // existem. A cozinha nunca cria, apaga ou edita o texto (isso é da dona).

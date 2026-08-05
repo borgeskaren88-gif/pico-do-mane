@@ -6,7 +6,7 @@ import MicBtn from './MicBtn';
 
 const itemVazio = () => ({ nome: '', quantidade: '', categoria: '' });
 
-export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], compras = [], despesas = [], onAplicar, tarefasCozinha = [], onTarefasCozinha }) {
+export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], compras = [], despesas = [], onAplicar, tarefasCozinha = [], onTarefasCozinha, subtitulo, mostrarTarefasCozinha = false }) {
   const [novo, setNovo] = useState(itemVazio());
   const [novaTarefaCoz, setNovaTarefaCoz] = useState('');
   const addTarefaCoz = () => { if (!novaTarefaCoz.trim() || !onTarefasCozinha) return; onTarefasCozinha([{ id: uid(), texto: novaTarefaCoz.trim() }, ...tarefasCozinha]); setNovaTarefaCoz(''); };
@@ -114,7 +114,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
 
   return (
     <div>
-      <PageTitle sub="O que falta repor no bar">Lista de Compras</PageTitle>
+      <PageTitle sub={subtitulo || 'O que falta repor no bar'}>Lista de Compras</PageTitle>
 
       <Card style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>{editId ? 'Editar item' : 'Adicionar item'}</div>
@@ -226,6 +226,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
         </Card>
       </div>
 
+      {mostrarTarefasCozinha && (
       <div style={{ marginTop: 22 }}>
         <SecTitle>Tarefas para a cozinha</SecTitle>
         <Card style={{ padding: 14 }}>
@@ -247,6 +248,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
           </div>
         </Card>
       </div>
+      )}
     </div>
   );
 }
