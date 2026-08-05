@@ -16,7 +16,7 @@ function Barra({ label, valor, max, cor, texto }) {
         <span style={{ color: C.muted }}>{label}</span>
         <b style={{ color: cor, fontVariantNumeric: 'tabular-nums' }}>{texto}</b>
       </div>
-      <div style={{ height: 8, borderRadius: 999, background: `${C.line}55`, overflow: 'hidden' }}>
+      <div style={{ height: 8, borderRadius: 999, background: `${C.hair}`, overflow: 'hidden' }}>
         <div style={{ width: `${max > 0 ? Math.max(3, (valor / max) * 100) : 0}%`, height: '100%', background: cor, borderRadius: 999 }} />
       </div>
     </div>
@@ -34,7 +34,7 @@ function MetaBar({ label, atual, meta }) {
         <span style={{ color: C.muted }}>{label}</span>
         <b style={{ color: cor, fontVariantNumeric: 'tabular-nums' }}>{int(atual)} / {int(meta)} · {Math.round(pct)}%{batida ? ' — batida!' : ''}</b>
       </div>
-      <div style={{ height: 10, borderRadius: 999, background: `${C.line}55`, overflow: 'hidden' }}>
+      <div style={{ height: 10, borderRadius: 999, background: `${C.hair}`, overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: cor, borderRadius: 999 }} />
       </div>
     </div>
@@ -243,7 +243,7 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
                       <span style={{ color: C.muted }}>{d.canal.replace(' (avaliações)', '')} · {mesLabel(d.mes)}</span>
                       <b style={{ color: C.accent }}>{texto}{dd !== null && dd !== 0 && <span style={{ color: dd > 0 ? C.green : C.red, fontWeight: 700, fontSize: 12, marginLeft: 6 }}>{dd > 0 ? '+' : ''}{int(dd)}</span>}</b>
                     </div>
-                    <div style={{ height: 8, borderRadius: 999, background: `${C.line}55`, overflow: 'hidden' }}>
+                    <div style={{ height: 8, borderRadius: 999, background: `${C.hair}`, overflow: 'hidden' }}>
                       <div style={{ width: `${larg}%`, height: '100%', background: C.green, borderRadius: 999 }} />
                     </div>
                   </div>
@@ -264,7 +264,7 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
                       <span style={{ color: C.muted }}>{mesLabel(d.mes)}</span>
                       <b style={{ color: C.accent, fontVariantNumeric: 'tabular-nums' }}>{int(v)}{dd !== null && dd !== 0 && <span style={{ color: dd > 0 ? C.green : C.red, fontWeight: 700, fontSize: 12, marginLeft: 6 }}>{dd > 0 ? '+' : ''}{int(dd)}</span>}</b>
                     </div>
-                    <div style={{ height: 8, borderRadius: 999, background: `${C.line}55`, overflow: 'hidden' }}>
+                    <div style={{ height: 8, borderRadius: 999, background: `${C.hair}`, overflow: 'hidden' }}>
                       <div style={{ width: `${Math.max(3, (v / maxSeg) * 100)}%`, height: '100%', background: C.accent, borderRadius: 999 }} />
                     </div>
                   </div>

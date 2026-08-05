@@ -1,0 +1,55 @@
+/* Paletas de cor do PicoOS. O tema escuro é o padrão (:root); o claro entra
+   quando o <html> recebe data-theme="claro". Os componentes usam var(--c-*)
+   através do objeto C em components/ui.js, então trocar o atributo troca tudo. */
+
+:root {
+  color-scheme: dark;
+  --c-ink: #080D18;
+  --c-panel: #0F1A2E;
+  --c-panel2: #16243D;
+  --c-raised: #1E2F4D;
+  --c-line: #243651;
+  --c-hair: #1C2A40;
+  --c-accent: #3B86F5;
+  --c-accent2: #6FB0FA;
+  --c-text: #E9F0FB;
+  --c-muted: #94A8C7;
+  --c-faint: #5E7391;
+  --c-green: #5BC98D;
+  --c-red: #E9765C;
+  --c-amber: #E7B24D;
+  --c-red-soft: rgba(233, 118, 92, 0.33);
+  --c-bar-bg: rgba(8, 13, 24, 0.55);
+  --c-glow-a: rgba(59, 134, 245, 0.30);
+  --c-glow-b: rgba(59, 134, 245, 0);
+  --c-bg-top: #0B1526;
+  --c-bg-bottom: #080D18;
+}
+
+:root[data-theme="claro"] {
+  color-scheme: light;
+  --c-ink: #EAEFF6;
+  --c-panel: #FFFFFF;
+  --c-panel2: #F1F5FA;
+  --c-raised: #FFFFFF;
+  --c-line: #DCE4EF;
+  --c-hair: #E9EEF5;
+  --c-accent: #2E74E6;
+  --c-accent2: #5B9BF5;
+  --c-text: #0F1E33;
+  --c-muted: #566579;
+  --c-faint: #8695A9;
+  --c-green: #2FA36B;
+  --c-red: #D9543A;
+  --c-amber: #B9820F;
+  --c-red-soft: rgba(217, 84, 58, 0.35);
+  --c-bar-bg: rgba(255, 255, 255, 0.68);
+  --c-glow-a: rgba(59, 134, 245, 0.12);
+  --c-glow-b: rgba(59, 134, 245, 0);
+  --c-bg-top: #F6F9FD;
+  --c-bg-bottom: #EAEFF6;
+}
+
+html, body {
+  background: var(--c-bg-bottom);
+}

@@ -80,7 +80,7 @@ export default function CalendarioPedidos({ dados }) {
           return (
             <div key={i} style={{
               aspectRatio: '1 / 1', borderRadius: 6, background: corDia(t),
-              border: ehMelhor ? `2px solid ${C.green}` : ehHoje ? `2px solid ${C.accent}` : `1px solid ${C.line}44`,
+              border: ehMelhor ? `2px solid ${C.green}` : ehHoje ? `2px solid ${C.accent}` : `1px solid ${C.hair}`,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 0, padding: 1,
             }}>
               <div style={{ fontSize: 8, color: ehHoje ? C.accent : C.faint, fontWeight: ehHoje ? 800 : 500, lineHeight: 1 }}>{d}</div>

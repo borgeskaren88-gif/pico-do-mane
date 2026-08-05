@@ -192,7 +192,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Check marcado onClick={() => desmarcar(it)} />
                 <div style={{ flex: 1, minWidth: 0, fontSize: 14, color: C.faint, textDecoration: 'line-through' }}>{it.nome}{it.quantidade && ` · ${it.quantidade}`}</div>
-                {it.lancado && <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: `${C.line}66`, borderRadius: 999, padding: '2px 8px' }}>lançado</span>}
+                {it.lancado && <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: `${C.hair}`, borderRadius: 999, padding: '2px 8px' }}>lançado</span>}
                 <button onClick={() => excluirItem(it.id)} title="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}>×</button>
               </div>
             </Card>

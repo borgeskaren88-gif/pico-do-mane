@@ -1,14 +1,18 @@
+// Cores por variáveis CSS (definidas em app/globals.css), pra permitir tema
+// claro e escuro sem trocar o código dos componentes. Os valores concretos de
+// cada tema ficam no globals.css; aqui só apontamos para as variáveis.
 export const C = {
-  ink: '#080D18', panel: '#0F1A2E', panel2: '#16243D', raised: '#1E2F4D',
-  line: '#243651', accent: '#3B86F5', accent2: '#6FB0FA',
-  text: '#E9F0FB', muted: '#94A8C7', faint: '#5E7391',
-  green: '#5BC98D', red: '#E9765C', amber: '#E7B24D',
+  ink: 'var(--c-ink)', panel: 'var(--c-panel)', panel2: 'var(--c-panel2)', raised: 'var(--c-raised)',
+  line: 'var(--c-line)', hair: 'var(--c-hair)', accent: 'var(--c-accent)', accent2: 'var(--c-accent2)',
+  text: 'var(--c-text)', muted: 'var(--c-muted)', faint: 'var(--c-faint)',
+  green: 'var(--c-green)', red: 'var(--c-red)', amber: 'var(--c-amber)',
+  redSoft: 'var(--c-red-soft)', barBg: 'var(--c-bar-bg)',
 };
 
 // Fundo da página com profundidade: um brilho azul no topo por cima de um
-// leve degradê escuro, dando cara mais moderna que o preto chapado. O
-// cabeçalho translúcido deixa esse brilho aparecer atrás do logo.
-export const pageBg = `radial-gradient(1000px 560px at 50% -4%, rgba(59,134,245,0.30), rgba(59,134,245,0) 58%), linear-gradient(180deg, #0B1526 0%, ${C.ink} 55%)`;
+// leve degradê, dando cara mais moderna que o fundo chapado. As cores vêm das
+// variáveis do tema, então o degradê muda junto no claro/escuro.
+export const pageBg = 'radial-gradient(1000px 560px at 50% -4%, var(--c-glow-a), var(--c-glow-b) 58%), linear-gradient(180deg, var(--c-bg-top) 0%, var(--c-bg-bottom) 55%)';
 
 // Marca do app: mesma seta de crescimento em degradê azul do ícone da tela
 // inicial. `size` em px; `radius` é o arredondamento em px do quadrado.
@@ -84,7 +88,7 @@ export function Btn({ children, onClick, kind = 'primary', small, type = 'button
   const styles = {
     primary: { background: C.accent, color: '#06101F', border: 'none' },
     ghost: { background: 'transparent', color: C.text, border: `1px solid ${C.line}` },
-    danger: { background: 'transparent', color: C.red, border: `1px solid ${C.red}55` },
+    danger: { background: 'transparent', color: C.red, border: `1px solid ${C.redSoft}` },
     ok: { background: C.green, color: '#052014', border: 'none' },
   }[kind];
   return (
