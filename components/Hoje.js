@@ -1,11 +1,22 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], setTab }) {
   const [mostrarValores, setMostrarValores] = useState(true);
   const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
+  // Próximos eventos do Google Agenda (só aparece se conectado).
+  const [agenda, setAgenda] = useState(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/google/eventos', { cache: 'no-store' });
+        const j = await r.json();
+        setAgenda(j.ok && j.conectado ? (j.eventos || []) : null);
+      } catch { setAgenda(null); }
+    })();
+  }, []);
   const hoje = todayISO();
   const mes = ymOf(hoje);
   const rec = receitas.filter((r) => ymOf(r.data) === mes).reduce((s, r) => s + num(r.valor), 0);
@@ -33,6 +44,20 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const tarefasAtrasadas = tarefas.filter((t) => !t.feito && t.data && t.data < hoje);
   const temAviso = boletosHoje.length || vencidas.length || tarefasHoje.length || tarefasAtrasadas.length;
   const avisoUrgente = boletosHoje.length || vencidas.length;
+
+  // Agrupa os eventos da agenda por dia.
+  const agendaGrupos = useMemo(() => {
+    if (!agenda || !agenda.length) return [];
+    const m = new Map();
+    for (const ev of agenda) {
+      const d = (ev.inicio || '').slice(0, 10);
+      if (!d) continue;
+      if (!m.has(d)) m.set(d, []);
+      m.get(d).push(ev);
+    }
+    return [...m.entries()];
+  }, [agenda]);
+  const rotuloDia = (d) => (d === hoje ? 'Hoje' : d === addDays(hoje, 1) ? 'Amanhã' : `${weekday(d)}, ${fmtDate(d)}`);
 
   return (
     <div>
@@ -79,6 +104,26 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           )}
         </Card>
       ) : null}
+
+      {agendaGrupos.length > 0 && (
+        <Card style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.accent, fontWeight: 700 }}>Sua agenda</div>
+            <span style={{ fontSize: 11, color: C.faint }}>Google Agenda</span>
+          </div>
+          {agendaGrupos.map(([d, evs]) => (
+            <div key={d} style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 3 }}>{rotuloDia(d)}</div>
+              {evs.map((ev) => (
+                <div key={ev.id} style={{ display: 'flex', gap: 10, fontSize: 14, padding: '3px 0' }}>
+                  <span style={{ color: C.accent, fontWeight: 700, minWidth: 64, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{ev.diaTodo ? 'dia todo' : ev.inicio.slice(11, 16)}</span>
+                  <span style={{ color: C.text, minWidth: 0 }}>{ev.titulo}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </Card>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
         <KPI titulo="Receita do mês" valor={oculto(brl(rec))} cor={C.green} />
