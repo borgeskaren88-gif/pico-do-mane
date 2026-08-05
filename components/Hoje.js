@@ -91,20 +91,28 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
     return cs;
   }, [mes]);
 
-  // Lista de compromissos de um dia, no estilo limpo (título + horário/etiqueta).
+  // Cor semântica de cada compromisso: boleto (âmbar), tarefa (azul),
+  // compromisso com hora (verde) e dia todo (cinza).
+  const ehBoleto = (ev) => ev.tarefa && /^\s*boleto/i.test(ev.titulo || '');
+  const corEvento = (ev) => (ehBoleto(ev) ? C.amber : ev.tarefa ? C.accent : ev.diaTodo ? C.muted : C.green);
+  const etiquetaEvento = (ev) => (ehBoleto(ev) ? 'A pagar' : ev.tarefa ? 'Tarefa' : ev.diaTodo ? 'Dia todo' : ev.inicio.slice(11, 16));
+
+  // Lista de compromissos de um dia, em cartões coloridos com barra lateral.
   const listaDoDia = (dia) => {
     const evs = porDia.get(dia) || [];
     if (!evs.length) return <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '14px 0 4px' }}>Nada agendado para {dia === hoje ? 'hoje' : 'este dia'}.</div>;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {evs.map((ev, i) => (
-          <div key={ev.id} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}55` }}>
-            <div style={{ fontSize: 14.5, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{ev.titulo}</div>
-            <div style={{ fontSize: 12.5, color: C.faint, fontWeight: 600, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
-              {ev.tarefa ? 'Tarefa' : ev.diaTodo ? 'Dia todo' : ev.inicio.slice(11, 16)}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {evs.map((ev) => {
+          const cor = corEvento(ev);
+          return (
+            <div key={ev.id} style={{ display: 'flex', gap: 12, alignItems: 'center', background: cor + '22', borderRadius: 12, padding: '11px 14px' }}>
+              <span style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: cor, flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{ev.titulo}</span>
+              <span style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{etiquetaEvento(ev)}</span>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -217,7 +225,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
 
           {vista !== 'dia' && (
             <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 8, paddingTop: 4, marginBottom: 2 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, marginTop: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginTop: 8, textTransform: 'uppercase', letterSpacing: '.07em' }}>
                 {diaSel === hoje ? 'Hoje' : diaSel === addDays(hoje, 1) ? 'Amanhã' : `${weekday(diaSel)}, ${fmtDate(diaSel)}`}
               </div>
             </div>
