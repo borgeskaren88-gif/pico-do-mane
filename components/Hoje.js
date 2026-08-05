@@ -8,6 +8,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
   // Próximos eventos do Google Agenda (só aparece se conectado).
   const [agenda, setAgenda] = useState(null);
+  const [vista, setVista] = useState('semana'); // 'dia' | 'semana' | 'mes'
   useEffect(() => {
     (async () => {
       try {
@@ -59,6 +60,31 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   }, [agenda]);
   const rotuloDia = (d) => (d === hoje ? 'Hoje' : d === addDays(hoje, 1) ? 'Amanhã' : `${weekday(d)}, ${fmtDate(d)}`);
 
+  // Filtro da vista escolhida (dia / semana / mês). A semana é a semana do
+  // calendário (domingo a sábado) que contém hoje.
+  const diaSemHoje = new Date(hoje + 'T12:00:00').getDay();
+  const iniSemana = addDays(hoje, -diaSemHoje);
+  const fimSemana = addDays(iniSemana, 6);
+  const dentroDaVista = (d) => (vista === 'dia' ? d === hoje : vista === 'semana' ? (d >= iniSemana && d <= fimSemana) : ymOf(d) === mes);
+  const gruposVista = agendaGrupos.filter(([d]) => dentroDaVista(d));
+
+  // Dias do mês com algum compromisso (pra marcar o quadradinho no calendário).
+  const diasComEvento = useMemo(() => {
+    const s = new Set();
+    for (const ev of (agenda || [])) { const d = (ev.inicio || '').slice(0, 10); if (d) s.add(d); }
+    return s;
+  }, [agenda]);
+  // Células do calendário do mês: nulls pra alinhar o 1º dia no dia da semana certo.
+  const celulasMes = useMemo(() => {
+    const [ano, mn] = mes.split('-').map(Number);
+    const offset = new Date(ano, mn - 1, 1).getDay();
+    const total = new Date(ano, mn, 0).getDate();
+    const cs = [];
+    for (let i = 0; i < offset; i++) cs.push(null);
+    for (let d = 1; d <= total; d++) cs.push(`${mes}-${String(d).padStart(2, '0')}`);
+    return cs;
+  }, [mes]);
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
@@ -107,25 +133,78 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
 
       {agendaGrupos.length > 0 && (
         <Card style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.accent, fontWeight: 700 }}>Sua agenda</div>
-            <span style={{ fontSize: 11, color: C.faint }}>Google Agenda</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text, letterSpacing: '-.01em' }}>Agenda</div>
+            <span style={{ fontSize: 11, color: C.faint, fontWeight: 600, letterSpacing: '.02em' }}>Google Agenda</span>
           </div>
-          {agendaGrupos.map(([d, evs]) => (
-            <div key={d} style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 3 }}>{rotuloDia(d)}</div>
-              {evs.map((ev) => (
-                <div key={ev.id} style={{ display: 'flex', gap: 10, fontSize: 14, padding: '3px 0', alignItems: 'center' }}>
-                  <span style={{ color: C.accent, fontWeight: 700, minWidth: 64, flexShrink: 0, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'center' }}>
-                    {ev.tarefa
-                      ? <span title="Tarefa" style={{ display: 'inline-block', width: 15, height: 15, borderRadius: 4, border: `2px solid ${C.accent}` }} />
-                      : (ev.diaTodo ? 'dia todo' : ev.inicio.slice(11, 16))}
-                  </span>
-                  <span style={{ color: C.text, minWidth: 0 }}>{ev.titulo}</span>
-                </div>
+
+          <div style={{ display: 'inline-flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 16 }}>
+            {[['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']].map(([v, rot]) => (
+              <button key={v} onClick={() => setVista(v)} style={{
+                border: 'none', cursor: 'pointer', borderRadius: 8, padding: '5px 14px', fontSize: 12.5, fontWeight: 700,
+                background: vista === v ? C.accent : 'transparent', color: vista === v ? '#06101F' : C.muted,
+              }}>{rot}</button>
+            ))}
+          </div>
+
+          {vista === 'mes' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: gruposVista.length ? 18 : 4 }}>
+              {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((w, i) => (
+                <div key={'h' + i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: C.faint, paddingBottom: 4 }}>{w}</div>
               ))}
+              {celulasMes.map((d, i) => {
+                if (!d) return <div key={'c' + i} />;
+                const ehHoje = d === hoje, passado = d < hoje, temEv = diasComEvento.has(d);
+                return (
+                  <div key={'c' + i} style={{
+                    position: 'relative', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9,
+                    background: ehHoje ? C.accent : 'transparent', color: ehHoje ? '#06101F' : (passado ? C.faint : C.text),
+                    fontSize: 13, fontWeight: ehHoje ? 800 : 600, fontVariantNumeric: 'tabular-nums',
+                  }}>
+                    {Number(d.slice(8))}
+                    {temEv && !ehHoje && <span style={{ position: 'absolute', bottom: 5, width: 4, height: 4, borderRadius: '50%', background: C.accent }} />}
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          )}
+
+          {gruposVista.length === 0 ? (
+            <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '6px 0 2px' }}>
+              {vista === 'dia' ? 'Nada na agenda para hoje.' : vista === 'semana' ? 'Nada na agenda para esta semana.' : 'Nada na agenda para este mês.'}
+            </div>
+          ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {gruposVista.map(([d, evs]) => {
+              const ehHoje = d === hoje;
+              return (
+                <div key={d}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.09em', fontWeight: 700, color: ehHoje ? C.accent : C.muted, whiteSpace: 'nowrap' }}>{rotuloDia(d)}</span>
+                    <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${C.line}, transparent)` }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {evs.map((ev, i) => (
+                      <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}55` }}>
+                        <span style={{ width: 16, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                          {ev.tarefa
+                            ? <span title="Tarefa" style={{ width: 13, height: 13, borderRadius: 4, border: `1.5px solid ${C.accent}`, boxSizing: 'border-box' }} />
+                            : ev.diaTodo
+                              ? <span style={{ width: 8, height: 8, borderRadius: '50%', border: `1.5px solid ${C.accent2}`, boxSizing: 'border-box' }} />
+                              : <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.accent }} />}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: C.text, fontWeight: 500, lineHeight: 1.35 }}>{ev.titulo}</span>
+                        <span style={{ flexShrink: 0, fontSize: 12.5, color: C.faint, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                          {ev.tarefa ? 'tarefa' : ev.diaTodo ? 'dia todo' : ev.inicio.slice(11, 16)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          )}
         </Card>
       )}
 
