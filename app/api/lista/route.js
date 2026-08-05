@@ -59,11 +59,20 @@ export async function POST(request) {
     const { data, error } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
     if (error) throw error;
     const blob = data?.valor || {};
-    // Preserva os itens já comprados (histórico da dona) e substitui só os itens
-    // em aberto pelo que veio. Assim a cozinha nunca mexe no que já foi comprado.
-    const comprados = Array.isArray(blob.listaCompras) ? blob.listaCompras.filter((i) => i.comprado) : [];
-    const novaLista = [...limparItens(body?.listaCompras), ...comprados];
-    const novoBlob = { ...blob, listaCompras: novaLista };
+    const novoBlob = { ...blob };
+    // Lista de compras: só mexe se veio no corpo. Preserva os itens já comprados
+    // (histórico da dona) e substitui só os itens em aberto pelo que veio.
+    if (Array.isArray(body?.listaCompras)) {
+      const comprados = Array.isArray(blob.listaCompras) ? blob.listaCompras.filter((i) => i.comprado) : [];
+      novoBlob.listaCompras = [...limparItens(body.listaCompras), ...comprados];
+    }
+    // Marcar/desmarcar tarefa como feita: só troca o "feito" de tarefas que já
+    // existem. A cozinha nunca cria, apaga ou edita o texto (isso é da dona).
+    if (body?.tarefasFeito && typeof body.tarefasFeito === 'object') {
+      const feitos = body.tarefasFeito;
+      const tarefas = Array.isArray(blob.tarefasCozinha) ? blob.tarefasCozinha : [];
+      novoBlob.tarefasCozinha = tarefas.map((t) => (t && Object.prototype.hasOwnProperty.call(feitos, t.id)) ? { ...t, feito: !!feitos[t.id] } : t);
+    }
     const { error: err2 } = await sb.from('pdm_dados').upsert(
       { chave: CHAVE, valor: novoBlob, atualizado_em: new Date().toISOString() },
       { onConflict: 'chave' }

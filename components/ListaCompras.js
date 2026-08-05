@@ -233,8 +233,11 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
           {tarefasCozinha.length === 0 ? <div style={{ fontSize: 13, color: C.faint, marginBottom: 12 }}>Nenhuma tarefa para a cozinha ainda.</div> :
             tarefasCozinha.map((t) => (
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, padding: '9px 0' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.accent, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0, fontSize: 14 }}>{t.texto}</div>
+                <span style={{ width: 18, height: 18, borderRadius: 6, flexShrink: 0, border: `2px solid ${t.feito ? C.green : C.line}`, background: t.feito ? C.green : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {t.feito && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#06101F" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 6.5" /></svg>}
+                </span>
+                <div style={{ flex: 1, minWidth: 0, fontSize: 14, color: t.feito ? C.faint : C.text, textDecoration: t.feito ? 'line-through' : 'none' }}>{t.texto}</div>
+                {t.feito && <span style={{ fontSize: 11, fontWeight: 700, color: C.green }}>feita</span>}
                 <button onClick={() => removerTarefaCoz(t.id)} title="Remover" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}>×</button>
               </div>
             ))}
