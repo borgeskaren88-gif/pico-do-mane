@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { nomeCookie, valorSessaoValida } from '../../../lib/auth';
+import { nomeCookie, valorSessaoValida, valorSessaoCozinha } from '../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +12,10 @@ function comparaSegura(a, b) {
 }
 
 export async function POST(request) {
-  const senhaCorreta = process.env.APP_PASSWORD;
-  if (!senhaCorreta) {
+  const senhaDona = process.env.APP_PASSWORD;
+  // Senha da cozinha: padrão "1234" se não houver variável configurada.
+  const senhaCozinha = process.env.APP_PASSWORD_COZINHA || '1234';
+  if (!senhaDona) {
     return NextResponse.json(
       { ok: false, erro: 'Servidor sem senha configurada (APP_PASSWORD).' },
       { status: 500 }
@@ -28,11 +30,16 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, erro: 'Requisição inválida.' }, { status: 400 });
   }
 
-  if (!senha || !comparaSegura(senha, senhaCorreta)) {
+  let valorCookie = null;
+  let papel = null;
+  if (senha && comparaSegura(senha, senhaDona)) { valorCookie = valorSessaoValida(); papel = 'dona'; }
+  else if (senha && comparaSegura(senha, senhaCozinha)) { valorCookie = valorSessaoCozinha(); papel = 'cozinha'; }
+
+  if (!valorCookie) {
     return NextResponse.json({ ok: false, erro: 'Senha incorreta.' }, { status: 401 });
   }
 
-  cookies().set(nomeCookie(), valorSessaoValida(), {
+  cookies().set(nomeCookie(), valorCookie, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -40,5 +47,5 @@ export async function POST(request) {
     maxAge: 60 * 60 * 24 * 90, // 90 dias
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, papel });
 }

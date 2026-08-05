@@ -1,12 +1,14 @@
 import { cookies } from 'next/headers';
-import { nomeCookie, sessaoEhValida } from '../lib/auth';
+import { nomeCookie, papelDaSessao } from '../lib/auth';
 import LoginForm from '../components/LoginForm';
 import Dashboard from '../components/Dashboard';
+import Cozinha from '../components/Cozinha';
 
 export default function Home() {
   const valorCookie = cookies().get(nomeCookie())?.value;
-  const autenticado = sessaoEhValida(valorCookie);
+  const papel = papelDaSessao(valorCookie);
 
-  if (!autenticado) return <LoginForm />;
-  return <Dashboard />;
+  if (papel === 'dona') return <Dashboard />;
+  if (papel === 'cozinha') return <Cozinha />;
+  return <LoginForm />;
 }
