@@ -115,8 +115,12 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
             <div key={d} style={{ marginBottom: 8 }}>
               <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 3 }}>{rotuloDia(d)}</div>
               {evs.map((ev) => (
-                <div key={ev.id} style={{ display: 'flex', gap: 10, fontSize: 14, padding: '3px 0' }}>
-                  <span style={{ color: C.accent, fontWeight: 700, minWidth: 64, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{ev.diaTodo ? 'dia todo' : ev.inicio.slice(11, 16)}</span>
+                <div key={ev.id} style={{ display: 'flex', gap: 10, fontSize: 14, padding: '3px 0', alignItems: 'center' }}>
+                  <span style={{ color: C.accent, fontWeight: 700, minWidth: 64, flexShrink: 0, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'center' }}>
+                    {ev.tarefa
+                      ? <span title="Tarefa" style={{ display: 'inline-block', width: 15, height: 15, borderRadius: 4, border: `2px solid ${C.accent}` }} />
+                      : (ev.diaTodo ? 'dia todo' : ev.inicio.slice(11, 16))}
+                  </span>
                   <span style={{ color: C.text, minWidth: 0 }}>{ev.titulo}</span>
                 </div>
               ))}

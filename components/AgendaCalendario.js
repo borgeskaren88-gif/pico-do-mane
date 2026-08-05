@@ -86,6 +86,9 @@ export default function AgendaCalendario() {
               <Btn small onClick={sincronizar}>{sincronizando ? 'Sincronizando…' : 'Sincronizar agora'}</Btn>
               <Btn kind="ghost" small onClick={desconectar}>Desconectar</Btn>
             </div>
+            <div style={{ fontSize: 12, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>
+              Os boletos entram como <b>tarefas</b> (com quadradinho pra marcar). Se você conectou antes dessa novidade, toque em <a href="/api/google/auth" style={{ color: C.accent, fontWeight: 700 }}>Atualizar permissões</a> e permita o acesso às Tarefas.
+            </div>
           </div>
         )}
 
