@@ -69,8 +69,10 @@ export default function Dashboard() {
   const [marketing, setMarketing] = useState([]);
   const [visitantes, setVisitantes] = useState([]);
   const [listaCompras, setListaCompras] = useState([]);
+  const [listaCozinha, setListaCozinha] = useState([]);
   const [listasModelo, setListasModelo] = useState([]);
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
+  const [qualLista, setQualLista] = useState('minha'); // 'minha' | 'cozinha'
   const [googleOn, setGoogleOn] = useState(false);
   const [mes, setMes] = useState(ymOf(todayISO()));
 
@@ -95,6 +97,7 @@ export default function Dashboard() {
       setMarketing((salvo && Array.isArray(salvo.marketing)) ? salvo.marketing : []);
       setVisitantes((salvo && Array.isArray(salvo.visitantes)) ? salvo.visitantes : []);
       setListaCompras((salvo && Array.isArray(salvo.listaCompras)) ? salvo.listaCompras : []);
+      setListaCozinha((salvo && Array.isArray(salvo.listaCozinha)) ? salvo.listaCozinha : []);
       setListasModelo((salvo && Array.isArray(salvo.listasModelo)) ? salvo.listasModelo : []);
       setTarefasCozinha((salvo && Array.isArray(salvo.tarefasCozinha)) ? salvo.tarefasCozinha : []);
       if (vazio || mudou) await apiSalvar({ ...limpos, tarefas: (salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : [] });
@@ -117,7 +120,8 @@ export default function Dashboard() {
       cotacoes: parcial.cotacoes ?? cotacoes, garrafas: parcial.garrafas ?? garrafas,
       tarefas: parcial.tarefas ?? tarefas, marketing: parcial.marketing ?? marketing,
       visitantes: parcial.visitantes ?? visitantes,
-      listaCompras: parcial.listaCompras ?? listaCompras, listasModelo: parcial.listasModelo ?? listasModelo,
+      listaCompras: parcial.listaCompras ?? listaCompras, listaCozinha: parcial.listaCozinha ?? listaCozinha,
+      listasModelo: parcial.listasModelo ?? listasModelo,
       tarefasCozinha: parcial.tarefasCozinha ?? tarefasCozinha,
     };
     apiSalvar(dados);
@@ -171,13 +175,18 @@ export default function Dashboard() {
   // Lista de compras: um único save aplica listaCompras/modelos e, quando um
   // item é "lançado", também compras/despesas/cotações — sem corrida de estado.
   const aplicarLista = (parcial) => {
-    if (parcial.listaCompras) setListaCompras(parcial.listaCompras);
-    if (parcial.listasModelo) setListasModelo(parcial.listasModelo);
-    if (parcial.compras) setCompras(parcial.compras);
-    if (parcial.despesas) setDespesas(parcial.despesas);
-    if (parcial.cotacoes) setCotacoes(parcial.cotacoes);
-    salvarTudo(parcial);
-    if (parcial.compras) syncGoogle();
+    // A Lista de Compras usa sempre a chave "listaCompras"; se a lista aberta é
+    // a da cozinha, redireciona pra "listaCozinha" sem mudar o componente.
+    const p = { ...parcial };
+    if (qualLista === 'cozinha' && 'listaCompras' in p) { p.listaCozinha = p.listaCompras; delete p.listaCompras; }
+    if (p.listaCompras) setListaCompras(p.listaCompras);
+    if (p.listaCozinha) setListaCozinha(p.listaCozinha);
+    if (p.listasModelo) setListasModelo(p.listasModelo);
+    if (p.compras) setCompras(p.compras);
+    if (p.despesas) setDespesas(p.despesas);
+    if (p.cotacoes) setCotacoes(p.cotacoes);
+    salvarTudo(p);
+    if (p.compras) syncGoogle();
   };
 
   // Repor na Lista de Compras a partir de outras abas (estoque crítico no
@@ -321,7 +330,24 @@ export default function Dashboard() {
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
         {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
-        {tab === 'lista' && <ListaCompras itens={listaCompras} modelos={listasModelo} cotacoes={cotacoes} compras={compras} despesas={despesas} onAplicar={aplicarLista} tarefasCozinha={tarefasCozinha} onTarefasCozinha={upd.tarefasCozinha} />}
+        {tab === 'lista' && (
+          <>
+            <div style={{ display: 'inline-flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
+              {[['minha', 'Minha lista'], ['cozinha', 'Da cozinha']].map(([v, rot]) => (
+                <button key={v} onClick={() => setQualLista(v)} style={{
+                  border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
+                  background: qualLista === v ? C.accent : 'transparent', color: qualLista === v ? '#06101F' : C.muted,
+                }}>{rot}</button>
+              ))}
+            </div>
+            <ListaCompras key={qualLista}
+              itens={qualLista === 'cozinha' ? listaCozinha : listaCompras}
+              modelos={listasModelo} cotacoes={cotacoes} compras={compras} despesas={despesas} onAplicar={aplicarLista}
+              tarefasCozinha={tarefasCozinha} onTarefasCozinha={upd.tarefasCozinha}
+              subtitulo={qualLista === 'cozinha' ? 'O que a cozinha pediu pra repor' : 'O que falta repor no bar'}
+              mostrarTarefasCozinha={qualLista === 'cozinha'} />
+          </>
+        )}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
