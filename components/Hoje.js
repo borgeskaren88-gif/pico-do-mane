@@ -107,25 +107,40 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
 
       {agendaGrupos.length > 0 && (
         <Card style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.accent, fontWeight: 700 }}>Sua agenda</div>
-            <span style={{ fontSize: 11, color: C.faint }}>Google Agenda</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text, letterSpacing: '-.01em' }}>Agenda</div>
+            <span style={{ fontSize: 11, color: C.faint, fontWeight: 600, letterSpacing: '.02em' }}>Google Agenda</span>
           </div>
-          {agendaGrupos.map(([d, evs]) => (
-            <div key={d} style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 3 }}>{rotuloDia(d)}</div>
-              {evs.map((ev) => (
-                <div key={ev.id} style={{ display: 'flex', gap: 10, fontSize: 14, padding: '3px 0', alignItems: 'center' }}>
-                  <span style={{ color: C.accent, fontWeight: 700, minWidth: 64, flexShrink: 0, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'center' }}>
-                    {ev.tarefa
-                      ? <span title="Tarefa" style={{ display: 'inline-block', width: 15, height: 15, borderRadius: 4, border: `2px solid ${C.accent}` }} />
-                      : (ev.diaTodo ? 'dia todo' : ev.inicio.slice(11, 16))}
-                  </span>
-                  <span style={{ color: C.text, minWidth: 0 }}>{ev.titulo}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {agendaGrupos.map(([d, evs]) => {
+              const ehHoje = d === hoje;
+              return (
+                <div key={d}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.09em', fontWeight: 700, color: ehHoje ? C.accent : C.muted, whiteSpace: 'nowrap' }}>{rotuloDia(d)}</span>
+                    <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${C.line}, transparent)` }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {evs.map((ev, i) => (
+                      <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}55` }}>
+                        <span style={{ width: 16, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                          {ev.tarefa
+                            ? <span title="Tarefa" style={{ width: 13, height: 13, borderRadius: 4, border: `1.5px solid ${C.accent}`, boxSizing: 'border-box' }} />
+                            : ev.diaTodo
+                              ? <span style={{ width: 8, height: 8, borderRadius: '50%', border: `1.5px solid ${C.accent2}`, boxSizing: 'border-box' }} />
+                              : <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.accent }} />}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: C.text, fontWeight: 500, lineHeight: 1.35 }}>{ev.titulo}</span>
+                        <span style={{ flexShrink: 0, fontSize: 12.5, color: C.faint, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                          {ev.tarefa ? 'tarefa' : ev.diaTodo ? 'dia todo' : ev.inicio.slice(11, 16)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </Card>
       )}
 
