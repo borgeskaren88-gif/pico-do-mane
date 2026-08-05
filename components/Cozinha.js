@@ -41,6 +41,12 @@ export default function Cozinha() {
   const editar = (it) => { setNome(it.nome || ''); setQuantidade(it.quantidade || ''); setEditId(it.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const excluir = (id) => { if (id === editId) limpar(); salvar(itens.filter((i) => i.id !== id)); };
 
+  // Marca/desmarca uma tarefa como feita (só o "feito"; o texto é da dona).
+  const marcarTarefa = (id, feito) => {
+    setTarefas((ts) => ts.map((t) => (t.id === id ? { ...t, feito } : t)));
+    fetch('/api/lista', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tarefasFeito: { [id]: feito } }) }).catch(() => { });
+  };
+
   // Tema claro/escuro (mesmo comportamento do resto do app).
   const [tema, setTema] = useState('escuro');
   useEffect(() => { setTema(document.documentElement.getAttribute('data-theme') === 'claro' ? 'claro' : 'escuro'); }, []);
@@ -120,9 +126,12 @@ export default function Cozinha() {
           {tarefas.length === 0 ? <Empty>Nenhuma tarefa por aqui.</Empty> : (
             <Card style={{ padding: 6 }}>
               {tarefas.map((t, i) => (
-                <div key={t.id || i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '11px 12px', borderTop: i === 0 ? 'none' : `1px solid ${C.hair}` }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.accent, flexShrink: 0, marginTop: 7 }} />
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 15, color: C.text, lineHeight: 1.35 }}>{t.texto}</span>
+                <div key={t.id || i} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '11px 12px', borderTop: i === 0 ? 'none' : `1px solid ${C.hair}` }}>
+                  <button onClick={() => marcarTarefa(t.id, !t.feito)} aria-label={t.feito ? 'Marcar como não feita' : 'Marcar como feita'}
+                    style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, cursor: 'pointer', padding: 0, border: `2px solid ${t.feito ? C.green : C.line}`, background: t.feito ? C.green : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {t.feito && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#06101F" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 6.5" /></svg>}
+                  </button>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 1.35, color: t.feito ? C.faint : C.text, textDecoration: t.feito ? 'line-through' : 'none' }}>{t.texto}</span>
                 </div>
               ))}
             </Card>
