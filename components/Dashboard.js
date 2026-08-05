@@ -202,6 +202,38 @@ export default function Dashboard() {
   const tarefasAlerta = tarefas.filter((t) => !t.feito && t.data && t.data <= hojeIso).length;
   const badges = { diario: tarefasAlerta };
 
+  // Navegação por gesto: deslizar o dedo para o lado troca de aba.
+  const toqueRef = useRef(null);
+  const tabBarRef = useRef(null);
+  const irParaAba = (delta) => {
+    const idx = tabs.findIndex(([id]) => id === tab);
+    const novo = idx + delta;
+    if (idx < 0 || novo < 0 || novo >= tabs.length) return;
+    setTab(tabs[novo][0]);
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0 });
+  };
+  const onTouchStart = (e) => {
+    const t = e.changedTouches[0];
+    toqueRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+  };
+  const onTouchEnd = (e) => {
+    const ini = toqueRef.current; toqueRef.current = null;
+    if (!ini) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - ini.x, dy = t.clientY - ini.y;
+    if (Date.now() - ini.t > 700) return;          // gesto muito lento
+    if (Math.abs(dx) < 60) return;                 // deslize curto demais
+    if (Math.abs(dx) < Math.abs(dy) * 1.5) return; // muito vertical (é rolagem)
+    irParaAba(dx < 0 ? 1 : -1);                     // esquerda = próxima; direita = anterior
+  };
+  // Mantém a aba ativa visível na barra ao trocar (inclusive por gesto).
+  useEffect(() => {
+    const bar = tabBarRef.current;
+    if (!bar) return;
+    const el = bar.querySelector(`[data-tab="${tab}"]`);
+    if (el && el.scrollIntoView) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [tab]);
+
   if (!loaded) return (
     <div style={{ minHeight: '100vh', background: C.ink, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>Carregando seus dados…</div>
   );
@@ -221,9 +253,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: 'calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', position: 'sticky', top: 0, background: 'rgba(8,13,24,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', zIndex: 10, borderBottom: `1px solid ${C.line}55` }}>
+      <div ref={tabBarRef} style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: 'calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', position: 'sticky', top: 0, background: 'rgba(8,13,24,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', zIndex: 10, borderBottom: `1px solid ${C.line}55` }}>
         {tabs.map(([id, nome]) => (
-          <button key={id} onClick={() => setTab(id)} style={{
+          <button key={id} data-tab={id} onClick={() => setTab(id)} style={{
             flexShrink: 0, padding: '8px 15px', borderRadius: 999, fontSize: 14, fontWeight: 700, cursor: 'pointer',
             border: `1px solid ${tab === id ? C.accent : C.line}`,
             background: tab === id ? C.accent : 'transparent',
@@ -242,7 +274,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={setTab} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
