@@ -90,6 +90,17 @@ export default function AgendaCalendario() {
         )}
 
         {sMsg && <div style={{ marginTop: 12, fontSize: 13, color: sMsg.startsWith('Erro') || sMsg.startsWith('Não') ? C.amber : C.accent, fontWeight: 600 }}>{sMsg}</div>}
+
+        {gs && gs.configurado && gs.diag && !gs.conectado && (
+          <details style={{ marginTop: 12 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 12, color: C.faint, fontWeight: 600 }}>Diagnóstico (abrir se der erro ao conectar)</summary>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.7, marginTop: 8, fontFamily: 'monospace' }}>
+              <div>Chave secreta começa com “GOCSPX-”: <b style={{ color: gs.diag.segStarts ? C.green : C.red }}>{gs.diag.segStarts ? 'sim' : 'NÃO'}</b></div>
+              <div>Chave secreta: <b>{gs.diag.segLen}</b> caracteres{gs.diag.segEspaco ? <b style={{ color: C.red }}> · TEM ESPAÇO/QUEBRA</b> : ''}</div>
+              <div>Client ID termina certo: <b style={{ color: gs.diag.idEnds ? C.green : C.red }}>{gs.diag.idEnds ? 'sim' : 'NÃO'}</b> · <b>{gs.diag.idLen}</b> caracteres{gs.diag.idEspaco ? <b style={{ color: C.red }}> · TEM ESPAÇO</b> : ''}</div>
+            </div>
+          </details>
+        )}
       </Card>
 
       <details style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 16, marginBottom: 14 }}>
