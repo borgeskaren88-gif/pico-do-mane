@@ -3,12 +3,16 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
+const MESES_LONGOS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const LETRAS_SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']; // domingo a sábado
+
 export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], setTab }) {
   const [mostrarValores, setMostrarValores] = useState(true);
   const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
   // Próximos eventos do Google Agenda (só aparece se conectado).
   const [agenda, setAgenda] = useState(null);
   const [vista, setVista] = useState('semana'); // 'dia' | 'semana' | 'mes'
+  const [diaSel, setDiaSel] = useState(todayISO()); // dia escolhido na faixa/calendário
   useEffect(() => {
     (async () => {
       try {
@@ -60,20 +64,22 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   }, [agenda]);
   const rotuloDia = (d) => (d === hoje ? 'Hoje' : d === addDays(hoje, 1) ? 'Amanhã' : `${weekday(d)}, ${fmtDate(d)}`);
 
-  // Filtro da vista escolhida (dia / semana / mês). A semana é a semana do
-  // calendário (domingo a sábado) que contém hoje.
+  // Semana do calendário (domingo a sábado) que contém hoje.
   const diaSemHoje = new Date(hoje + 'T12:00:00').getDay();
   const iniSemana = addDays(hoje, -diaSemHoje);
-  const fimSemana = addDays(iniSemana, 6);
-  const dentroDaVista = (d) => (vista === 'dia' ? d === hoje : vista === 'semana' ? (d >= iniSemana && d <= fimSemana) : ymOf(d) === mes);
-  const gruposVista = agendaGrupos.filter(([d]) => dentroDaVista(d));
+  const diasSemana = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(iniSemana, i)), [iniSemana]);
 
-  // Dias do mês com algum compromisso (pra marcar o quadradinho no calendário).
+  // Eventos indexados por dia (pra mostrar os do dia escolhido).
+  const porDia = useMemo(() => new Map(agendaGrupos), [agendaGrupos]);
+  // Dias com algum compromisso (pra marcar o pontinho na faixa/calendário).
   const diasComEvento = useMemo(() => {
     const s = new Set();
     for (const ev of (agenda || [])) { const d = (ev.inicio || '').slice(0, 10); if (d) s.add(d); }
     return s;
   }, [agenda]);
+  // Rótulo "Mês Ano" do dia selecionado (ex.: Agosto 2026).
+  const cabMes = (() => { const [y, m] = diaSel.split('-'); return `${MESES_LONGOS[Number(m) - 1]} ${y}`; })();
+
   // Células do calendário do mês: nulls pra alinhar o 1º dia no dia da semana certo.
   const celulasMes = useMemo(() => {
     const [ano, mn] = mes.split('-').map(Number);
@@ -84,6 +90,24 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
     for (let d = 1; d <= total; d++) cs.push(`${mes}-${String(d).padStart(2, '0')}`);
     return cs;
   }, [mes]);
+
+  // Lista de compromissos de um dia, no estilo limpo (título + horário/etiqueta).
+  const listaDoDia = (dia) => {
+    const evs = porDia.get(dia) || [];
+    if (!evs.length) return <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '14px 0 4px' }}>Nada agendado para {dia === hoje ? 'hoje' : 'este dia'}.</div>;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {evs.map((ev, i) => (
+          <div key={ev.id} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}55` }}>
+            <div style={{ fontSize: 14.5, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{ev.titulo}</div>
+            <div style={{ fontSize: 12.5, color: C.faint, fontWeight: 600, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
+              {ev.tarefa ? 'Tarefa' : ev.diaTodo ? 'Dia todo' : ev.inicio.slice(11, 16)}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -133,78 +157,72 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
 
       {agendaGrupos.length > 0 && (
         <Card style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: C.text, letterSpacing: '-.01em' }}>Agenda</div>
-            <span style={{ fontSize: 11, color: C.faint, fontWeight: 600, letterSpacing: '.02em' }}>Google Agenda</span>
-          </div>
-
-          <div style={{ display: 'inline-flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 16 }}>
-            {[['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']].map(([v, rot]) => (
-              <button key={v} onClick={() => setVista(v)} style={{
-                border: 'none', cursor: 'pointer', borderRadius: 8, padding: '5px 14px', fontSize: 12.5, fontWeight: 700,
-                background: vista === v ? C.accent : 'transparent', color: vista === v ? '#06101F' : C.muted,
-              }}>{rot}</button>
-            ))}
-          </div>
-
-          {vista === 'mes' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: gruposVista.length ? 18 : 4 }}>
-              {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((w, i) => (
-                <div key={'h' + i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: C.faint, paddingBottom: 4 }}>{w}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.text, letterSpacing: '-.02em' }}>{vista === 'dia' ? 'Hoje' : cabMes}</div>
+            <div style={{ display: 'inline-flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2 }}>
+              {[['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']].map(([v, rot]) => (
+                <button key={v} onClick={() => { setVista(v); setDiaSel(hoje); }} style={{
+                  border: 'none', cursor: 'pointer', borderRadius: 8, padding: '5px 11px', fontSize: 12, fontWeight: 700,
+                  background: vista === v ? C.accent : 'transparent', color: vista === v ? '#06101F' : C.muted,
+                }}>{rot}</button>
               ))}
-              {celulasMes.map((d, i) => {
-                if (!d) return <div key={'c' + i} />;
-                const ehHoje = d === hoje, passado = d < hoje, temEv = diasComEvento.has(d);
+            </div>
+          </div>
+
+          {vista === 'semana' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 6 }}>
+              {diasSemana.map((d, i) => {
+                const sel = d === diaSel, ehHoje = d === hoje, temEv = diasComEvento.has(d);
                 return (
-                  <div key={'c' + i} style={{
-                    position: 'relative', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9,
-                    background: ehHoje ? C.accent : 'transparent', color: ehHoje ? '#06101F' : (passado ? C.faint : C.text),
-                    fontSize: 13, fontWeight: ehHoje ? 800 : 600, fontVariantNumeric: 'tabular-nums',
+                  <button key={d} onClick={() => setDiaSel(d)} style={{
+                    border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 0',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                   }}>
-                    {Number(d.slice(8))}
-                    {temEv && !ehHoje && <span style={{ position: 'absolute', bottom: 5, width: 4, height: 4, borderRadius: '50%', background: C.accent }} />}
-                  </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: C.faint }}>{LETRAS_SEMANA[i]}</span>
+                    <span style={{
+                      width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%',
+                      background: sel ? C.accent : 'transparent', color: sel ? '#06101F' : C.text,
+                      border: !sel && ehHoje ? `1.5px solid ${C.accent}` : '1.5px solid transparent', boxSizing: 'border-box',
+                      fontSize: 15, fontWeight: sel || ehHoje ? 800 : 600, fontVariantNumeric: 'tabular-nums',
+                    }}>{Number(d.slice(8))}</span>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: temEv && !sel ? C.accent : 'transparent' }} />
+                  </button>
                 );
               })}
             </div>
           )}
 
-          {gruposVista.length === 0 ? (
-            <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '6px 0 2px' }}>
-              {vista === 'dia' ? 'Nada na agenda para hoje.' : vista === 'semana' ? 'Nada na agenda para esta semana.' : 'Nada na agenda para este mês.'}
+          {vista === 'mes' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 6 }}>
+              {LETRAS_SEMANA.map((w, i) => (
+                <div key={'h' + i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: C.faint, paddingBottom: 4 }}>{w}</div>
+              ))}
+              {celulasMes.map((d, i) => {
+                if (!d) return <div key={'c' + i} />;
+                const sel = d === diaSel, ehHoje = d === hoje, passado = d < hoje, temEv = diasComEvento.has(d);
+                return (
+                  <button key={'c' + i} onClick={() => setDiaSel(d)} style={{
+                    border: 'none', cursor: 'pointer', position: 'relative', height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10,
+                    background: sel ? C.accent : 'transparent', color: sel ? '#06101F' : (passado ? C.faint : C.text),
+                    boxShadow: !sel && ehHoje ? `inset 0 0 0 1.5px ${C.accent}` : 'none',
+                    fontSize: 13, fontWeight: sel || ehHoje ? 800 : 600, fontVariantNumeric: 'tabular-nums',
+                  }}>
+                    {Number(d.slice(8))}
+                    {temEv && !sel && <span style={{ position: 'absolute', bottom: 5, width: 4, height: 4, borderRadius: '50%', background: C.accent }} />}
+                  </button>
+                );
+              })}
             </div>
-          ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {gruposVista.map(([d, evs]) => {
-              const ehHoje = d === hoje;
-              return (
-                <div key={d}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.09em', fontWeight: 700, color: ehHoje ? C.accent : C.muted, whiteSpace: 'nowrap' }}>{rotuloDia(d)}</span>
-                    <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${C.line}, transparent)` }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {evs.map((ev, i) => (
-                      <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}55` }}>
-                        <span style={{ width: 16, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                          {ev.tarefa
-                            ? <span title="Tarefa" style={{ width: 13, height: 13, borderRadius: 4, border: `1.5px solid ${C.accent}`, boxSizing: 'border-box' }} />
-                            : ev.diaTodo
-                              ? <span style={{ width: 8, height: 8, borderRadius: '50%', border: `1.5px solid ${C.accent2}`, boxSizing: 'border-box' }} />
-                              : <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.accent }} />}
-                        </span>
-                        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: C.text, fontWeight: 500, lineHeight: 1.35 }}>{ev.titulo}</span>
-                        <span style={{ flexShrink: 0, fontSize: 12.5, color: C.faint, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                          {ev.tarefa ? 'tarefa' : ev.diaTodo ? 'dia todo' : ev.inicio.slice(11, 16)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
           )}
+
+          {vista !== 'dia' && (
+            <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 8, paddingTop: 4, marginBottom: 2 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, marginTop: 8 }}>
+                {diaSel === hoje ? 'Hoje' : diaSel === addDays(hoje, 1) ? 'Amanhã' : `${weekday(diaSel)}, ${fmtDate(diaSel)}`}
+              </div>
+            </div>
+          )}
+          {listaDoDia(vista === 'dia' ? hoje : diaSel)}
         </Card>
       )}
 
