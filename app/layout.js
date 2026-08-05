@@ -1,3 +1,5 @@
+import './globals.css';
+
 export const metadata = {
   title: 'PicoOS — Central de Gestão',
   description: 'Painel de gestão do PicoOS',
@@ -24,6 +26,13 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('picoos-tema');if(t!=='claro'&&t!=='escuro')t='escuro';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body style={{ margin: 0 }}>
         {children}
         <script

@@ -106,7 +106,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
         {evs.map((ev) => {
           const cor = corEvento(ev);
           return (
-            <div key={ev.id} style={{ display: 'flex', gap: 12, alignItems: 'center', background: cor + '22', borderRadius: 12, padding: '11px 14px' }}>
+            <div key={ev.id} style={{ display: 'flex', gap: 12, alignItems: 'center', background: `color-mix(in srgb, ${cor} 14%, transparent)`, borderRadius: 12, padding: '11px 14px' }}>
               <span style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: cor, flexShrink: 0 }} />
               <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{ev.titulo}</span>
               <span style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{etiquetaEvento(ev)}</span>

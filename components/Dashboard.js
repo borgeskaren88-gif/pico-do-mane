@@ -191,6 +191,24 @@ export default function Dashboard() {
     router.refresh();
   };
 
+  // Tema claro/escuro. O tema inicial já é aplicado no <html> por um script no
+  // layout (sem piscar); aqui só lemos o valor atual e deixamos a Karen trocar.
+  const [tema, setTema] = useState('escuro');
+  useEffect(() => {
+    const atual = document.documentElement.getAttribute('data-theme') === 'claro' ? 'claro' : 'escuro';
+    setTema(atual);
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', atual === 'claro' ? '#F6F9FD' : '#0A1220');
+  }, []);
+  const trocarTema = () => {
+    const novo = tema === 'claro' ? 'escuro' : 'claro';
+    setTema(novo);
+    document.documentElement.setAttribute('data-theme', novo);
+    try { localStorage.setItem('picoos-tema', novo); } catch { /* ignora */ }
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', novo === 'claro' ? '#F6F9FD' : '#0A1220');
+  };
+
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
     ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
@@ -240,7 +258,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <div style={{ padding: 'calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', borderBottom: `1px solid ${C.line}55`, background: 'transparent' }}>
+      <div style={{ padding: 'calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', borderBottom: `1px solid ${C.hair}`, background: 'transparent' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <LogoMark size={42} radius={12} />
@@ -249,11 +267,28 @@ export default function Dashboard() {
               <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 3, fontWeight: 600 }}>Central de Gestão</div>
             </div>
           </div>
-          <button onClick={sair} style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>Sair</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <button onClick={trocarTema} title={tema === 'claro' ? 'Mudar para escuro' : 'Mudar para claro'} aria-label="Trocar tema"
+              style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {tema === 'claro' ? (
+                // Lua (está claro -> toca pra escurecer)
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+                </svg>
+              ) : (
+                // Sol (está escuro -> toca pra clarear)
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4.2" />
+                  <path d="M12 2.5v2.2M12 19.3v2.2M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.4 19.6l1.6-1.6M18 6l1.6-1.6" />
+                </svg>
+              )}
+            </button>
+            <button onClick={sair} style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Sair</button>
+          </div>
         </div>
       </div>
 
-      <div ref={tabBarRef} style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: 'calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', position: 'sticky', top: 0, background: 'rgba(8,13,24,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', zIndex: 10, borderBottom: `1px solid ${C.line}55` }}>
+      <div ref={tabBarRef} style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: 'calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', position: 'sticky', top: 0, background: C.barBg, backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', zIndex: 10, borderBottom: `1px solid ${C.hair}` }}>
         {tabs.map(([id, nome]) => (
           <button key={id} data-tab={id} onClick={() => setTab(id)} style={{
             flexShrink: 0, padding: '8px 15px', borderRadius: 999, fontSize: 14, fontWeight: 700, cursor: 'pointer',

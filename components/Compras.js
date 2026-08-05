@@ -185,7 +185,7 @@ export default function Compras({ dados, cotacoes, despesas = [], onChange, onRe
                   Carrinho ({carrinho.length} {carrinho.length > 1 ? 'itens' : 'item'})
                 </div>
                 {carrinho.map((it) => (
-                  <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: `1px solid ${C.line}44` }}>
+                  <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: `1px solid ${C.hair}` }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, color: C.text }}>{it.produto}</div>
                       <div style={{ fontSize: 12, color: C.faint }}>{num(it.quantidade) || 1} × {brl(num(it.valorUnit))}{it.categoria ? ` · ${it.categoria}` : ''}</div>

@@ -47,7 +47,7 @@ export default function Visitantes({ dados = [], onChange }) {
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
             {Object.entries(resumo.porCanal).sort((a, b) => b[1] - a[1]).map(([canal, n]) => (
-              <span key={canal} style={{ fontSize: 12, fontWeight: 600, color: canal === 'Instagram' ? C.accent : C.muted, background: `${C.line}66`, borderRadius: 999, padding: '3px 9px' }}>
+              <span key={canal} style={{ fontSize: 12, fontWeight: 600, color: canal === 'Instagram' ? C.accent : C.muted, background: `${C.hair}`, borderRadius: 999, padding: '3px 9px' }}>
                 {canal}: {n}
               </span>
             ))}
@@ -84,7 +84,7 @@ export default function Visitantes({ dados = [], onChange }) {
                   {d.origem || 'Visitante'}
                   <span style={{ fontSize: 12, color: C.faint, fontWeight: 400 }}> · {pes(d)} pessoa{pes(d) > 1 ? 's' : ''} · {fmtDate(d.data)}</span>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 600, color: d.comoConheceu === 'Instagram' ? C.accent : C.muted, background: `${C.line}66`, borderRadius: 999, padding: '2px 8px', flexShrink: 0, whiteSpace: 'nowrap' }}>{d.comoConheceu || 'Outro'}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: d.comoConheceu === 'Instagram' ? C.accent : C.muted, background: `${C.hair}`, borderRadius: 999, padding: '2px 8px', flexShrink: 0, whiteSpace: 'nowrap' }}>{d.comoConheceu || 'Outro'}</span>
               </div>
               {d.obs && <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{d.obs}</div>}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>

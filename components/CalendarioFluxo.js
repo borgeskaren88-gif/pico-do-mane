@@ -150,7 +150,7 @@ export default function CalendarioFluxo({ contas }) {
               onClick={temConta ? () => setSelecionado((s) => (s === iso ? null : iso)) : undefined}
               style={{
                 aspectRatio: '1 / 1', borderRadius: 8, background: corDia(t),
-                border: ehHoje ? `2px solid ${C.accent}` : vencido ? `1px solid ${C.red}` : `1px solid ${C.line}44`,
+                border: ehHoje ? `2px solid ${C.accent}` : vencido ? `1px solid ${C.red}` : `1px solid ${C.hair}`,
                 boxShadow: sel ? `0 0 0 2px ${C.accent2}` : 'none',
                 cursor: temConta ? 'pointer' : 'default',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 2, minWidth: 0,
@@ -211,7 +211,7 @@ export default function CalendarioFluxo({ contas }) {
                   <span style={{ color: C.muted }}>{pad(ini)}–{pad(fim)}/{pad(mes)}</span>
                   <b style={{ color: cor, fontVariantNumeric: 'tabular-nums' }}>{brl(t)}</b>
                 </div>
-                <div style={{ height: 8, borderRadius: 999, background: `${C.line}55`, overflow: 'hidden' }}>
+                <div style={{ height: 8, borderRadius: 999, background: `${C.hair}`, overflow: 'hidden' }}>
                   <div style={{ width: `${Math.max(6, ratio * 100)}%`, height: '100%', background: cor, borderRadius: 999 }} />
                 </div>
               </div>
