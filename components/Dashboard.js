@@ -70,6 +70,7 @@ export default function Dashboard() {
   const [visitantes, setVisitantes] = useState([]);
   const [listaCompras, setListaCompras] = useState([]);
   const [listasModelo, setListasModelo] = useState([]);
+  const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [googleOn, setGoogleOn] = useState(false);
   const [mes, setMes] = useState(ymOf(todayISO()));
 
@@ -95,6 +96,7 @@ export default function Dashboard() {
       setVisitantes((salvo && Array.isArray(salvo.visitantes)) ? salvo.visitantes : []);
       setListaCompras((salvo && Array.isArray(salvo.listaCompras)) ? salvo.listaCompras : []);
       setListasModelo((salvo && Array.isArray(salvo.listasModelo)) ? salvo.listasModelo : []);
+      setTarefasCozinha((salvo && Array.isArray(salvo.tarefasCozinha)) ? salvo.tarefasCozinha : []);
       if (vazio || mudou) await apiSalvar({ ...limpos, tarefas: (salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : [] });
       setLoaded(true);
     })();
@@ -116,6 +118,7 @@ export default function Dashboard() {
       tarefas: parcial.tarefas ?? tarefas, marketing: parcial.marketing ?? marketing,
       visitantes: parcial.visitantes ?? visitantes,
       listaCompras: parcial.listaCompras ?? listaCompras, listasModelo: parcial.listasModelo ?? listasModelo,
+      tarefasCozinha: parcial.tarefasCozinha ?? tarefasCozinha,
     };
     apiSalvar(dados);
   };
@@ -140,6 +143,8 @@ export default function Dashboard() {
     tarefas: (v) => { setTarefas(v); salvarTudo({ tarefas: v }); syncGoogle(); },
     marketing: (v) => { setMarketing(v); salvarTudo({ marketing: v }); },
     visitantes: (v) => { setVisitantes(v); salvarTudo({ visitantes: v }); },
+    listaCompras: (v) => { setListaCompras(v); salvarTudo({ listaCompras: v }); },
+    tarefasCozinha: (v) => { setTarefasCozinha(v); salvarTudo({ tarefasCozinha: v }); },
   };
 
   // Aplica mudanças em compras E despesas numa tacada só (usado ao marcar/
@@ -316,7 +321,7 @@ export default function Dashboard() {
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
         {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
-        {tab === 'lista' && <ListaCompras itens={listaCompras} modelos={listasModelo} cotacoes={cotacoes} compras={compras} despesas={despesas} onAplicar={aplicarLista} />}
+        {tab === 'lista' && <ListaCompras itens={listaCompras} modelos={listasModelo} cotacoes={cotacoes} compras={compras} despesas={despesas} onAplicar={aplicarLista} tarefasCozinha={tarefasCozinha} onTarefasCozinha={upd.tarefasCozinha} />}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}

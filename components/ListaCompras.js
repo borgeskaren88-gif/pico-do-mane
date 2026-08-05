@@ -6,8 +6,11 @@ import MicBtn from './MicBtn';
 
 const itemVazio = () => ({ nome: '', quantidade: '', categoria: '' });
 
-export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], compras = [], despesas = [], onAplicar }) {
+export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], compras = [], despesas = [], onAplicar, tarefasCozinha = [], onTarefasCozinha }) {
   const [novo, setNovo] = useState(itemVazio());
+  const [novaTarefaCoz, setNovaTarefaCoz] = useState('');
+  const addTarefaCoz = () => { if (!novaTarefaCoz.trim() || !onTarefasCozinha) return; onTarefasCozinha([{ id: uid(), texto: novaTarefaCoz.trim() }, ...tarefasCozinha]); setNovaTarefaCoz(''); };
+  const removerTarefaCoz = (id) => onTarefasCozinha && onTarefasCozinha(tarefasCozinha.filter((t) => t.id !== id));
   const [editId, setEditId] = useState(null);
   const [marcandoId, setMarcandoId] = useState(null);
   const [lancForm, setLancForm] = useState({ valor: '', fornecedor: '', forma: 'À vista', vencimento: '' });
@@ -220,6 +223,25 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
             <Btn small onClick={salvarModelo}>Salvar lista atual</Btn>
           </div>
           {ativos.length === 0 && <div style={{ fontSize: 11, color: C.faint, marginTop: 6 }}>Adicione itens acima para salvar como modelo.</div>}
+        </Card>
+      </div>
+
+      <div style={{ marginTop: 22 }}>
+        <SecTitle>Tarefas para a cozinha</SecTitle>
+        <Card style={{ padding: 14 }}>
+          <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>Recados e tarefas que aparecem no acesso da cozinha (ela vê, não edita).</div>
+          {tarefasCozinha.length === 0 ? <div style={{ fontSize: 13, color: C.faint, marginBottom: 12 }}>Nenhuma tarefa para a cozinha ainda.</div> :
+            tarefasCozinha.map((t) => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, padding: '9px 0' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.accent, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0, fontSize: 14 }}>{t.texto}</div>
+                <button onClick={() => removerTarefaCoz(t.id)} title="Remover" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}>×</button>
+              </div>
+            ))}
+          <div style={{ display: 'flex', gap: 8, marginTop: 14, borderTop: `1px solid ${C.line}`, paddingTop: 14 }}>
+            <div style={{ flex: 1, minWidth: 0 }}><TextInput value={novaTarefaCoz} onChange={setNovaTarefaCoz} placeholder="Ex.: Descongelar o frango pra amanhã" /></div>
+            <Btn small onClick={addTarefaCoz}>Adicionar</Btn>
+          </div>
         </Card>
       </div>
     </div>
