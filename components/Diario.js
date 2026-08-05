@@ -22,8 +22,13 @@ const migrarRelato = (d) => {
     d.aprendizado && `Aprendizado: ${d.aprendizado}`,
   ].filter(Boolean).join('\n');
 };
-export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [], visitantes = [], onVisitantes, onRepor }) {
+const FONTE_ATRASADO = 'Recebimento Atrasado';
+const atrVazio = () => ({ data: todayISO(), valor: '', descricao: '' });
+export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [], onReceitas, visitantes = [], onVisitantes, onRepor }) {
+  const [abaLog, setAbaLog] = useState('fechamento'); // 'fechamento' | 'atrasados'
   const [form, setForm] = useState(diarioVazio());
+  const [atrForm, setAtrForm] = useState(atrVazio());
+  const setAtr = (k) => (v) => setAtrForm((f) => ({ ...f, [k]: v }));
   const [editId, setEditId] = useState(null);
   const [novaTarefa, setNovaTarefa] = useState('');
   const [novaTarefaData, setNovaTarefaData] = useState('');
@@ -50,22 +55,34 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
   const toggleTarefa = (id) => onTarefas(tarefas.map((t) => t.id === id ? { ...t, feito: !t.feito, feitoEm: !t.feito ? Date.now() : null } : t));
   const removerTarefa = (id) => onTarefas(tarefas.filter((t) => t.id !== id));
   const limparConcluidas = () => onTarefas(tarefas.filter((t) => !t.feito));
-  // Receita do dia = soma de TUDO que foi lançado em Receitas naquela data
-  // (todas as fontes, inclusive Recebimento Atrasado). Para dias antigos sem
-  // nada lançado em Receitas, mantém o valor que já estava salvo no diário.
+  // Caixa do dia = receitas da data SEM o "Recebimento Atrasado" (esse fica à
+  // parte, pra não inflar o caixa do dia). Para dias antigos sem nada lançado em
+  // Receitas, mantém o valor que já estava salvo no diário.
+  const ehAtrasado = (r) => (r.categoria || '') === FONTE_ATRASADO;
   const receitasDoDia = (data) => receitas.filter((r) => r.data === data);
-  const totalReceitasDia = (data) => receitasDoDia(data).reduce((s, r) => s + num(r.valor), 0);
-  const receitaExibida = (d) => { const rd = totalReceitasDia(d.data); return rd > 0 ? rd : num(d.receita); };
+  const caixaDoDia = (data) => receitasDoDia(data).filter((r) => !ehAtrasado(r)).reduce((s, r) => s + num(r.valor), 0);
+  const atrasadoDoDia = (data) => receitasDoDia(data).filter(ehAtrasado).reduce((s, r) => s + num(r.valor), 0);
+  const receitaExibida = (d) => { const c = caixaDoDia(d.data); return c > 0 ? c : num(d.receita); };
 
   const recForm = receitasDoDia(form.data);
-  const totalRecForm = recForm.reduce((s, r) => s + num(r.valor), 0);
-  const porFonteForm = recForm.reduce((m, r) => { const k = r.categoria || 'Outros'; m[k] = (m[k] || 0) + num(r.valor); return m; }, {});
-  const receitaForm = totalRecForm > 0 ? totalRecForm : num(form.receita);
+  const caixaForm = caixaDoDia(form.data);
+  const atrasadoForm = atrasadoDoDia(form.data);
+  const porFonteForm = recForm.filter((r) => !ehAtrasado(r)).reduce((m, r) => { const k = r.categoria || 'Outros'; m[k] = (m[k] || 0) + num(r.valor); return m; }, {});
+  const receitaForm = caixaForm > 0 ? caixaForm : num(form.receita);
   const ticket = receitaForm && num(form.nPedidos) ? receitaForm / num(form.nPedidos) : 0;
+
+  // Recebimentos atrasados (todas as datas), pra aba própria.
+  const atrasados = receitas.filter(ehAtrasado).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+  const addAtrasado = () => {
+    if (!onReceitas || !atrForm.data || num(atrForm.valor) <= 0) return;
+    onReceitas([{ id: uid(), data: atrForm.data, categoria: FONTE_ATRASADO, descricao: atrForm.descricao.trim(), valor: atrForm.valor, obs: '' }, ...receitas]);
+    setAtrForm(atrVazio());
+  };
+  const excluirAtrasado = (id) => onReceitas && onReceitas(receitas.filter((r) => r.id !== id));
 
   const salvar = () => {
     if (!form.data) return;
-    const recCalc = totalReceitasDia(form.data);
+    const recCalc = caixaDoDia(form.data);
     const registro = { ...form, receita: recCalc > 0 ? recCalc.toFixed(2).replace('.', ',') : form.receita };
     if (editId) onChange(dados.map((d) => d.id === editId ? { ...registro, id: editId } : d));
     else onChange([{ ...registro, id: uid() }, ...dados]);
@@ -88,11 +105,22 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
   const ordenado = [...dados].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   const notas = dados.map((d) => num(d.nota)).filter((n) => n > 0);
   const media = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : 0;
-  const receitaTotal = dados.reduce((s, d) => s + receitaExibida(d), 0);
+  const receitaTotal = dados.reduce((s, d) => s + receitaExibida(d) + atrasadoDoDia(d.data), 0);
 
   return (
     <div>
       <PageTitle sub="Checklist do bar e fechamento do dia">Log Operacional</PageTitle>
+
+      <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
+        {[['fechamento', 'Fechamento'], ['atrasados', 'Recebimentos atrasados']].map(([v, rot]) => (
+          <button key={v} onClick={() => setAbaLog(v)} style={{
+            flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 13.5, fontWeight: 700,
+            background: abaLog === v ? C.accent : 'transparent', color: abaLog === v ? '#06101F' : C.muted,
+          }}>{rot}</button>
+        ))}
+      </div>
+
+      {abaLog === 'fechamento' && (<>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 18 }}>
       {onTarefas && (
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>
@@ -169,12 +197,17 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
           <Field label="Data"><TextInput type="date" value={form.data} onChange={set('data')} /></Field>
           <Field label="Dia da semana"><TextInput value={weekday(form.data)} onChange={() => { }} /></Field>
         </div>
-        <Field label="Receita do dia (puxada das Receitas)">
+        <Field label="Caixa do dia (puxado das Receitas)">
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: '11px 12px' }}>
-            <div style={{ fontSize: 19, fontWeight: 800, color: totalRecForm > 0 ? C.green : C.faint, fontVariantNumeric: 'tabular-nums' }}>{brl(totalRecForm)}</div>
-            {recForm.length > 0
+            <div style={{ fontSize: 19, fontWeight: 800, color: caixaForm > 0 ? C.green : C.faint, fontVariantNumeric: 'tabular-nums' }}>{brl(caixaForm)}</div>
+            {caixaForm > 0
               ? <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{Object.entries(porFonteForm).map(([f, v]) => `${f}: ${brl(v)}`).join(' · ')}</div>
-              : <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>Nada lançado em Receitas nesse dia. Lance na aba <b>Receitas</b> que aparece aqui automaticamente (soma todas as fontes, inclusive recebimentos atrasados).</div>}
+              : <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>Nada de caixa lançado em Receitas nesse dia. Lance na aba <b>Receitas</b> que aparece aqui automaticamente.</div>}
+            {atrasadoForm > 0 && (
+              <div style={{ fontSize: 12, color: C.amber, marginTop: 8, borderTop: `1px solid ${C.line}`, paddingTop: 8, fontWeight: 600 }}>
+                + {brl(atrasadoForm)} de recebimento atrasado nesse dia — <span style={{ color: C.muted, fontWeight: 400 }}>não entra no caixa do dia.</span>
+              </div>
+            )}
           </div>
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -233,6 +266,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
               <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{d.clima && <span>{d.clima} · </span>}{d.evento || 'Sem evento'}</div>
               <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap', fontVariantNumeric: 'tabular-nums' }}>
                 <span style={{ color: C.green, fontWeight: 700 }}>{brl(receitaExibida(d))}</span>
+                {atrasadoDoDia(d.data) > 0 && <span style={{ color: C.amber, fontSize: 13 }}>+ {brl(atrasadoDoDia(d.data))} atrasado</span>}
                 {num(d.nPedidos) > 0 && <span style={{ color: C.muted, fontSize: 13 }}>{d.nPedidos} pedidos · tkt {brl(receitaExibida(d) / num(d.nPedidos))}</span>}
                 {num(d.fiado) > 0 && <span style={{ color: C.amber, fontSize: 13 }}>{d.fiado} fiado{num(d.fiado) > 1 ? 's' : ''}</span>}
                 {d.nota && <span style={{ color: C.accent, fontSize: 13 }}>Nota {d.nota}</span>}
@@ -246,6 +280,40 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
             </div>
           </Card>
         ))}
+      </>)}
+
+      {abaLog === 'atrasados' && (<>
+        <Card style={{ marginBottom: 14, background: C.panel2 }}>
+          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+            Valores que <b style={{ color: C.text }}>caíram depois</b> (ex.: um fiado antigo que te pagaram hoje). Entram como receita do mês, mas <b style={{ color: C.text }}>não</b> contam no caixa do dia em que você recebeu.
+          </div>
+        </Card>
+
+        <Card style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 14 }}>Lançar recebimento atrasado</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Data que recebeu"><TextInput type="date" value={atrForm.data} onChange={setAtr('data')} /></Field>
+            <Field label="Valor (R$)"><NumInput value={atrForm.valor} onChange={setAtr('valor')} /></Field>
+          </div>
+          <Field label="Referência"><TextInput value={atrForm.descricao} onChange={setAtr('descricao')} placeholder="Ex.: Fiado do João — venda de 12/07" /></Field>
+          <Btn onClick={addAtrasado}>Lançar recebimento</Btn>
+          {!onReceitas && <div style={{ fontSize: 12, color: C.amber, marginTop: 8 }}>Indisponível neste modo.</div>}
+        </Card>
+
+        <SecTitle>Recebimentos atrasados ({atrasados.length})</SecTitle>
+        {atrasados.length === 0 ? <Empty>Nenhum recebimento atrasado lançado.</Empty> :
+          atrasados.map((r) => (
+            <Card key={r.id} style={{ marginBottom: 8, padding: '12px 14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{brl(num(r.valor))}</div>
+                  <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>Recebido {fmtDate(r.data)}{r.descricao ? ` · ${r.descricao}` : ''}</div>
+                </div>
+                <Btn kind="danger" small onClick={() => excluirAtrasado(r.id)}>×</Btn>
+              </div>
+            </Card>
+          ))}
+      </>)}
     </div>
   );
 }
