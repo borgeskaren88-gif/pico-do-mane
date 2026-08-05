@@ -111,16 +111,6 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
     <div>
       <PageTitle sub="Checklist do bar e fechamento do dia">Log Operacional</PageTitle>
 
-      <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
-        {[['fechamento', 'Fechamento'], ['atrasados', 'Recebimentos atrasados']].map(([v, rot]) => (
-          <button key={v} onClick={() => setAbaLog(v)} style={{
-            flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 13.5, fontWeight: 700,
-            background: abaLog === v ? C.accent : 'transparent', color: abaLog === v ? '#06101F' : C.muted,
-          }}>{rot}</button>
-        ))}
-      </div>
-
-      {abaLog === 'fechamento' && (<>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 18 }}>
       {onTarefas && (
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>
@@ -191,6 +181,16 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
         { t: 'Receita lançada', v: brl(receitaTotal), c: C.green },
       ]} />
 
+      <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
+        {[['fechamento', 'Fechamento'], ['atrasados', 'Recebimentos atrasados']].map(([v, rot]) => (
+          <button key={v} onClick={() => setAbaLog(v)} style={{
+            flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 13.5, fontWeight: 700,
+            background: abaLog === v ? C.accent : 'transparent', color: abaLog === v ? '#06101F' : C.muted,
+          }}>{rot}</button>
+        ))}
+      </div>
+
+      {abaLog === 'fechamento' && (<>
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 14 }}>{editId ? 'Editar dia' : 'Fechamento do dia'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
