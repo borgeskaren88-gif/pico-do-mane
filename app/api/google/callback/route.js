@@ -26,7 +26,8 @@ export async function GET(request) {
       await sincronizar(data?.valor || {});
     } catch { /* a sincronização pode ser refeita depois */ }
     return NextResponse.redirect(base() + '/?google=ok');
-  } catch {
-    return NextResponse.redirect(base() + '/?google=erro');
+  } catch (e) {
+    const motivo = encodeURIComponent(String(e?.message || '').slice(0, 180));
+    return NextResponse.redirect(base() + '/?google=erro&motivo=' + motivo);
   }
 }
