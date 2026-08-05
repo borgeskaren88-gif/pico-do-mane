@@ -1,17 +1,23 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { C, Card, Btn, Field, TextInput, Empty, SecTitle, PageTitle, LogoMark, pageBg } from './ui';
-import { uid } from '../lib/util';
+import { C, Card, Btn, Field, TextInput, NumInput, Empty, SecTitle, PageTitle, LogoMark, pageBg } from './ui';
+import { uid, num, fmtDate } from '../lib/util';
 
 export default function Cozinha() {
   const router = useRouter();
+  const [aba, setAba] = useState('compras'); // 'compras' | 'garrafas'
   const [itens, setItens] = useState([]);
   const [tarefas, setTarefas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [nome, setNome] = useState('');
   const [quantidade, setQuantidade] = useState('');
   const [editId, setEditId] = useState(null);
+  // Controle de garrafas (só abrir e encerrar).
+  const [garrafas, setGarrafas] = useState([]);
+  const [gProduto, setGProduto] = useState('');
+  const [gVolume, setGVolume] = useState('1000');
+  const [gMsg, setGMsg] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -22,7 +28,35 @@ export default function Cozinha() {
       } catch { /* ignora */ }
       setCarregando(false);
     })();
+    carregarGarrafas();
   }, []);
+
+  const carregarGarrafas = async () => {
+    try {
+      const r = await fetch('/api/garrafas', { cache: 'no-store' });
+      const j = await r.json();
+      if (j.ok) setGarrafas(Array.isArray(j.garrafas) ? j.garrafas : []);
+    } catch { /* ignora */ }
+  };
+  const abrirGarrafa = async () => {
+    if (!gProduto.trim()) return;
+    setGMsg('');
+    try {
+      const r = await fetch('/api/garrafas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'abrir', produto: gProduto.trim(), volume: gVolume }) });
+      const j = await r.json();
+      if (j.ok) { setGProduto(''); setGVolume('1000'); await carregarGarrafas(); } else setGMsg(j.erro || 'Não consegui abrir a garrafa.');
+    } catch { setGMsg('Não consegui abrir a garrafa.'); }
+  };
+  const encerrarGarrafa = async (id) => {
+    if (typeof window !== 'undefined' && !window.confirm('Encerrar esta garrafa (marcar que acabou hoje)?')) return;
+    try {
+      const r = await fetch('/api/garrafas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'encerrar', id }) });
+      const j = await r.json();
+      if (j.ok) await carregarGarrafas(); else setGMsg(j.erro || 'Não consegui encerrar.');
+    } catch { setGMsg('Não consegui encerrar.'); }
+  };
+  const garrafasAbertas = garrafas.filter((g) => g.dataAbertura && !g.dataTermino);
+  const garrafasEncerradas = garrafas.filter((g) => g.dataTermino);
 
   // Salva a lista (só a lista) no servidor. O servidor preserva os itens já
   // comprados pela dona; aqui a gente cuida só dos itens em aberto.
@@ -91,6 +125,16 @@ export default function Cozinha() {
       </div>
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
+        <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
+          {[['compras', 'Lista de Compras'], ['garrafas', 'Garrafas']].map(([v, rot]) => (
+            <button key={v} onClick={() => setAba(v)} style={{
+              flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 14, fontWeight: 700,
+              background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
+            }}>{rot}</button>
+          ))}
+        </div>
+
+        {aba === 'compras' && (<>
         <PageTitle sub="Anote o que está faltando no bar">Lista de Compras</PageTitle>
 
         <Card style={{ marginBottom: 16 }}>
@@ -135,6 +179,43 @@ export default function Cozinha() {
             </Card>
           )}
         </div>
+        </>)}
+
+        {aba === 'garrafas' && (<>
+        <PageTitle sub="Abra quando começar e encerre quando acabar">Controle de Garrafas</PageTitle>
+
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Abrir garrafa</div>
+          <Field label="Produto"><TextInput value={gProduto} onChange={setGProduto} placeholder="Gin Kalvelage, Red Label…" /></Field>
+          <Field label="Volume da garrafa (ml)"><NumInput value={gVolume} onChange={setGVolume} placeholder="1000" /></Field>
+          {gMsg && <div style={{ color: C.amber, fontSize: 13, marginBottom: 10, fontWeight: 600 }}>{gMsg}</div>}
+          <Btn onClick={abrirGarrafa}>Abrir garrafa</Btn>
+        </Card>
+
+        <SecTitle>Abertas agora ({garrafasAbertas.length})</SecTitle>
+        {garrafasAbertas.length === 0 ? <Empty>Nenhuma garrafa aberta.</Empty> : garrafasAbertas.map((g) => (
+          <Card key={g.id} style={{ marginBottom: 8, padding: 14, borderColor: C.accent }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{g.produto}</div>
+                <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>{num(g.volume)}ml · aberta {fmtDate(g.dataAbertura)}</div>
+              </div>
+              <Btn kind="ok" small onClick={() => encerrarGarrafa(g.id)}>Encerrar</Btn>
+            </div>
+          </Card>
+        ))}
+
+        {garrafasEncerradas.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            <SecTitle>Encerradas recentes</SecTitle>
+            {garrafasEncerradas.map((g) => (
+              <Card key={g.id} style={{ marginBottom: 6, padding: '10px 14px' }}>
+                <div style={{ fontSize: 14, color: C.faint }}>{g.produto}<span style={{ color: C.faint }}> · {num(g.volume)}ml · encerrada {fmtDate(g.dataTermino)}</span></div>
+              </Card>
+            ))}
+          </div>
+        )}
+        </>)}
       </div>
     </div>
   );

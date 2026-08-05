@@ -17,13 +17,13 @@ export default function Garrafas({ dados, onChange, onRepor }) {
   const salvar = () => {
     if (!form.produto) return;
     if (editId) onChange(dados.map((d) => d.id === editId ? { ...form, id: editId } : d));
-    else onChange([{ ...form, id: uid() }, ...dados]);
+    else onChange([{ ...form, id: uid(), criadoPor: 'dona' }, ...dados]);
     setForm(garrafaVazia()); setEditId(null);
   };
   const editar = (d) => { setForm(d); setEditId(d.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const excluir = (id) => onChange(dados.filter((d) => d.id !== id));
   const finalizar = (d) => {
-    onChange(dados.map((x) => x.id === d.id ? { ...x, dataTermino: todayISO() } : x));
+    onChange(dados.map((x) => x.id === d.id ? { ...x, dataTermino: todayISO(), encerradoPor: 'dona' } : x));
     if (onRepor && d.produto) setReporSugestao(d);
   };
   const reporAgora = () => {
@@ -42,12 +42,17 @@ export default function Garrafas({ dados, onChange, onRepor }) {
     <Card key={g.id} style={{ marginBottom: 8, padding: 14, borderColor: aberta ? C.accent : C.line }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>{g.produto} {aberta && <span style={{ fontSize: 12, color: C.accent }}>· aberta</span>}</div>
+          <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {g.produto} {aberta && <span style={{ fontSize: 12, color: C.accent }}>· aberta</span>}
+            {(g.criadoPor === 'cozinha' || g.encerradoPor === 'cozinha') && (
+              <span title={g.criadoPor === 'cozinha' ? 'Aberta pela cozinha' : 'Encerrada pela cozinha'} style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: C.amber, border: `1px solid ${C.amber}`, borderRadius: 999, padding: '1px 7px' }}>cozinha</span>
+            )}
+          </div>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>
             {num(g.volume)}ml · dose {num(g.dose)}ml · <b style={{ color: C.text }}>{dosesTeoricas(g)} doses</b>
           </div>
           <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
-            Aberta {fmtDate(g.dataAbertura)}{g.dataTermino ? ` · encerrada ${fmtDate(g.dataTermino)}` : ''}
+            Aberta {fmtDate(g.dataAbertura)}{g.criadoPor === 'cozinha' ? ' (cozinha)' : ''}{g.dataTermino ? ` · encerrada ${fmtDate(g.dataTermino)}${g.encerradoPor === 'cozinha' ? ' (cozinha)' : ''}` : ''}
             {dias(g) > 0 && ` · durou ${dias(g)} dia(s) · ${dosesDia(g).toFixed(2)} doses/dia`}
           </div>
           {g.drinks && <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}><b style={{ color: C.faint }}>Drinks:</b> {g.drinks}</div>}
