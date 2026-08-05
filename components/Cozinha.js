@@ -39,7 +39,6 @@ export default function Cozinha() {
     limpar();
   };
   const editar = (it) => { setNome(it.nome || ''); setQuantidade(it.quantidade || ''); setEditId(it.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const excluir = (id) => { if (id === editId) limpar(); salvar(itens.filter((i) => i.id !== id)); };
 
   // Marca/desmarca uma tarefa como feita (só o "feito"; o texto é da dona).
   const marcarTarefa = (id, feito) => {
@@ -114,7 +113,6 @@ export default function Cozinha() {
                     <div style={{ fontSize: 15, fontWeight: 600 }}>{it.nome}{it.quantidade && <span style={{ color: C.muted, fontWeight: 400 }}> · {it.quantidade}</span>}</div>
                   </div>
                   <button onClick={() => editar(it)} title="Editar" style={{ background: 'none', border: 'none', color: C.accent, cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: 4 }}>Editar</button>
-                  <button onClick={() => excluir(it.id)} title="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 20, lineHeight: 1, padding: '2px 4px' }}>×</button>
                 </div>
               </Card>
             ))}
