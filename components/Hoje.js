@@ -13,15 +13,22 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const [agenda, setAgenda] = useState(null);
   const [vista, setVista] = useState('semana'); // 'dia' | 'semana' | 'mes'
   const [diaSel, setDiaSel] = useState(todayISO()); // dia escolhido na faixa/calendário
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch('/api/google/eventos', { cache: 'no-store' });
-        const j = await r.json();
-        setAgenda(j.ok && j.conectado ? (j.eventos || []) : null);
-      } catch { setAgenda(null); }
-    })();
-  }, []);
+  // Formulário de novo compromisso (cria direto no Google Agenda).
+  const [novoAberto, setNovoAberto] = useState(false);
+  const [evTitulo, setEvTitulo] = useState('');
+  const [evData, setEvData] = useState(todayISO());
+  const [evHora, setEvHora] = useState('19:00');
+  const [evDiaTodo, setEvDiaTodo] = useState(false);
+  const [salvandoEv, setSalvandoEv] = useState(false);
+  const [evErro, setEvErro] = useState('');
+  const carregarAgenda = async () => {
+    try {
+      const r = await fetch('/api/google/eventos', { cache: 'no-store' });
+      const j = await r.json();
+      setAgenda(j.ok && j.conectado ? (j.eventos || []) : null);
+    } catch { setAgenda(null); }
+  };
+  useEffect(() => { carregarAgenda(); }, []);
   const hoje = todayISO();
   const mes = ymOf(hoje);
   const rec = receitas.filter((r) => ymOf(r.data) === mes).reduce((s, r) => s + num(r.valor), 0);
@@ -117,6 +124,19 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
     );
   };
 
+  const abrirNovo = () => { setEvData(vista === 'dia' ? hoje : diaSel); setEvErro(''); setNovoAberto(true); };
+  const salvarEvento = async () => {
+    if (!evTitulo.trim() || salvandoEv) return;
+    setSalvandoEv(true); setEvErro('');
+    try {
+      const r = await fetch('/api/google/criar-evento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titulo: evTitulo.trim(), data: evData, hora: evHora, diaTodo: evDiaTodo }) });
+      const j = await r.json();
+      if (j.ok) { setNovoAberto(false); setEvTitulo(''); setEvDiaTodo(false); setDiaSel(evData); if (vista === 'dia' && evData !== hoje) setVista('semana'); await carregarAgenda(); }
+      else setEvErro(j.erro || 'Não consegui criar o evento.');
+    } catch { setEvErro('Não consegui criar o evento.'); }
+    setSalvandoEv(false);
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
@@ -163,7 +183,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
         </Card>
       ) : null}
 
-      {agendaGrupos.length > 0 && (
+      {agenda !== null && (
         <Card style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: C.text, letterSpacing: '-.02em' }}>{vista === 'dia' ? 'Hoje' : cabMes}</div>
@@ -231,6 +251,27 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
             </div>
           )}
           {listaDoDia(vista === 'dia' ? hoje : diaSel)}
+
+          {!novoAberto ? (
+            <button onClick={abrirNovo} style={{ marginTop: 12, width: '100%', background: 'transparent', border: `1px dashed ${C.line}`, color: C.accent, borderRadius: 10, padding: '10px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>+ Adicionar ao Google Agenda</button>
+          ) : (
+            <div style={{ marginTop: 14, borderTop: `1px solid ${C.line}`, paddingTop: 14 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>Novo compromisso</div>
+              <div style={{ marginBottom: 10 }}><TextInput value={evTitulo} onChange={setEvTitulo} placeholder="Ex.: Reserva aniversário — 20 pessoas" /></div>
+              <div style={{ display: 'grid', gridTemplateColumns: evDiaTodo ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <input type="date" value={evData} onChange={(e) => setEvData(e.target.value)} style={inputStyle} />
+                {!evDiaTodo && <input type="time" value={evHora} onChange={(e) => setEvHora(e.target.value)} style={inputStyle} />}
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.muted, marginBottom: 12, cursor: 'pointer' }}>
+                <input type="checkbox" checked={evDiaTodo} onChange={(e) => setEvDiaTodo(e.target.checked)} /> Dia todo
+              </label>
+              {evErro && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{evErro}</div>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Btn small onClick={salvarEvento}>{salvandoEv ? 'Adicionando…' : 'Adicionar'}</Btn>
+                <Btn kind="ghost" small onClick={() => { setNovoAberto(false); setEvErro(''); }}>Cancelar</Btn>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
