@@ -18,9 +18,10 @@ export default function AgendaCalendario() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const p = new URLSearchParams(window.location.search).get('google');
+      const params = new URLSearchParams(window.location.search);
+      const p = params.get('google');
       if (p === 'ok') setSMsg('Google Agenda conectado! Seus boletos e tarefas já foram enviados.');
-      else if (p === 'erro') setSMsg('Não consegui conectar ao Google. Tente de novo.');
+      else if (p === 'erro') { const m = params.get('motivo'); setSMsg('Não consegui conectar ao Google. Tente de novo.' + (m ? ` (Detalhe: ${decodeURIComponent(m)})` : '')); }
       else if (p === 'naoconfig') setSMsg('A integração ainda não está configurada no app (faltam as credenciais do Google).');
       if (p) window.history.replaceState({}, '', window.location.pathname);
     }
