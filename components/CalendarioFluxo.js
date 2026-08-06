@@ -98,7 +98,7 @@ export default function CalendarioFluxo({ contas }) {
     const r = valor / media;
     return r <= 0.7 ? C.green : r <= 1.4 ? C.amber : C.red;
   };
-  const rgbDe = (cor) => (cor === C.green ? '91,201,141' : cor === C.amber ? '231,178,77' : '233,118,92');
+  const rgbDe = (cor) => (cor === C.green ? '79,199,155' : cor === C.amber ? '236,178,74' : '233,118,92');
   // Nível do dia: se você definir um limite (R$), vira absoluto — vermelho só
   // acima dele e amarelo a partir da metade; senão, compara ao dia típico do mês.
   const nivelDia = (t) => {
@@ -108,7 +108,7 @@ export default function CalendarioFluxo({ contas }) {
   };
   const compacto = (n) => (n >= 1000 ? (n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'k' : String(Math.round(n)));
   const corDia = (t) => {
-    if (t <= 0) return 'rgba(91,201,141,0.08)'; // sem conta = tranquilo (verde bem suave)
+    if (t <= 0) return 'rgba(79,199,155,0.08)'; // sem conta = tranquilo (verde bem suave)
     const alpha = (0.30 + 0.45 * (t / maxDia)).toFixed(2);
     return `rgba(${rgbDe(nivelDia(t))},${alpha})`;
   };
