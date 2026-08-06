@@ -15,7 +15,7 @@
   --c-text: #E9F0FB;
   --c-muted: #94A8C7;
   --c-faint: #5E7391;
-  --c-green: #5BC98D;
+  --c-green: #4FC79B;
   --c-red: #E9765C;
   /* "Ambar" foi trocado por um azul: cor neutra de atencao (boletos, avisos),
      mantendo verde/vermelho so pro dinheiro. */
@@ -44,7 +44,7 @@
   --c-text: #14233B;
   --c-muted: #5B6B82;
   --c-faint: #8A99AD;
-  --c-green: #1F9D68;
+  --c-green: #1DA97C;
   --c-red: #E05640;
   --c-amber: #2E77E8;
   --c-red-soft: rgba(224, 86, 64, 0.35);
