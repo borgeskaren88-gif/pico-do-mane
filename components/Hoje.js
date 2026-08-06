@@ -101,7 +101,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   // Cor semântica de cada compromisso: boleto (âmbar), tarefa (azul),
   // compromisso com hora (verde) e dia todo (cinza).
   const ehBoleto = (ev) => ev.tarefa && /^\s*boleto/i.test(ev.titulo || '');
-  const corEvento = (ev) => (ehBoleto(ev) ? C.amber : ev.tarefa ? C.accent : ev.diaTodo ? C.muted : C.green);
+  const corEvento = (ev) => (ehBoleto(ev) ? C.amber : ev.tarefa ? C.accent : ev.diaTodo ? C.muted : C.accent2);
   const etiquetaEvento = (ev) => (ehBoleto(ev) ? 'A pagar' : ev.tarefa ? 'Tarefa' : ev.diaTodo ? 'Dia todo' : ev.inicio.slice(11, 16));
 
   // Lista de compromissos de um dia, em cartões coloridos com barra lateral.

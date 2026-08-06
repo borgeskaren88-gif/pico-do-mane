@@ -17,7 +17,9 @@
   --c-faint: #5E7391;
   --c-green: #5BC98D;
   --c-red: #E9765C;
-  --c-amber: #E7B24D;
+  /* "Ambar" foi trocado por um azul: cor neutra de atencao (boletos, avisos),
+     mantendo verde/vermelho so pro dinheiro. */
+  --c-amber: #5AA6F2;
   --c-red-soft: rgba(233, 118, 92, 0.33);
   --c-bar-bg: rgba(8, 13, 24, 0.55);
   --c-glow-a: rgba(59, 134, 245, 0.30);
@@ -44,7 +46,7 @@
   --c-faint: #8A99AD;
   --c-green: #1F9D68;
   --c-red: #E05640;
-  --c-amber: #C1841A;
+  --c-amber: #2E77E8;
   --c-red-soft: rgba(224, 86, 64, 0.35);
   --c-bar-bg: rgba(247, 250, 255, 0.72);
   --c-glow-a: rgba(59, 111, 240, 0.07);
