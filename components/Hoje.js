@@ -250,7 +250,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
                 <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.07em' }}>
                   {diaSel === hoje ? 'Hoje' : diaSel === addDays(hoje, 1) ? 'Amanhã' : `${weekday(diaSel)}, ${fmtDate(diaSel)}`}
                 </div>
-                {listaDoDia(diaSel)}
+                <div className="agenda-dia-lista">{listaDoDia(diaSel)}</div>
               </div>
             </div>
           ) : (
