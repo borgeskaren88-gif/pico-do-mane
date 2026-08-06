@@ -78,7 +78,7 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
 
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.accent, fontWeight: 700, marginBottom: 12 }}>DRE — {mesLabel(mes)}</div>
-        {[['Receita bruta', totalRec, C.green, false], ['(–) Custo variável', custoVar, C.red, false], ['(–) Despesas operacionais', despOp, C.red, false], ['(=) Lucro operacional', lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, val, cor, bold]) => (
+        {[['Receita bruta', totalRec, C.green, false], ['(–) Custo variável', custoVar, C.amber, false], ['(–) Despesas operacionais', despOp, C.amber, false], ['(=) Lucro operacional', lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, val, cor, bold]) => (
           <div key={nome} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderTop: bold ? `1px solid ${C.line}` : 'none' }}>
             <span style={{ fontWeight: bold ? 800 : 500, color: bold ? C.text : C.muted }}>{nome}</span>
             <span style={{ fontWeight: bold ? 800 : 600, color: cor, fontVariantNumeric: 'tabular-nums' }}>{brl(val)}</span>
@@ -157,12 +157,12 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
                 <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{brl(val)}</span>
               </div>
               <div style={{ height: 7, background: C.panel2, borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ width: (val / maxCat * 100) + '%', height: '100%', background: CUSTO_VARIAVEL.includes(cat) ? C.red : C.accent, borderRadius: 4 }} />
+                <div style={{ width: (val / maxCat * 100) + '%', height: '100%', background: CUSTO_VARIAVEL.includes(cat) ? C.amber : C.accent, borderRadius: 4 }} />
               </div>
             </div>
           ))}
         <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 12, color: C.muted }}>
-          <span><span style={{ display: 'inline-block', width: 10, height: 10, background: C.red, borderRadius: 3, marginRight: 5 }} />Custo variável</span>
+          <span><span style={{ display: 'inline-block', width: 10, height: 10, background: C.amber, borderRadius: 3, marginRight: 5 }} />Custo variável</span>
           <span><span style={{ display: 'inline-block', width: 10, height: 10, background: C.accent, borderRadius: 3, marginRight: 5 }} />Despesa operacional</span>
         </div>
       </Card>
