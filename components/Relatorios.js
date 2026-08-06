@@ -1,10 +1,41 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip,
+  BarChart, Bar, AreaChart, Area as AreaRecharts, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle, Label } from './ui';
+
+// Medidor (gauge) semicircular de leque, em azul — usado na nota média do mês.
+function Medidor({ valor = 0, max = 10 }) {
+  const N = 34;
+  const frac = Math.max(0, Math.min(1, valor / max));
+  const cx = 100, cy = 96, r1 = 56, r2 = 84;
+  const ticks = [];
+  for (let i = 0; i < N; i++) {
+    const t = i / (N - 1);
+    const ang = Math.PI - t * Math.PI;
+    const x1 = cx + r1 * Math.cos(ang), y1 = cy - r1 * Math.sin(ang);
+    const x2 = cx + r2 * Math.cos(ang), y2 = cy - r2 * Math.sin(ang);
+    const on = t <= frac + 1e-9;
+    ticks.push(<line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={on ? 'url(#medGrad)' : C.hair} strokeWidth={3.4} strokeLinecap="round" />);
+  }
+  return (
+    <svg viewBox="0 0 200 116" width="100%" style={{ maxWidth: 250, display: 'block', margin: '0 auto' }} aria-hidden="true">
+      <defs>
+        <linearGradient id="medGrad" gradientUnits="userSpaceOnUse" x1="20" y1="0" x2="180" y2="0">
+          <stop offset="0" stopColor={C.accent2} />
+          <stop offset="1" stopColor={C.accent} />
+        </linearGradient>
+      </defs>
+      {ticks}
+      <text x="100" y="94" textAnchor="middle" fontSize="36" fontWeight="800" fill={C.text} fontFamily="system-ui, -apple-system, sans-serif">{valor.toFixed(1)}</text>
+      <text x="100" y="111" textAnchor="middle" fontSize="12" fontWeight="600" fill={C.faint} fontFamily="system-ui, -apple-system, sans-serif">de {max}</text>
+    </svg>
+  );
+}
+
+const tooltipModerno = { background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 12, color: C.text, boxShadow: C.cardShadow, fontSize: 12, padding: '8px 12px' };
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Relatorios({ diario, receitas, despesas, mes, setMes }) {
@@ -61,13 +92,23 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
         {evolucao.length === 0 ? <Empty>Sem dados suficientes.</Empty> : (
           <div style={{ height: 220 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={evolucao} margin={{ top: 4, right: 4, left: -14, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={C.line} vertical={false} />
-                <XAxis dataKey="mes" tick={{ fill: C.muted, fontSize: 12 }} axisLine={{ stroke: C.line }} tickLine={false} />
-                <YAxis tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => 'R$' + (v / 1000).toFixed(0) + 'k'} />
-                <Tooltip formatter={(v) => brl(v)} contentStyle={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, color: C.text }} labelStyle={{ color: C.text }} />
-                <Bar dataKey="receita" fill={C.green} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="despesa" fill={C.red} radius={[4, 4, 0, 0]} />
+              <BarChart data={evolucao} margin={{ top: 8, right: 4, left: -14, bottom: 0 }} barGap={5} barCategoryGap="26%">
+                <defs>
+                  <linearGradient id="gRec" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={C.green} stopOpacity={0.95} />
+                    <stop offset="100%" stopColor={C.green} stopOpacity={0.5} />
+                  </linearGradient>
+                  <linearGradient id="gDesp" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={C.red} stopOpacity={0.95} />
+                    <stop offset="100%" stopColor={C.red} stopOpacity={0.5} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="2 7" stroke={C.hair} vertical={false} />
+                <XAxis dataKey="mes" tick={{ fill: C.muted, fontSize: 12 }} axisLine={false} tickLine={false} dy={6} />
+                <YAxis tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={46} tickFormatter={(v) => 'R$' + (v / 1000).toFixed(0) + 'k'} />
+                <Tooltip cursor={{ fill: 'rgba(120,150,200,0.10)', radius: 8 }} formatter={(v) => brl(v)} contentStyle={tooltipModerno} labelStyle={{ color: C.muted, fontWeight: 700, marginBottom: 2 }} />
+                <Bar dataKey="receita" fill="url(#gRec)" radius={[6, 6, 0, 0]} maxBarSize={26} />
+                <Bar dataKey="despesa" fill="url(#gDesp)" radius={[6, 6, 0, 0]} maxBarSize={26} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -79,13 +120,19 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
           <div style={{ fontWeight: 700, marginBottom: 12 }}>Lucro por mês</div>
           <div style={{ height: 180 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={evolucao} margin={{ top: 4, right: 8, left: -14, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={C.line} vertical={false} />
-                <XAxis dataKey="mes" tick={{ fill: C.muted, fontSize: 12 }} axisLine={{ stroke: C.line }} tickLine={false} />
-                <YAxis tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => (v / 1000).toFixed(0) + 'k'} />
-                <Tooltip formatter={(v) => brl(v)} contentStyle={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, color: C.text }} />
-                <Line type="monotone" dataKey="lucro" stroke={C.accent} strokeWidth={3} dot={{ fill: C.accent, r: 4 }} />
-              </LineChart>
+              <AreaChart data={evolucao} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gLucro" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={C.accent} stopOpacity={0.32} />
+                    <stop offset="100%" stopColor={C.accent} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="2 7" stroke={C.hair} vertical={false} />
+                <XAxis dataKey="mes" tick={{ fill: C.muted, fontSize: 12 }} axisLine={false} tickLine={false} dy={6} />
+                <YAxis tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={46} tickFormatter={(v) => (v / 1000).toFixed(0) + 'k'} />
+                <Tooltip formatter={(v) => brl(v)} contentStyle={tooltipModerno} labelStyle={{ color: C.muted, fontWeight: 700, marginBottom: 2 }} />
+                <AreaRecharts type="monotone" dataKey="lucro" stroke={C.accent} strokeWidth={3} fill="url(#gLucro)" dot={{ fill: C.accent, r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </Card>
@@ -112,10 +159,19 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
       </Card>
 
       {diarioMes.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <KPI titulo="Nota média do mês" valor={notaMedia.toFixed(1)} cor={C.accent} sub={`${diarioMes.length} dias`} />
+        <>
+          {notas.length > 0 && (
+            <Card style={{ marginBottom: 10, textAlign: 'center' }}>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 700, marginBottom: 6 }}>Nota média do mês</div>
+              <Medidor valor={notaMedia} />
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.accent, marginTop: 2 }}>
+                {notaMedia >= 8 ? 'Ótima' : notaMedia >= 6 ? 'Boa' : notaMedia >= 4 ? 'Regular' : 'Precisa melhorar'}
+                <span style={{ color: C.faint, fontWeight: 500 }}> · {notas.length} dia(s) avaliado(s)</span>
+              </div>
+            </Card>
+          )}
           <KPI titulo="Pedidos fiados no mês" valor={fiadoMes} cor={C.accent2} />
-        </div>
+        </>
       )}
     </div>
   );
