@@ -11,7 +11,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
   // Próximos eventos do Google Agenda (só aparece se conectado).
   const [agenda, setAgenda] = useState(null);
-  const [vista, setVista] = useState('semana'); // 'dia' | 'semana' | 'mes'
+  const [vista, setVista] = useState('mes'); // 'dia' | 'mes'
   const [diaSel, setDiaSel] = useState(todayISO()); // dia escolhido na faixa/calendário
   // Formulário de novo compromisso (cria direto no Google Agenda).
   const [novoAberto, setNovoAberto] = useState(false);
@@ -69,12 +69,6 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
     }
     return [...m.entries()];
   }, [agenda]);
-  const rotuloDia = (d) => (d === hoje ? 'Hoje' : d === addDays(hoje, 1) ? 'Amanhã' : `${weekday(d)}, ${fmtDate(d)}`);
-
-  // Semana do calendário (domingo a sábado) que contém hoje.
-  const diaSemHoje = new Date(hoje + 'T12:00:00').getDay();
-  const iniSemana = addDays(hoje, -diaSemHoje);
-  const diasSemana = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(iniSemana, i)), [iniSemana]);
 
   // Eventos indexados por dia (pra mostrar os do dia escolhido).
   const porDia = useMemo(() => new Map(agendaGrupos), [agendaGrupos]);
@@ -131,7 +125,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
     try {
       const r = await fetch('/api/google/criar-evento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titulo: evTitulo.trim(), data: evData, hora: evHora, diaTodo: evDiaTodo }) });
       const j = await r.json();
-      if (j.ok) { setNovoAberto(false); setEvTitulo(''); setEvDiaTodo(false); setDiaSel(evData); if (vista === 'dia' && evData !== hoje) setVista('semana'); await carregarAgenda(); }
+      if (j.ok) { setNovoAberto(false); setEvTitulo(''); setEvDiaTodo(false); setDiaSel(evData); if (vista === 'dia' && evData !== hoje) setVista('mes'); await carregarAgenda(); }
       else setEvErro(j.erro || 'Não consegui criar o evento.');
     } catch { setEvErro('Não consegui criar o evento.'); }
     setSalvandoEv(false);
@@ -188,7 +182,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: C.text, letterSpacing: '-.02em' }}>{vista === 'dia' ? 'Hoje' : cabMes}</div>
             <div style={{ display: 'inline-flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2 }}>
-              {[['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']].map(([v, rot]) => (
+              {[['mes', 'Mês'], ['dia', 'Dia']].map(([v, rot]) => (
                 <button key={v} onClick={() => { setVista(v); setDiaSel(hoje); }} style={{
                   border: 'none', cursor: 'pointer', borderRadius: 8, padding: '5px 11px', fontSize: 12, fontWeight: 700,
                   background: vista === v ? C.accent : 'transparent', color: vista === v ? '#06101F' : C.muted,
@@ -196,29 +190,6 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
               ))}
             </div>
           </div>
-
-          {vista === 'semana' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 6 }}>
-              {diasSemana.map((d, i) => {
-                const sel = d === diaSel, ehHoje = d === hoje, temEv = diasComEvento.has(d);
-                return (
-                  <button key={d} onClick={() => setDiaSel(d)} style={{
-                    border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 0',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.faint }}>{LETRAS_SEMANA[i]}</span>
-                    <span style={{
-                      width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%',
-                      background: sel ? C.accent : 'transparent', color: sel ? '#06101F' : C.text,
-                      border: !sel && ehHoje ? `1.5px solid ${C.accent}` : '1.5px solid transparent', boxSizing: 'border-box',
-                      fontSize: 15, fontWeight: sel || ehHoje ? 800 : 600, fontVariantNumeric: 'tabular-nums',
-                    }}>{Number(d.slice(8))}</span>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: temEv && !sel ? C.accent : 'transparent' }} />
-                  </button>
-                );
-              })}
-            </div>
-          )}
 
           {vista === 'mes' ? (
             // Tablet (tela larga): calendário à esquerda, dia selecionado à direita.
@@ -254,16 +225,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
               </div>
             </div>
           ) : (
-            <>
-              {vista === 'semana' && (
-                <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 8, paddingTop: 4, marginBottom: 2 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginTop: 8, textTransform: 'uppercase', letterSpacing: '.07em' }}>
-                    {diaSel === hoje ? 'Hoje' : diaSel === addDays(hoje, 1) ? 'Amanhã' : `${weekday(diaSel)}, ${fmtDate(diaSel)}`}
-                  </div>
-                </div>
-              )}
-              {listaDoDia(vista === 'dia' ? hoje : diaSel)}
-            </>
+            listaDoDia(hoje)
           )}
 
           {!novoAberto ? (
