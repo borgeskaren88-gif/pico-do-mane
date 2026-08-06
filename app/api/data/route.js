@@ -45,10 +45,18 @@ export async function POST(request) {
   }
   try {
     const sb = supabaseServer();
+    // Preserva a lista e as tarefas da cozinha se não vierem no corpo: elas são
+    // gravadas pelo acesso da cozinha (/api/lista) e não podem ser apagadas por
+    // um salvamento da dona que não as incluiu.
+    const { data: atual } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
+    const anterior = atual?.valor || {};
+    const valor = { ...dados };
+    if (!('listaCozinha' in valor) && Array.isArray(anterior.listaCozinha)) valor.listaCozinha = anterior.listaCozinha;
+    if (!('tarefasCozinha' in valor) && Array.isArray(anterior.tarefasCozinha)) valor.tarefasCozinha = anterior.tarefasCozinha;
     const { error } = await sb
       .from('pdm_dados')
       .upsert(
-        { chave: CHAVE, valor: dados, atualizado_em: new Date().toISOString() },
+        { chave: CHAVE, valor, atualizado_em: new Date().toISOString() },
         { onConflict: 'chave' }
       );
     if (error) throw error;
