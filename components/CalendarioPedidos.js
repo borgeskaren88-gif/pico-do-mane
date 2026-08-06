@@ -7,8 +7,8 @@ const pad = (n) => String(n).padStart(2, '0');
 const DIAS_CURTO = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
 // Calendário de pedidos: pinta cada dia pela quantidade de pedidos daquele dia
-// (puxada do Diário), pra ver de relance os melhores dias — quanto mais verde,
-// mais pedidos. Destaca o melhor dia do mês.
+// (puxada do Diário), pra ver de relance os melhores dias — quanto mais azul
+// forte, mais pedidos. Destaca o melhor dia do mês.
 export default function CalendarioPedidos({ dados }) {
   const hoje = todayISO();
   const [ref, setRef] = useState(hoje.slice(0, 7)); // 'YYYY-MM'
@@ -48,8 +48,8 @@ export default function CalendarioPedidos({ dados }) {
     setRef(`${a}-${pad(m)}`);
   };
 
-  // Verde mais forte = mais pedidos (melhores dias)
-  const corDia = (t) => (t <= 0 ? 'transparent' : `rgba(91,201,141,${(0.14 + 0.6 * (t / maxDia)).toFixed(2)})`);
+  // Azul mais forte = mais pedidos (melhores dias). Usa a cor de acento do tema.
+  const corDia = (t) => (t <= 0 ? 'transparent' : `color-mix(in srgb, ${C.accent} ${Math.round(16 + 60 * (t / maxDia))}%, transparent)`);
   const btn = { background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 8, width: 28, height: 28, cursor: 'pointer', fontSize: 15, fontWeight: 800, lineHeight: 1 };
 
   return (
@@ -61,7 +61,7 @@ export default function CalendarioPedidos({ dados }) {
         <button onClick={() => mudarMes(1)} style={btn} aria-label="Próximo mês">›</button>
       </div>
       <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>
-        Quanto mais verde, mais pedidos.
+        Quanto mais azul, mais pedidos.
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 3 }}>
@@ -80,7 +80,7 @@ export default function CalendarioPedidos({ dados }) {
           return (
             <div key={i} style={{
               aspectRatio: '1 / 1', borderRadius: 6, background: corDia(t),
-              border: ehMelhor ? `2px solid ${C.green}` : ehHoje ? `2px solid ${C.accent}` : `1px solid ${C.hair}`,
+              border: ehMelhor ? `2px solid ${C.accent}` : ehHoje ? `2px solid ${C.accent2}` : `1px solid ${C.hair}`,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 0, padding: 1,
             }}>
               <div style={{ fontSize: 8, color: ehHoje ? C.accent : C.faint, fontWeight: ehHoje ? 800 : 500, lineHeight: 1 }}>{d}</div>
@@ -92,7 +92,7 @@ export default function CalendarioPedidos({ dados }) {
 
       {melhorPed > 0 ? (
         <div style={{ fontSize: 12, color: C.muted, marginTop: 10, lineHeight: 1.4 }}>
-          Melhor dia: <b style={{ color: C.green }}>{fmtDate(isoDe(melhorDia))}</b> com <b style={{ color: C.text }}>{melhorPed} pedidos</b>.
+          Melhor dia: <b style={{ color: C.accent }}>{fmtDate(isoDe(melhorDia))}</b> com <b style={{ color: C.text }}>{melhorPed} pedidos</b>.
           <span style={{ color: C.faint }}> {diasComReg} dia(s) · {totalMes} pedidos no mês.</span>
         </div>
       ) : (
