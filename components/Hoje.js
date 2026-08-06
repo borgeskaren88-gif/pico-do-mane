@@ -220,37 +220,51 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
             </div>
           )}
 
-          {vista === 'mes' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 6 }}>
-              {LETRAS_SEMANA.map((w, i) => (
-                <div key={'h' + i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: C.faint, paddingBottom: 4 }}>{w}</div>
-              ))}
-              {celulasMes.map((d, i) => {
-                if (!d) return <div key={'c' + i} />;
-                const sel = d === diaSel, ehHoje = d === hoje, passado = d < hoje, temEv = diasComEvento.has(d);
-                return (
-                  <button key={'c' + i} onClick={() => setDiaSel(d)} style={{
-                    border: 'none', cursor: 'pointer', position: 'relative', height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10,
-                    background: sel ? C.accent : 'transparent', color: sel ? '#06101F' : (passado ? C.faint : C.text),
-                    boxShadow: !sel && ehHoje ? `inset 0 0 0 1.5px ${C.accent}` : 'none',
-                    fontSize: 13, fontWeight: sel || ehHoje ? 800 : 600, fontVariantNumeric: 'tabular-nums',
-                  }}>
-                    {Number(d.slice(8))}
-                    {temEv && !sel && <span style={{ position: 'absolute', bottom: 5, width: 4, height: 4, borderRadius: '50%', background: C.accent }} />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {vista !== 'dia' && (
-            <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 8, paddingTop: 4, marginBottom: 2 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginTop: 8, textTransform: 'uppercase', letterSpacing: '.07em' }}>
-                {diaSel === hoje ? 'Hoje' : diaSel === addDays(hoje, 1) ? 'Amanhã' : `${weekday(diaSel)}, ${fmtDate(diaSel)}`}
+          {vista === 'mes' ? (
+            // Tablet (tela larga): calendário à esquerda, dia selecionado à direita.
+            // Celular (estreito): empilha (o flex-wrap cuida disso sozinho).
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, alignItems: 'flex-start' }}>
+              <div style={{ flex: '1 1 300px', minWidth: 0 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+                  {LETRAS_SEMANA.map((w, i) => (
+                    <div key={'h' + i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: C.faint, paddingBottom: 4 }}>{w}</div>
+                  ))}
+                  {celulasMes.map((d, i) => {
+                    if (!d) return <div key={'c' + i} />;
+                    const sel = d === diaSel, ehHoje = d === hoje, passado = d < hoje, temEv = diasComEvento.has(d);
+                    return (
+                      <button key={'c' + i} onClick={() => setDiaSel(d)} style={{
+                        border: 'none', cursor: 'pointer', position: 'relative', height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10,
+                        background: sel ? C.accent : 'transparent', color: sel ? '#06101F' : (passado ? C.faint : C.text),
+                        boxShadow: !sel && ehHoje ? `inset 0 0 0 1.5px ${C.accent}` : 'none',
+                        fontSize: 13, fontWeight: sel || ehHoje ? 800 : 600, fontVariantNumeric: 'tabular-nums',
+                      }}>
+                        {Number(d.slice(8))}
+                        {temEv && !sel && <span style={{ position: 'absolute', bottom: 5, width: 4, height: 4, borderRadius: '50%', background: C.accent }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.07em' }}>
+                  {diaSel === hoje ? 'Hoje' : diaSel === addDays(hoje, 1) ? 'Amanhã' : `${weekday(diaSel)}, ${fmtDate(diaSel)}`}
+                </div>
+                {listaDoDia(diaSel)}
               </div>
             </div>
+          ) : (
+            <>
+              {vista === 'semana' && (
+                <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 8, paddingTop: 4, marginBottom: 2 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginTop: 8, textTransform: 'uppercase', letterSpacing: '.07em' }}>
+                    {diaSel === hoje ? 'Hoje' : diaSel === addDays(hoje, 1) ? 'Amanhã' : `${weekday(diaSel)}, ${fmtDate(diaSel)}`}
+                  </div>
+                </div>
+              )}
+              {listaDoDia(vista === 'dia' ? hoje : diaSel)}
+            </>
           )}
-          {listaDoDia(vista === 'dia' ? hoje : diaSel)}
 
           {!novoAberto ? (
             <button onClick={abrirNovo} style={{ marginTop: 12, width: '100%', background: 'transparent', border: `1px dashed ${C.line}`, color: C.accent, borderRadius: 10, padding: '10px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>+ Adicionar ao Google Agenda</button>
