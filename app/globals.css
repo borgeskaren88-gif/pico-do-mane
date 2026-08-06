@@ -60,3 +60,16 @@
 html, body {
   background: var(--c-bg-bottom);
 }
+
+/* Agenda (vista Mês): em tela larga a lista de compromissos do dia rola sozinha,
+   mantendo o calendário do lado sempre visível. No celular ela flui normal. */
+@media (min-width: 640px) {
+  .agenda-dia-lista {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 6px;
+  }
+}
+.agenda-dia-lista::-webkit-scrollbar { width: 6px; }
+.agenda-dia-lista::-webkit-scrollbar-thumb { background: var(--c-line); border-radius: 999px; }
+.agenda-dia-lista::-webkit-scrollbar-track { background: transparent; }
