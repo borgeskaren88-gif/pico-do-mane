@@ -36,6 +36,9 @@ function Medidor({ valor = 0, max = 10 }) {
 }
 
 const tooltipModerno = { background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 12, color: C.text, boxShadow: C.cardShadow, fontSize: 12, padding: '8px 12px' };
+// Tons dos graficos: verde suave pra receita, dourado quente pra despesa.
+const CHART_RECEITA = '#4FC79B';
+const CHART_DESPESA = '#ECB24A';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Relatorios({ diario, receitas, despesas, mes, setMes }) {
@@ -90,17 +93,18 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontWeight: 700, marginBottom: 12 }}>Evolução (receita × despesa)</div>
         {evolucao.length === 0 ? <Empty>Sem dados suficientes.</Empty> : (
+          <>
           <div style={{ height: 220 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={evolucao} margin={{ top: 8, right: 4, left: -14, bottom: 0 }} barGap={5} barCategoryGap="26%">
                 <defs>
                   <linearGradient id="gRec" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={C.green} stopOpacity={0.95} />
-                    <stop offset="100%" stopColor={C.green} stopOpacity={0.5} />
+                    <stop offset="0%" stopColor={CHART_RECEITA} stopOpacity={0.95} />
+                    <stop offset="100%" stopColor={CHART_RECEITA} stopOpacity={0.5} />
                   </linearGradient>
                   <linearGradient id="gDesp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={C.red} stopOpacity={0.95} />
-                    <stop offset="100%" stopColor={C.red} stopOpacity={0.5} />
+                    <stop offset="0%" stopColor={CHART_DESPESA} stopOpacity={0.95} />
+                    <stop offset="100%" stopColor={CHART_DESPESA} stopOpacity={0.5} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="2 7" stroke={C.hair} vertical={false} />
@@ -112,6 +116,11 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
               </BarChart>
             </ResponsiveContainer>
           </div>
+          <div style={{ display: 'flex', gap: 18, marginTop: 10, fontSize: 12, color: C.muted }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: CHART_RECEITA }} />Receita</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: CHART_DESPESA }} />Despesa</span>
+          </div>
+          </>
         )}
       </Card>
 
