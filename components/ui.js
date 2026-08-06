@@ -7,6 +7,7 @@ export const C = {
   text: 'var(--c-text)', muted: 'var(--c-muted)', faint: 'var(--c-faint)',
   green: 'var(--c-green)', red: 'var(--c-red)', amber: 'var(--c-amber)',
   redSoft: 'var(--c-red-soft)', barBg: 'var(--c-bar-bg)',
+  cardBorder: 'var(--c-card-border)', cardShadow: 'var(--c-card-shadow)',
 };
 
 // Fundo da página com profundidade: um brilho azul no topo por cima de um
@@ -100,7 +101,7 @@ export function Btn({ children, onClick, kind = 'primary', small, type = 'button
 }
 
 export function Card({ children, style }) {
-  return <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18, ...style }}>{children}</div>;
+  return <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 18, boxShadow: C.cardShadow, ...style }}>{children}</div>;
 }
 
 export function Field({ label, children }) {
@@ -113,7 +114,7 @@ export function Empty({ children }) {
 
 export function KPI({ titulo, valor, cor, sub }) {
   return (
-    <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: '13px 15px', minWidth: 0 }}>
+    <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 14, padding: '13px 15px', minWidth: 0, boxShadow: C.cardShadow }}>
       <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: C.muted, fontWeight: 600 }}>{titulo}</div>
       <div style={{ fontSize: 20, fontWeight: 800, color: cor || C.text, marginTop: 4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{valor}</div>
       {sub && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{sub}</div>}
