@@ -100,7 +100,14 @@ export default function Dashboard() {
       setListaCozinha((salvo && Array.isArray(salvo.listaCozinha)) ? salvo.listaCozinha : []);
       setListasModelo((salvo && Array.isArray(salvo.listasModelo)) ? salvo.listasModelo : []);
       setTarefasCozinha((salvo && Array.isArray(salvo.tarefasCozinha)) ? salvo.tarefasCozinha : []);
-      if (vazio || mudou) await apiSalvar({ ...limpos, tarefas: (salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : [] });
+      // IMPORTANTE: preserva TODOS os campos ao re-salvar (a limpeza de nomes só
+      // mexe em compras/cotações). Antes isso salvava só parte e apagava a lista
+      // da cozinha, a Lista de Compras, marketing, etc. Espalhar `salvo` primeiro
+      // garante que nada some.
+      if (vazio || mudou) {
+        const base = (salvo && typeof salvo === 'object') ? salvo : {};
+        await apiSalvar({ ...base, ...limpos, tarefas: (salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : [] });
+      }
       setLoaded(true);
     })();
   }, []);
@@ -120,10 +127,15 @@ export default function Dashboard() {
       cotacoes: parcial.cotacoes ?? cotacoes, garrafas: parcial.garrafas ?? garrafas,
       tarefas: parcial.tarefas ?? tarefas, marketing: parcial.marketing ?? marketing,
       visitantes: parcial.visitantes ?? visitantes,
-      listaCompras: parcial.listaCompras ?? listaCompras, listaCozinha: parcial.listaCozinha ?? listaCozinha,
+      listaCompras: parcial.listaCompras ?? listaCompras,
       listasModelo: parcial.listasModelo ?? listasModelo,
-      tarefasCozinha: parcial.tarefasCozinha ?? tarefasCozinha,
     };
+    // A lista e as tarefas da cozinha são compartilhadas com o acesso da cozinha
+    // (que grava por /api/lista). Só as incluímos aqui quando a dona realmente as
+    // editou; senão o servidor preserva o que a cozinha salvou (evita apagar por
+    // cima com uma cópia velha na memória).
+    if ('listaCozinha' in parcial) dados.listaCozinha = parcial.listaCozinha;
+    if ('tarefasCozinha' in parcial) dados.tarefasCozinha = parcial.tarefasCozinha;
     apiSalvar(dados);
   };
 
