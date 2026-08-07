@@ -6,6 +6,16 @@ import MicBtn from './MicBtn';
 
 const itemVazio = () => ({ nome: '', quantidade: '', categoria: '' });
 
+// Formata quando a cozinha deu OK numa tarefa (aceita ISO ou timestamp).
+const fmtQuando = (v) => {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return '';
+  const dia = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `${dia} às ${hora}`;
+};
+
 export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], compras = [], despesas = [], onAplicar, tarefasCozinha = [], onTarefasCozinha, subtitulo, mostrarTarefasCozinha = false }) {
   const [novo, setNovo] = useState(itemVazio());
   const [novaTarefaCoz, setNovaTarefaCoz] = useState('');
@@ -359,7 +369,12 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
                   {t.feito && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#06101F" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 6.5" /></svg>}
                 </span>
                 <div style={{ flex: 1, minWidth: 0, fontSize: 14, color: t.feito ? C.faint : C.text, textDecoration: t.feito ? 'line-through' : 'none' }}>{t.texto}</div>
-                {t.feito && <span style={{ fontSize: 11, fontWeight: 700, color: C.green }}>feita</span>}
+                {t.feito && (
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.green }}>feita</div>
+                    {t.feitoEm && <div style={{ fontSize: 10, color: C.faint, whiteSpace: 'nowrap' }}>{fmtQuando(t.feitoEm)}</div>}
+                  </div>
+                )}
                 <button onClick={() => removerTarefaCoz(t.id)} title="Remover" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}>×</button>
               </div>
             ))}

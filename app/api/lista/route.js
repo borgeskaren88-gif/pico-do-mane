@@ -72,7 +72,13 @@ export async function POST(request) {
     if (body?.tarefasFeito && typeof body.tarefasFeito === 'object') {
       const feitos = body.tarefasFeito;
       const tarefas = Array.isArray(blob.tarefasCozinha) ? blob.tarefasCozinha : [];
-      novoBlob.tarefasCozinha = tarefas.map((t) => (t && Object.prototype.hasOwnProperty.call(feitos, t.id)) ? { ...t, feito: !!feitos[t.id] } : t);
+      const agora = new Date().toISOString();
+      novoBlob.tarefasCozinha = tarefas.map((t) => {
+        if (!t || !Object.prototype.hasOwnProperty.call(feitos, t.id)) return t;
+        const feito = !!feitos[t.id];
+        // Carimba a hora (do servidor) em que a cozinha deu OK; ao desmarcar, limpa.
+        return { ...t, feito, feitoEm: feito ? agora : '' };
+      });
     }
     const { error: err2 } = await sb.from('pdm_dados').upsert(
       { chave: CHAVE, valor: novoBlob, atualizado_em: new Date().toISOString() },
