@@ -59,7 +59,12 @@
 
 html, body {
   background: var(--c-bg-bottom);
+  /* Puxar-para-atualizar próprio: desliga o refresh nativo do navegador no topo
+     pra não brigar com o gesto do PicoOS (e funcionar também no app instalado). */
+  overscroll-behavior-y: contain;
 }
+
+@keyframes pdm-spin { to { transform: rotate(360deg); } }
 
 /* Agenda (vista Mês): em tela larga a lista de compromissos do dia rola sozinha,
    mantendo o calendário do lado sempre visível. No celular ela flui normal. */

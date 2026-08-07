@@ -17,6 +17,8 @@ import Garrafas from './Garrafas';
 import Cotacoes from './Cotacoes';
 import Relatorios from './Relatorios';
 import Backup from './Backup';
+import BotaoAtualizar from './BotaoAtualizar';
+import PullToRefresh from './PullToRefresh';
 
 async function apiCarregar() {
   const res = await fetch('/api/data', { cache: 'no-store' });
@@ -284,6 +286,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <PullToRefresh />
       <div style={{ padding: 'calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', borderBottom: `1px solid ${C.hair}`, background: 'transparent' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -294,6 +297,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <BotaoAtualizar />
             <button onClick={trocarTema} title={tema === 'claro' ? 'Mudar para escuro' : 'Mudar para claro'} aria-label="Trocar tema"
               style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {tema === 'claro' ? (

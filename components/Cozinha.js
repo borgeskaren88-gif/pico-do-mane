@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, Card, Btn, Field, TextInput, NumInput, Empty, SecTitle, PageTitle, LogoMark, pageBg } from './ui';
 import { uid, num, fmtDate } from '../lib/util';
+import BotaoAtualizar from './BotaoAtualizar';
+import PullToRefresh from './PullToRefresh';
 
 export default function Cozinha() {
   const router = useRouter();
@@ -96,6 +98,7 @@ export default function Cozinha() {
 
   return (
     <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <PullToRefresh />
       <div style={{ padding: 'calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', borderBottom: `1px solid ${C.hair}` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -106,6 +109,7 @@ export default function Cozinha() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <BotaoAtualizar />
             <button onClick={trocarTema} title={tema === 'claro' ? 'Mudar para escuro' : 'Mudar para claro'} aria-label="Trocar tema"
               style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {tema === 'claro' ? (
