@@ -13,7 +13,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
   const removerTarefaCoz = (id) => onTarefasCozinha && onTarefasCozinha(tarefasCozinha.filter((t) => t.id !== id));
   const [editId, setEditId] = useState(null);
   const [marcandoId, setMarcandoId] = useState(null);
-  const [lancForm, setLancForm] = useState({ valor: '', fornecedor: '', forma: 'À vista', vencimento: '' });
+  const [lancForm, setLancForm] = useState({ quantidade: '1', valor: '', fornecedor: '', forma: 'À vista', vencimento: '' });
   const [nomeModelo, setNomeModelo] = useState('');
   const [verComprados, setVerComprados] = useState(false);
   const set = (k) => (v) => setNovo((f) => ({ ...f, [k]: v }));
@@ -61,6 +61,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
     const best = melhorCotacao(it.nome);
     setMarcandoId(it.id);
     setLancForm({
+      quantidade: num(it.quantidade) > 0 ? String(num(it.quantidade)).replace('.', ',') : '1',
       valor: best ? best.preco.toFixed(2).replace('.', ',') : '',
       fornecedor: (it.fornecedor && it.fornecedor.trim()) || best?.fornecedor || '',
       forma: 'À vista', vencimento: addDays(todayISO(), 7),
@@ -72,12 +73,15 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
   const lancar = (it) => {
     const hoje = todayISO();
     const aVista = lancForm.forma === 'À vista';
-    const valor = lancForm.valor || '0';
+    const unit = lancForm.valor || '0';
+    const qtd = num(lancForm.quantidade) > 0 ? num(lancForm.quantidade) : 1;
+    const total = qtd * num(unit);
+    const totalStr = total.toFixed(2).replace('.', ',');
     const forn = lancForm.fornecedor.trim();
     const despId = aVista ? uid() : '';
     const compraEntry = {
       id: uid(), data: hoje, produto: it.nome, fornecedor: forn, categoria: it.categoria || '',
-      quantidade: '1', valorUnit: valor, formaPagto: aVista ? 'À vista' : 'Prazo', prazoDias: '',
+      quantidade: String(qtd), valorUnit: unit, formaPagto: aVista ? 'À vista' : 'Prazo', prazoDias: '',
       vencimento: aVista ? '' : (lancForm.vencimento || ''), pago: aVista ? 'Sim' : 'Não',
       dataPagamento: aVista ? hoje : '', despesaId: despId, obs: 'Lista de compras',
     };
@@ -85,8 +89,8 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
       listaCompras: itens.map((x) => (x.id === it.id ? { ...x, comprado: true, lancado: true, compradoEm: Date.now() } : x)),
       compras: [compraEntry, ...compras],
     };
-    if (aVista) payload.despesas = [{ id: despId, data: hoje, categoria: 'Fornecedores de insumo', descricao: [forn, it.nome].filter(Boolean).join(' · ') || it.nome, valor, obs: 'Compra à vista (lista de compras)', origem: 'lista-compras' }, ...despesas];
-    if (num(valor) > 0 && forn) payload.cotacoes = [{ id: uid(), data: hoje, produto: it.nome, fornecedor: forn, preco: valor, categoria: it.categoria || '' }, ...cotacoes];
+    if (aVista) payload.despesas = [{ id: despId, data: hoje, categoria: 'Fornecedores de insumo', descricao: [forn, it.nome].filter(Boolean).join(' · ') || it.nome, valor: totalStr, obs: 'Compra à vista (lista de compras)', origem: 'lista-compras' }, ...despesas];
+    if (num(unit) > 0 && forn) payload.cotacoes = [{ id: uid(), data: hoje, produto: it.nome, fornecedor: forn, preco: unit, categoria: it.categoria || '' }, ...cotacoes];
     onAplicar(payload);
     setMarcandoId(null);
   };
@@ -160,8 +164,13 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
                   <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Comprou! Quer lançar em Compras / Contas a Pagar?</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      <Field label="Valor (R$)"><NumInput value={lancForm.valor} onChange={setLanc('valor')} /></Field>
-                      <Field label="Fornecedor"><TextInput value={lancForm.fornecedor} onChange={setLanc('fornecedor')} placeholder="Ambev…" /></Field>
+                      <Field label="Qtd"><NumInput value={lancForm.quantidade} onChange={setLanc('quantidade')} /></Field>
+                      <Field label="Valor unitário (R$)"><NumInput value={lancForm.valor} onChange={setLanc('valor')} /></Field>
+                    </div>
+                    <Field label="Fornecedor"><TextInput value={lancForm.fornecedor} onChange={setLanc('fornecedor')} placeholder="Ambev…" /></Field>
+                    <div style={{ fontSize: 12, color: C.muted, margin: '-4px 0 10px' }}>
+                      Total: <b style={{ color: C.text }}>{brl((num(lancForm.quantidade) > 0 ? num(lancForm.quantidade) : 1) * num(lancForm.valor))}</b>
+                      {num(lancForm.quantidade) > 1 && <span style={{ color: C.faint }}> ({num(lancForm.quantidade)} × {brl(num(lancForm.valor))})</span>}
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: lancForm.forma === 'À vista' ? '1fr' : '1fr 1fr', gap: 10 }}>
                       <Field label="Pagamento"><Select value={lancForm.forma} onChange={setLanc('forma')} options={['À vista', 'A prazo']} /></Field>
