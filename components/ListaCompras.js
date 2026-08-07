@@ -16,8 +16,15 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
   const [lancForm, setLancForm] = useState({ quantidade: '1', valor: '', fornecedor: '', forma: 'À vista', vencimento: '' });
   const [nomeModelo, setNomeModelo] = useState('');
   const [verComprados, setVerComprados] = useState(false);
+  // Lançamento em lote: vários itens do mesmo fornecedor num boleto só.
+  const [selForn, setSelForn] = useState(null);
+  const [selItens, setSelItens] = useState({});
+  const [boleto, setBoleto] = useState({ fornecedor: '', forma: 'A prazo', vencimento: '', nota: '' });
   const set = (k) => (v) => setNovo((f) => ({ ...f, [k]: v }));
   const setLanc = (k) => (v) => setLancForm((f) => ({ ...f, [k]: v }));
+  const setBol = (k) => (v) => setBoleto((f) => ({ ...f, [k]: v }));
+  const setSelItem = (id, k) => (v) => setSelItens((m) => ({ ...m, [id]: { ...m[id], [k]: v } }));
+  const toggleSel = (id) => setSelItens((m) => ({ ...m, [id]: { ...m[id], sel: !m[id]?.sel } }));
 
   // Melhor preço já cotado para um produto (menor preço entre os fornecedores).
   const melhorCotacao = (nome) => {
@@ -95,6 +102,62 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
     setMarcandoId(null);
   };
 
+  // --- Lançar vários itens num boleto só (mesmo fornecedor) ---
+  const abrirBoleto = (g) => {
+    const map = {};
+    for (const it of g.itens) {
+      map[it.id] = {
+        sel: true,
+        quantidade: num(it.quantidade) > 0 ? String(num(it.quantidade)).replace('.', ',') : '1',
+        valor: it.best ? it.best.preco.toFixed(2).replace('.', ',') : '',
+      };
+    }
+    setSelItens(map);
+    setBoleto({ fornecedor: g.fornecedor && g.fornecedor !== 'A definir' ? g.fornecedor : '', forma: 'A prazo', vencimento: addDays(todayISO(), 7), nota: '' });
+    setSelForn(g.fornecedor);
+    setMarcandoId(null);
+  };
+  const cancelarBoleto = () => { setSelForn(null); setSelItens({}); };
+
+  const lancarBoleto = (g) => {
+    const hoje = todayISO();
+    const aVista = boleto.forma === 'À vista';
+    const selecionados = g.itens.filter((it) => selItens[it.id]?.sel);
+    if (!selecionados.length) return;
+    const forn = boleto.fornecedor.trim();
+    // Uma "nota" compartilhada faz os itens virarem UM boleto só em Contas a Pagar.
+    const nota = aVista ? '' : (boleto.nota.trim() || `LC-${Date.now().toString(36).slice(-5).toUpperCase()}`);
+    const despId = aVista ? uid() : '';
+    let total = 0;
+    const novasCompras = [];
+    const novasCotacoes = [];
+    const idsSel = new Set(selecionados.map((it) => it.id));
+    for (const it of selecionados) {
+      const f = selItens[it.id];
+      const unit = f.valor || '0';
+      const qtd = num(f.quantidade) > 0 ? num(f.quantidade) : 1;
+      total += qtd * num(unit);
+      novasCompras.push({
+        id: uid(), data: hoje, produto: it.nome, fornecedor: forn, categoria: it.categoria || '',
+        quantidade: String(qtd), valorUnit: unit, formaPagto: aVista ? 'À vista' : 'Prazo', prazoDias: '',
+        vencimento: aVista ? '' : (boleto.vencimento || ''), pago: aVista ? 'Sim' : 'Não',
+        dataPagamento: aVista ? hoje : '', despesaId: despId, nota, obs: 'Lista de compras',
+      });
+      if (num(unit) > 0 && forn) novasCotacoes.push({ id: uid(), data: hoje, produto: it.nome, fornecedor: forn, preco: unit, categoria: it.categoria || '' });
+    }
+    const payload = {
+      listaCompras: itens.map((x) => (idsSel.has(x.id) ? { ...x, comprado: true, lancado: true, compradoEm: Date.now() } : x)),
+      compras: [...novasCompras, ...compras],
+    };
+    if (novasCotacoes.length) payload.cotacoes = [...novasCotacoes, ...cotacoes];
+    if (aVista) {
+      const nomes = selecionados.map((it) => it.nome).slice(0, 3).join(', ') + (selecionados.length > 3 ? '…' : '');
+      payload.despesas = [{ id: despId, data: hoje, categoria: 'Fornecedores de insumo', descricao: [forn, nomes].filter(Boolean).join(' · ') || nomes, valor: total.toFixed(2).replace('.', ','), obs: `Compra à vista (lista de compras · ${selecionados.length} itens)`, origem: 'lista-compras' }, ...despesas];
+    }
+    onAplicar(payload);
+    cancelarBoleto();
+  };
+
   const limparComprados = () => onAplicar({ listaCompras: itens.filter((i) => !i.comprado) });
 
   // Modelos (listas recorrentes).
@@ -146,7 +209,56 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
               <div style={{ fontWeight: 800, fontSize: 14 }}>{g.fornecedor}<span style={{ fontSize: 12, color: C.faint, fontWeight: 400 }}> · {g.itens.length} item{g.itens.length > 1 ? 's' : ''}</span></div>
               {g.temPreco && <div style={{ fontSize: 12, color: C.muted }}>~ <b style={{ color: C.text }}>{brl(g.estimativa)}</b></div>}
             </div>
-            {g.itens.map((it) => (
+            {g.itens.length > 1 && selForn !== g.fornecedor && (
+              <button onClick={() => abrirBoleto(g)} style={{ background: 'none', border: `1px solid ${C.accent}`, color: C.accent, cursor: 'pointer', fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '5px 10px', marginBottom: 2 }}>
+                Comprei vários — lançar num boleto só
+              </button>
+            )}
+            {selForn === g.fornecedor ? (() => {
+              const totalBoleto = g.itens.reduce((s, it) => { const f = selItens[it.id]; if (!f?.sel) return s; const q = num(f.quantidade) > 0 ? num(f.quantidade) : 1; return s + q * num(f.valor); }, 0);
+              const qtdeSel = g.itens.filter((it) => selItens[it.id]?.sel).length;
+              const aVista = boleto.forma === 'À vista';
+              return (
+                <div style={{ background: C.panel2, border: `1px solid ${C.accent}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Boleto único — marque os itens deste fornecedor</div>
+                  <div style={{ fontSize: 11, color: C.faint, marginBottom: 10 }}>Confira quantidade e valor unitário de cada um. Tudo vira {aVista ? 'uma despesa' : 'uma conta a pagar'} só.</div>
+                  {g.itens.map((it) => {
+                    const f = selItens[it.id] || {};
+                    return (
+                      <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 8, opacity: f.sel ? 1 : 0.45 }}>
+                        <button onClick={() => toggleSel(it.id)} aria-label={f.sel ? 'Tirar do boleto' : 'Pôr no boleto'}
+                          style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, cursor: 'pointer', border: `2px solid ${f.sel ? C.accent : C.line}`, background: f.sel ? C.accent : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {f.sel && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 6.5" /></svg>}
+                        </button>
+                        <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}>{it.nome}</div>
+                        <div style={{ width: 56, flexShrink: 0 }}><NumInput value={f.quantidade || ''} onChange={setSelItem(it.id, 'quantidade')} /></div>
+                        <span style={{ fontSize: 12, color: C.faint }}>×</span>
+                        <div style={{ width: 82, flexShrink: 0 }}><NumInput value={f.valor || ''} onChange={setSelItem(it.id, 'valor')} /></div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                    <Field label="Fornecedor"><TextInput value={boleto.fornecedor} onChange={setBol('fornecedor')} placeholder="Ambev…" /></Field>
+                    <div style={{ display: 'grid', gridTemplateColumns: aVista ? '1fr' : '1fr 1fr', gap: 10 }}>
+                      <Field label="Pagamento"><Select value={boleto.forma} onChange={setBol('forma')} options={['À vista', 'A prazo']} /></Field>
+                      {!aVista && <Field label="Vencimento"><TextInput type="date" value={boleto.vencimento} onChange={setBol('vencimento')} /></Field>}
+                    </div>
+                    {!aVista && <Field label="Nº do boleto / nota (opcional)"><TextInput value={boleto.nota} onChange={setBol('nota')} placeholder="Deixe em branco se não tiver" /></Field>}
+                  </div>
+                  <div style={{ fontSize: 14, margin: '2px 0 10px' }}>
+                    Total do boleto: <b style={{ color: C.text }}>{brl(totalBoleto)}</b>
+                    <span style={{ fontSize: 12, color: C.faint }}> · {qtdeSel} item{qtdeSel !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: C.faint, marginBottom: 10 }}>
+                    {aVista ? 'Vira uma despesa paga hoje.' : 'Vira uma conta a pagar única (todos os itens juntos) com esse vencimento.'} Os preços também entram nas Cotações.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <Btn small onClick={() => lancarBoleto(g)}>Lançar boleto</Btn>
+                    <Btn kind="ghost" small onClick={cancelarBoleto}>Cancelar</Btn>
+                  </div>
+                </div>
+              );
+            })() : g.itens.map((it) => (
               <div key={it.id} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Check marcado={false} onClick={() => abrirLancar(it)} />
