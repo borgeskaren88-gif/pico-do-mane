@@ -78,7 +78,7 @@ export default function Cozinha() {
 
   // Marca/desmarca uma tarefa como feita (só o "feito"; o texto é da dona).
   const marcarTarefa = (id, feito) => {
-    setTarefas((ts) => ts.map((t) => (t.id === id ? { ...t, feito } : t)));
+    setTarefas((ts) => ts.map((t) => (t.id === id ? { ...t, feito, feitoEm: feito ? new Date().toISOString() : '' } : t)));
     fetch('/api/lista', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tarefasFeito: { [id]: feito } }) }).catch(() => { });
   };
 
