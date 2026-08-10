@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   BarChart, Bar, AreaChart, Area as AreaRecharts, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid,
+  ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell,
 } from 'recharts';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle, Label } from './ui';
 
@@ -39,6 +39,22 @@ const tooltipModerno = { background: C.panel, border: `1px solid ${C.cardBorder}
 // Tons dos graficos: verde suave pra receita, dourado quente pra despesa.
 const CHART_RECEITA = '#4FC79B';
 const CHART_DESPESA = '#ECB24A';
+// Paleta da pizza (rosca) de despesas: azuis, verde, dourado, tons modernos.
+const PIZZA = ['#2F6BF0', '#4FC79B', '#ECB24A', '#7AA6F5', '#5BC8C2', '#C88BEA', '#F2A65A', '#9FB4D8'];
+
+// Pilula de crescimento: seta + % comparando com o mês anterior.
+function Delta({ atual, anterior, boaSubida = true }) {
+  if (!(anterior > 0) && !(atual > 0)) return <span style={{ fontSize: 11, color: C.faint }}>—</span>;
+  const pct = anterior > 0 ? ((atual - anterior) / anterior) * 100 : 100;
+  const subiu = pct >= 0;
+  const bom = subiu === boaSubida;
+  const cor = Math.abs(pct) < 0.05 ? C.faint : bom ? C.green : C.red;
+  return (
+    <span style={{ fontSize: 11, fontWeight: 800, color: cor, whiteSpace: 'nowrap' }}>
+      {subiu ? '▲' : '▼'} {Math.abs(pct).toFixed(0)}%
+    </span>
+  );
+}
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Relatorios({ diario, receitas, despesas, mes, setMes }) {
@@ -71,10 +87,53 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
   const fiadoMes = diarioMes.reduce((s, d) => s + num(d.fiado), 0);
   const maxCat = porCategoria[0]?.val || 1;
 
+  // Mês anterior, pra comparar crescimento.
+  const prevMes = useMemo(() => {
+    const y = parseInt(mes.slice(0, 4)), m = parseInt(mes.slice(5));
+    const dt = new Date(y, m - 2, 1);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+  }, [mes]);
+  const resumoDe = (ym) => {
+    const r = receitas.filter((x) => ymOf(x.data) === ym).reduce((s, x) => s + num(x.valor), 0);
+    const dd = despesas.filter((x) => ymOf(x.data) === ym);
+    const cv = dd.filter((x) => CUSTO_VARIAVEL.includes(x.categoria)).reduce((s, x) => s + num(x.valor), 0);
+    const op = dd.filter((x) => DESPESA_OPERACIONAL.includes(x.categoria)).reduce((s, x) => s + num(x.valor), 0);
+    return { rec: r, desp: cv + op, lucro: r - cv - op };
+  };
+  const prev = useMemo(() => resumoDe(prevMes), [prevMes, receitas, despesas]);
+
+  // Padrão por dia da semana (Dom..Sáb): total de receita e despesa no mês.
+  const porDiaSemana = useMemo(() => {
+    const base = DIAS.map((d) => ({ dia: d, receita: 0, despesa: 0 }));
+    recMes.forEach((r) => { const wd = new Date(r.data + 'T12:00:00').getDay(); if (base[wd]) base[wd].receita += num(r.valor); });
+    despMes.forEach((d) => { const wd = new Date(d.data + 'T12:00:00').getDay(); if (base[wd]) base[wd].despesa += num(d.valor); });
+    return base;
+  }, [recMes, despMes]);
+  const melhorDiaVenda = porDiaSemana.reduce((a, b) => (b.receita > a.receita ? b : a), porDiaSemana[0]);
+  const temPadraoSemana = porDiaSemana.some((d) => d.receita > 0 || d.despesa > 0);
+
+  // Pizza de despesas por categoria (com %).
+  const totalDesp = porCategoria.reduce((s, c) => s + c.val, 0);
+  const pizza = porCategoria.map((c, i) => ({ ...c, cor: PIZZA[i % PIZZA.length], pct: totalDesp ? (c.val / totalDesp) * 100 : 0 }));
+
   return (
     <div>
       <PageTitle sub="Resultado do mês">Relatórios</PageTitle>
       <div style={{ marginBottom: 14 }}><Label>Mês do relatório</Label><Select value={mes} onChange={setMes} options={opts} /></div>
+
+      <Card style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 700, marginBottom: 4 }}>Crescimento</div>
+        <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Comparado com {mesLabel(prevMes)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+          {[['Receita', totalRec, prev.rec, C.green, true], ['Despesa', custoVar + despOp, prev.desp, C.amber, false], ['Lucro', lucro, prev.lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, atual, ant, cor, boa]) => (
+            <div key={nome} style={{ background: C.panel2, borderRadius: 12, padding: '11px 12px' }}>
+              <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginBottom: 4 }}>{nome}</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brl(atual)}</div>
+              <Delta atual={atual} anterior={ant} boaSubida={boa} />
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.accent, fontWeight: 700, marginBottom: 12 }}>DRE — {mesLabel(mes)}</div>
@@ -147,8 +206,73 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
         </Card>
       )}
 
+      {temPadraoSemana && (
+        <Card style={{ marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, marginBottom: 2 }}>Padrão por dia da semana</div>
+          <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Total de {mesLabel(mes)} — que dia vende e gasta mais</div>
+          <div style={{ height: 200 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={porDiaSemana} margin={{ top: 8, right: 4, left: -14, bottom: 0 }} barGap={3} barCategoryGap="22%">
+                <defs>
+                  <linearGradient id="gRecDia" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={CHART_RECEITA} stopOpacity={0.95} />
+                    <stop offset="100%" stopColor={CHART_RECEITA} stopOpacity={0.5} />
+                  </linearGradient>
+                  <linearGradient id="gDespDia" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={CHART_DESPESA} stopOpacity={0.95} />
+                    <stop offset="100%" stopColor={CHART_DESPESA} stopOpacity={0.5} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="2 7" stroke={C.hair} vertical={false} />
+                <XAxis dataKey="dia" tick={{ fill: C.muted, fontSize: 12 }} axisLine={false} tickLine={false} dy={6} />
+                <YAxis tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={46} tickFormatter={(v) => 'R$' + (v / 1000).toFixed(0) + 'k'} />
+                <Tooltip cursor={{ fill: 'rgba(120,150,200,0.10)', radius: 8 }} formatter={(v) => brl(v)} contentStyle={tooltipModerno} labelStyle={{ color: C.muted, fontWeight: 700, marginBottom: 2 }} />
+                <Bar dataKey="receita" fill="url(#gRecDia)" radius={[6, 6, 0, 0]} maxBarSize={22} />
+                <Bar dataKey="despesa" fill="url(#gDespDia)" radius={[6, 6, 0, 0]} maxBarSize={22} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ display: 'flex', gap: 18, marginTop: 10, fontSize: 12, color: C.muted, flexWrap: 'wrap' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: CHART_RECEITA }} />Receita</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: CHART_DESPESA }} />Despesa</span>
+          </div>
+          {melhorDiaVenda && melhorDiaVenda.receita > 0 && (
+            <div style={{ fontSize: 13, color: C.text, marginTop: 12, background: C.panel2, borderRadius: 10, padding: '10px 12px' }}>
+              Seu melhor dia de venda é <b style={{ color: C.green }}>{melhorDiaVenda.dia}</b> — {brl(melhorDiaVenda.receita)} no mês.
+            </div>
+          )}
+        </Card>
+      )}
+
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontWeight: 700, marginBottom: 12 }}>Para onde foi o dinheiro</div>
+        {pizza.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ position: 'relative', width: 172, height: 172, flexShrink: 0, margin: '0 auto' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pizza} dataKey="val" nameKey="cat" cx="50%" cy="50%" innerRadius={52} outerRadius={82} paddingAngle={2} stroke="none">
+                    {pizza.map((p) => <Cell key={p.cat} fill={p.cor} />)}
+                  </Pie>
+                  <Tooltip formatter={(v) => brl(v)} contentStyle={tooltipModerno} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <div style={{ fontSize: 11, color: C.faint, fontWeight: 600 }}>Total</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{brl(totalDesp)}</div>
+              </div>
+            </div>
+            <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+              {pizza.map((p) => (
+                <div key={p.cat} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 3, background: p.cor, flexShrink: 0 }} />
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.cat}</span>
+                  <span style={{ fontSize: 12, color: C.muted, fontWeight: 700 }}>{p.pct.toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {porCategoria.length === 0 ? <Empty>Sem despesas neste mês.</Empty> :
           porCategoria.map(({ cat, val }) => (
             <div key={cat} style={{ marginBottom: 10 }}>
