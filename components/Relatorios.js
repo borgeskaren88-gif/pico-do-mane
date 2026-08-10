@@ -124,12 +124,14 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 700, marginBottom: 4 }}>Crescimento</div>
         <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Comparado com {mesLabel(prevMes)}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[['Receita', totalRec, prev.rec, C.green, true], ['Despesa', custoVar + despOp, prev.desp, C.amber, false], ['Lucro', lucro, prev.lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, atual, ant, cor, boa]) => (
-            <div key={nome} style={{ background: C.panel2, borderRadius: 12, padding: '11px 12px' }}>
-              <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginBottom: 4 }}>{nome}</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brl(atual)}</div>
-              <Delta atual={atual} anterior={ant} boaSubida={boa} />
+            <div key={nome} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: C.panel2, borderRadius: 12, padding: '11px 14px' }}>
+              <span style={{ fontSize: 13, color: C.muted, fontWeight: 600, flexShrink: 0 }}>{nome}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, minWidth: 0 }}>
+                <span style={{ fontSize: 16, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{brl(atual)}</span>
+                <span style={{ minWidth: 48, textAlign: 'right', flexShrink: 0 }}><Delta atual={atual} anterior={ant} boaSubida={boa} /></span>
+              </div>
             </div>
           ))}
         </div>
