@@ -18,10 +18,18 @@ const txt = (v, max) => String(v == null ? '' : v).slice(0, max).trim();
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const chaveDe = (id) => PREFIXO + id;
 
-async function lerCardapio(sb) {
+async function lerPainel(sb) {
   const { data } = await sb.from('pdm_dados').select('valor').eq('chave', PAINEL).maybeSingle();
-  const blob = data?.valor || {};
+  return data?.valor || {};
+}
+async function lerCardapio(sb) {
+  const blob = await lerPainel(sb);
   return Array.isArray(blob.cardapio) ? blob.cardapio : [];
+}
+// Nº de mesas do salão (configurável pela dona). Padrão 20.
+function mesasDe(blob) {
+  const n = Math.floor(Number(blob?.mesasQtd));
+  return n >= 1 && n <= 80 ? n : 20;
 }
 
 async function lerComanda(sb, id) {
@@ -52,8 +60,9 @@ export async function GET() {
       .map((r) => r.valor)
       .filter((c) => c && c.status === 'aberta')
       .sort((a, b) => Number(a.mesa) - Number(b.mesa) || (a.abertaEm || '').localeCompare(b.abertaEm || ''));
-    const cardapio = (await lerCardapio(sb)).filter((i) => i && i.ativo !== false);
-    return NextResponse.json({ ok: true, comandas, cardapio });
+    const blob = await lerPainel(sb);
+    const cardapio = (Array.isArray(blob.cardapio) ? blob.cardapio : []).filter((i) => i && i.ativo !== false);
+    return NextResponse.json({ ok: true, comandas, cardapio, mesasQtd: mesasDe(blob) });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar comandas.' }, { status: 500 });
   }
@@ -67,6 +76,20 @@ export async function POST(request) {
   const acao = txt(body?.acao, 20);
   try {
     const sb = supabaseServer();
+
+    // Configurar o nº de mesas do salão (só a dona). Preserva o resto do painel.
+    if (acao === 'config') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona configura as mesas.' }, { status: 403 });
+      const n = Math.floor(Number(body?.mesasQtd));
+      if (!(n >= 1 && n <= 80)) return NextResponse.json({ ok: false, erro: 'Número de mesas inválido (1 a 80).' }, { status: 400 });
+      const blob = await lerPainel(sb);
+      const { error } = await sb.from('pdm_dados').upsert(
+        { chave: PAINEL, valor: { ...blob, mesasQtd: n }, atualizado_em: new Date().toISOString() },
+        { onConflict: 'chave' }
+      );
+      if (error) throw error;
+      return NextResponse.json({ ok: true, mesasQtd: n });
+    }
 
     // Abrir uma comanda numa mesa. Se a mesa já tem comanda aberta, devolve ela
     // (não duplica a mesa).
