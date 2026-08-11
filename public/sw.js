@@ -1,9 +1,9 @@
-// Service worker enxuto do PicoOS.
+// Service worker enxuto do app de finanças.
 // Estratégia conservadora: SEMPRE tenta a rede primeiro (assim o site nunca
 // "trava" numa versão antiga) e só cai no cache quando está offline / sem
 // internet. As chamadas de dados (/api/...) nunca são cacheadas, pra não
 // mostrar número velho nem atrapalhar o salvamento.
-const CACHE = 'picoos-v1';
+const CACHE = 'financas-v1';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

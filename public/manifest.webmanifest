@@ -1,7 +1,7 @@
 {
-  "name": "PicoOS — Central de Gestão",
-  "short_name": "PicoOS",
-  "description": "Painel de gestão do PicoOS: receitas, despesas, compras e relatórios.",
+  "name": "Nossas Finanças",
+  "short_name": "Finanças",
+  "description": "Controle de gastos do casal, com um login para cada um.",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",

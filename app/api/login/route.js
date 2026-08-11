@@ -1,23 +1,14 @@
-import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { nomeCookie, valorSessaoValida, valorSessaoCozinha } from '../../../lib/auth';
+import { nomeCookie, valorSessao, autenticar, usuarios } from '../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-function comparaSegura(a, b) {
-  const ha = crypto.createHash('sha256').update(String(a)).digest();
-  const hb = crypto.createHash('sha256').update(String(b)).digest();
-  return crypto.timingSafeEqual(ha, hb);
-}
-
 export async function POST(request) {
-  const senhaDona = process.env.APP_PASSWORD;
-  // Senha da cozinha: padrão "1234" se não houver variável configurada.
-  const senhaCozinha = process.env.APP_PASSWORD_COZINHA || '1234';
-  if (!senhaDona) {
+  const configurados = usuarios().filter((u) => u.senha);
+  if (configurados.length === 0) {
     return NextResponse.json(
-      { ok: false, erro: 'Servidor sem senha configurada (APP_PASSWORD).' },
+      { ok: false, erro: 'Servidor sem senhas configuradas (USUARIO1_SENHA / USUARIO2_SENHA).' },
       { status: 500 }
     );
   }
@@ -30,16 +21,12 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, erro: 'Requisição inválida.' }, { status: 400 });
   }
 
-  let valorCookie = null;
-  let papel = null;
-  if (senha && comparaSegura(senha, senhaDona)) { valorCookie = valorSessaoValida(); papel = 'dona'; }
-  else if (senha && comparaSegura(senha, senhaCozinha)) { valorCookie = valorSessaoCozinha(); papel = 'cozinha'; }
-
-  if (!valorCookie) {
+  const usuario = autenticar(senha);
+  if (!usuario) {
     return NextResponse.json({ ok: false, erro: 'Senha incorreta.' }, { status: 401 });
   }
 
-  cookies().set(nomeCookie(), valorCookie, {
+  cookies().set(nomeCookie(), valorSessao(usuario.id), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -47,5 +34,5 @@ export async function POST(request) {
     maxAge: 60 * 60 * 24 * 90, // 90 dias
   });
 
-  return NextResponse.json({ ok: true, papel });
+  return NextResponse.json({ ok: true, nome: usuario.nome });
 }

@@ -1,14 +1,14 @@
 import { cookies } from 'next/headers';
-import { nomeCookie, papelDaSessao } from '../lib/auth';
+import { nomeCookie, usuarioDaSessao } from '../lib/auth';
 import LoginForm from '../components/LoginForm';
-import Dashboard from '../components/Dashboard';
-import Cozinha from '../components/Cozinha';
+import Financas from '../components/Financas';
+
+export const dynamic = 'force-dynamic';
 
 export default function Home() {
   const valorCookie = cookies().get(nomeCookie())?.value;
-  const papel = papelDaSessao(valorCookie);
+  const usuario = usuarioDaSessao(valorCookie);
 
-  if (papel === 'dona') return <Dashboard />;
-  if (papel === 'cozinha') return <Cozinha />;
+  if (usuario) return <Financas usuario={usuario} />;
   return <LoginForm />;
 }

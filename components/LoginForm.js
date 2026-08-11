@@ -38,13 +38,13 @@ export default function LoginForm() {
       <div style={{ width: '100%', maxWidth: 360 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ width: 56, margin: '0 auto 14px' }}><LogoMark size={56} radius={16} /></div>
-          <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '.02em' }}>PicoOS</div>
-          <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 4, fontWeight: 600 }}>Central de Gestão</div>
+          <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '.02em' }}>Nossas Finanças</div>
+          <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 4, fontWeight: 600 }}>Controle do casal</div>
         </div>
 
         <Card>
           <form onSubmit={entrar}>
-            <Field label="Senha">
+            <Field label="Sua senha">
               <div style={{ position: 'relative' }}>
                 <input
                   type={mostrarSenha ? 'text' : 'password'}
@@ -71,7 +71,7 @@ export default function LoginForm() {
           </form>
         </Card>
         <div style={{ textAlign: 'center', fontSize: 12, color: C.faint, marginTop: 16, lineHeight: 1.5 }}>
-          Acesso restrito à gestão do PicoOS.
+          Cada um tem a sua própria senha.<br />Os dois veem todos os gastos juntos.
         </div>
       </div>
     </div>
