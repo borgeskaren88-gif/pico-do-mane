@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, LogoMark, pageBg } from './ui';
 import { ymOf, todayISO, limparNome } from '../lib/util';
@@ -77,6 +77,7 @@ export default function Dashboard() {
   const [listasModelo, setListasModelo] = useState([]);
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [cardapio, setCardapio] = useState([]);
+  const [vendas, setVendas] = useState([]); // vendas do salão (comandas fechadas)
   const [qualLista, setQualLista] = useState('minha'); // 'minha' | 'cozinha'
   const [googleOn, setGoogleOn] = useState(false);
   const [mes, setMes] = useState(ymOf(todayISO()));
@@ -125,6 +126,25 @@ export default function Dashboard() {
       try { const r = await fetch('/api/google/status', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setGoogleOn(!!j.conectado); } catch { /* ignora */ }
     })();
   }, []);
+
+  // Vendas do salão (comandas fechadas). Ficam separadas das receitas digitadas
+  // à mão (não entram no bloco salvo), mas são somadas como receita no resumo e
+  // nos relatórios. Recarrega ao abrir e ao entrar nas telas que mostram receita.
+  const carregarVendas = async () => {
+    try { const r = await fetch('/api/vendas', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setVendas(Array.isArray(j.vendas) ? j.vendas : []); } catch { /* ignora */ }
+  };
+  useEffect(() => { carregarVendas(); }, []);
+  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas'].includes(tab)) carregarVendas(); }, [tab]);
+
+  // Receita total = o que a dona lançou + as vendas do salão (só leitura).
+  const receitasComVendas = useMemo(() => {
+    const doSalao = vendas.map((v) => ({
+      id: v.id, data: v.data, valor: (Number(v.total) || 0).toFixed(2).replace('.', ','),
+      categoria: 'Venda do salão', forma: v.pagamento || '', origem: 'comanda',
+      descricao: `Mesa ${v.mesa}`, obs: `Comanda · ${v.pagamento || ''}`,
+    }));
+    return [...receitas, ...doSalao];
+  }, [receitas, vendas]);
 
   const salvarTudo = (parcial) => {
     const dados = {
@@ -347,7 +367,7 @@ export default function Dashboard() {
       </div>
 
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
-        {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={setTab} />}
+        {tab === 'hoje' && <Hoje diario={diario} receitas={receitasComVendas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={setTab} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
@@ -375,8 +395,8 @@ export default function Dashboard() {
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'comandas' && <Comandas papel="dona" />}
         {tab === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} />}
-        {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
-        {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
+        {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitasComVendas} />}
+        {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitasComVendas} despesas={despesas} mes={mes} setMes={setMes} />}
         {tab === 'backup' && (<><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
