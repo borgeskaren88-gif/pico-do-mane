@@ -63,7 +63,7 @@ código fica) e **Vercel** (onde o site fica no ar). Siga na ordem.
    | `SUPABASE_SERVICE_ROLE_KEY` | a service_role key que você guardou no passo 1 |
    | `USUARIO1_NOME` | seu nome (ex.: `Karen`) |
    | `USUARIO1_SENHA` | a senha que **você** vai usar para entrar |
-   | `USUARIO2_NOME` | o nome dela/dele (ex.: `Minha esposa`) |
+   | `USUARIO2_NOME` | o nome dela (ex.: `Mariele`) |
    | `USUARIO2_SENHA` | a senha que **ela/ele** vai usar para entrar |
    | `SESSION_SECRET` | uma frase longa e aleatória, só sua (ex.: `cavalo-azul-2026-xyz`) |
 
