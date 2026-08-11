@@ -3,6 +3,7 @@ import { nomeCookie, papelDaSessao } from '../lib/auth';
 import LoginForm from '../components/LoginForm';
 import Dashboard from '../components/Dashboard';
 import Cozinha from '../components/Cozinha';
+import Garcom from '../components/Garcom';
 
 export default function Home() {
   const valorCookie = cookies().get(nomeCookie())?.value;
@@ -10,5 +11,6 @@ export default function Home() {
 
   if (papel === 'dona') return <Dashboard />;
   if (papel === 'cozinha') return <Cozinha />;
+  if (papel === 'garcom') return <Garcom />;
   return <LoginForm />;
 }

@@ -3,8 +3,11 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, Card, Field, inputStyle, LogoMark, pageBg } from './ui';
 
+const PAPEIS = [['dona', 'Dona'], ['cozinha', 'Cozinha'], ['garcom', 'Garçom']];
+
 export default function LoginForm() {
   const router = useRouter();
+  const [papel, setPapel] = useState('dona');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
@@ -18,7 +21,7 @@ export default function LoginForm() {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senha }),
+        body: JSON.stringify({ senha, papel }),
       });
       const json = await res.json();
       if (json.ok) {
@@ -44,6 +47,16 @@ export default function LoginForm() {
 
         <Card>
           <form onSubmit={entrar}>
+            <Field label="Quem está entrando?">
+              <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 3, gap: 3 }}>
+                {PAPEIS.map(([v, rot]) => (
+                  <button key={v} type="button" onClick={() => { setPapel(v); setErro(''); }} style={{
+                    flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '9px 6px', fontSize: 14, fontWeight: 700,
+                    background: papel === v ? C.accent : 'transparent', color: papel === v ? '#06101F' : C.muted,
+                  }}>{rot}</button>
+                ))}
+              </div>
+            </Field>
             <Field label="Senha">
               <div style={{ position: 'relative' }}>
                 <input

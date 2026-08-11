@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { nomeCookie, valorSessaoValida, valorSessaoCozinha } from '../../../lib/auth';
+import { nomeCookie, valorSessaoValida, valorSessaoCozinha, valorSessaoGarcom } from '../../../lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,8 +13,9 @@ function comparaSegura(a, b) {
 
 export async function POST(request) {
   const senhaDona = process.env.APP_PASSWORD;
-  // Senha da cozinha: padrão "1234" se não houver variável configurada.
+  // Senha da cozinha e do garçom: padrão "1234" se não houver variável.
   const senhaCozinha = process.env.APP_PASSWORD_COZINHA || '1234';
+  const senhaGarcom = process.env.APP_PASSWORD_GARCOM || '1234';
   if (!senhaDona) {
     return NextResponse.json(
       { ok: false, erro: 'Servidor sem senha configurada (APP_PASSWORD).' },
@@ -23,17 +24,29 @@ export async function POST(request) {
   }
 
   let senha = '';
+  let papelPedido = '';
   try {
     const body = await request.json();
     senha = body?.senha ?? '';
+    papelPedido = body?.papel ?? '';
   } catch {
     return NextResponse.json({ ok: false, erro: 'Requisição inválida.' }, { status: 400 });
   }
 
   let valorCookie = null;
   let papel = null;
-  if (senha && comparaSegura(senha, senhaDona)) { valorCookie = valorSessaoValida(); papel = 'dona'; }
-  else if (senha && comparaSegura(senha, senhaCozinha)) { valorCookie = valorSessaoCozinha(); papel = 'cozinha'; }
+  // Com o papel escolhido no login, cozinha e garçom podem usar a mesma senha
+  // (1234) sem ambiguidade: o papel é que decide qual acesso abrir.
+  if (papelPedido === 'cozinha') {
+    if (senha && comparaSegura(senha, senhaCozinha)) { valorCookie = valorSessaoCozinha(); papel = 'cozinha'; }
+  } else if (papelPedido === 'garcom') {
+    if (senha && comparaSegura(senha, senhaGarcom)) { valorCookie = valorSessaoGarcom(); papel = 'garcom'; }
+  } else if (papelPedido === 'dona' || !papelPedido) {
+    // 'dona' explícito, ou sem papel (compatibilidade): tenta dona e, se não for,
+    // ainda aceita cozinha pela senha (não quebra quem já usava só a senha).
+    if (senha && comparaSegura(senha, senhaDona)) { valorCookie = valorSessaoValida(); papel = 'dona'; }
+    else if (!papelPedido && senha && comparaSegura(senha, senhaCozinha)) { valorCookie = valorSessaoCozinha(); papel = 'cozinha'; }
+  }
 
   if (!valorCookie) {
     return NextResponse.json({ ok: false, erro: 'Senha incorreta.' }, { status: 401 });
