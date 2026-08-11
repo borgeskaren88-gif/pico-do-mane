@@ -281,27 +281,31 @@ export default function Comandas({ papel = 'dona' }) {
       {erro && <div style={{ fontSize: 13, color: C.red, marginBottom: 10 }}>{erro}</div>}
 
       {!carregado ? <Empty>Carregando…</Empty> : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(104px, 1fr))', gap: 10 }}>
           {numeros.map((m) => {
             const c = abertasPorMesa.get(m);
             const ocupada = !!c;
             const total = ocupada ? totalDe(c) : 0;
+            const escuroSobreAzul = 'rgba(6,16,31,0.62)';
             return (
               <button key={m} onClick={() => (ocupada ? setSelId(c.id) : tocarMesa(m))} disabled={busy}
                 style={{
-                  cursor: 'pointer', borderRadius: 14, padding: '12px 8px', minHeight: 84,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                  border: ocupada ? `1px solid ${C.accent}` : `1px solid ${C.line}`,
-                  background: ocupada ? C.accent : C.panel2,
+                  cursor: 'pointer', borderRadius: 18, padding: ocupada ? '14px 10px 12px' : '16px 10px', minHeight: 104,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                  border: ocupada ? 'none' : `1px solid color-mix(in srgb, ${C.accent} 16%, ${C.panel})`,
+                  background: ocupada ? C.accent : `color-mix(in srgb, ${C.accent} 7%, ${C.panel})`,
+                  boxShadow: ocupada ? C.cardShadow : 'none',
                   color: ocupada ? '#06101F' : C.text,
+                  transition: 'transform .08s ease',
                 }}>
-                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ocupada ? 'rgba(6,16,31,0.65)' : C.faint }}>
-                  {ocupada ? 'Ocupada' : 'Abrir'}
+                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: ocupada ? escuroSobreAzul : C.faint }}>
+                  {ocupada ? 'Ocupada' : 'Livre'}
                 </span>
-                <span style={{ fontSize: 26, fontWeight: 900, lineHeight: 1 }}>{m}</span>
-                {ocupada && c.nome && <span style={{ fontSize: 11, fontWeight: 700, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>}
-                {ocupada && <span style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</span>}
-                {ocupada && c.pessoas > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(6,16,31,0.65)' }}>{c.pessoas} pessoa{c.pessoas === 1 ? '' : 's'}</span>}
+                <span style={{ fontSize: 21, fontWeight: 800, lineHeight: 1, color: ocupada ? '#06101F' : C.accent }}>{m}</span>
+                {!ocupada && <span style={{ fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '.02em' }}>toque p/ abrir</span>}
+                {ocupada && c.nome && <span style={{ fontSize: 11, fontWeight: 600, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: escuroSobreAzul }}>{c.nome}</span>}
+                {ocupada && <span style={{ fontSize: 14, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</span>}
+                {ocupada && c.pessoas > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: escuroSobreAzul }}>{c.pessoas} pessoa{c.pessoas === 1 ? '' : 's'}</span>}
               </button>
             );
           })}
