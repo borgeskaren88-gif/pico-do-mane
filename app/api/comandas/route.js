@@ -176,10 +176,13 @@ export async function POST(request) {
       const soma = Math.round(pags.reduce((s, x) => s + x.valor, 0) * 100) / 100;
       if (Math.abs(soma - total) > 0.05) return NextResponse.json({ ok: false, erro: 'A soma das formas de pagamento não bate com o total.' }, { status: 400 });
       const fiado = Math.round(pags.filter((x) => x.forma === 'Fiado').reduce((s, x) => s + x.valor, 0) * 100) / 100;
+      // Liga a venda ao caixa aberto (se houver), pro fechamento do caixa somar.
+      const { data: caixaRows } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
+      const caixaAberto = (caixaRows || []).map((r) => r.valor).find((x) => x && x.aberto);
       const venda = {
         id: uid(), data: hojeBrasil(), mesa: c.mesa, total, pessoas,
         pagamentos: pags, pagamento: pags.length === 1 ? pags[0].forma : 'Dividido', fiado,
-        nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens,
+        nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens, caixaId: caixaAberto ? caixaAberto.id : null,
         // Só fica "não pago" (na lista de fiados) o que ficou no fiado.
         pago: fiado <= 0.005, fechadaEm: new Date().toISOString(), fechadaPor: p,
       };
