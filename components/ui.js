@@ -55,9 +55,9 @@ export function Label({ children }) {
   );
 }
 
-export function TextInput({ value, onChange, placeholder, type = 'text' }) {
+export function TextInput({ value, onChange, placeholder, type = 'text', inputMode }) {
   return (
-    <input type={type} value={value} placeholder={placeholder}
+    <input type={type} value={value} placeholder={placeholder} inputMode={inputMode}
       onChange={(e) => onChange(e.target.value)} style={inputStyle} />
   );
 }
