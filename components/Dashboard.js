@@ -19,6 +19,7 @@ import Relatorios from './Relatorios';
 import Backup from './Backup';
 import Cardapio from './Cardapio';
 import Comandas from './Comandas';
+import Caixa from './Caixa';
 import Fiados from './Fiados';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
@@ -277,7 +278,7 @@ export default function Dashboard() {
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
     ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
-    ['comandas', 'Comandas'], ['cardapio', 'Cardápio'], ['fiados', 'Fiados'],
+    ['comandas', 'Comandas'], ['caixa', 'Caixa'], ['cardapio', 'Cardápio'], ['fiados', 'Fiados'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
 
@@ -405,6 +406,7 @@ export default function Dashboard() {
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'comandas' && <Comandas papel="dona" />}
+        {tab === 'caixa' && <Caixa />}
         {tab === 'fiados' && <Fiados onMudou={carregarVendas} />}
         {tab === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} />}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitasComVendas} />}
