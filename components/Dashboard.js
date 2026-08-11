@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, LogoMark, pageBg } from './ui';
-import { ymOf, todayISO, limparNome } from '../lib/util';
+import { ymOf, todayISO, limparNome, fiadoDaVenda } from '../lib/util';
 import SEED_DATA from '../data/seed.json';
 
 import Hoje from './Hoje';
@@ -138,20 +138,24 @@ export default function Dashboard() {
   useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'fiados'].includes(tab)) carregarVendas(); }, [tab]);
 
   // Receita total = o que a dona lançou + as vendas do salão RECEBIDAS (só
-  // leitura). Fiado em aberto NÃO conta no caixa; quando a dona marca "Recebi",
-  // passa a contar na data do recebimento.
+  // leitura). A parte recebida na hora entra no dia da venda; a parte no fiado
+  // só entra quando a dona marca "Recebi" (na data do recebimento).
   const receitasComVendas = useMemo(() => {
-    const doSalao = vendas
-      .filter((v) => v.pagamento !== 'Fiado' || v.pago)
-      .map((v) => ({
-        id: v.id, data: (v.pagamento === 'Fiado' && v.pagoEm) ? v.pagoEm : v.data,
-        valor: (Number(v.total) || 0).toFixed(2).replace('.', ','),
-        categoria: 'Venda do salão', forma: v.pagamento || '', origem: 'comanda',
-        descricao: `Mesa ${v.mesa}`, obs: `Comanda · ${v.pagamento || ''}`,
-      }));
+    const doSalao = [];
+    for (const v of vendas) {
+      const total = Number(v.total) || 0;
+      const fiado = fiadoDaVenda(v);
+      const recebidoNaHora = total - fiado; // dinheiro/pix/cartão pagos no fechamento
+      if (recebidoNaHora > 0.005) {
+        doSalao.push({ id: v.id + '-r', data: v.data, valor: recebidoNaHora.toFixed(2).replace('.', ','), categoria: 'Venda do salão', origem: 'comanda', descricao: `Mesa ${v.mesa}`, obs: `Comanda · ${v.pagamento || ''}` });
+      }
+      if (fiado > 0.005 && v.pago) {
+        doSalao.push({ id: v.id + '-f', data: v.pagoEm || v.data, valor: fiado.toFixed(2).replace('.', ','), categoria: 'Venda do salão', origem: 'comanda', descricao: `Mesa ${v.mesa}`, obs: 'Fiado recebido' });
+      }
+    }
     return [...receitas, ...doSalao];
   }, [receitas, vendas]);
-  const fiadosAbertos = vendas.filter((v) => v.pagamento === 'Fiado' && !v.pago).length;
+  const fiadosAbertos = vendas.filter((v) => fiadoDaVenda(v) > 0.005 && !v.pago).length;
 
   const salvarTudo = (parcial) => {
     const dados = {

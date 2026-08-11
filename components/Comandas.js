@@ -1,9 +1,10 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { C, Card, Btn, Field, TextInput, Empty, PageTitle } from './ui';
+import { C, Card, Btn, Field, TextInput, NumInput, Empty, PageTitle } from './ui';
 import { brl, num } from '../lib/util';
 
 const CATS = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Outros'];
+const FORMAS_PAG = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Fiado'];
 
 export default function Comandas({ papel = 'dona' }) {
   const [comandas, setComandas] = useState([]);
@@ -86,7 +87,8 @@ export default function Comandas({ papel = 'dona' }) {
     setSelId(null);
   };
   const confirmarFechar = async () => {
-    const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamento: fecharForm.pagamento, pessoas: fecharForm.pessoas, nome: fecharForm.nome || '' }) });
+    const pagamentos = FORMAS_PAG.map((f) => ({ forma: f, valor: num(fecharForm.valores[f] || '') })).filter((x) => x.valor > 0);
+    const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: fecharForm.nome || '' }) });
     const j = await r.json();
     if (!j.ok) { setErro(j.erro || 'Não consegui fechar.'); return; }
     setFecharForm(null);
@@ -246,38 +248,47 @@ export default function Comandas({ papel = 'dona' }) {
         </div>
 
         {total > 0 && (
-          fecharForm ? (
-            <Card style={{ marginBottom: 14, padding: 14, borderColor: C.green }}>
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>Fechar conta — {brl(total)}</div>
-              <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>Forma de pagamento</div>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-                {['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Fiado'].map((f) => (
-                  <button key={f} onClick={() => setFecharForm((s) => ({ ...s, pagamento: f }))}
-                    style={{ flex: '1 1 90px', cursor: 'pointer', borderRadius: 10, padding: '10px 8px', fontSize: 14, fontWeight: 700,
-                      border: `1px solid ${fecharForm.pagamento === f ? C.accent : C.line}`, background: fecharForm.pagamento === f ? C.accent : 'transparent', color: fecharForm.pagamento === f ? '#06101F' : C.muted }}>{f}</button>
+          fecharForm ? (() => {
+            const soma = FORMAS_PAG.reduce((s, f) => s + num(fecharForm.valores[f] || ''), 0);
+            const falta = Math.round((total - soma) * 100) / 100;
+            const fiadoVal = num(fecharForm.valores['Fiado'] || '');
+            const confere = Math.abs(falta) <= 0.005;
+            const setVal = (f) => (v) => setFecharForm((s) => ({ ...s, valores: { ...s.valores, [f]: v } }));
+            const preencherResto = (f) => {
+              const outros = FORMAS_PAG.filter((x) => x !== f).reduce((s, x) => s + num(fecharForm.valores[x] || ''), 0);
+              const resto = Math.round((total - outros) * 100) / 100;
+              setFecharForm((s) => ({ ...s, valores: { ...s.valores, [f]: resto > 0 ? resto.toFixed(2).replace('.', ',') : '' } }));
+            };
+            return (
+              <Card style={{ marginBottom: 14, padding: 14, borderColor: C.green }}>
+                <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Fechar conta — {brl(total)}</div>
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Quanto entrou em cada forma? Dá pra dividir. Use “resto” pra completar.</div>
+                {FORMAS_PAG.map((f) => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{ width: 82, flexShrink: 0, fontSize: 13, fontWeight: 700, color: f === 'Fiado' ? C.amber : C.text }}>{f}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}><NumInput value={fecharForm.valores[f] || ''} onChange={setVal(f)} /></div>
+                    <button onClick={() => preencherResto(f)} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 8, padding: '7px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>resto</button>
+                  </div>
                 ))}
-              </div>
-              {fecharForm.pagamento === 'Fiado' && (
-                <div style={{ marginBottom: 12 }}>
-                  <Field label="Quem ficou devendo?"><TextInput value={fecharForm.nome} onChange={(v) => setFecharForm((s) => ({ ...s, nome: v }))} placeholder="Nome do cliente" /></Field>
-                  <div style={{ fontSize: 11, color: C.amber, marginTop: -4 }}>Vai pra lista de Fiados. Não entra no caixa até você marcar “Recebi”.</div>
+                <div style={{ fontSize: 13, marginTop: 4, marginBottom: fiadoVal > 0 ? 10 : 6, fontWeight: 700, color: confere ? C.green : C.amber }}>
+                  {confere ? 'Confere!' : falta > 0 ? `Falta ${brl(falta)}` : `Passou ${brl(-falta)}`}
+                  <span style={{ color: C.faint, fontWeight: 500 }}> · somado {brl(soma)} de {brl(total)}</span>
                 </div>
-              )}
-              <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>Dividir por quantas pessoas?</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                <button onClick={() => setFecharForm((s) => ({ ...s, pessoas: Math.max(1, s.pessoas - 1) }))} style={estBtn}>–</button>
-                <span style={{ fontSize: 20, fontWeight: 900, minWidth: 26, textAlign: 'center' }}>{fecharForm.pessoas}</span>
-                <button onClick={() => setFecharForm((s) => ({ ...s, pessoas: s.pessoas + 1 }))} style={estBtn}>+</button>
-                {fecharForm.pessoas > 1 && <span style={{ fontSize: 14, color: C.text }}><b style={{ color: C.green }}>{brl(total / fecharForm.pessoas)}</b> <span style={{ color: C.faint }}>por pessoa</span></span>}
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                <Btn kind="ok" onClick={confirmarFechar} disabled={busy}>Confirmar e receber</Btn>
-                <Btn kind="ghost" onClick={() => setFecharForm(null)}>Voltar</Btn>
-              </div>
-            </Card>
-          ) : (
+                {fiadoVal > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <Field label="Quem ficou devendo?"><TextInput value={fecharForm.nome} onChange={(v) => setFecharForm((s) => ({ ...s, nome: v }))} placeholder="Nome do cliente" /></Field>
+                    <div style={{ fontSize: 11, color: C.amber, marginTop: -4 }}>{brl(fiadoVal)} vai pra lista de Fiados (não entra no caixa até você marcar “Recebi”).</div>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <Btn kind="ok" onClick={confirmarFechar} disabled={busy || !confere}>Confirmar</Btn>
+                  <Btn kind="ghost" onClick={() => setFecharForm(null)}>Voltar</Btn>
+                </div>
+              </Card>
+            );
+          })() : (
             <div style={{ marginBottom: 14 }}>
-              <Btn kind="ok" onClick={() => setFecharForm({ pagamento: 'Dinheiro', pessoas: sel.pessoas > 0 ? sel.pessoas : 1, nome: sel.nome || '' })}>Fechar conta · {brl(total)}</Btn>
+              <Btn kind="ok" onClick={() => setFecharForm({ valores: {}, nome: sel.nome || '', pessoas: sel.pessoas > 0 ? sel.pessoas : 1 })}>Fechar conta · {brl(total)}</Btn>
             </div>
           )
         )}

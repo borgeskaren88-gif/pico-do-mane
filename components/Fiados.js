@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, KPI, Empty, SecTitle, PageTitle } from './ui';
-import { brl, fmtDate } from '../lib/util';
+import { brl, fmtDate, fiadoDaVenda } from '../lib/util';
 
 export default function Fiados({ onMudou }) {
   const [vendas, setVendas] = useState([]);
@@ -35,10 +35,10 @@ export default function Fiados({ onMudou }) {
   const receber = (id) => acao({ acao: 'receber', id });
   const excluir = (id) => { if (typeof window !== 'undefined' && !window.confirm('Excluir este fiado? Não vai mais aparecer nem contar em lugar nenhum.')) return; acao({ acao: 'excluir', id }); };
 
-  const fiados = vendas.filter((v) => v.pagamento === 'Fiado');
+  const fiados = vendas.filter((v) => fiadoDaVenda(v) > 0.005);
   const abertos = fiados.filter((v) => !v.pago).sort((a, b) => (a.fechadaEm || '').localeCompare(b.fechadaEm || ''));
   const pagos = fiados.filter((v) => v.pago).sort((a, b) => (b.pagoEm || '').localeCompare(a.pagoEm || ''));
-  const totalDevido = abertos.reduce((s, v) => s + (Number(v.total) || 0), 0);
+  const totalDevido = abertos.reduce((s, v) => s + fiadoDaVenda(v), 0);
   const rotulo = (v) => (v.nome && v.nome.trim()) || `Mesa ${v.mesa}`;
 
   return (
@@ -58,9 +58,9 @@ export default function Fiados({ onMudou }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{rotulo(v)}</div>
-                    <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Mesa {v.mesa} · {fmtDate(v.data)}</div>
+                    <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Mesa {v.mesa} · {fmtDate(v.data)}{fiadoDaVenda(v) < (Number(v.total) || 0) - 0.005 ? ` · parte de ${brl(Number(v.total) || 0)}` : ''}</div>
                   </div>
-                  <div style={{ fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(Number(v.total) || 0)}</div>
+                  <div style={{ fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(fiadoDaVenda(v))}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 10 }}>
                   <Btn kind="ok" small onClick={() => receber(v.id)} disabled={busy}>Recebi</Btn>
@@ -84,7 +84,7 @@ export default function Fiados({ onMudou }) {
                       <div style={{ fontSize: 14, fontWeight: 600, color: C.faint }}>{rotulo(v)}</div>
                       <div style={{ fontSize: 12, color: C.faint }}>Recebido {v.pagoEm ? fmtDate(v.pagoEm) : ''}</div>
                     </div>
-                    <div style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(Number(v.total) || 0)}</div>
+                    <div style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(fiadoDaVenda(v))}</div>
                   </div>
                 </Card>
               ))}
