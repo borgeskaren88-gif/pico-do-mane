@@ -66,6 +66,22 @@ html, body {
 
 @keyframes pdm-spin { to { transform: rotate(360deg); } }
 
+/* Tela de adicionar produtos: categorias em abas. No celular as abas rolam
+   na horizontal em cima; no tablet/computador viram uma lista na lateral. */
+.picker-layout { display: flex; flex-direction: column; gap: 12px; }
+.picker-cats { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.picker-cats::-webkit-scrollbar { height: 5px; }
+.picker-cats::-webkit-scrollbar-thumb { background: var(--c-line); border-radius: 999px; }
+.picker-produtos { min-width: 0; }
+.picker-cat-chip { flex: 0 0 auto; white-space: nowrap; cursor: pointer; border-radius: 999px; padding: 9px 15px; font-size: 13px; font-weight: 700; border: 1px solid var(--c-line); background: transparent; color: var(--c-muted); }
+.picker-cat-chip.on { background: var(--c-accent); color: #06101F; border-color: var(--c-accent); }
+@media (min-width: 620px) {
+  .picker-layout { flex-direction: row; align-items: flex-start; }
+  .picker-cats { flex-direction: column; overflow-x: visible; flex: 0 0 176px; gap: 4px; padding-bottom: 0; position: sticky; top: 72px; }
+  .picker-cat-chip { width: 100%; text-align: left; border-radius: 10px; }
+  .picker-produtos { flex: 1; }
+}
+
 /* Agenda (vista Mês): em tela larga a lista de compromissos do dia rola sozinha,
    mantendo o calendário do lado sempre visível. No celular ela flui normal. */
 @media (min-width: 640px) {

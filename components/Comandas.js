@@ -18,6 +18,7 @@ export default function Comandas({ papel = 'dona' }) {
   const [fecharForm, setFecharForm] = useState(null); // { pagamento, pessoas } quando fechando
   const [busca, setBusca] = useState('');
   const [picker, setPicker] = useState(false); // tela de adicionar produtos (carrinho)
+  const [catSel, setCatSel] = useState(null); // categoria escolhida na tela de adicionar
   const [info, setInfo] = useState({ nome: '', pessoas: '', obs: '' });
   const infoDe = useRef(null); // id da comanda cujo info está carregado
   const editandoRef = useRef(false);
@@ -124,11 +125,29 @@ export default function Comandas({ papel = 'dona' }) {
   if (sel && picker) {
     const total = totalDe(sel);
     const termoBusca = busca.trim().toLowerCase();
-    const gruposFiltrados = cardapioGrupos
-      .map((g) => ({ ...g, itens: g.itens.filter((it) => (it.nome || '').toLowerCase().includes(termoBusca)) }))
-      .filter((g) => g.itens.length > 0);
     const qtdNaComanda = (cardapioId) => (sel.itens.find((it) => it.cardapioId === cardapioId)?.qtd) || 0;
     const nItens = (sel.itens || []).reduce((s, it) => s + (Number(it.qtd) || 0), 0);
+    const categorias = cardapioGrupos.map((g) => g.cat);
+    const catAtiva = catSel && categorias.includes(catSel) ? catSel : categorias[0];
+    // Com busca, mostra todos os itens que batem (ignora a categoria). Sem busca,
+    // mostra só os da categoria escolhida na aba.
+    const itensMostrar = termoBusca
+      ? cardapioGrupos.flatMap((g) => g.itens).filter((it) => (it.nome || '').toLowerCase().includes(termoBusca))
+      : (cardapioGrupos.find((g) => g.cat === catAtiva)?.itens || []);
+
+    const linhaProduto = (it) => {
+      const q = qtdNaComanda(it.id);
+      return (
+        <button key={it.id} onClick={() => addItem(it.id)} disabled={busy}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+          <span style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: C.accent, color: '#fff', fontSize: 20, fontWeight: 800, lineHeight: '26px', textAlign: 'center' }}>+</span>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{it.nome}</span>
+          {q > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: '#06101F', background: C.green, borderRadius: 999, padding: '2px 8px' }}>{q} na mesa</span>}
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(num(it.preco))}</span>
+        </button>
+      );
+    };
+
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -139,25 +158,26 @@ export default function Comandas({ papel = 'dona' }) {
         {cardapio.length > 0 && (
           <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar produto…" /></div>
         )}
-        {cardapio.length === 0 ? <Empty>Cardápio vazio. Cadastre os itens na aba Cardápio.</Empty> :
-          gruposFiltrados.length === 0 ? <Empty>Nenhum produto com esse nome.</Empty> :
-          gruposFiltrados.map((g) => (
-            <Card key={g.cat} style={{ marginBottom: 10, padding: 14 }}>
-              <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 4, color: C.accent }}>{g.cat}</div>
-              {g.itens.map((it) => {
-                const q = qtdNaComanda(it.id);
-                return (
-                  <button key={it.id} onClick={() => addItem(it.id)} disabled={busy}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                    <span style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: C.accent, color: '#fff', fontSize: 20, fontWeight: 800, lineHeight: '26px', textAlign: 'center' }}>+</span>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{it.nome}</span>
-                    {q > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: '#06101F', background: C.green, borderRadius: 999, padding: '2px 8px' }}>{q} na mesa</span>}
-                    <span style={{ fontSize: 13, fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(num(it.preco))}</span>
-                  </button>
-                );
-              })}
-            </Card>
-          ))}
+
+        {cardapio.length === 0 ? <Empty>Cardápio vazio. Cadastre os itens na aba Cardápio.</Empty> : (
+          <div className="picker-layout">
+            {!termoBusca && (
+              <div className="picker-cats">
+                {categorias.map((cat) => (
+                  <button key={cat} className={`picker-cat-chip${cat === catAtiva ? ' on' : ''}`} onClick={() => setCatSel(cat)}>{cat}</button>
+                ))}
+              </div>
+            )}
+            <div className="picker-produtos">
+              {itensMostrar.length === 0 ? <Empty>Nenhum produto{termoBusca ? ' com esse nome' : ' nesta categoria'}.</Empty> : (
+                <Card style={{ padding: 14 }}>
+                  {termoBusca && <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 4, color: C.accent }}>Resultados</div>}
+                  {itensMostrar.map((it) => linhaProduto(it))}
+                </Card>
+              )}
+            </div>
+          </div>
+        )}
 
         <div style={{ position: 'sticky', bottom: 12, marginTop: 14 }}>
           <button onClick={() => { setPicker(false); setBusca(''); }}
@@ -222,7 +242,7 @@ export default function Comandas({ papel = 'dona' }) {
         </Card>
 
         <div style={{ marginBottom: 14 }}>
-          <Btn onClick={() => { setBusca(''); setPicker(true); }}>+ Adicionar produtos</Btn>
+          <Btn onClick={() => { setBusca(''); setCatSel(null); setPicker(true); }}>+ Adicionar produtos</Btn>
         </div>
 
         {total > 0 && (
