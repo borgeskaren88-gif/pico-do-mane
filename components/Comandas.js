@@ -251,7 +251,7 @@ export default function Comandas({ papel = 'dona' }) {
               <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>Fechar conta — {brl(total)}</div>
               <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>Forma de pagamento</div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-                {['Dinheiro', 'Pix', 'Cartão'].map((f) => (
+                {['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Fiado'].map((f) => (
                   <button key={f} onClick={() => setFecharForm((s) => ({ ...s, pagamento: f }))}
                     style={{ flex: '1 1 90px', cursor: 'pointer', borderRadius: 10, padding: '10px 8px', fontSize: 14, fontWeight: 700,
                       border: `1px solid ${fecharForm.pagamento === f ? C.accent : C.line}`, background: fecharForm.pagamento === f ? C.accent : 'transparent', color: fecharForm.pagamento === f ? '#06101F' : C.muted }}>{f}</button>
