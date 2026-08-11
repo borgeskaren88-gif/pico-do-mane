@@ -17,6 +17,8 @@ function papel() {
 const txt = (v, max) => String(v == null ? '' : v).slice(0, max).trim();
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const chaveDe = (id) => PREFIXO + id;
+// Data de hoje no fuso do Brasil (senão à noite o UTC vira o dia seguinte).
+const hojeBrasil = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
 async function lerPainel(sb) {
   const { data } = await sb.from('pdm_dados').select('valor').eq('chave', PAINEL).maybeSingle();
@@ -141,6 +143,29 @@ export async function POST(request) {
       c.itens = c.itens.filter((it) => it.id !== itemId);
       await gravarComanda(sb, c);
       return NextResponse.json({ ok: true, comanda: c });
+    }
+
+    // Fechar a conta: vira uma "venda do salão" (registro próprio, chave
+    // venda:<id>) e libera a mesa. A venda é somada como receita no financeiro
+    // da dona, sem entrar na lista que ela digita à mão (não tem risco de um
+    // salvamento apagar o outro).
+    if (acao === 'fechar') {
+      const total = totalDe(c);
+      if (total <= 0) return NextResponse.json({ ok: false, erro: 'Comanda sem consumo. Use cancelar.' }, { status: 400 });
+      const forma = txt(body?.pagamento, 20) || 'Dinheiro';
+      const pessoas = Math.max(1, Math.floor(Number(body?.pessoas) || 1));
+      const venda = {
+        id: uid(), data: hojeBrasil(), mesa: c.mesa, total, pagamento: forma, pessoas,
+        itens: c.itens, fechadaEm: new Date().toISOString(), fechadaPor: p,
+      };
+      const { error: eV } = await sb.from('pdm_dados').upsert(
+        { chave: 'venda:' + venda.id, valor: venda, atualizado_em: new Date().toISOString() },
+        { onConflict: 'chave' }
+      );
+      if (eV) throw eV;
+      const { error: eD } = await sb.from('pdm_dados').delete().eq('chave', chaveDe(id));
+      if (eD) throw eD;
+      return NextResponse.json({ ok: true, venda });
     }
 
     // Cancelar (fechar sem virar receita) — só a dona pode, pra o garçom não

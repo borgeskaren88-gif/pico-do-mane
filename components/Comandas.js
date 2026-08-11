@@ -15,6 +15,7 @@ export default function Comandas({ papel = 'dona' }) {
   const [busy, setBusy] = useState(false);
   const [configAberto, setConfigAberto] = useState(false);
   const [mesasInput, setMesasInput] = useState('');
+  const [fecharForm, setFecharForm] = useState(null); // { pagamento, pessoas } quando fechando
   const editandoRef = useRef(false);
 
   const carregar = useCallback(async () => {
@@ -79,6 +80,14 @@ export default function Comandas({ papel = 'dona' }) {
     await acao({ acao: 'cancelar', comandaId: id }, { manterSel: false });
     setSelId(null);
   };
+  const confirmarFechar = async () => {
+    const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamento: fecharForm.pagamento, pessoas: fecharForm.pessoas }) });
+    const j = await r.json();
+    if (!j.ok) { setErro(j.erro || 'Não consegui fechar.'); return; }
+    setFecharForm(null);
+    setSelId(null);
+    await carregar();
+  };
 
   const totalDe = (c) => (c.itens || []).reduce((s, it) => s + (Number(it.qtd) || 0) * (Number(it.preco) || 0), 0);
   const sel = comandas.find((c) => c.id === selId) || null;
@@ -124,6 +133,37 @@ export default function Comandas({ papel = 'dona' }) {
             <span style={{ fontSize: 22, fontWeight: 900, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</span>
           </div>
         </Card>
+
+        {total > 0 && (
+          fecharForm ? (
+            <Card style={{ marginBottom: 14, padding: 14, borderColor: C.green }}>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>Fechar conta — {brl(total)}</div>
+              <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>Forma de pagamento</div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+                {['Dinheiro', 'Pix', 'Cartão'].map((f) => (
+                  <button key={f} onClick={() => setFecharForm((s) => ({ ...s, pagamento: f }))}
+                    style={{ flex: '1 1 90px', cursor: 'pointer', borderRadius: 10, padding: '10px 8px', fontSize: 14, fontWeight: 700,
+                      border: `1px solid ${fecharForm.pagamento === f ? C.accent : C.line}`, background: fecharForm.pagamento === f ? C.accent : 'transparent', color: fecharForm.pagamento === f ? '#06101F' : C.muted }}>{f}</button>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>Dividir por quantas pessoas?</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+                <button onClick={() => setFecharForm((s) => ({ ...s, pessoas: Math.max(1, s.pessoas - 1) }))} style={estBtn}>–</button>
+                <span style={{ fontSize: 20, fontWeight: 900, minWidth: 26, textAlign: 'center' }}>{fecharForm.pessoas}</span>
+                <button onClick={() => setFecharForm((s) => ({ ...s, pessoas: s.pessoas + 1 }))} style={estBtn}>+</button>
+                {fecharForm.pessoas > 1 && <span style={{ fontSize: 14, color: C.text }}><b style={{ color: C.green }}>{brl(total / fecharForm.pessoas)}</b> <span style={{ color: C.faint }}>por pessoa</span></span>}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <Btn kind="ok" onClick={confirmarFechar} disabled={busy}>Confirmar e receber</Btn>
+                <Btn kind="ghost" onClick={() => setFecharForm(null)}>Voltar</Btn>
+              </div>
+            </Card>
+          ) : (
+            <div style={{ marginBottom: 14 }}>
+              <Btn kind="ok" onClick={() => setFecharForm({ pagamento: 'Dinheiro', pessoas: 1 })}>Fechar conta · {brl(total)}</Btn>
+            </div>
+          )
+        )}
 
         <SecTitle>Cardápio</SecTitle>
         {cardapio.length === 0 ? <Empty>Cardápio vazio. Cadastre os itens na aba Cardápio.</Empty> :
