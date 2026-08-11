@@ -18,6 +18,7 @@ import Cotacoes from './Cotacoes';
 import Relatorios from './Relatorios';
 import Backup from './Backup';
 import Cardapio from './Cardapio';
+import Comandas from './Comandas';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 
@@ -245,7 +246,7 @@ export default function Dashboard() {
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
     ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
-    ['cardapio', 'Cardápio'],
+    ['comandas', 'Comandas'], ['cardapio', 'Cardápio'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
 
@@ -372,6 +373,7 @@ export default function Dashboard() {
         )}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
+        {tab === 'comandas' && <Comandas papel="dona" />}
         {tab === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} />}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
