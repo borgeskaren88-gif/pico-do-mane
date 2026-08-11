@@ -19,6 +19,7 @@ import Relatorios from './Relatorios';
 import Backup from './Backup';
 import Cardapio from './Cardapio';
 import Comandas from './Comandas';
+import Fiados from './Fiados';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 
@@ -134,17 +135,23 @@ export default function Dashboard() {
     try { const r = await fetch('/api/vendas', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setVendas(Array.isArray(j.vendas) ? j.vendas : []); } catch { /* ignora */ }
   };
   useEffect(() => { carregarVendas(); }, []);
-  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas'].includes(tab)) carregarVendas(); }, [tab]);
+  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'fiados'].includes(tab)) carregarVendas(); }, [tab]);
 
-  // Receita total = o que a dona lançou + as vendas do salão (só leitura).
+  // Receita total = o que a dona lançou + as vendas do salão RECEBIDAS (só
+  // leitura). Fiado em aberto NÃO conta no caixa; quando a dona marca "Recebi",
+  // passa a contar na data do recebimento.
   const receitasComVendas = useMemo(() => {
-    const doSalao = vendas.map((v) => ({
-      id: v.id, data: v.data, valor: (Number(v.total) || 0).toFixed(2).replace('.', ','),
-      categoria: 'Venda do salão', forma: v.pagamento || '', origem: 'comanda',
-      descricao: `Mesa ${v.mesa}`, obs: `Comanda · ${v.pagamento || ''}`,
-    }));
+    const doSalao = vendas
+      .filter((v) => v.pagamento !== 'Fiado' || v.pago)
+      .map((v) => ({
+        id: v.id, data: (v.pagamento === 'Fiado' && v.pagoEm) ? v.pagoEm : v.data,
+        valor: (Number(v.total) || 0).toFixed(2).replace('.', ','),
+        categoria: 'Venda do salão', forma: v.pagamento || '', origem: 'comanda',
+        descricao: `Mesa ${v.mesa}`, obs: `Comanda · ${v.pagamento || ''}`,
+      }));
     return [...receitas, ...doSalao];
   }, [receitas, vendas]);
+  const fiadosAbertos = vendas.filter((v) => v.pagamento === 'Fiado' && !v.pago).length;
 
   const salvarTudo = (parcial) => {
     const dados = {
@@ -266,14 +273,14 @@ export default function Dashboard() {
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
     ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
-    ['comandas', 'Comandas'], ['cardapio', 'Cardápio'],
+    ['comandas', 'Comandas'], ['cardapio', 'Cardápio'], ['fiados', 'Fiados'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
 
   // Selo do Diário: tarefas com data até hoje ainda não feitas.
   const hojeIso = todayISO();
   const tarefasAlerta = tarefas.filter((t) => !t.feito && t.data && t.data <= hojeIso).length;
-  const badges = { diario: tarefasAlerta };
+  const badges = { diario: tarefasAlerta, fiados: fiadosAbertos };
 
   // Navegação por gesto: deslizar o dedo para o lado troca de aba.
   const toqueRef = useRef(null);
@@ -394,6 +401,7 @@ export default function Dashboard() {
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'comandas' && <Comandas papel="dona" />}
+        {tab === 'fiados' && <Fiados onMudou={carregarVendas} />}
         {tab === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} />}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitasComVendas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitasComVendas} despesas={despesas} mes={mes} setMes={setMes} />}
