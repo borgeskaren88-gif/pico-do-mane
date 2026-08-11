@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { C, Card, Btn, Field, TextInput, Empty, SecTitle, PageTitle } from './ui';
+import { C, Card, Btn, Field, TextInput, Empty, PageTitle } from './ui';
 import { brl, num } from '../lib/util';
 
 const CATS = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Outros'];
@@ -17,6 +17,7 @@ export default function Comandas({ papel = 'dona' }) {
   const [mesasInput, setMesasInput] = useState('');
   const [fecharForm, setFecharForm] = useState(null); // { pagamento, pessoas } quando fechando
   const [busca, setBusca] = useState('');
+  const [picker, setPicker] = useState(false); // tela de adicionar produtos (carrinho)
   const [info, setInfo] = useState({ nome: '', pessoas: '', obs: '' });
   const infoDe = useRef(null); // id da comanda cujo info está carregado
   const editandoRef = useRef(false);
@@ -100,7 +101,7 @@ export default function Comandas({ papel = 'dona' }) {
     if (sel && infoDe.current !== sel.id) {
       infoDe.current = sel.id;
       setInfo({ nome: sel.nome || '', pessoas: sel.pessoas > 0 ? String(sel.pessoas) : '', obs: sel.obs || '' });
-      setBusca(''); setFecharForm(null);
+      setBusca(''); setFecharForm(null); setPicker(false);
     }
     if (!sel) { infoDe.current = null; }
   }, [sel]);
@@ -119,13 +120,59 @@ export default function Comandas({ papel = 'dona' }) {
       .map(([cat, itens]) => ({ cat: cat || 'Outros', itens: itens.sort((x, y) => (x.nome || '').localeCompare(y.nome || '')) }));
   }, [cardapio]);
 
-  // ---- Detalhe de uma comanda ----
-  if (sel) {
+  // ---- Tela de adicionar produtos (carrinho) ----
+  if (sel && picker) {
     const total = totalDe(sel);
     const termoBusca = busca.trim().toLowerCase();
     const gruposFiltrados = cardapioGrupos
       .map((g) => ({ ...g, itens: g.itens.filter((it) => (it.nome || '').toLowerCase().includes(termoBusca)) }))
       .filter((g) => g.itens.length > 0);
+    const qtdNaComanda = (cardapioId) => (sel.itens.find((it) => it.cardapioId === cardapioId)?.qtd) || 0;
+    const nItens = (sel.itens || []).reduce((s, it) => s + (Number(it.qtd) || 0), 0);
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <button onClick={() => { setPicker(false); setBusca(''); }} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>‹ Voltar</button>
+          <div style={{ fontSize: 18, fontWeight: 900 }}>Adicionar · Mesa {sel.mesa}</div>
+        </div>
+
+        {cardapio.length > 0 && (
+          <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar produto…" /></div>
+        )}
+        {cardapio.length === 0 ? <Empty>Cardápio vazio. Cadastre os itens na aba Cardápio.</Empty> :
+          gruposFiltrados.length === 0 ? <Empty>Nenhum produto com esse nome.</Empty> :
+          gruposFiltrados.map((g) => (
+            <Card key={g.cat} style={{ marginBottom: 10, padding: 14 }}>
+              <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 4, color: C.accent }}>{g.cat}</div>
+              {g.itens.map((it) => {
+                const q = qtdNaComanda(it.id);
+                return (
+                  <button key={it.id} onClick={() => addItem(it.id)} disabled={busy}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: C.accent, color: '#fff', fontSize: 20, fontWeight: 800, lineHeight: '26px', textAlign: 'center' }}>+</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{it.nome}</span>
+                    {q > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: '#06101F', background: C.green, borderRadius: 999, padding: '2px 8px' }}>{q} na mesa</span>}
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(num(it.preco))}</span>
+                  </button>
+                );
+              })}
+            </Card>
+          ))}
+
+        <div style={{ position: 'sticky', bottom: 12, marginTop: 14 }}>
+          <button onClick={() => { setPicker(false); setBusca(''); }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, cursor: 'pointer', border: 'none', borderRadius: 14, padding: '14px 18px', background: C.accent, color: '#06101F', boxShadow: C.cardShadow }}>
+            <span style={{ fontSize: 15, fontWeight: 800 }}>Concluir</span>
+            <span style={{ fontSize: 14, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{nItens} item{nItens === 1 ? '' : 's'} · {brl(total)}</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Detalhe de uma comanda (só o que foi pedido) ----
+  if (sel) {
+    const total = totalDe(sel);
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -152,7 +199,7 @@ export default function Comandas({ papel = 'dona' }) {
         </Card>
 
         <Card style={{ marginBottom: 14, padding: 14 }}>
-          {sel.itens.length === 0 ? <Empty>Nada lançado ainda.<br />Toque nos itens do cardápio abaixo.</Empty> :
+          {sel.itens.length === 0 ? <Empty>Nada lançado ainda.<br />Toque em “Adicionar produtos” abaixo.</Empty> :
             sel.itens.map((it) => (
               <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -173,6 +220,10 @@ export default function Comandas({ papel = 'dona' }) {
             <span style={{ fontSize: 22, fontWeight: 900, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</span>
           </div>
         </Card>
+
+        <div style={{ marginBottom: 14 }}>
+          <Btn onClick={() => { setBusca(''); setPicker(true); }}>+ Adicionar produtos</Btn>
+        </div>
 
         {total > 0 && (
           fecharForm ? (
@@ -204,26 +255,6 @@ export default function Comandas({ papel = 'dona' }) {
             </div>
           )
         )}
-
-        <SecTitle>Cardápio</SecTitle>
-        {cardapio.length > 0 && (
-          <div style={{ marginBottom: 10 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar produto…" /></div>
-        )}
-        {cardapio.length === 0 ? <Empty>Cardápio vazio. Cadastre os itens na aba Cardápio.</Empty> :
-          gruposFiltrados.length === 0 ? <Empty>Nenhum produto com esse nome.</Empty> :
-          gruposFiltrados.map((g) => (
-            <Card key={g.cat} style={{ marginBottom: 10, padding: 14 }}>
-              <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 4, color: C.accent }}>{g.cat}</div>
-              {g.itens.map((it) => (
-                <button key={it.id} onClick={() => addItem(it.id)} disabled={busy}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                  <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, background: C.accent, color: '#fff', fontSize: 18, fontWeight: 800, lineHeight: '24px', textAlign: 'center' }}>+</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{it.nome}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(num(it.preco))}</span>
-                </button>
-              ))}
-            </Card>
-          ))}
 
         {papel === 'dona' && (
           <div style={{ marginTop: 8 }}>
