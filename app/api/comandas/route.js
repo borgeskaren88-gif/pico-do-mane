@@ -145,6 +145,16 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, comanda: c });
     }
 
+    // Infos da mesa: nome do cliente, nº de pessoas, observação. Só grava o que
+    // vier no corpo (deixa o resto como estava).
+    if (acao === 'infos') {
+      if ('nome' in body) c.nome = txt(body?.nome, 60);
+      if ('obs' in body) c.obs = txt(body?.obs, 200);
+      if ('pessoas' in body) { const n = Math.floor(Number(body?.pessoas)); c.pessoas = n >= 1 && n <= 99 ? n : 0; }
+      await gravarComanda(sb, c);
+      return NextResponse.json({ ok: true, comanda: c });
+    }
+
     // Fechar a conta: vira uma "venda do salão" (registro próprio, chave
     // venda:<id>) e libera a mesa. A venda é somada como receita no financeiro
     // da dona, sem entrar na lista que ela digita à mão (não tem risco de um

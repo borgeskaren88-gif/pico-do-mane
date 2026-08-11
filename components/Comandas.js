@@ -16,6 +16,9 @@ export default function Comandas({ papel = 'dona' }) {
   const [configAberto, setConfigAberto] = useState(false);
   const [mesasInput, setMesasInput] = useState('');
   const [fecharForm, setFecharForm] = useState(null); // { pagamento, pessoas } quando fechando
+  const [busca, setBusca] = useState('');
+  const [info, setInfo] = useState({ nome: '', pessoas: '', obs: '' });
+  const infoDe = useRef(null); // id da comanda cujo info está carregado
   const editandoRef = useRef(false);
 
   const carregar = useCallback(async () => {
@@ -92,6 +95,21 @@ export default function Comandas({ papel = 'dona' }) {
   const totalDe = (c) => (c.itens || []).reduce((s, it) => s + (Number(it.qtd) || 0) * (Number(it.preco) || 0), 0);
   const sel = comandas.find((c) => c.id === selId) || null;
   useEffect(() => { editandoRef.current = !!selId; }, [selId]);
+  // Ao abrir uma comanda, carrega os campos de nome/pessoas/obs pra edição.
+  useEffect(() => {
+    if (sel && infoDe.current !== sel.id) {
+      infoDe.current = sel.id;
+      setInfo({ nome: sel.nome || '', pessoas: sel.pessoas > 0 ? String(sel.pessoas) : '', obs: sel.obs || '' });
+      setBusca(''); setFecharForm(null);
+    }
+    if (!sel) { infoDe.current = null; }
+  }, [sel]);
+
+  const salvarInfos = (parcial) => acao({ acao: 'infos', comandaId: selId, ...parcial }, { manterSel: true });
+
+  // Formata o horário de abertura (HH:MM).
+  const horaAbertura = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+  const rotuloPapel = (x) => (x === 'garcom' ? 'Garçom' : x === 'dona' ? 'Dona' : '');
 
   const cardapioGrupos = useMemo(() => {
     const ordem = [...CATS, ''];
@@ -104,12 +122,34 @@ export default function Comandas({ papel = 'dona' }) {
   // ---- Detalhe de uma comanda ----
   if (sel) {
     const total = totalDe(sel);
+    const termoBusca = busca.trim().toLowerCase();
+    const gruposFiltrados = cardapioGrupos
+      .map((g) => ({ ...g, itens: g.itens.filter((it) => (it.nome || '').toLowerCase().includes(termoBusca)) }))
+      .filter((g) => g.itens.length > 0);
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <button onClick={() => setSelId(null)} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>‹ Mesas</button>
           <div style={{ fontSize: 20, fontWeight: 900 }}>Mesa {sel.mesa}</div>
         </div>
+
+        <Card style={{ marginBottom: 14, padding: 14 }}>
+          <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>
+            {horaAbertura(sel.abertaEm) && <>Aberta às <b style={{ color: C.muted }}>{horaAbertura(sel.abertaEm)}</b></>}
+            {rotuloPapel(sel.abertaPor) && <> · por {rotuloPapel(sel.abertaPor)}</>}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end' }}>
+            <Field label="Nome do cliente (opcional)"><TextInput value={info.nome} onChange={(v) => setInfo((s) => ({ ...s, nome: v }))} onBlur={() => salvarInfos({ nome: info.nome })} placeholder="Ex.: João do balcão" /></Field>
+            <Field label="Pessoas">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button onClick={() => { const n = Math.max(0, (Number(info.pessoas) || 0) - 1); setInfo((s) => ({ ...s, pessoas: n ? String(n) : '' })); salvarInfos({ pessoas: n }); }} style={estBtn}>–</button>
+                <span style={{ minWidth: 24, textAlign: 'center', fontWeight: 800 }}>{info.pessoas || '–'}</span>
+                <button onClick={() => { const n = (Number(info.pessoas) || 0) + 1; setInfo((s) => ({ ...s, pessoas: String(n) })); salvarInfos({ pessoas: n }); }} style={estBtn}>+</button>
+              </div>
+            </Field>
+          </div>
+          <Field label="Observação (opcional)"><TextInput value={info.obs} onChange={(v) => setInfo((s) => ({ ...s, obs: v }))} onBlur={() => salvarInfos({ obs: info.obs })} placeholder="Ex.: sem cebola, cliente com pressa…" /></Field>
+        </Card>
 
         <Card style={{ marginBottom: 14, padding: 14 }}>
           {sel.itens.length === 0 ? <Empty>Nada lançado ainda.<br />Toque nos itens do cardápio abaixo.</Empty> :
@@ -160,14 +200,18 @@ export default function Comandas({ papel = 'dona' }) {
             </Card>
           ) : (
             <div style={{ marginBottom: 14 }}>
-              <Btn kind="ok" onClick={() => setFecharForm({ pagamento: 'Dinheiro', pessoas: 1 })}>Fechar conta · {brl(total)}</Btn>
+              <Btn kind="ok" onClick={() => setFecharForm({ pagamento: 'Dinheiro', pessoas: sel.pessoas > 0 ? sel.pessoas : 1 })}>Fechar conta · {brl(total)}</Btn>
             </div>
           )
         )}
 
         <SecTitle>Cardápio</SecTitle>
+        {cardapio.length > 0 && (
+          <div style={{ marginBottom: 10 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar produto…" /></div>
+        )}
         {cardapio.length === 0 ? <Empty>Cardápio vazio. Cadastre os itens na aba Cardápio.</Empty> :
-          cardapioGrupos.map((g) => (
+          gruposFiltrados.length === 0 ? <Empty>Nenhum produto com esse nome.</Empty> :
+          gruposFiltrados.map((g) => (
             <Card key={g.cat} style={{ marginBottom: 10, padding: 14 }}>
               <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 4, color: C.accent }}>{g.cat}</div>
               {g.itens.map((it) => (
@@ -224,7 +268,9 @@ export default function Comandas({ papel = 'dona' }) {
                   {ocupada ? 'Ocupada' : 'Abrir'}
                 </span>
                 <span style={{ fontSize: 26, fontWeight: 900, lineHeight: 1 }}>{m}</span>
+                {ocupada && c.nome && <span style={{ fontSize: 11, fontWeight: 700, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>}
                 {ocupada && <span style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</span>}
+                {ocupada && c.pessoas > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(6,16,31,0.65)' }}>{c.pessoas} pessoa{c.pessoas === 1 ? '' : 's'}</span>}
               </button>
             );
           })}
