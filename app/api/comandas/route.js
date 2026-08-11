@@ -162,15 +162,26 @@ export async function POST(request) {
     if (acao === 'fechar') {
       const total = totalDe(c);
       if (total <= 0) return NextResponse.json({ ok: false, erro: 'Comanda sem consumo. Use cancelar.' }, { status: 400 });
-      const forma = txt(body?.pagamento, 20) || 'Dinheiro';
       const pessoas = Math.max(1, Math.floor(Number(body?.pessoas) || 1));
-      const ehFiado = forma === 'Fiado';
+      // Pagamento pode ser dividido em várias formas (novo) ou uma só (compat).
+      let pags = [];
+      if (Array.isArray(body?.pagamentos)) {
+        pags = body.pagamentos
+          .map((x) => ({ forma: txt(x?.forma, 20), valor: Math.round((Number(x?.valor) || 0) * 100) / 100 }))
+          .filter((x) => x.forma && x.valor > 0);
+      } else {
+        pags = [{ forma: txt(body?.pagamento, 20) || 'Dinheiro', valor: total }];
+      }
+      if (!pags.length) return NextResponse.json({ ok: false, erro: 'Informe como foi pago.' }, { status: 400 });
+      const soma = Math.round(pags.reduce((s, x) => s + x.valor, 0) * 100) / 100;
+      if (Math.abs(soma - total) > 0.05) return NextResponse.json({ ok: false, erro: 'A soma das formas de pagamento não bate com o total.' }, { status: 400 });
+      const fiado = Math.round(pags.filter((x) => x.forma === 'Fiado').reduce((s, x) => s + x.valor, 0) * 100) / 100;
       const venda = {
-        id: uid(), data: hojeBrasil(), mesa: c.mesa, total, pagamento: forma, pessoas,
+        id: uid(), data: hojeBrasil(), mesa: c.mesa, total, pessoas,
+        pagamentos: pags, pagamento: pags.length === 1 ? pags[0].forma : 'Dividido', fiado,
         nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens,
-        // Fiado entra como não-recebido (fica na lista de fiados até a dona
-        // marcar que recebeu); as outras formas já entram como recebidas.
-        pago: !ehFiado, fechadaEm: new Date().toISOString(), fechadaPor: p,
+        // Só fica "não pago" (na lista de fiados) o que ficou no fiado.
+        pago: fiado <= 0.005, fechadaEm: new Date().toISOString(), fechadaPor: p,
       };
       const { error: eV } = await sb.from('pdm_dados').upsert(
         { chave: 'venda:' + venda.id, valor: venda, atualizado_em: new Date().toISOString() },
