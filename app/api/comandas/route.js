@@ -164,9 +164,13 @@ export async function POST(request) {
       if (total <= 0) return NextResponse.json({ ok: false, erro: 'Comanda sem consumo. Use cancelar.' }, { status: 400 });
       const forma = txt(body?.pagamento, 20) || 'Dinheiro';
       const pessoas = Math.max(1, Math.floor(Number(body?.pessoas) || 1));
+      const ehFiado = forma === 'Fiado';
       const venda = {
         id: uid(), data: hojeBrasil(), mesa: c.mesa, total, pagamento: forma, pessoas,
-        itens: c.itens, fechadaEm: new Date().toISOString(), fechadaPor: p,
+        nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens,
+        // Fiado entra como não-recebido (fica na lista de fiados até a dona
+        // marcar que recebeu); as outras formas já entram como recebidas.
+        pago: !ehFiado, fechadaEm: new Date().toISOString(), fechadaPor: p,
       };
       const { error: eV } = await sb.from('pdm_dados').upsert(
         { chave: 'venda:' + venda.id, valor: venda, atualizado_em: new Date().toISOString() },

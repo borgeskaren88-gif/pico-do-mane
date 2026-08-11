@@ -86,7 +86,7 @@ export default function Comandas({ papel = 'dona' }) {
     setSelId(null);
   };
   const confirmarFechar = async () => {
-    const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamento: fecharForm.pagamento, pessoas: fecharForm.pessoas }) });
+    const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamento: fecharForm.pagamento, pessoas: fecharForm.pessoas, nome: fecharForm.nome || '' }) });
     const j = await r.json();
     if (!j.ok) { setErro(j.erro || 'Não consegui fechar.'); return; }
     setFecharForm(null);
@@ -257,6 +257,12 @@ export default function Comandas({ papel = 'dona' }) {
                       border: `1px solid ${fecharForm.pagamento === f ? C.accent : C.line}`, background: fecharForm.pagamento === f ? C.accent : 'transparent', color: fecharForm.pagamento === f ? '#06101F' : C.muted }}>{f}</button>
                 ))}
               </div>
+              {fecharForm.pagamento === 'Fiado' && (
+                <div style={{ marginBottom: 12 }}>
+                  <Field label="Quem ficou devendo?"><TextInput value={fecharForm.nome} onChange={(v) => setFecharForm((s) => ({ ...s, nome: v }))} placeholder="Nome do cliente" /></Field>
+                  <div style={{ fontSize: 11, color: C.amber, marginTop: -4 }}>Vai pra lista de Fiados. Não entra no caixa até você marcar “Recebi”.</div>
+                </div>
+              )}
               <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 6 }}>Dividir por quantas pessoas?</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
                 <button onClick={() => setFecharForm((s) => ({ ...s, pessoas: Math.max(1, s.pessoas - 1) }))} style={estBtn}>–</button>
@@ -271,7 +277,7 @@ export default function Comandas({ papel = 'dona' }) {
             </Card>
           ) : (
             <div style={{ marginBottom: 14 }}>
-              <Btn kind="ok" onClick={() => setFecharForm({ pagamento: 'Dinheiro', pessoas: sel.pessoas > 0 ? sel.pessoas : 1 })}>Fechar conta · {brl(total)}</Btn>
+              <Btn kind="ok" onClick={() => setFecharForm({ pagamento: 'Dinheiro', pessoas: sel.pessoas > 0 ? sel.pessoas : 1, nome: sel.nome || '' })}>Fechar conta · {brl(total)}</Btn>
             </div>
           )
         )}
