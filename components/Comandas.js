@@ -8,18 +8,20 @@ const CATS = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólico
 export default function Comandas({ papel = 'dona' }) {
   const [comandas, setComandas] = useState([]);
   const [cardapio, setCardapio] = useState([]);
+  const [mesasQtd, setMesasQtd] = useState(20);
   const [carregado, setCarregado] = useState(false);
   const [erro, setErro] = useState('');
   const [selId, setSelId] = useState(null);
-  const [mesaNova, setMesaNova] = useState('');
   const [busy, setBusy] = useState(false);
+  const [configAberto, setConfigAberto] = useState(false);
+  const [mesasInput, setMesasInput] = useState('');
   const editandoRef = useRef(false);
 
   const carregar = useCallback(async () => {
     try {
       const r = await fetch('/api/comandas', { cache: 'no-store' });
       const j = await r.json();
-      if (j.ok) { setComandas(j.comandas || []); setCardapio(j.cardapio || []); setErro(''); }
+      if (j.ok) { setComandas(j.comandas || []); setCardapio(j.cardapio || []); if (j.mesasQtd) setMesasQtd(j.mesasQtd); setErro(''); }
       else setErro(j.erro || 'Erro ao carregar.');
     } catch { setErro('Sem conexão.'); }
     finally { setCarregado(true); }
@@ -56,11 +58,18 @@ export default function Comandas({ papel = 'dona' }) {
     finally { setBusy(false); }
   };
 
-  const abrirMesa = async () => {
-    const mesa = mesaNova.trim();
-    if (!mesa) return;
-    const j = await acao({ acao: 'abrir', mesa });
-    if (j?.comanda) { setMesaNova(''); setSelId(j.comanda.id); }
+  // Toca numa mesa do grid: se já tem comanda, entra; se não, abre e entra.
+  const tocarMesa = async (mesa) => {
+    const existente = comandas.find((c) => String(c.mesa) === String(mesa));
+    if (existente) { setSelId(existente.id); return; }
+    const j = await acao({ acao: 'abrir', mesa: String(mesa) });
+    if (j?.comanda) setSelId(j.comanda.id);
+  };
+  const salvarMesas = async () => {
+    const n = Math.floor(Number(mesasInput));
+    if (!(n >= 1 && n <= 80)) { setErro('Número de mesas inválido (1 a 80).'); return; }
+    const j = await acao({ acao: 'config', mesasQtd: n }, { manterSel: true });
+    if (j?.ok) { setMesasQtd(n); setConfigAberto(false); }
   };
   const addItem = (cardapioId) => acao({ acao: 'add', comandaId: selId, cardapioId });
   const setQtd = (itemId, qtd) => acao({ acao: 'setQtd', comandaId: selId, itemId, qtd });
@@ -141,42 +150,67 @@ export default function Comandas({ papel = 'dona' }) {
     );
   }
 
-  // ---- Painel de mesas ----
+  // ---- Painel de mesas (grid como o Consumer) ----
+  // Monta a lista de mesas: 1..mesasQtd + qualquer mesa aberta fora dessa faixa.
+  const abertasPorMesa = new Map(comandas.map((c) => [String(c.mesa), c]));
+  const numeros = [];
+  for (let i = 1; i <= mesasQtd; i++) numeros.push(String(i));
+  for (const c of comandas) { const m = String(c.mesa); if (!numeros.includes(m)) numeros.push(m); }
+  numeros.sort((a, b) => Number(a) - Number(b));
+  const nAbertas = comandas.length;
+
   return (
     <div>
-      <PageTitle sub="Mesas abertas agora">Comandas</PageTitle>
-
-      <Card style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>Abrir mesa</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <TextInput value={mesaNova} onChange={setMesaNova} inputMode="numeric" placeholder="Número da mesa (ex.: 7)" />
-          </div>
-          <Btn onClick={abrirMesa} disabled={busy || !mesaNova.trim()}>Abrir</Btn>
-        </div>
-      </Card>
+      <PageTitle sub={`${nAbertas} mesa${nAbertas === 1 ? '' : 's'} ocupada${nAbertas === 1 ? '' : 's'} de ${mesasQtd}`}>Comandas</PageTitle>
 
       {erro && <div style={{ fontSize: 13, color: C.red, marginBottom: 10 }}>{erro}</div>}
 
-      <SecTitle>Mesas abertas ({comandas.length})</SecTitle>
-      {!carregado ? <Empty>Carregando…</Empty> :
-        comandas.length === 0 ? <Empty>Nenhuma mesa aberta.<br />Abra uma mesa acima pra começar a lançar.</Empty> : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-            {comandas.map((c) => {
-              const total = totalDe(c);
-              const nItens = (c.itens || []).reduce((s, it) => s + (Number(it.qtd) || 0), 0);
-              return (
-                <button key={c.id} onClick={() => setSelId(c.id)}
-                  style={{ textAlign: 'left', cursor: 'pointer', background: C.panel, border: `1px solid ${C.cardBorder}`, boxShadow: C.cardShadow, borderRadius: 16, padding: 14 }}>
-                  <div style={{ fontSize: 12, color: C.faint, fontWeight: 600 }}>Mesa</div>
-                  <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1.1, color: C.text }}>{c.mesa}</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: C.green, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</div>
-                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{nItens} item{nItens === 1 ? '' : 's'}</div>
-                </button>
-              );
-            })}
-          </div>
-        )}
+      {!carregado ? <Empty>Carregando…</Empty> : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))', gap: 8 }}>
+          {numeros.map((m) => {
+            const c = abertasPorMesa.get(m);
+            const ocupada = !!c;
+            const total = ocupada ? totalDe(c) : 0;
+            return (
+              <button key={m} onClick={() => (ocupada ? setSelId(c.id) : tocarMesa(m))} disabled={busy}
+                style={{
+                  cursor: 'pointer', borderRadius: 14, padding: '12px 8px', minHeight: 84,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                  border: ocupada ? `1px solid ${C.accent}` : `1px solid ${C.line}`,
+                  background: ocupada ? C.accent : C.panel2,
+                  color: ocupada ? '#06101F' : C.text,
+                }}>
+                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ocupada ? 'rgba(6,16,31,0.65)' : C.faint }}>
+                  {ocupada ? 'Ocupada' : 'Abrir'}
+                </span>
+                <span style={{ fontSize: 26, fontWeight: 900, lineHeight: 1 }}>{m}</span>
+                {ocupada && <span style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {papel === 'dona' && (
+        <div style={{ marginTop: 18 }}>
+          {!configAberto ? (
+            <button onClick={() => { setMesasInput(String(mesasQtd)); setConfigAberto(true); }}
+              style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: 0 }}>
+              Configurar nº de mesas ({mesasQtd})
+            </button>
+          ) : (
+            <Card style={{ padding: 14 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>Quantas mesas tem o salão?</div>
+              <div style={{ fontSize: 12, color: C.faint, marginBottom: 10 }}>Vira o grid de mesas que você e os garçons usam.</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ width: 100 }}><TextInput value={mesasInput} onChange={setMesasInput} inputMode="numeric" placeholder="20" /></div>
+                <Btn small onClick={salvarMesas} disabled={busy}>Salvar</Btn>
+                <Btn kind="ghost" small onClick={() => setConfigAberto(false)}>Cancelar</Btn>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }
