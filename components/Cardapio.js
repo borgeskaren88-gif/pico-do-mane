@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle } from './ui';
 import { brl, num, uid, limparNome } from '../lib/util';
 
-export const CATEGORIAS_CARDAPIO = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Outros'];
+export const CATEGORIAS_CARDAPIO = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Outros'];
 
 const itemVazio = () => ({ nome: '', preco: '', categoria: '' });
 
