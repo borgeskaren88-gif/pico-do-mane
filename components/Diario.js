@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import CalendarioPedidos from './CalendarioPedidos';
@@ -24,7 +24,7 @@ const migrarRelato = (d) => {
 };
 const FONTE_ATRASADO = 'Recebimento Atrasado';
 const atrVazio = () => ({ data: todayISO(), valor: '', descricao: '' });
-export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [], onReceitas, visitantes = [], onVisitantes, onRepor, pessoasPorDia = {} }) {
+export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [], onReceitas, visitantes = [], onVisitantes, onRepor, pessoasPorDia = {}, pedidosPorDia = {}, fiadosPorDia = {} }) {
   const [abaLog, setAbaLog] = useState('fechamento'); // 'fechamento' | 'atrasados'
   const [form, setForm] = useState(diarioVazio());
   const [atrForm, setAtrForm] = useState(atrVazio());
@@ -36,6 +36,17 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
   const [faltou, setFaltou] = useState('');
   const [msgFaltou, setMsgFaltou] = useState('');
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Preenche sozinho o nº de pedidos e de fiados com as comandas do dia quando a
+  // data muda (igual a receita). Só ao registrar um dia novo (não ao editar um
+  // dia salvo), e só quando há comandas naquele dia — dá pra ajustar na mão.
+  useEffect(() => {
+    if (editId) return;
+    const ped = pedidosPorDia[form.data] || 0;
+    const fia = fiadosPorDia[form.data] || 0;
+    if (ped > 0 || fia > 0) setForm((f) => ({ ...f, nPedidos: ped > 0 ? String(ped) : f.nPedidos, fiado: fia > 0 ? String(fia) : f.fiado }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.data, pedidosPorDia, fiadosPorDia, editId]);
 
   // Tarefas em aberto: as COM data primeiro (mais próximas no topo), depois as
   // sem data (mais recentes primeiro).
@@ -214,6 +225,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
           <Field label="Nº de pedidos"><NumInput value={form.nPedidos} onChange={set('nPedidos')} /></Field>
           <Field label="Nº de pedidos fiados"><NumInput value={form.fiado} onChange={set('fiado')} placeholder="0" /></Field>
         </div>
+        {!editId && ((pedidosPorDia[form.data] || 0) > 0 || (fiadosPorDia[form.data] || 0) > 0) && <div style={{ fontSize: 12, color: C.faint, margin: '-4px 0 12px' }}>Preenchido automaticamente pelas comandas do dia — dá pra ajustar.</div>}
         {num(pessoasPorDia[form.data]) > 0 && <div style={{ fontSize: 13, color: C.accent2, margin: '-4px 0 12px', fontWeight: 600 }}>Pessoas nas mesas nesse dia: {num(pessoasPorDia[form.data])} <span style={{ color: C.faint, fontWeight: 400 }}>(somado das comandas)</span></div>}
         {ticket > 0 && <div style={{ fontSize: 13, color: C.accent, margin: '-4px 0 12px', fontWeight: 600 }}>Ticket médio: {brl(ticket)}</div>}
         <Field label="Relatório do dia"><AreaVoz value={form.relato} onChange={set('relato')} placeholder="Relato livre do dia: movimento, o que funcionou, o que faltou, clientes, equipe, imprevistos…" rows={6} /></Field>
