@@ -16,7 +16,11 @@ function papel() {
 }
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const n2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+// Aceita número ou texto em formato brasileiro ("1.234,50") e arredonda em 2 casas.
+const n2 = (n) => {
+  const v = typeof n === 'string' ? parseFloat(n.replace(/\./g, '').replace(',', '.')) : Number(n);
+  return Math.round((Number.isFinite(v) ? v : 0) * 100) / 100;
+};
 
 // Soma as entradas das vendas ligadas a um caixa, separadas por forma.
 async function entradasDoCaixa(sb, caixaId) {
