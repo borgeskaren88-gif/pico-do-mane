@@ -144,24 +144,10 @@ export default function Dashboard() {
   useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario', 'backup'].includes(tab)) carregarVendas(); }, [tab]);
   useEffect(() => { if (tab === 'salao' && subSalao === 'fiados') carregarVendas(); }, [subSalao]);
 
-  // Receita total = o que a dona lançou + as vendas do salão RECEBIDAS (só
-  // leitura). A parte recebida na hora entra no dia da venda; a parte no fiado
-  // só entra quando a dona marca "Recebi" (na data do recebimento).
-  const receitasComVendas = useMemo(() => {
-    const doSalao = [];
-    for (const v of vendas) {
-      const total = Number(v.total) || 0;
-      const fiado = fiadoDaVenda(v);
-      const recebidoNaHora = total - fiado; // dinheiro/pix/cartão pagos no fechamento
-      if (recebidoNaHora > 0.005) {
-        doSalao.push({ id: v.id + '-r', data: v.data, valor: recebidoNaHora.toFixed(2).replace('.', ','), categoria: 'Venda do salão', origem: 'comanda', descricao: `Mesa ${v.mesa}`, obs: `Comanda · ${v.pagamento || ''}` });
-      }
-      if (fiado > 0.005 && v.pago) {
-        doSalao.push({ id: v.id + '-f', data: v.pagoEm || v.data, valor: fiado.toFixed(2).replace('.', ','), categoria: 'Venda do salão', origem: 'comanda', descricao: `Mesa ${v.mesa}`, obs: 'Fiado recebido' });
-      }
-    }
-    return [...receitas, ...doSalao];
-  }, [receitas, vendas]);
+  // FONTE DO FATURAMENTO: manual. As comandas são só operacionais (salão +
+  // conferência de gaveta + fiados) e NÃO entram no DRE/Relatórios/Hoje. O caixa
+  // oficial é o que a dona lança à mão, verificado nas máquinas. Por isso o
+  // financeiro usa só `receitas` (o que ela digita), não as vendas do salão.
   const fiadosAbertos = vendas.filter((v) => fiadoDaVenda(v) > 0.005 && !v.pago).length;
   // Pessoas atendidas por dia (somado do nº de pessoas de cada mesa fechada).
   const pessoasPorDia = useMemo(() => {
@@ -404,7 +390,7 @@ export default function Dashboard() {
       </div>
 
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
-        {tab === 'hoje' && <Hoje diario={diario} receitas={receitasComVendas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={setTab} />}
+        {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={setTab} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
@@ -451,8 +437,8 @@ export default function Dashboard() {
             {subSalao === 'clientes' && <Clientes dados={clientes} onChange={upd.clientes} vendas={vendas} />}
           </>
         )}
-        {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitasComVendas} />}
-        {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitasComVendas} despesas={despesas} mes={mes} setMes={setMes} />}
+        {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
+        {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
         {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
