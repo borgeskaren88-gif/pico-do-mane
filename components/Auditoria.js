@@ -1,6 +1,6 @@
 'use client';
-import React, { useMemo } from 'react';
-import { C, Card, SecTitle, PageTitle } from './ui';
+import React, { useMemo, useState } from 'react';
+import { C, Card, Btn, SecTitle, PageTitle } from './ui';
 import { brl, num, fmtDate, limparNome, fiadoDaVenda } from '../lib/util';
 
 const chaveTxt = (s) => (s || '').trim().toLowerCase();
@@ -17,7 +17,20 @@ function duplicados(arr, keyFn) {
   return [...m.values()].filter((g) => g.length > 1);
 }
 
-export default function Auditoria({ receitas = [], despesas = [], compras = [], vendas = [] }) {
+export default function Auditoria({ receitas = [], despesas = [], compras = [], vendas = [], onMudou }) {
+  const [aberto, setAberto] = useState({});
+  const [busy, setBusy] = useState(false);
+  const excluirVenda = async (id) => {
+    if (typeof window !== 'undefined' && !window.confirm('Excluir esta venda de comanda? (use para tirar vendas de teste)')) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/vendas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'excluir', id }) });
+      const j = await r.json();
+      if (j.ok && onMudou) onMudou();
+    } catch { /* ignora */ }
+    finally { setBusy(false); }
+  };
+  const hora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
   const dupReceitas = useMemo(() => duplicados(
     receitas.filter((r) => num(r.valor) > 0),
     (r) => `${r.data}|${num(r.valor).toFixed(2)}|${chaveTxt(r.categoria)}|${chaveTxt(r.descricao)}`
@@ -88,13 +101,27 @@ export default function Auditoria({ receitas = [], despesas = [], compras = [], 
         <div style={{ marginTop: 4 }}>
           <SecTitle>Caixa manual + comandas ({overlapCaixa.length})</SecTitle>
           <Card style={{ marginBottom: 14, padding: 14 }}>
-            <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Nesses dias você tem receita digitada à mão E vendas de comanda. Se o valor manual já inclui o que passou pelas comandas, está contando dobrado.</div>
-            {overlapCaixa.map((d) => (
-              <div key={d.data} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 8 }}>
-                <span style={{ color: C.text }}>{fmtDate(d.data)}</span>
-                <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>manual {brl(d.manual)} · comandas {brl(d.vendasDia)}</span>
-              </div>
-            ))}
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Nesses dias você tem receita digitada à mão E vendas de comanda. Se as comandas foram teste (ou o caixa manual já inclui elas), toque em “ver vendas” e exclua o que não deve contar.</div>
+            {overlapCaixa.map((d) => {
+              const vd = vendas.filter((v) => v.data === d.data).sort((a, b) => (a.fechadaEm || '').localeCompare(b.fechadaEm || ''));
+              return (
+                <div key={d.data} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                    <button onClick={() => setAberto((m) => ({ ...m, [d.data]: !m[d.data] }))} style={{ background: 'none', border: 'none', color: C.accent, cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: 0, textAlign: 'left' }}>
+                      {aberto[d.data] ? '▾' : '▸'} {fmtDate(d.data)} · ver vendas ({vd.length})
+                    </button>
+                    <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>manual {brl(d.manual)} · comandas {brl(d.vendasDia)}</span>
+                  </div>
+                  {aberto[d.data] && vd.map((v) => (
+                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, paddingLeft: 14, marginTop: 6 }}>
+                      <span style={{ flex: 1, minWidth: 0, color: C.text }}>Mesa {v.mesa} · {v.pagamento || '—'}{hora(v.fechadaEm) ? ` · ${hora(v.fechadaEm)}` : ''}</span>
+                      <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{brl(Number(v.total) || 0)}</span>
+                      <Btn kind="danger" small onClick={() => excluirVenda(v.id)} disabled={busy}>Excluir</Btn>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </Card>
         </div>
       )}
