@@ -81,6 +81,7 @@ export default function Dashboard() {
   const [cardapio, setCardapio] = useState([]);
   const [vendas, setVendas] = useState([]); // vendas do salão (comandas fechadas)
   const [qualLista, setQualLista] = useState('minha'); // 'minha' | 'cozinha'
+  const [subSalao, setSubSalao] = useState('comandas'); // 'comandas' | 'cardapio' | 'fiados'
   const [googleOn, setGoogleOn] = useState(false);
   const [mes, setMes] = useState(ymOf(todayISO()));
 
@@ -136,7 +137,8 @@ export default function Dashboard() {
     try { const r = await fetch('/api/vendas', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setVendas(Array.isArray(j.vendas) ? j.vendas : []); } catch { /* ignora */ }
   };
   useEffect(() => { carregarVendas(); }, []);
-  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'fiados'].includes(tab)) carregarVendas(); }, [tab]);
+  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa'].includes(tab)) carregarVendas(); }, [tab]);
+  useEffect(() => { if (tab === 'salao' && subSalao === 'fiados') carregarVendas(); }, [subSalao]);
 
   // Receita total = o que a dona lançou + as vendas do salão RECEBIDAS (só
   // leitura). A parte recebida na hora entra no dia da venda; a parte no fiado
@@ -278,14 +280,14 @@ export default function Dashboard() {
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
     ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
-    ['comandas', 'Comandas'], ['caixa', 'Caixa'], ['cardapio', 'Cardápio'], ['fiados', 'Fiados'],
+    ['salao', 'Salão'], ['caixa', 'Caixa'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
 
   // Selo do Diário: tarefas com data até hoje ainda não feitas.
   const hojeIso = todayISO();
   const tarefasAlerta = tarefas.filter((t) => !t.feito && t.data && t.data <= hojeIso).length;
-  const badges = { diario: tarefasAlerta, fiados: fiadosAbertos };
+  const badges = { diario: tarefasAlerta, salao: fiadosAbertos };
 
   // Navegação por gesto: deslizar o dedo para o lado troca de aba.
   const toqueRef = useRef(null);
@@ -405,10 +407,26 @@ export default function Dashboard() {
         )}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
-        {tab === 'comandas' && <Comandas papel="dona" />}
+        {tab === 'salao' && (
+          <>
+            <div style={{ display: 'inline-flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
+              {[['comandas', 'Comandas'], ['cardapio', 'Cardápio'], ['fiados', 'Fiados']].map(([v, rot]) => (
+                <button key={v} onClick={() => setSubSalao(v)} style={{
+                  border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
+                  background: subSalao === v ? C.accent : 'transparent', color: subSalao === v ? '#06101F' : C.muted,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  {rot}
+                  {v === 'fiados' && fiadosAbertos > 0 && <span style={{ background: subSalao === v ? '#06101F' : C.red, color: subSalao === v ? C.accent : '#fff', fontSize: 11, fontWeight: 800, lineHeight: 1, borderRadius: 999, padding: '2px 6px' }}>{fiadosAbertos}</span>}
+                </button>
+              ))}
+            </div>
+            {subSalao === 'comandas' && <Comandas papel="dona" />}
+            {subSalao === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} />}
+            {subSalao === 'fiados' && <Fiados onMudou={carregarVendas} />}
+          </>
+        )}
         {tab === 'caixa' && <Caixa />}
-        {tab === 'fiados' && <Fiados onMudou={carregarVendas} />}
-        {tab === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} />}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitasComVendas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitasComVendas} despesas={despesas} mes={mes} setMes={setMes} />}
         {tab === 'backup' && (<><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio }} restore={(d) => {

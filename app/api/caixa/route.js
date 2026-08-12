@@ -23,11 +23,13 @@ async function entradasDoCaixa(sb, caixaId) {
   const { data } = await sb.from('pdm_dados').select('valor').like('chave', VD + '%');
   const vendas = (data || []).map((r) => r.valor).filter((v) => v && v.caixaId === caixaId);
   const ent = { Dinheiro: 0, Pix: 0, 'Crédito': 0, 'Débito': 0, Fiado: 0 };
+  let servico = 0;
   for (const v of vendas) {
+    servico = n2(servico + (Number(v.servico) || 0));
     const pags = Array.isArray(v.pagamentos) ? v.pagamentos : (v.pagamento ? [{ forma: v.pagamento, valor: Number(v.total) || 0 }] : []);
     for (const pg of pags) { if (ent[pg.forma] != null) ent[pg.forma] = n2(ent[pg.forma] + (Number(pg.valor) || 0)); }
   }
-  return { entradas: ent, qtdVendas: vendas.length };
+  return { entradas: ent, qtdVendas: vendas.length, servico };
 }
 
 function resumo(caixa, entradas) {
@@ -45,13 +47,13 @@ export async function GET() {
     if (error) throw error;
     const caixas = (data || []).map((r) => r.valor).filter(Boolean);
     const aberto = caixas.find((c) => c.aberto) || null;
-    let entradas = null, extra = null, qtdVendas = 0;
+    let entradas = null, extra = null, qtdVendas = 0, servico = 0;
     if (aberto) {
       const r = await entradasDoCaixa(sb, aberto.id);
-      entradas = r.entradas; qtdVendas = r.qtdVendas; extra = resumo(aberto, r.entradas);
+      entradas = r.entradas; qtdVendas = r.qtdVendas; servico = r.servico; extra = resumo(aberto, r.entradas);
     }
     const historico = caixas.filter((c) => !c.aberto).sort((a, b) => (b.fechadoEm || '').localeCompare(a.fechadoEm || '')).slice(0, 15);
-    return NextResponse.json({ ok: true, aberto, entradas, ...(extra || {}), qtdVendas, historico });
+    return NextResponse.json({ ok: true, aberto, entradas, servico, ...(extra || {}), qtdVendas, historico });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar o caixa.' }, { status: 500 });
   }
@@ -82,12 +84,12 @@ export async function POST(request) {
       const id = String(body?.id || '').slice(0, 40);
       const caixa = caixas.find((c) => c.id === id && c.aberto);
       if (!caixa) return NextResponse.json({ ok: false, erro: 'Caixa não encontrado ou já fechado.' }, { status: 404 });
-      const { entradas, qtdVendas } = await entradasDoCaixa(sb, caixa.id);
+      const { entradas, qtdVendas, servico } = await entradasDoCaixa(sb, caixa.id);
       const r = resumo(caixa, entradas);
       const contado = body?.contado != null && body?.contado !== '' ? n2(body.contado) : null;
       const fechado = {
         ...caixa, aberto: false, fechadoEm: new Date().toISOString(), fechadoPor: p,
-        entradas, recebido: r.recebido, dinheiroFinal: r.dinheiroFinal, fiado: r.fiado,
+        entradas, recebido: r.recebido, dinheiroFinal: r.dinheiroFinal, fiado: r.fiado, servico,
         qtdVendas, contado, diferenca: contado != null ? n2(contado - r.dinheiroFinal) : null,
       };
       const { error } = await sb.from('pdm_dados').upsert({ chave: CX + caixa.id, valor: fechado, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
