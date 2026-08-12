@@ -54,7 +54,7 @@ export default function CalendarioPedidos({ dados }) {
 
   return (
     <Card style={{ padding: 14 }}>
-      <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Pedidos por dia</div>
+      <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Pedidos por dia</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <button onClick={() => mudarMes(-1)} style={btn} aria-label="Mês anterior">‹</button>
         <div style={{ fontWeight: 700, fontSize: 13 }}>{MESES[mes - 1]}/{ano}</div>

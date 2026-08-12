@@ -127,28 +127,28 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>
         <Card style={{ marginBottom: 0, padding: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 15, fontWeight: 800 }}>Checklist</div>
-            {tarefasAbertas.length > 0 && <div style={{ fontSize: 12, color: C.muted }}>{tarefasAbertas.length} pend.</div>}
+            <div style={{ fontSize: 14, fontWeight: 800 }}>Checklist</div>
+            {tarefasAbertas.length > 0 && <div style={{ fontSize: 11, color: C.muted }}>{tarefasAbertas.length} pend.</div>}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: tarefasAbertas.length || tarefasFeitas.length ? 12 : 0 }}>
             <input value={novaTarefa} onChange={(e) => setNovaTarefa(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addTarefa(); }}
-              placeholder="Nova tarefa… (ex: pagar boleto Ambev)" style={{ ...inputStyle, flex: '1 1 100%' }} />
+              placeholder="Nova tarefa… (ex: pagar boleto Ambev)" style={{ ...inputStyle, flex: '1 1 100%', fontSize: 13.5, padding: '9px 11px' }} />
             <input type="date" value={novaTarefaData} onChange={(e) => setNovaTarefaData(e.target.value)}
-              title="Data (opcional) — pra receber aviso no dia" style={{ ...inputStyle, flex: '1 1 110px' }} />
+              title="Data (opcional) — pra receber aviso no dia" style={{ ...inputStyle, flex: '1 1 110px', fontSize: 13.5, padding: '9px 11px' }} />
             <Btn small onClick={addTarefa}>Add</Btn>
           </div>
 
           {tarefasAbertas.length === 0 && tarefasFeitas.length === 0 && (
-            <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '10px 0 2px' }}>Nenhuma tarefa. Anote o que precisa fazer no bar.</div>
+            <div style={{ fontSize: 12.5, color: C.faint, textAlign: 'center', padding: '10px 0 2px' }}>Nenhuma tarefa. Anote o que precisa fazer no bar.</div>
           )}
 
           {tarefasAbertas.map((t) => {
             const atrasada = t.data && t.data < todayISO();
             const venceHoje = t.data === todayISO();
             return (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
-                <button onClick={() => toggleTarefa(t.id)} aria-label="Concluir" style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${C.line}`, background: 'transparent', cursor: 'pointer', flexShrink: 0 }} />
-                <div style={{ flex: 1, fontSize: 14, color: C.text }}>
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.line}` }}>
+                <button onClick={() => toggleTarefa(t.id)} aria-label="Concluir" style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${C.line}`, background: 'transparent', cursor: 'pointer', flexShrink: 0 }} />
+                <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.35 }}>
                   {t.texto}
                   {t.data && (
                     <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: atrasada ? C.red : venceHoje ? C.amber : C.faint, whiteSpace: 'nowrap' }}>
@@ -156,7 +156,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
                     </span>
                   )}
                 </div>
-                <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
+                <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 4 }}>×</button>
               </div>
             );
           })}
@@ -171,9 +171,9 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
               </div>
               {verConcluidas && tarefasFeitas.map((t) => (
                 <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-                  <button onClick={() => toggleTarefa(t.id)} aria-label="Reabrir" style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${C.green}`, background: C.green, color: '#052014', cursor: 'pointer', flexShrink: 0, fontWeight: 900, fontSize: 13, lineHeight: 1 }} />
-                  <div style={{ flex: 1, fontSize: 14, color: C.faint, textDecoration: 'line-through' }}>{t.texto}</div>
-                  <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
+                  <button onClick={() => toggleTarefa(t.id)} aria-label="Reabrir" style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${C.green}`, background: C.green, color: '#052014', cursor: 'pointer', flexShrink: 0, fontWeight: 900, fontSize: 12, lineHeight: 1 }} />
+                  <div style={{ flex: 1, fontSize: 13, color: C.faint, textDecoration: 'line-through' }}>{t.texto}</div>
+                  <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 4 }}>×</button>
                 </div>
               ))}
             </div>
@@ -189,7 +189,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
       <Resumo items={[
         { t: 'Dias registrados', v: dados.length },
         { t: 'Nota média', v: media ? media.toFixed(1) : '—', c: C.accent },
-        { t: 'Receita lançada', v: brl(receitaTotal), c: C.green },
+        { t: 'Receita lançada', v: 'R$ ' + Math.round(receitaTotal).toLocaleString('pt-BR'), c: C.green },
       ]} />
 
       <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>

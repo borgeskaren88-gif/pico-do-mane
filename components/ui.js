@@ -113,10 +113,14 @@ export function Empty({ children }) {
 }
 
 export function KPI({ titulo, valor, cor, sub }) {
+  // Encolhe a fonte quando o número é longo (ex.: valores altos em R$), pra caber
+  // inteiro na coluna estreita do celular sem cortar com "…".
+  const len = String(valor).length;
+  const vf = len <= 5 ? 18 : len <= 7 ? 16 : len <= 9 ? 14 : len <= 11 ? 12 : 11;
   return (
     <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 14, padding: '13px 15px', minWidth: 0, boxShadow: C.cardShadow }}>
       <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: C.muted, fontWeight: 600 }}>{titulo}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: cor || C.text, marginTop: 4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{valor}</div>
+      <div style={{ fontSize: vf, fontWeight: 800, color: cor || C.text, marginTop: 4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{valor}</div>
       {sub && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{sub}</div>}
     </div>
   );
