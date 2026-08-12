@@ -82,7 +82,10 @@ export default function Comandas({ papel = 'dona' }) {
   const setQtd = (itemId, qtd) => acao({ acao: 'setQtd', comandaId: selId, itemId, qtd });
   const remover = (itemId) => acao({ acao: 'remover', comandaId: selId, itemId });
   const cancelar = async (id) => {
-    if (typeof window !== 'undefined' && !window.confirm('Cancelar esta comanda? Todo o consumo lançado será apagado.')) return;
+    const c = comandas.find((x) => x.id === id);
+    const vazia = !c || (c.itens || []).length === 0;
+    const msg = vazia ? 'Excluir esta mesa aberta? (sem consumo lançado)' : 'Cancelar esta comanda? Todo o consumo lançado será apagado.';
+    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
     await acao({ acao: 'cancelar', comandaId: id }, { manterSel: false });
     setSelId(null);
   };
@@ -97,6 +100,13 @@ export default function Comandas({ papel = 'dona' }) {
   };
 
   const totalDe = (c) => (c.itens || []).reduce((s, it) => s + (Number(it.qtd) || 0) * (Number(it.preco) || 0), 0);
+  // Conta com a taxa de serviço de 10% (ligada por padrão; some se a comanda tiver servico=false).
+  const contaDe = (c) => {
+    const subtotal = totalDe(c);
+    const servicoOn = c && c.servico !== false;
+    const servicoVal = servicoOn ? Math.round(subtotal * 0.10 * 100) / 100 : 0;
+    return { subtotal, servicoOn, servicoVal, total: Math.round((subtotal + servicoVal) * 100) / 100 };
+  };
   const sel = comandas.find((c) => c.id === selId) || null;
   useEffect(() => { editandoRef.current = !!selId; }, [selId]);
   // Ao abrir uma comanda, carrega os campos de nome/pessoas/obs pra edição.
@@ -125,7 +135,7 @@ export default function Comandas({ papel = 'dona' }) {
 
   // ---- Tela de adicionar produtos (carrinho) ----
   if (sel && picker) {
-    const total = totalDe(sel);
+    const total = contaDe(sel).total;
     const termoBusca = busca.trim().toLowerCase();
     const qtdNaComanda = (cardapioId) => (sel.itens.find((it) => it.cardapioId === cardapioId)?.qtd) || 0;
     const nItens = (sel.itens || []).reduce((s, it) => s + (Number(it.qtd) || 0), 0);
@@ -194,7 +204,8 @@ export default function Comandas({ papel = 'dona' }) {
 
   // ---- Detalhe de uma comanda (só o que foi pedido) ----
   if (sel) {
-    const total = totalDe(sel);
+    const conta = contaDe(sel);
+    const total = conta.total;
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -237,10 +248,28 @@ export default function Comandas({ papel = 'dona' }) {
                 <button onClick={() => remover(it.id)} disabled={busy} title="Remover" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}>×</button>
               </div>
             ))}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTop: `2px solid ${C.line}` }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: C.muted }}>Total da mesa</span>
-            <span style={{ fontSize: 22, fontWeight: 900, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</span>
-          </div>
+          {sel.itens.length > 0 && (
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `2px solid ${C.line}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', fontSize: 14 }}>
+                <span style={{ color: C.muted }}>Consumo</span>
+                <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{brl(conta.subtotal)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
+                <button onClick={() => salvarInfos({ servico: !conta.servicoOn })} disabled={busy}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: C.muted, fontSize: 14 }}>
+                  <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, border: `2px solid ${conta.servicoOn ? C.accent : C.line}`, background: conta.servicoOn ? C.accent : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {conta.servicoOn && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#06101F" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 6.5" /></svg>}
+                  </span>
+                  Serviço (10%)
+                </button>
+                <span style={{ fontWeight: 700, color: conta.servicoOn ? C.text : C.faint, fontVariantNumeric: 'tabular-nums' }}>{conta.servicoOn ? brl(conta.servicoVal) : 'retirado'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, marginTop: 4, borderTop: `1px solid ${C.line}` }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Total da mesa</span>
+                <span style={{ fontSize: 22, fontWeight: 900, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</span>
+              </div>
+            </div>
+          )}
         </Card>
 
         <div style={{ marginBottom: 14 }}>
@@ -293,9 +322,9 @@ export default function Comandas({ papel = 'dona' }) {
           )
         )}
 
-        {papel === 'dona' && (
+        {(papel === 'dona' || sel.itens.length === 0) && (
           <div style={{ marginTop: 8 }}>
-            <Btn kind="danger" small onClick={() => cancelar(sel.id)}>Cancelar comanda</Btn>
+            <Btn kind="danger" small onClick={() => cancelar(sel.id)}>{sel.itens.length === 0 ? 'Excluir mesa (aberta sem querer)' : 'Cancelar comanda'}</Btn>
           </div>
         )}
       </div>
@@ -322,7 +351,7 @@ export default function Comandas({ papel = 'dona' }) {
           {numeros.map((m) => {
             const c = abertasPorMesa.get(m);
             const ocupada = !!c;
-            const total = ocupada ? totalDe(c) : 0;
+            const total = ocupada ? contaDe(c).total : 0;
             const escuroSobreAzul = 'rgba(6,16,31,0.62)';
             return (
               <button key={m} onClick={() => (ocupada ? setSelId(c.id) : tocarMesa(m))} disabled={busy}

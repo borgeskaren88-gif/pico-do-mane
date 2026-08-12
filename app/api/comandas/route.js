@@ -151,6 +151,7 @@ export async function POST(request) {
       if ('nome' in body) c.nome = txt(body?.nome, 60);
       if ('obs' in body) c.obs = txt(body?.obs, 200);
       if ('pessoas' in body) { const n = Math.floor(Number(body?.pessoas)); c.pessoas = n >= 1 && n <= 99 ? n : 0; }
+      if ('servico' in body) c.servico = !!body.servico; // taxa de 10% liga/desliga
       await gravarComanda(sb, c);
       return NextResponse.json({ ok: true, comanda: c });
     }
@@ -160,8 +161,12 @@ export async function POST(request) {
     // da dona, sem entrar na lista que ela digita à mão (não tem risco de um
     // salvamento apagar o outro).
     if (acao === 'fechar') {
-      const total = totalDe(c);
-      if (total <= 0) return NextResponse.json({ ok: false, erro: 'Comanda sem consumo. Use cancelar.' }, { status: 400 });
+      const subtotal = totalDe(c);
+      if (subtotal <= 0) return NextResponse.json({ ok: false, erro: 'Comanda sem consumo. Use cancelar.' }, { status: 400 });
+      // Taxa de serviço (10%): ligada por padrão; a dona/garçom pode tirar na mesa.
+      const servicoOn = c.servico !== false;
+      const servico = servicoOn ? Math.round(subtotal * 0.10 * 100) / 100 : 0;
+      const total = Math.round((subtotal + servico) * 100) / 100;
       const pessoas = Math.max(1, Math.floor(Number(body?.pessoas) || 1));
       // Pagamento pode ser dividido em várias formas (novo) ou uma só (compat).
       let pags = [];
@@ -180,7 +185,7 @@ export async function POST(request) {
       const { data: caixaRows } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
       const caixaAberto = (caixaRows || []).map((r) => r.valor).find((x) => x && x.aberto);
       const venda = {
-        id: uid(), data: hojeBrasil(), mesa: c.mesa, total, pessoas,
+        id: uid(), data: hojeBrasil(), mesa: c.mesa, total, subtotal, servico, pessoas,
         pagamentos: pags, pagamento: pags.length === 1 ? pags[0].forma : 'Dividido', fiado,
         nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens, caixaId: caixaAberto ? caixaAberto.id : null,
         // Só fica "não pago" (na lista de fiados) o que ficou no fiado.
@@ -196,10 +201,12 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, venda });
     }
 
-    // Cancelar (fechar sem virar receita) — só a dona pode, pra o garçom não
-    // apagar consumo. Remove a comanda.
+    // Cancelar (fechar sem virar receita) e remover a comanda. Uma comanda VAZIA
+    // (aberta sem querer) qualquer um pode excluir; com consumo, só a dona — pra
+    // o garçom não apagar o que já foi lançado.
     if (acao === 'cancelar') {
-      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona pode cancelar.' }, { status: 403 });
+      const temConsumo = (c.itens || []).length > 0;
+      if (temConsumo && p !== 'dona') return NextResponse.json({ ok: false, erro: 'Comanda com consumo: só a dona pode cancelar.' }, { status: 403 });
       const { error } = await sb.from('pdm_dados').delete().eq('chave', chaveDe(id));
       if (error) throw error;
       return NextResponse.json({ ok: true, cancelada: true });
