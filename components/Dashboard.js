@@ -419,7 +419,7 @@ export default function Dashboard() {
         {tab === 'salao' && (
           <>
             <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-              {[['comandas', 'Comandas'], ['caixa', 'Caixa'], ['cardapio', 'Cardápio'], ['fiados', 'Fiados'], ['clientes', 'Clientes']].map(([v, rot]) => (
+              {[['caixa', 'Caixa'], ['comandas', 'Comandas'], ['fiados', 'Fiados'], ['clientes', 'Clientes'], ['cardapio', 'Cardápio']].map(([v, rot]) => (
                 <button key={v} onClick={() => setSubSalao(v)} style={{
                   flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
                   background: subSalao === v ? C.accent : 'transparent', color: subSalao === v ? '#06101F' : C.muted,
