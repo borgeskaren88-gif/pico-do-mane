@@ -181,6 +181,26 @@ export async function POST(request) {
       const soma = Math.round(pags.reduce((s, x) => s + x.valor, 0) * 100) / 100;
       if (Math.abs(soma - total) > 0.05) return NextResponse.json({ ok: false, erro: 'A soma das formas de pagamento não bate com o total.' }, { status: 400 });
       const fiado = Math.round(pags.filter((x) => x.forma === 'Fiado').reduce((s, x) => s + x.valor, 0) * 100) / 100;
+      const nomeCli = txt(body?.nome, 60) || c.nome || '';
+      // Limite de fiado: se o cliente está cadastrado com limite e "bloquear",
+      // barra o novo fiado que passaria do limite (soma o que já está em aberto).
+      if (fiado > 0.005 && nomeCli) {
+        const norm = (s) => (s || '').trim().toLowerCase();
+        const numBR = (s) => { const v = parseFloat(String(s).replace(/\./g, '').replace(',', '.')); return isFinite(v) ? v : 0; };
+        const fmt = (n) => 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
+        const fiadoDe = (v) => (v.fiado != null ? (Number(v.fiado) || 0) : (v.pagamento === 'Fiado' ? (Number(v.total) || 0) : 0));
+        const blob = await lerPainel(sb);
+        const clientes = Array.isArray(blob.clientes) ? blob.clientes : [];
+        const cli = clientes.find((x) => norm(x.nome) === norm(nomeCli) && x.bloquear && numBR(x.limite) > 0);
+        if (cli) {
+          const limite = numBR(cli.limite);
+          const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
+          const abertoAtual = (vrows || []).map((r) => r.valor).filter((v) => v && !v.pago && norm(v.nome) === norm(nomeCli)).reduce((s, v) => s + fiadoDe(v), 0);
+          if (abertoAtual + fiado > limite + 0.005) {
+            return NextResponse.json({ ok: false, bloqueado: true, erro: `${cli.nome} atingiu o limite de fiado (${fmt(limite)}). Em aberto: ${fmt(abertoAtual)}. Não dá pra fiar mais ${fmt(fiado)}.` }, { status: 400 });
+          }
+        }
+      }
       // Liga a venda ao caixa aberto (se houver), pro fechamento do caixa somar.
       const { data: caixaRows } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
       const caixaAberto = (caixaRows || []).map((r) => r.valor).find((x) => x && x.aberto);
