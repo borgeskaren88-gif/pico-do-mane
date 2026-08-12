@@ -168,6 +168,17 @@ export default function Dashboard() {
     for (const v of vendas) { if (!v.data) continue; m[v.data] = (m[v.data] || 0) + (Number(v.pessoas) || 0); }
     return m;
   }, [vendas]);
+  // Nº de pedidos (comandas fechadas) e de fiados por dia — pra preencher o Log.
+  const pedidosPorDia = useMemo(() => {
+    const m = {};
+    for (const v of vendas) { if (!v.data) continue; m[v.data] = (m[v.data] || 0) + 1; }
+    return m;
+  }, [vendas]);
+  const fiadosPorDia = useMemo(() => {
+    const m = {};
+    for (const v of vendas) { if (!v.data || fiadoDaVenda(v) <= 0.005) continue; m[v.data] = (m[v.data] || 0) + 1; }
+    return m;
+  }, [vendas]);
 
   const salvarTudo = (parcial) => {
     const dados = {
@@ -393,7 +404,7 @@ export default function Dashboard() {
 
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitasComVendas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={setTab} />}
-        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} />}
+        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
