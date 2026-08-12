@@ -286,7 +286,7 @@ export default function Dashboard() {
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
     ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
-    ['salao', 'Salão'], ['caixa', 'Caixa'],
+    ['salao', 'Salão'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
 
@@ -415,12 +415,12 @@ export default function Dashboard() {
         {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'salao' && (
           <>
-            <div style={{ display: 'inline-flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-              {[['comandas', 'Comandas'], ['cardapio', 'Cardápio'], ['fiados', 'Fiados']].map(([v, rot]) => (
+            <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
+              {[['comandas', 'Comandas'], ['caixa', 'Caixa'], ['cardapio', 'Cardápio'], ['fiados', 'Fiados']].map(([v, rot]) => (
                 <button key={v} onClick={() => setSubSalao(v)} style={{
-                  border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
+                  flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
                   background: subSalao === v ? C.accent : 'transparent', color: subSalao === v ? '#06101F' : C.muted,
-                  display: 'flex', alignItems: 'center', gap: 6,
+                  display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
                 }}>
                   {rot}
                   {v === 'fiados' && fiadosAbertos > 0 && <span style={{ background: subSalao === v ? '#06101F' : C.red, color: subSalao === v ? C.accent : '#fff', fontSize: 11, fontWeight: 800, lineHeight: 1, borderRadius: 999, padding: '2px 6px' }}>{fiadosAbertos}</span>}
@@ -428,11 +428,11 @@ export default function Dashboard() {
               ))}
             </div>
             {subSalao === 'comandas' && <Comandas papel="dona" />}
+            {subSalao === 'caixa' && <Caixa />}
             {subSalao === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} />}
             {subSalao === 'fiados' && <Fiados onMudou={carregarVendas} />}
           </>
         )}
-        {tab === 'caixa' && <Caixa />}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitasComVendas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitasComVendas} despesas={despesas} mes={mes} setMes={setMes} />}
         {tab === 'backup' && (<><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio }} restore={(d) => {
