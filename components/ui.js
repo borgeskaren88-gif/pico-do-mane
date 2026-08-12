@@ -1,3 +1,6 @@
+'use client';
+import { useRef, useLayoutEffect } from 'react';
+
 // Cores por variáveis CSS (definidas em app/globals.css), pra permitir tema
 // claro e escuro sem trocar o código dos componentes. Os valores concretos de
 // cada tema ficam no globals.css; aqui só apontamos para as variáveis.
@@ -112,15 +115,36 @@ export function Empty({ children }) {
   return <div style={{ textAlign: 'center', color: C.faint, padding: '36px 12px', fontSize: 14, lineHeight: 1.5 }}>{children}</div>;
 }
 
+// Ajusta a fonte do valor pra caber na largura da coluna: fica grande (18px)
+// quando há espaço (ex.: KPI de 2 colunas) e só encolhe o necessário quando o
+// número é longo numa coluna estreita (ex.: 3 colunas), sem cortar com "…".
+function useFitFonte(valor) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const MAX = 18, MIN = 11;
+    const ajustar = () => {
+      el.style.fontSize = MAX + 'px';
+      const disp = el.clientWidth;
+      if (!disp) return;
+      const preciso = el.scrollWidth;
+      if (preciso > disp) el.style.fontSize = Math.max(MIN, Math.floor((MAX * disp) / preciso)) + 'px';
+    };
+    ajustar();
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(ajustar); ro.observe(el); }
+    return () => { if (ro) ro.disconnect(); };
+  }, [valor]);
+  return ref;
+}
+
 export function KPI({ titulo, valor, cor, sub }) {
-  // Encolhe a fonte quando o número é longo (ex.: valores altos em R$), pra caber
-  // inteiro na coluna estreita do celular sem cortar com "…".
-  const len = String(valor).length;
-  const vf = len <= 5 ? 18 : len <= 7 ? 16 : len <= 9 ? 14 : len <= 11 ? 12 : 11;
+  const ref = useFitFonte(valor);
   return (
     <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 14, padding: '13px 15px', minWidth: 0, boxShadow: C.cardShadow }}>
       <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: C.muted, fontWeight: 600 }}>{titulo}</div>
-      <div style={{ fontSize: vf, fontWeight: 800, color: cor || C.text, marginTop: 4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{valor}</div>
+      <div ref={ref} style={{ fontSize: 18, fontWeight: 800, color: cor || C.text, marginTop: 4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{valor}</div>
       {sub && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{sub}</div>}
     </div>
   );
