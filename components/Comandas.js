@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { C, Card, Btn, Field, TextInput, NumInput, Empty, PageTitle } from './ui';
+import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, PageTitle } from './ui';
 import { brl, num } from '../lib/util';
 
 const CATS = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Outros'];
@@ -9,6 +9,7 @@ const FORMAS_PAG = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Fiado'];
 export default function Comandas({ papel = 'dona' }) {
   const [comandas, setComandas] = useState([]);
   const [cardapio, setCardapio] = useState([]);
+  const [clientes, setClientes] = useState([]);
   const [mesasQtd, setMesasQtd] = useState(20);
   const [carregado, setCarregado] = useState(false);
   const [erro, setErro] = useState('');
@@ -17,6 +18,7 @@ export default function Comandas({ papel = 'dona' }) {
   const [configAberto, setConfigAberto] = useState(false);
   const [mesasInput, setMesasInput] = useState('');
   const [fecharForm, setFecharForm] = useState(null); // { pagamento, pessoas } quando fechando
+  const [outroCliente, setOutroCliente] = useState(false); // digitar nome fora da lista de clientes
   const [busca, setBusca] = useState('');
   const [picker, setPicker] = useState(false); // tela de adicionar produtos (carrinho)
   const [catSel, setCatSel] = useState(null); // categoria escolhida na tela de adicionar
@@ -28,7 +30,7 @@ export default function Comandas({ papel = 'dona' }) {
     try {
       const r = await fetch('/api/comandas', { cache: 'no-store' });
       const j = await r.json();
-      if (j.ok) { setComandas(j.comandas || []); setCardapio(j.cardapio || []); if (j.mesasQtd) setMesasQtd(j.mesasQtd); setErro(''); }
+      if (j.ok) { setComandas(j.comandas || []); setCardapio(j.cardapio || []); setClientes(j.clientes || []); if (j.mesasQtd) setMesasQtd(j.mesasQtd); setErro(''); }
       else setErro(j.erro || 'Erro ao carregar.');
     } catch { setErro('Sem conexão.'); }
     finally { setCarregado(true); }
@@ -305,8 +307,20 @@ export default function Comandas({ papel = 'dona' }) {
                 </div>
                 {fiadoVal > 0 && (
                   <div style={{ marginBottom: 10 }}>
-                    <Field label="Quem ficou devendo?"><TextInput value={fecharForm.nome} onChange={(v) => setFecharForm((s) => ({ ...s, nome: v }))} placeholder="Nome do cliente" /></Field>
-                    <div style={{ fontSize: 11, color: C.amber, marginTop: -4 }}>{brl(fiadoVal)} vai pra lista de Fiados (não entra no caixa até você marcar “Recebi”).</div>
+                    <Field label="Quem ficou devendo?">
+                      {clientes.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <Select
+                            value={outroCliente ? 'Outro (digitar)' : fecharForm.nome}
+                            onChange={(v) => { if (v === 'Outro (digitar)') { setOutroCliente(true); setFecharForm((s) => ({ ...s, nome: '' })); } else { setOutroCliente(false); setFecharForm((s) => ({ ...s, nome: v })); } }}
+                            options={[...clientes, 'Outro (digitar)']} placeholder="Selecionar cliente" />
+                          {outroCliente && <TextInput value={fecharForm.nome} onChange={(v) => setFecharForm((s) => ({ ...s, nome: v }))} placeholder="Nome do cliente" />}
+                        </div>
+                      ) : (
+                        <TextInput value={fecharForm.nome} onChange={(v) => setFecharForm((s) => ({ ...s, nome: v }))} placeholder="Nome do cliente" />
+                      )}
+                    </Field>
+                    <div style={{ fontSize: 11, color: C.amber, marginTop: 6 }}>{brl(fiadoVal)} vai pra lista de Fiados (não entra no caixa até você marcar “Recebi”).</div>
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -317,7 +331,7 @@ export default function Comandas({ papel = 'dona' }) {
             );
           })() : (
             <div style={{ marginBottom: 14 }}>
-              <Btn kind="ok" onClick={() => setFecharForm({ valores: {}, nome: sel.nome || '', pessoas: sel.pessoas > 0 ? sel.pessoas : 1 })}>Fechar conta · {brl(total)}</Btn>
+              <Btn kind="ok" onClick={() => { setOutroCliente(!!(sel.nome && !clientes.includes(sel.nome))); setFecharForm({ valores: {}, nome: sel.nome || '', pessoas: sel.pessoas > 0 ? sel.pessoas : 1 }); }}>Fechar conta · {brl(total)}</Btn>
             </div>
           )
         )}
