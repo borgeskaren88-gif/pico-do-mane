@@ -29,6 +29,20 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
     } catch { setAgenda(null); }
   };
   useEffect(() => { carregarAgenda(); }, []);
+  // Movimento ao vivo: mesas abertas agora e nº de pessoas nelas.
+  const [salaoAgora, setSalaoAgora] = useState({ mesas: 0, pessoas: 0 });
+  useEffect(() => {
+    const carregar = async () => {
+      try {
+        const r = await fetch('/api/comandas', { cache: 'no-store' });
+        const j = await r.json();
+        if (j.ok) { const cs = j.comandas || []; setSalaoAgora({ mesas: cs.length, pessoas: cs.reduce((s, c) => s + (Number(c.pessoas) || 0), 0) }); }
+      } catch { /* ignora */ }
+    };
+    carregar();
+    const t = setInterval(carregar, 20000);
+    return () => clearInterval(t);
+  }, []);
   const hoje = todayISO();
   const mes = ymOf(hoje);
   const rec = receitas.filter((r) => ymOf(r.data) === mes).reduce((s, r) => s + num(r.valor), 0);
@@ -146,6 +160,22 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           {mostrarValores ? 'Ocultar' : 'Mostrar'}
         </button>
       </div>
+
+      {salaoAgora.mesas > 0 && (
+        <Card style={{ marginBottom: 12, borderColor: C.accent2 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.accent2, fontWeight: 700 }}>Movimento agora</div>
+              <div style={{ fontSize: 16, marginTop: 4 }}>
+                {salaoAgora.pessoas > 0
+                  ? <><b>{salaoAgora.pessoas}</b> pessoa{salaoAgora.pessoas === 1 ? '' : 's'} em <b>{salaoAgora.mesas}</b> mesa{salaoAgora.mesas === 1 ? '' : 's'}</>
+                  : <><b>{salaoAgora.mesas}</b> mesa{salaoAgora.mesas === 1 ? '' : 's'} aberta{salaoAgora.mesas === 1 ? '' : 's'}</>}
+              </div>
+            </div>
+            <Btn kind="ghost" small onClick={() => setTab('salao')}>Ver</Btn>
+          </div>
+        </Card>
+      )}
 
       {temAviso ? (
         <Card style={{ marginBottom: 12, borderColor: avisoUrgente ? C.red : C.amber, background: C.raised }}>
