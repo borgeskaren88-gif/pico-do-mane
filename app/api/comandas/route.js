@@ -64,7 +64,9 @@ export async function GET() {
       .sort((a, b) => Number(a.mesa) - Number(b.mesa) || (a.abertaEm || '').localeCompare(b.abertaEm || ''));
     const blob = await lerPainel(sb);
     const cardapio = (Array.isArray(blob.cardapio) ? blob.cardapio : []).filter((i) => i && i.ativo !== false);
-    return NextResponse.json({ ok: true, comandas, cardapio, mesasQtd: mesasDe(blob) });
+    // Só os nomes dos clientes, pro seletor de "quem ficou devendo" no fiado.
+    const clientes = (Array.isArray(blob.clientes) ? blob.clientes : []).map((c) => (c && c.nome ? String(c.nome) : '')).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    return NextResponse.json({ ok: true, comandas, cardapio, mesasQtd: mesasDe(blob), clientes });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar comandas.' }, { status: 500 });
   }
