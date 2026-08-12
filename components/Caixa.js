@@ -16,6 +16,8 @@ export default function Caixa() {
   const [contado, setContado] = useState('');
   const [fechando, setFechando] = useState(false);
   const [verHist, setVerHist] = useState(false);
+  const [editSaldo, setEditSaldo] = useState(false);
+  const [saldoEdit, setSaldoEdit] = useState('');
 
   const carregar = useCallback(async () => {
     try {
@@ -49,6 +51,7 @@ export default function Caixa() {
     const j = await acao({ acao: 'fechar', id: dados.aberto.id, contado });
     if (j) { setContado(''); setFechando(false); }
   };
+  const salvarSaldo = async () => { const j = await acao({ acao: 'ajustar', id: dados.aberto.id, saldoInicial: saldoEdit }); if (j) setEditSaldo(false); };
 
   const aberto = dados?.aberto || null;
   const entradas = dados?.entradas || {};
@@ -81,10 +84,22 @@ export default function Caixa() {
 
           <Card style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 10 }}>Movimento do caixa</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', fontSize: 14 }}>
-              <span style={{ color: C.muted }}>Saldo inicial</span>
-              <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{brl(aberto.saldoInicial)}</span>
-            </div>
+            {!editSaldo ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', fontSize: 14 }}>
+                <span style={{ color: C.muted }}>Saldo inicial</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button onClick={() => { setSaldoEdit(String(aberto.saldoInicial).replace('.', ',')); setEditSaldo(true); }} style={{ background: 'none', border: 'none', color: C.accent, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0 }}>editar</button>
+                  <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{brl(aberto.saldoInicial)}</span>
+                </span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0' }}>
+                <span style={{ color: C.muted, fontSize: 14, flexShrink: 0 }}>Saldo inicial</span>
+                <div style={{ flex: 1, minWidth: 0 }}><NumInput value={saldoEdit} onChange={setSaldoEdit} /></div>
+                <Btn small onClick={salvarSaldo} disabled={busy}>Salvar</Btn>
+                <Btn kind="ghost" small onClick={() => setEditSaldo(false)}>×</Btn>
+              </div>
+            )}
             {METODOS.map((m) => (
               <div key={m} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderTop: `1px solid ${C.line}`, fontSize: 14 }}>
                 <span style={{ color: C.muted }}>Entrada · {m}</span>

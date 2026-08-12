@@ -84,6 +84,17 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, caixa });
     }
 
+    // Corrigir o saldo inicial de um caixa já aberto (ex.: abriu sem o valor).
+    if (acao === 'ajustar') {
+      const id = String(body?.id || '').slice(0, 40);
+      const caixa = caixas.find((c) => c.id === id && c.aberto);
+      if (!caixa) return NextResponse.json({ ok: false, erro: 'Caixa não encontrado ou já fechado.' }, { status: 404 });
+      caixa.saldoInicial = n2(body?.saldoInicial);
+      const { error } = await sb.from('pdm_dados').upsert({ chave: CX + caixa.id, valor: caixa, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, caixa });
+    }
+
     if (acao === 'fechar') {
       const id = String(body?.id || '').slice(0, 40);
       const caixa = caixas.find((c) => c.id === id && c.aberto);
