@@ -1,5 +1,8 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
+import {
+  AreaChart, Area as AreaRecharts, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+} from 'recharts';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle } from './ui';
 import { brl, num, todayISO, ymOf, mesLabel, uid } from '../lib/util';
 
@@ -7,6 +10,31 @@ const CANAIS = ['Meta Ads', 'Google Ads', 'Instagram', 'Google (avaliações)', 
 const REPUT = ['Google (avaliações)', 'TripAdvisor']; // canais de reputação (nota + avaliações)
 const vazio = () => ({ mes: ymOf(todayISO()), canal: 'Meta Ads', investido: '', alcance: '', cliques: '', seguidores: '', nota: '', avaliacoes: '', obs: '' });
 const int = (n) => Math.round(n).toLocaleString('pt-BR');
+
+const tooltipModerno = { background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 12, color: C.text, boxShadow: C.cardShadow, fontSize: 12, padding: '8px 12px' };
+
+// Soma/subtrai N meses de um 'YYYY-MM'.
+const addMeses = (ym, n) => {
+  const total = (parseInt(ym.slice(0, 4)) * 12) + (parseInt(ym.slice(5)) - 1) + n;
+  const y = Math.floor(total / 12), m = ((total % 12) + 12) % 12;
+  return `${y}-${String(m + 1).padStart(2, '0')}`;
+};
+const mesesEntre = (a, b) => (parseInt(b.slice(0, 4)) - parseInt(a.slice(0, 4))) * 12 + (parseInt(b.slice(5)) - parseInt(a.slice(5)));
+
+// Previsão de quando bate a meta, no ritmo médio de crescimento da série.
+function previsao(serie, campo, meta) {
+  if (!meta || meta <= 0 || serie.length < 2) return null;
+  const atual = num(serie[serie.length - 1][campo]);
+  if (atual >= meta) return null;
+  const primeiro = num(serie[0][campo]);
+  const span = mesesEntre(serie[0].mes, serie[serie.length - 1].mes) || (serie.length - 1);
+  const ganhoMes = span > 0 ? (atual - primeiro) / span : 0;
+  if (ganhoMes <= 0) return { texto: 'Sem crescimento no período — no ritmo atual a meta não é alcançada. Vale reforçar.', alerta: true };
+  const faltam = Math.ceil((meta - atual) / ganhoMes);
+  if (faltam > 60) return { texto: `No ritmo atual (~${int(Math.round(ganhoMes))}/mês) leva mais de 5 anos. Vale acelerar.`, alerta: true };
+  const alvo = addMeses(ymOf(todayISO()), faltam);
+  return { texto: `No seu ritmo (~${int(Math.round(ganhoMes))}/mês), você chega lá por volta de ${mesLabel(alvo)}.`, alerta: false };
+}
 
 // Barra horizontal simples (mesmo estilo do resto do app).
 function Barra({ label, valor, max, cor, texto }) {
@@ -38,6 +66,35 @@ function MetaBar({ label, atual, meta }) {
         <div style={{ width: `${pct}%`, height: '100%', background: cor, borderRadius: 999 }} />
       </div>
     </div>
+  );
+}
+
+// Gráfico de linha (área) da evolução de um número mês a mês — mesmo azul do resto.
+function CurvaCard({ titulo, data, sufixo }) {
+  if (data.length < 2) return null;
+  const id = 'gCurva-' + sufixo;
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>{titulo}</div>
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Evolução mês a mês</div>
+      <div style={{ height: 190 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
+            <defs>
+              <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={C.accent} stopOpacity={0.32} />
+                <stop offset="100%" stopColor={C.accent} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="2 7" stroke={C.hair} vertical={false} />
+            <XAxis dataKey="mes" tick={{ fill: C.muted, fontSize: 12 }} axisLine={false} tickLine={false} dy={6} />
+            <YAxis tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={46} tickFormatter={(v) => (v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'k' : v)} />
+            <Tooltip formatter={(v) => [int(v), titulo]} contentStyle={tooltipModerno} labelStyle={{ color: C.muted, fontWeight: 700, marginBottom: 2 }} />
+            <AreaRecharts type="monotone" dataKey="val" stroke={C.accent} strokeWidth={3} fill={`url(#${id})`} dot={{ fill: C.accent, r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
   );
 }
 
@@ -125,8 +182,31 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
       linhas.push('Lance esses números de novo no próximo mês pra o app calcular o quanto você cresceu.');
     }
 
-    return { meses, investidoMes, porCanal, investidoTotal, roasGeral, rep, avaliacoesAtual, notaAtual, insta, seguidoresAtual, segDelta, avalDelta, linhas };
+    return { meses, investidoMes, porCanal, investidoTotal, roasGeral, rep, repSerie, repCanal, avaliacoesAtual, notaAtual, insta, seguidoresAtual, segDelta, avalDelta, linhas };
   }, [regs, receitas]);
+
+  // Comparativo "este mês vs. anterior" — cada métrica com o mês do próprio dado.
+  const cmpRows = useMemo(() => {
+    const ult2 = (arr, campo) => {
+      if (!arr.length) return null;
+      const a = arr[arr.length - 1], p = arr.length >= 2 ? arr[arr.length - 2] : null;
+      return { atual: num(a[campo]), mesAtual: a.mes, prev: p ? num(p[campo]) : null, mesPrev: p ? p.mes : null };
+    };
+    const mesesInv = an.meses.filter((m) => an.investidoMes(m) > 0);
+    const invRow = mesesInv.length ? {
+      atual: an.investidoMes(mesesInv[mesesInv.length - 1]), mesAtual: mesesInv[mesesInv.length - 1],
+      prev: mesesInv.length >= 2 ? an.investidoMes(mesesInv[mesesInv.length - 2]) : null,
+      mesPrev: mesesInv.length >= 2 ? mesesInv[mesesInv.length - 2] : null,
+    } : null;
+    const rows = [];
+    const seg = ult2(an.insta, 'seguidores'); if (seg) rows.push({ label: 'Seguidores', ...seg, fmt: int, tipo: 'cresc' });
+    const aval = ult2(an.repSerie, 'avaliacoes'); if (aval) rows.push({ label: 'Avaliações', ...aval, fmt: int, tipo: 'cresc' });
+    if (invRow) rows.push({ label: 'Investido', ...invRow, fmt: brl, tipo: 'neutro' });
+    return rows.filter((r) => r.prev !== null);
+  }, [an]);
+
+  const segChart = useMemo(() => an.insta.map((d) => ({ mes: mesLabel(d.mes), val: num(d.seguidores) })), [an.insta]);
+  const avalChart = useMemo(() => an.repSerie.map((d) => ({ mes: mesLabel(d.mes), val: num(d.avaliacoes) })), [an.repSerie]);
 
   const maxInvRec = Math.max(1, ...an.meses.map((m) => Math.max(an.investidoMes(m), receitaMes(m))));
   const maxCanal = Math.max(1, ...Object.values(an.porCanal));
@@ -152,6 +232,8 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
   const metaSegV = metasRec ? num(metasRec.seguidores) : 0;
   const metaAvalV = metasRec ? num(metasRec.avaliacoes) : 0;
   const temMeta = metaSegV > 0 || metaAvalV > 0;
+  const prevSeg = metaSegV > 0 ? previsao(an.insta, 'seguidores', metaSegV) : null;
+  const prevAval = metaAvalV > 0 ? previsao(an.repSerie, 'avaliacoes', metaAvalV) : null;
 
   const c = form.canal;
   const mostra = (campo) => {
@@ -166,10 +248,38 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
 
       <Resumo items={resumoItems} />
 
+      {cmpRows.length > 0 && (
+        <Card style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>Este mês vs. anterior</div>
+          {cmpRows.map((r) => {
+            const d = r.atual - r.prev;
+            const subiu = d > 0;
+            const cor = r.tipo === 'neutro' ? C.muted : (subiu ? C.green : (d < 0 ? C.red : C.faint));
+            const seta = d === 0 ? '' : (subiu ? '▲' : '▼');
+            return (
+              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.line}` }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{r.label}</div>
+                  <div style={{ fontSize: 11, color: C.faint }}>{mesLabel(r.mesPrev)} → {mesLabel(r.mesAtual)}</div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{r.fmt(r.atual)}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums' }}>
+                    {d === 0 ? 'estável' : `${seta} ${r.fmt(Math.abs(d))}`}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+      )}
+
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 15, fontWeight: 800, marginBottom: temMeta ? 12 : 8 }}>Metas</div>
         {metaSegV > 0 && <MetaBar label="Seguidores" atual={an.seguidoresAtual} meta={metaSegV} />}
+        {prevSeg && <div style={{ fontSize: 12, color: prevSeg.alerta ? C.amber : C.muted, marginTop: -6, marginBottom: 12, lineHeight: 1.4 }}>Seguidores: {prevSeg.texto}</div>}
         {metaAvalV > 0 && <MetaBar label="Avaliações" atual={an.avaliacoesAtual} meta={metaAvalV} />}
+        {prevAval && <div style={{ fontSize: 12, color: prevAval.alerta ? C.amber : C.muted, marginTop: -6, marginBottom: 12, lineHeight: 1.4 }}>Avaliações: {prevAval.texto}</div>}
         {!temMeta && <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}>Defina um objetivo (ex.: chegar a 30 mil seguidores) pra acompanhar seu progresso mês a mês.</div>}
         <details>
           <summary style={{ cursor: 'pointer', fontSize: 13, color: C.muted, fontWeight: 600, padding: '4px 0' }}>{temMeta ? 'Editar metas' : 'Definir metas'}</summary>
@@ -198,6 +308,9 @@ export default function Marketing({ dados, onChange, receitas = [] }) {
               ))}
             </Card>
           )}
+
+          <CurvaCard titulo="Instagram — curva de seguidores" data={segChart} sufixo="seg" />
+          <CurvaCard titulo="Avaliações — curva de crescimento" data={avalChart} sufixo="aval" />
 
           {an.investidoTotal > 0 && (
             <Card style={{ marginBottom: 14 }}>
