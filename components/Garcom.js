@@ -35,7 +35,7 @@ export default function Garcom() {
             <LogoMark size={40} radius={11} />
             <div>
               <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.02em', lineHeight: 1 }}>PicoOS</div>
-              <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 3, fontWeight: 600 }}>Salão</div>
+              <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 3, fontWeight: 600 }}>Central de Operações</div>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
