@@ -453,7 +453,7 @@ export default function Dashboard() {
         )}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitasComVendas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitasComVendas} despesas={despesas} mes={mes} setMes={setMes} />}
-        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes }} restore={(d) => {
+        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
             compras: d.compras || compras, cotacoes: d.cotacoes || cotacoes, garrafas: d.garrafas || garrafas,
