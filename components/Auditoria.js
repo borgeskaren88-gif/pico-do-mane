@@ -41,9 +41,12 @@ export default function Auditoria({ receitas = [], despesas = [], compras = [], 
     (d) => `${d.data}|${num(d.valor).toFixed(2)}|${chaveTxt(d.categoria)}|${chaveTxt(d.descricao)}`
   ), [despesas]);
 
+  // Itens de compra repetidos (mesma nota, mesmo produto/valor/qtd/vencimento).
+  // Ignora boletos parcelados (formaPagto "Prazo"), que têm vencimentos diferentes
+  // e NÃO são duplicata.
   const dupCompras = useMemo(() => duplicados(
-    compras,
-    (c) => `${c.data}|${chaveTxt(limparNome(c.produto))}|${chaveTxt(limparNome(c.fornecedor))}|${num(c.valorUnit).toFixed(2)}|${num(c.quantidade)}`
+    compras.filter((c) => chaveTxt(c.formaPagto) !== 'prazo'),
+    (c) => `${c.data}|${chaveTxt(limparNome(c.produto))}|${chaveTxt(limparNome(c.fornecedor))}|${num(c.valorUnit).toFixed(2)}|${num(c.quantidade)}|${(c.nota || '').trim()}|${c.vencimento || ''}`
   ), [compras]);
 
   // Dias com receita digitada à mão E vendas de comanda — risco de contar dobrado.
@@ -71,7 +74,7 @@ export default function Auditoria({ receitas = [], despesas = [], compras = [], 
       {g.map((x, i) => (
         <div key={x.id || i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, padding: '2px 0' }}>
           <span style={{ color: C.text, minWidth: 0 }}>
-            {fmtDate(x.data)} · {tipo === 'compra' ? `${limparNome(x.produto)} (${limparNome(x.fornecedor) || 'sem fornecedor'})` : (x.descricao || x.categoria || '—')}
+            {fmtDate(x.data)} · {tipo === 'compra' ? `${limparNome(x.produto)}${x.nota ? ` · Nota ${x.nota}` : ''} (${limparNome(x.fornecedor) || 'sem fornecedor'})` : (x.descricao || x.categoria || '—')}
           </span>
           <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
             {tipo === 'compra' ? brl(num(x.quantidade) * num(x.valorUnit)) : brl(num(x.valor))}
@@ -142,8 +145,11 @@ export default function Auditoria({ receitas = [], despesas = [], compras = [], 
 
       {dupCompras.length > 0 && (
         <div>
-          <SecTitle>Compras repetidas ({dupCompras.length})</SecTitle>
-          <Card style={{ marginBottom: 14, padding: 14 }}>{dupCompras.map((g, i) => <Grupo key={i} g={g} tipo="compra" />)}</Card>
+          <SecTitle>Itens de compra repetidos ({dupCompras.length})</SecTitle>
+          <Card style={{ marginBottom: 14, padding: 14 }}>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 2 }}>Mesmo item lançado 2× na mesma nota. Não mexe no seu caixa (a despesa está certa), mas bagunça o histórico de preços — vale apagar o repetido na aba Compras/Cotações. Parcelas de boleto não entram aqui.</div>
+            {dupCompras.map((g, i) => <Grupo key={i} g={g} tipo="compra" />)}
+          </Card>
         </div>
       )}
     </div>
