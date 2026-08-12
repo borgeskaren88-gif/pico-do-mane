@@ -289,7 +289,7 @@ export default function Dashboard() {
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
     ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
-    ['salao', 'Salão'],
+    ['salao', 'Central de Operações'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
 
