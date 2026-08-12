@@ -24,7 +24,7 @@ const migrarRelato = (d) => {
 };
 const FONTE_ATRASADO = 'Recebimento Atrasado';
 const atrVazio = () => ({ data: todayISO(), valor: '', descricao: '' });
-export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [], onReceitas, visitantes = [], onVisitantes, onRepor }) {
+export default function Diario({ dados, onChange, tarefas = [], onTarefas, receitas = [], onReceitas, visitantes = [], onVisitantes, onRepor, pessoasPorDia = {} }) {
   const [abaLog, setAbaLog] = useState('fechamento'); // 'fechamento' | 'atrasados'
   const [form, setForm] = useState(diarioVazio());
   const [atrForm, setAtrForm] = useState(atrVazio());
@@ -214,6 +214,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
           <Field label="Nº de pedidos"><NumInput value={form.nPedidos} onChange={set('nPedidos')} /></Field>
           <Field label="Nº de pedidos fiados"><NumInput value={form.fiado} onChange={set('fiado')} placeholder="0" /></Field>
         </div>
+        {num(pessoasPorDia[form.data]) > 0 && <div style={{ fontSize: 13, color: C.accent2, margin: '-4px 0 12px', fontWeight: 600 }}>Pessoas nas mesas nesse dia: {num(pessoasPorDia[form.data])} <span style={{ color: C.faint, fontWeight: 400 }}>(somado das comandas)</span></div>}
         {ticket > 0 && <div style={{ fontSize: 13, color: C.accent, margin: '-4px 0 12px', fontWeight: 600 }}>Ticket médio: {brl(ticket)}</div>}
         <Field label="Relatório do dia"><AreaVoz value={form.relato} onChange={set('relato')} placeholder="Relato livre do dia: movimento, o que funcionou, o que faltou, clientes, equipe, imprevistos…" rows={6} /></Field>
         <Field label="Prioridade de amanhã"><AreaVoz value={form.prioridade} onChange={set('prioridade')} placeholder="Foco nº 1 do próximo dia" /></Field>
@@ -268,6 +269,7 @@ export default function Diario({ dados, onChange, tarefas = [], onTarefas, recei
                 <span style={{ color: C.green, fontWeight: 700 }}>{brl(receitaExibida(d))}</span>
                 {atrasadoDoDia(d.data) > 0 && <span style={{ color: C.amber, fontSize: 13 }}>+ {brl(atrasadoDoDia(d.data))} atrasado</span>}
                 {num(d.nPedidos) > 0 && <span style={{ color: C.muted, fontSize: 13 }}>{d.nPedidos} pedidos · tkt {brl(receitaExibida(d) / num(d.nPedidos))}</span>}
+                {num(pessoasPorDia[d.data]) > 0 && <span style={{ color: C.accent2, fontSize: 13 }}>{num(pessoasPorDia[d.data])} pessoas</span>}
                 {num(d.fiado) > 0 && <span style={{ color: C.amber, fontSize: 13 }}>{d.fiado} fiado{num(d.fiado) > 1 ? 's' : ''}</span>}
                 {d.nota && <span style={{ color: C.accent, fontSize: 13 }}>Nota {d.nota}</span>}
               </div>

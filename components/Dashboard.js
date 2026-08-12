@@ -137,7 +137,7 @@ export default function Dashboard() {
     try { const r = await fetch('/api/vendas', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setVendas(Array.isArray(j.vendas) ? j.vendas : []); } catch { /* ignora */ }
   };
   useEffect(() => { carregarVendas(); }, []);
-  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa'].includes(tab)) carregarVendas(); }, [tab]);
+  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario'].includes(tab)) carregarVendas(); }, [tab]);
   useEffect(() => { if (tab === 'salao' && subSalao === 'fiados') carregarVendas(); }, [subSalao]);
 
   // Receita total = o que a dona lançou + as vendas do salão RECEBIDAS (só
@@ -159,6 +159,12 @@ export default function Dashboard() {
     return [...receitas, ...doSalao];
   }, [receitas, vendas]);
   const fiadosAbertos = vendas.filter((v) => fiadoDaVenda(v) > 0.005 && !v.pago).length;
+  // Pessoas atendidas por dia (somado do nº de pessoas de cada mesa fechada).
+  const pessoasPorDia = useMemo(() => {
+    const m = {};
+    for (const v of vendas) { if (!v.data) continue; m[v.data] = (m[v.data] || 0) + (Number(v.pessoas) || 0); }
+    return m;
+  }, [vendas]);
 
   const salvarTudo = (parcial) => {
     const dados = {
@@ -382,7 +388,7 @@ export default function Dashboard() {
 
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitasComVendas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={setTab} />}
-        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} />}
+        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
