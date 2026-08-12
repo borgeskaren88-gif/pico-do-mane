@@ -103,6 +103,18 @@ export default function Caixa() {
             )}
           </Card>
 
+          {(dados.servico || 0) > 0 && (
+            <Card style={{ marginBottom: 14, padding: '12px 14px', borderColor: C.accent2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: C.accent2 }}>Serviço (10%) do turno</div>
+                  <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Parte dos garçons — já está incluída no total acima.</div>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: C.accent2, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(dados.servico)}</div>
+              </div>
+            </Card>
+          )}
+
           {!fechando ? (
             <Btn kind="danger" onClick={() => setFechando(true)}>Fechar caixa</Btn>
           ) : (
@@ -131,7 +143,7 @@ export default function Caixa() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{fmtDate((c.fechadoEm || '').slice(0, 10))} · {hora(c.abertoEm)}–{hora(c.fechadoEm)}</div>
-                      <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Recebido {brl(c.recebido)} · gaveta {brl(c.dinheiroFinal)}{c.contado != null ? ` · contado ${brl(c.contado)}` : ''}</div>
+                      <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Recebido {brl(c.recebido)} · gaveta {brl(c.dinheiroFinal)}{(c.servico || 0) > 0 ? ` · serviço ${brl(c.servico)}` : ''}{c.contado != null ? ` · contado ${brl(c.contado)}` : ''}</div>
                     </div>
                     {c.diferenca != null && Math.abs(c.diferenca) > 0.005 && (
                       <div style={{ fontSize: 12, fontWeight: 800, color: c.diferenca < 0 ? C.red : C.amber, flexShrink: 0 }}>{c.diferenca > 0 ? '+' : ''}{brl(c.diferenca)}</div>
