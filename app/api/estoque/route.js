@@ -8,10 +8,12 @@ export const dynamic = 'force-dynamic';
 
 const PAINEL = 'painel';
 
-// O catálogo e as fichas são da dona. O garçom vê a disponibilidade por outro
-// caminho (dentro de /api/comandas), sem acesso ao estoque inteiro.
-function ehDona() {
-  return papelDaSessao(cookies().get(nomeCookie())?.value) === 'dona';
+// Ler o estoque e mexer no SALDO (entrada/saída/contagem) vale para a dona e a
+// cozinha (a cozinha ajuda a cuidar do estoque no dia a dia). Cadastrar, editar,
+// excluir itens e mexer nas fichas técnicas é só da dona. O garçom não acessa o
+// estoque inteiro (ele vê a disponibilidade por /api/comandas).
+function papelAtual() {
+  return papelDaSessao(cookies().get(nomeCookie())?.value);
 }
 
 async function lerPainel(sb) {
@@ -19,8 +21,6 @@ async function lerPainel(sb) {
   return data?.valor || {};
 }
 
-// Grava de volta SÓ as chaves do estoque, preservando todo o resto do painel
-// (read-modify-write). Assim edições do estoque não brigam com outros dados.
 async function gravarEstoque(sb, blob, patch) {
   const novo = { ...blob, ...patch };
   const { error } = await sb.from('pdm_dados').upsert(
@@ -34,18 +34,21 @@ async function gravarEstoque(sb, blob, patch) {
 const arr = (v) => (Array.isArray(v) ? v : []);
 
 export async function GET() {
-  if (!ehDona()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
+  const p = papelAtual();
+  if (p !== 'dona' && p !== 'cozinha') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
     const sb = supabaseServer();
     const blob = await lerPainel(sb);
-    return NextResponse.json({ ok: true, itens: arr(blob.estoque), fichas: arr(blob.fichas) });
+    // As fichas só interessam à dona; a cozinha recebe só os itens.
+    return NextResponse.json({ ok: true, itens: arr(blob.estoque), fichas: p === 'dona' ? arr(blob.fichas) : [] });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar o estoque.' }, { status: 500 });
   }
 }
 
 export async function POST(request) {
-  if (!ehDona()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
+  const p = papelAtual();
+  if (p !== 'dona' && p !== 'cozinha') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   let body;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
   const acao = String(body?.acao || '');
@@ -54,26 +57,30 @@ export async function POST(request) {
     const blob = await lerPainel(sb);
     let itens = arr(blob.estoque);
 
-    if (acao === 'add') {
-      const item = novoItemEstoque(body?.item || {});
-      if (!item.nome) return NextResponse.json({ ok: false, erro: 'Informe o nome do item.' }, { status: 400 });
-      // Evita duplicar por nome.
-      const jaTem = itens.some((it) => (it.nome || '').trim().toLowerCase() === item.nome.toLowerCase());
-      if (jaTem) return NextResponse.json({ ok: true, itens, jaExistia: true });
-      itens = [item, ...itens];
-      const novo = await gravarEstoque(sb, blob, { estoque: itens });
-      return NextResponse.json({ ok: true, itens: arr(novo.estoque), novoId: item.id });
-    }
-
+    // Movimento de saldo (entrada/saída/contagem): dona OU cozinha.
     if (acao === 'mov') {
       const id = String(body?.id || '');
       const tipo = ['entrada', 'saida', 'contagem'].includes(body?.tipo) ? body.tipo : null;
       if (!id || !tipo) return NextResponse.json({ ok: false, erro: 'Dados do movimento incompletos.' }, { status: 400 });
       let achou = false;
-      itens = itens.map((it) => { if (it.id !== id) return it; achou = true; return aplicarMovimentoItem(it, tipo, body?.qtd, body?.motivo); });
+      const quem = p === 'cozinha' ? ' (cozinha)' : '';
+      itens = itens.map((it) => { if (it.id !== id) return it; achou = true; return aplicarMovimentoItem(it, tipo, body?.qtd, (body?.motivo || '') + quem); });
       if (!achou) return NextResponse.json({ ok: false, erro: 'Item não encontrado.' }, { status: 404 });
       const novo = await gravarEstoque(sb, blob, { estoque: itens });
       return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
+    }
+
+    // A partir daqui, só a dona.
+    if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Essa ação é só da dona.' }, { status: 403 });
+
+    if (acao === 'add') {
+      const item = novoItemEstoque(body?.item || {});
+      if (!item.nome) return NextResponse.json({ ok: false, erro: 'Informe o nome do item.' }, { status: 400 });
+      const jaTem = itens.some((it) => (it.nome || '').trim().toLowerCase() === item.nome.toLowerCase());
+      if (jaTem) return NextResponse.json({ ok: true, itens, jaExistia: true });
+      itens = [item, ...itens];
+      const novo = await gravarEstoque(sb, blob, { estoque: itens });
+      return NextResponse.json({ ok: true, itens: arr(novo.estoque), novoId: item.id });
     }
 
     if (acao === 'edit') {
@@ -92,8 +99,7 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
     }
 
-    // Entrada automática vinda das Compras: soma no saldo dos itens já
-    // cadastrados (itens não cadastrados são ignorados -> viram sugestão).
+    // Entrada automática vinda das Compras.
     if (acao === 'entradaCompras') {
       const novoEstoque = aplicarEntradasEstoque(itens, arr(body?.comprasNovas));
       if (novoEstoque !== itens) { const novo = await gravarEstoque(sb, blob, { estoque: novoEstoque }); return NextResponse.json({ ok: true, itens: arr(novo.estoque) }); }
@@ -106,8 +112,7 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, fichas: arr(novo.fichas) });
     }
 
-    // Reconciliação: baixa qualquer venda que ainda não foi processada (rede de
-    // segurança caso a baixa no fechamento da comanda tenha falhado).
+    // Reconciliação: baixa qualquer venda ainda não processada (rede de segurança).
     if (acao === 'sincronizar') {
       const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
       const vendas = (vrows || []).map((r) => r.valor).filter(Boolean);
