@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque } from '../../../lib/estoque';
+import { limparNome } from '../../../lib/util';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,6 +111,53 @@ export async function POST(request) {
       const fichas = arr(body?.fichas).filter((f) => f && f.cardapioId).map((f) => ({ cardapioId: String(f.cardapioId), itens: arr(f.itens).map((x) => ({ estoqueId: String(x.estoqueId), qtd: String(x.qtd), unidade: String(x.unidade || '') })) }));
       const novo = await gravarEstoque(sb, blob, { fichas });
       return NextResponse.json({ ok: true, fichas: arr(novo.fichas) });
+    }
+
+    // Importa um "modelo" de fichas: cria os ingredientes que faltam no estoque
+    // e monta as fichas ligando cada prato ao item do CARDÁPIO com o mesmo nome.
+    // Genérico: o modelo (ingredientes + fichas) vem do cliente. Não mexe em
+    // preço nem cria itens no cardápio — só relata os pratos que não casaram.
+    if (acao === 'importarModelo') {
+      const norm = (s) => limparNome(s).toLowerCase();
+      const ingredientes = arr(body?.ingredientes);
+      const fichasModelo = arr(body?.fichas);
+      const cardapio = arr(blob.cardapio);
+
+      const idPorNome = new Map(itens.map((it) => [norm(it.nome), it.id]));
+      let criados = 0;
+      for (const ing of ingredientes) {
+        if (!ing?.nome || idPorNome.has(norm(ing.nome))) continue;
+        const item = novoItemEstoque({ nome: ing.nome, categoria: ing.categoria || 'Cozinha', unidade: ing.unidade || 'un', conteudo: ing.conteudo, conteudoUnid: ing.conteudoUnid, saldo: 0 });
+        itens = [item, ...itens];
+        idPorNome.set(norm(item.nome), item.id);
+        criados += 1;
+      }
+
+      const card = cardapio.map((c) => ({ id: c.id, n: norm(c.nome) }));
+      const acharCardapio = (prato) => {
+        const p = norm(prato);
+        let c = card.find((x) => x.n === p);
+        if (c) return c.id;
+        c = card.find((x) => x.n && (x.n.includes(p) || p.includes(x.n)));
+        return c ? c.id : null;
+      };
+
+      let fichas = arr(blob.fichas);
+      const naoEncontrados = [];
+      let fichasCriadas = 0;
+      for (const fm of fichasModelo) {
+        const cid = acharCardapio(fm?.prato || '');
+        if (!cid) { naoEncontrados.push(fm?.prato || '?'); continue; }
+        const itensFicha = arr(fm.itens)
+          .map((x) => ({ estoqueId: idPorNome.get(norm(x.ingrediente)), qtd: String(x.qtd), unidade: String(x.unidade || '') }))
+          .filter((x) => x.estoqueId);
+        if (!itensFicha.length) { naoEncontrados.push((fm?.prato || '?') + ' (sem ingredientes)'); continue; }
+        fichas = [...fichas.filter((f) => f.cardapioId !== cid), { cardapioId: cid, itens: itensFicha }];
+        fichasCriadas += 1;
+      }
+
+      const novo = await gravarEstoque(sb, blob, { estoque: itens, fichas });
+      return NextResponse.json({ ok: true, itens: arr(novo.estoque), fichas: arr(novo.fichas), report: { criados, fichasCriadas, naoEncontrados, cardapioVazio: cardapio.length === 0 } });
     }
 
     // Reconciliação: baixa qualquer venda ainda não processada (rede de segurança).
