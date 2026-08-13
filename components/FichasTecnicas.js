@@ -27,16 +27,16 @@ const MODELO_FICHAS = [
   { prato: 'Batata Tradicional', itens: [{ ingrediente: 'Batata frita', qtd: 400, unidade: 'g' }] },
   { prato: 'Calabresa', itens: [{ ingrediente: 'Calabresa', qtd: 300, unidade: 'g' }] },
   { prato: 'Tábua Calabresa', itens: [{ ingrediente: 'Calabresa', qtd: 300, unidade: 'g' }, { ingrediente: 'Batata frita', qtd: 300, unidade: 'g' }, { ingrediente: 'Pão de alho', qtd: 1, unidade: 'un' }] },
-  { prato: 'Ostras Gratinadas', itens: [{ ingrediente: 'Ostras', qtd: 6, unidade: 'un' }] },
+  { prato: 'Sol e Mar Ostra Gratinada', itens: [{ ingrediente: 'Ostras', qtd: 6, unidade: 'un' }] },
   { prato: 'Pão de Alho', itens: [{ ingrediente: 'Pão de alho', qtd: 1, unidade: 'un' }] },
   { prato: 'Polenta Frita', itens: [{ ingrediente: 'Polenta', qtd: 300, unidade: 'g' }] },
-  { prato: 'Polenta Frita com Queijo', itens: [{ ingrediente: 'Polenta', qtd: 300, unidade: 'g' }] },
-  { prato: 'Açaí na Tigela', itens: [{ ingrediente: 'Açaí', qtd: 400, unidade: 'g' }] },
+  { prato: 'Polenta ao Queijo', itens: [{ ingrediente: 'Polenta', qtd: 300, unidade: 'g' }] },
+  { prato: 'Cume Supremo', itens: [{ ingrediente: 'Açaí', qtd: 500, unidade: 'g' }] },
+  { prato: 'Mirante', itens: [{ ingrediente: 'Açaí', qtd: 400, unidade: 'g' }] },
   { prato: 'Isca de Tilápia', itens: [{ ingrediente: 'Isca de tilápia', qtd: 400, unidade: 'g' }, { ingrediente: 'Batata frita', qtd: 200, unidade: 'g' }] },
-  { prato: 'Camarão à Milanesa', itens: [{ ingrediente: 'Camarão', qtd: 300, unidade: 'g' }, { ingrediente: 'Batata frita', qtd: 200, unidade: 'g' }] },
-  { prato: 'Camarão ao Alho e Óleo', itens: [{ ingrediente: 'Camarão', qtd: 300, unidade: 'g' }, { ingrediente: 'Batata frita', qtd: 200, unidade: 'g' }] },
+  { prato: 'Camarão do Pico', itens: [{ ingrediente: 'Camarão', qtd: 500, unidade: 'g' }] },
+  { prato: 'Camarão do Pico meia Porção', itens: [{ ingrediente: 'Camarão', qtd: 250, unidade: 'g' }] },
   { prato: 'Parmegiana', itens: [{ ingrediente: 'Bife empanado', qtd: 1, unidade: 'un' }] },
-  { prato: 'Camarão à Milanesa (porção)', itens: [{ ingrediente: 'Camarão', qtd: 500, unidade: 'g' }] },
 ];
 
 // Editor das fichas técnicas: liga cada item do CARDÁPIO aos ingredientes do
