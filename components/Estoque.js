@@ -1,44 +1,41 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
-import { brl, num, todayISO, fmtDate, uid, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
-import { UNIDADES, MOTIVOS_SAIDA } from '../lib/estoque';
+import { brl, num, fmtDate, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
+import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome } from '../lib/estoque';
 
-const MAX_MOV = 60; // guarda os últimos movimentos por item, pra não inchar o banco
-const igualNome = (a, b) => limparNome(a).toLowerCase() === limparNome(b).toLowerCase();
+const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '' });
 
-const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '' });
-
-export default function Estoque({ dados = [], onChange, compras = [], onRepor }) {
+// Aba Estoque: catálogo de itens com saldo, mínimo, custo e "conteúdo por
+// unidade" (pra diluir garrafa em doses). Toda mudança de saldo passa por ações
+// atômicas na API (/api/estoque), pra ficar em sincronia com a baixa feita ao
+// fechar as comandas — nada é sobrescrito.
+export default function Estoque({ itens = [], carregado = true, onAcao, compras = [], onRepor }) {
   const [novo, setNovo] = useState(itemVazio());
   const [editId, setEditId] = useState(null);
   const [acao, setAcao] = useState(null);   // { id, tipo: 'entrada'|'saida'|'contagem' }
   const [acaoQtd, setAcaoQtd] = useState('');
   const [acaoMotivo, setAcaoMotivo] = useState(MOTIVOS_SAIDA[0]);
-  const [verMov, setVerMov] = useState(null); // id do item com histórico aberto
+  const [verMov, setVerMov] = useState(null);
   const [busca, setBusca] = useState('');
   const [reposto, setReposto] = useState('');
+  const [busy, setBusy] = useState(false);
   const set = (k) => (v) => setNovo((f) => ({ ...f, [k]: v }));
 
-  // Resumo geral
   const totais = useMemo(() => {
     let valor = 0, baixo = 0;
-    for (const it of dados) {
+    for (const it of itens) {
       valor += num(it.saldo) * num(it.custo);
       if (num(it.minimo) > 0 && num(it.saldo) <= num(it.minimo)) baixo += 1;
     }
     return { valor, baixo };
-  }, [dados]);
+  }, [itens]);
 
-  const abaixoDoMin = useMemo(
-    () => dados.filter((it) => num(it.minimo) > 0 && num(it.saldo) <= num(it.minimo)),
-    [dados]
-  );
+  const abaixoDoMin = useMemo(() => itens.filter((it) => num(it.minimo) > 0 && num(it.saldo) <= num(it.minimo)), [itens]);
 
-  // Produtos que já foram comprados mas ainda NÃO estão no estoque (sugestões
-  // pra começar a controlar com um toque). Traz o último custo conhecido.
+  // Produtos já comprados que ainda não estão no estoque (sugestões).
   const sugestoes = useMemo(() => {
-    const noEstoque = new Set(dados.map((it) => limparNome(it.nome).toLowerCase()));
+    const noEstoque = new Set(itens.map((it) => limparNome(it.nome).toLowerCase()));
     const map = new Map();
     for (const c of compras) {
       const nome = limparNome(c.produto);
@@ -46,107 +43,76 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
       const chave = nome.toLowerCase();
       if (noEstoque.has(chave)) continue;
       const anterior = map.get(chave);
-      // Mantém a compra mais recente (pra pegar o custo e a categoria atuais).
-      if (!anterior || (c.data || '') >= (anterior.data || '')) {
-        map.set(chave, { nome, categoria: c.categoria || '', custo: c.valorUnit || '', data: c.data || '' });
-      }
+      if (!anterior || (c.data || '') >= (anterior.data || '')) map.set(chave, { nome, categoria: c.categoria || '', custo: c.valorUnit || '', data: c.data || '' });
     }
     return [...map.values()].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
-  }, [compras, dados]);
+  }, [compras, itens]);
 
-  // Agrupa o estoque por categoria pra listar organizado.
   const grupos = useMemo(() => {
     const filtro = busca.trim().toLowerCase();
     const ordem = [...CATEGORIAS_PRODUTO, ''];
     const map = new Map();
-    for (const it of dados) {
+    for (const it of itens) {
       if (filtro && !(it.nome || '').toLowerCase().includes(filtro)) continue;
       const cat = it.categoria || '';
       if (!map.has(cat)) map.set(cat, []);
       map.get(cat).push(it);
     }
-    return [...map.entries()]
-      .sort((a, b) => ordem.indexOf(a[0]) - ordem.indexOf(b[0]))
-      .map(([cat, itens]) => ({ cat: cat || 'Sem categoria', itens: itens.sort((x, y) => (x.nome || '').localeCompare(y.nome || '')) }));
-  }, [dados, busca]);
+    return [...map.entries()].sort((a, b) => ordem.indexOf(a[0]) - ordem.indexOf(b[0]))
+      .map(([cat, is]) => ({ cat: cat || 'Sem categoria', itens: is.sort((x, y) => (x.nome || '').localeCompare(y.nome || '')) }));
+  }, [itens, busca]);
 
-  const salvarItem = () => {
-    if (!novo.nome.trim()) return;
-    const base = {
-      nome: limparNome(novo.nome), categoria: novo.categoria, unidade: novo.unidade || 'un',
-      saldo: num(novo.saldo), minimo: num(novo.minimo), custo: num(novo.custo), atualizadoEm: todayISO(),
-    };
+  const salvarItem = async () => {
+    if (!novo.nome.trim() || busy) return;
+    setBusy(true);
     if (editId) {
-      onChange(dados.map((it) => it.id === editId ? { ...it, ...base } : it));
+      await onAcao({ acao: 'edit', id: editId, campos: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid } });
     } else {
-      // Evita duplicar: se já existe item com o mesmo nome, não cria outro.
-      if (dados.some((it) => igualNome(it.nome, base.nome))) { setNovo(itemVazio()); return; }
-      const mov = num(novo.saldo) > 0
-        ? [{ id: uid(), tipo: 'contagem', qtd: num(novo.saldo), saldoDepois: num(novo.saldo), motivo: 'Saldo inicial', data: todayISO(), ts: Date.now() }]
-        : [];
-      onChange([{ id: uid(), ...base, movimentos: mov }, ...dados]);
+      await onAcao({ acao: 'add', item: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', saldo: num(novo.saldo), minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid } });
     }
-    setNovo(itemVazio()); setEditId(null);
+    setNovo(itemVazio()); setEditId(null); setBusy(false);
   };
 
   const editar = (it) => {
     setEditId(it.id);
-    setNovo({ nome: it.nome || '', categoria: it.categoria || '', unidade: it.unidade || 'un', saldo: String(it.saldo ?? ''), minimo: String(it.minimo ?? ''), custo: String(it.custo ?? '') });
+    setNovo({ nome: it.nome || '', categoria: it.categoria || '', unidade: it.unidade || 'un', saldo: '', minimo: String(it.minimo ?? ''), custo: String(it.custo ?? ''), conteudo: String(it.conteudo ?? ''), conteudoUnid: it.conteudoUnid || '' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const cancelar = () => { setNovo(itemVazio()); setEditId(null); };
-  const excluir = (id) => { if (!window.confirm('Excluir este item do estoque?')) return; if (id === editId) cancelar(); onChange(dados.filter((it) => it.id !== id)); };
+  const excluir = async (id) => { if (!window.confirm('Excluir este item do estoque?')) return; if (id === editId) cancelar(); await onAcao({ acao: 'del', id }); };
 
-  const adicionarSugestao = (s) => {
-    if (dados.some((it) => igualNome(it.nome, s.nome))) return;
-    const item = { id: uid(), nome: s.nome, categoria: s.categoria, unidade: 'un', saldo: 0, minimo: 0, custo: num(s.custo), atualizadoEm: todayISO(), movimentos: [] };
-    onChange([item, ...dados]);
-    // Já abre a contagem pra pessoa dizer quanto tem hoje.
-    abrirAcao(item.id, 'contagem');
+  const adicionarSugestao = async (s) => {
+    if (itens.some((it) => igualNome(it.nome, s.nome)) || busy) return;
+    setBusy(true);
+    const j = await onAcao({ acao: 'add', item: { nome: s.nome, categoria: s.categoria, unidade: 'un', saldo: 0, custo: num(s.custo) } });
+    setBusy(false);
+    if (j && j.novoId) abrirAcao(j.novoId, 'contagem');
   };
 
   const abrirAcao = (id, tipo) => { setAcao({ id, tipo }); setAcaoQtd(''); setAcaoMotivo(MOTIVOS_SAIDA[0]); };
   const fecharAcao = () => { setAcao(null); setAcaoQtd(''); };
-
-  const confirmarAcao = () => {
-    if (String(acaoQtd).trim() === '') return; // exige um número digitado (evita zerar sem querer)
+  const confirmarAcao = async () => {
+    if (String(acaoQtd).trim() === '' || busy) return;
     const q = num(acaoQtd);
     if (acao.tipo !== 'contagem' && !(q > 0)) return;
-    onChange(dados.map((it) => {
-      if (it.id !== acao.id) return it;
-      const saldoAtual = num(it.saldo);
-      let saldoNovo = saldoAtual, mov;
-      if (acao.tipo === 'entrada') {
-        saldoNovo = saldoAtual + q;
-        mov = { tipo: 'entrada', qtd: q, motivo: 'Entrada manual' };
-      } else if (acao.tipo === 'saida') {
-        saldoNovo = Math.max(0, saldoAtual - q);
-        mov = { tipo: 'saida', qtd: q, motivo: acaoMotivo };
-      } else { // contagem
-        saldoNovo = q;
-        const dif = q - saldoAtual;
-        mov = { tipo: 'contagem', qtd: q, motivo: `Contagem${dif !== 0 ? ` (${dif > 0 ? '+' : ''}${(Math.round(dif * 100) / 100)})` : ''}` };
-      }
-      const movimento = { id: uid(), ...mov, saldoDepois: saldoNovo, data: todayISO(), ts: Date.now() };
-      return { ...it, saldo: saldoNovo, atualizadoEm: todayISO(), movimentos: [movimento, ...(it.movimentos || [])].slice(0, MAX_MOV) };
-    }));
-    fecharAcao();
+    setBusy(true);
+    await onAcao({ acao: 'mov', id: acao.id, tipo: acao.tipo, qtd: q, motivo: acao.tipo === 'saida' ? acaoMotivo : undefined });
+    setBusy(false); fecharAcao();
   };
 
-  const reporNaLista = (itens) => {
+  const reporNaLista = (lista) => {
     if (!onRepor) return;
-    const add = onRepor(itens.map((it) => ({ id: uid(), nome: it.nome, quantidade: '', categoria: it.categoria || '', comprado: false, criadoEm: Date.now() })));
+    const add = onRepor(lista.map((it) => ({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), nome: it.nome, quantidade: '', categoria: it.categoria || '', comprado: false, criadoEm: Date.now() })));
     setReposto(add === 0 ? 'Já estavam na Lista de Compras.' : `${add} item(ns) adicionado(s) à Lista de Compras.`);
     setTimeout(() => setReposto(''), 3000);
   };
 
-  const itemAcao = acao ? dados.find((it) => it.id === acao.id) : null;
   const rotuloAcao = { entrada: 'Entrada', saida: 'Saída', contagem: 'Contagem' };
 
   return (
     <div>
       <Resumo items={[
-        { t: 'Itens', v: dados.length },
+        { t: 'Itens', v: itens.length },
         { t: 'Abaixo do mínimo', v: totais.baixo, c: totais.baixo ? C.red : C.faint },
         { t: 'Valor em estoque', v: brl(totais.valor), c: C.green },
       ]} />
@@ -155,7 +121,6 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
 
       {reposto && <Card style={{ marginBottom: 12, borderColor: C.green }}><div style={{ fontSize: 14, color: C.green, fontWeight: 700 }}>{reposto}</div></Card>}
 
-      {/* Alertas de estoque baixo */}
       {abaixoDoMin.length > 0 && (
         <Card style={{ marginBottom: 14, borderColor: C.red }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -171,19 +136,15 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
         </Card>
       )}
 
-      {/* Sugestões: produtos comprados que ainda não estão no estoque */}
       {sugestoes.length > 0 && (
         <Card style={{ marginBottom: 14, background: C.panel2 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: C.accent, marginBottom: 4 }}>Começar a controlar ({sugestoes.length})</div>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.4 }}>
-            Estes produtos já apareceram nas suas Compras mas ainda não estão no estoque. Toque para começar a controlar (o app já pergunta quanto você tem hoje).
+            Produtos que já apareceram nas Compras mas ainda não estão no estoque. Toque para começar a controlar (o app já pergunta quanto você tem hoje).
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {sugestoes.slice(0, 24).map((s) => (
-              <button key={s.nome} onClick={() => adicionarSugestao(s)} style={{
-                border: `1px solid ${C.line}`, background: C.panel, color: C.text, borderRadius: 999,
-                padding: '7px 12px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-              }}>
+              <button key={s.nome} onClick={() => adicionarSugestao(s)} disabled={busy} style={{ border: `1px solid ${C.line}`, background: C.panel, color: C.text, borderRadius: 999, padding: '7px 12px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ color: C.accent, fontWeight: 800 }}>+</span> {s.nome}
               </button>
             ))}
@@ -191,21 +152,30 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
         </Card>
       )}
 
-      {/* Formulário de item */}
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar item' : 'Novo item de estoque'}</div>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>
-          {editId ? 'Ajuste os dados deste item.' : 'Cadastre um item pra controlar. Depois, as Compras já somam sozinhas no saldo.'}
+          {editId ? 'Ajuste os dados. Para mudar a quantidade, use os botões Entrada / Saída / Contar.' : 'Cadastre um item pra controlar. Depois, as Compras somam sozinhas no saldo.'}
         </div>
-        <Field label="Produto"><TextInput value={novo.nome} onChange={set('nome')} placeholder="Cerveja Original 600ml, Arroz 5kg…" /></Field>
+        <Field label="Produto"><TextInput value={novo.nome} onChange={set('nome')} placeholder="Cerveja Original 600ml, Carne, Gin…" /></Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 10 }}>
           <Field label="Categoria"><Select value={novo.categoria} onChange={set('categoria')} options={CATEGORIAS_PRODUTO} /></Field>
           <Field label="Unidade"><Select value={novo.unidade} onChange={set('unidade')} options={UNIDADES} /></Field>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-          <Field label={editId ? 'Saldo atual' : 'Qtd que tem hoje'}><NumInput value={novo.saldo} onChange={set('saldo')} /></Field>
+        <div style={{ display: 'grid', gridTemplateColumns: editId ? '1fr 1fr' : '1fr 1fr 1fr', gap: 10 }}>
+          {!editId && <Field label="Qtd que tem hoje"><NumInput value={novo.saldo} onChange={set('saldo')} /></Field>}
           <Field label="Estoque mínimo"><NumInput value={novo.minimo} onChange={set('minimo')} /></Field>
           <Field label="Custo un. (R$)"><NumInput value={novo.custo} onChange={set('custo')} /></Field>
+        </div>
+        {/* Conteúdo por unidade: pra diluir garrafa em doses/taças. */}
+        <Field label="Conteúdo por unidade (opcional)">
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ flex: 1 }}><NumInput value={novo.conteudo} onChange={set('conteudo')} placeholder="ex.: 1000" /></div>
+            <div style={{ width: 90 }}><Select value={novo.conteudoUnid} onChange={set('conteudoUnid')} options={UNIDADES_CONTEUDO} placeholder="—" /></div>
+          </div>
+        </Field>
+        <div style={{ fontSize: 11, color: C.faint, margin: '-6px 0 12px', lineHeight: 1.4 }}>
+          Só pra quem vende em fração: garrafa de <b>1000 ml</b> → a ficha da taça usa <b>ml</b> e o estoque baixa a garrafa certinho.
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvarItem}>{editId ? 'Salvar item' : 'Adicionar ao estoque'}</Btn>
@@ -213,12 +183,9 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
         </div>
       </Card>
 
-      {/* Lista do estoque */}
-      <SecTitle>Meu estoque ({dados.length})</SecTitle>
-      {dados.length > 6 && (
-        <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar item…" /></div>
-      )}
-      {dados.length === 0 ? (
+      <SecTitle>Meu estoque ({itens.length})</SecTitle>
+      {itens.length > 6 && <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar item…" /></div>}
+      {!carregado ? <Empty>Carregando…</Empty> : itens.length === 0 ? (
         <Empty>Seu estoque está vazio.<br />Cadastre um item acima, ou use as sugestões das suas compras. 👆</Empty>
       ) : grupos.map((g) => (
         <div key={g.cat} style={{ marginBottom: 14 }}>
@@ -227,6 +194,7 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
             const saldo = num(it.saldo), minimo = num(it.minimo), custo = num(it.custo);
             const baixo = minimo > 0 && saldo <= minimo;
             const aberto = verMov === it.id;
+            const conteudoTxt = num(it.conteudo) > 0 && it.conteudoUnid ? ` · ${num(it.conteudo)} ${it.conteudoUnid}/${it.unidade}` : '';
             return (
               <Card key={it.id} style={{ marginBottom: 8, padding: 14, borderColor: baixo ? C.red : C.cardBorder }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
@@ -234,7 +202,7 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{it.nome}</div>
                     <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
                       {custo > 0 ? `${brl(custo)}/${it.unidade} · em estoque ${brl(saldo * custo)}` : `unidade: ${it.unidade}`}
-                      {minimo > 0 ? ` · mín. ${minimo}` : ''}
+                      {minimo > 0 ? ` · mín. ${minimo}` : ''}{conteudoTxt}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -243,7 +211,6 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
                   </div>
                 </div>
 
-                {/* Ações rápidas */}
                 {acao && acao.id === it.id ? (
                   <div style={{ marginTop: 12, borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 8 }}>
@@ -251,9 +218,7 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <div style={{ width: 110 }}><NumInput value={acaoQtd} onChange={setAcaoQtd} placeholder={acao.tipo === 'contagem' ? String(saldo) : '0'} /></div>
-                      {acao.tipo === 'saida' && (
-                        <div style={{ flex: 1, minWidth: 150 }}><Select value={acaoMotivo} onChange={setAcaoMotivo} options={MOTIVOS_SAIDA} /></div>
-                      )}
+                      {acao.tipo === 'saida' && <div style={{ flex: 1, minWidth: 150 }}><Select value={acaoMotivo} onChange={setAcaoMotivo} options={MOTIVOS_SAIDA} /></div>}
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                       <Btn small onClick={confirmarAcao}>Confirmar</Btn>
@@ -267,15 +232,12 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
                     <Btn kind="ghost" small onClick={() => abrirAcao(it.id, 'contagem')}>Contar</Btn>
                     <Btn kind="ghost" small onClick={() => editar(it)}>Editar</Btn>
                     {(it.movimentos || []).length > 0 && (
-                      <button onClick={() => setVerMov(aberto ? null : it.id)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '7px 6px' }}>
-                        {aberto ? 'ocultar' : 'histórico'}
-                      </button>
+                      <button onClick={() => setVerMov(aberto ? null : it.id)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '7px 6px' }}>{aberto ? 'ocultar' : 'histórico'}</button>
                     )}
                     <button onClick={() => excluir(it.id)} title="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '4px 6px', marginLeft: 'auto' }}>×</button>
                   </div>
                 )}
 
-                {/* Histórico de movimentos */}
                 {aberto && (
                   <div style={{ marginTop: 10, borderTop: `1px solid ${C.hair}`, paddingTop: 8 }}>
                     {(it.movimentos || []).slice(0, 15).map((m) => (

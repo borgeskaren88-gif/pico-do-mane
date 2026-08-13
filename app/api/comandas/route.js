@@ -2,8 +2,11 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
+import { disponibilidadeCardapio, aplicarBaixasVendas } from '../../../lib/estoque';
 
 export const dynamic = 'force-dynamic';
+
+const arr = (v) => (Array.isArray(v) ? v : []);
 
 const PAINEL = 'painel';
 const PREFIXO = 'comanda:';
@@ -63,7 +66,11 @@ export async function GET() {
       .filter((c) => c && c.status === 'aberta')
       .sort((a, b) => Number(a.mesa) - Number(b.mesa) || (a.abertaEm || '').localeCompare(b.abertaEm || ''));
     const blob = await lerPainel(sb);
-    const cardapio = (Array.isArray(blob.cardapio) ? blob.cardapio : []).filter((i) => i && i.ativo !== false);
+    const cardapioAtivo = (Array.isArray(blob.cardapio) ? blob.cardapio : []).filter((i) => i && i.ativo !== false);
+    // Disponibilidade de cada item (via fichas técnicas + estoque), pra avisar o
+    // garçom o que está em falta/acabando. disp = null quando não há ficha.
+    const disp = disponibilidadeCardapio(cardapioAtivo, arr(blob.fichas), arr(blob.estoque));
+    const cardapio = cardapioAtivo.map((i) => ({ ...i, disp: disp[i.id] ? disp[i.id].disp : null }));
     // Só os nomes dos clientes, pro seletor de "quem ficou devendo" no fiado.
     const clientes = (Array.isArray(blob.clientes) ? blob.clientes : []).map((c) => (c && c.nome ? String(c.nome) : '')).filter(Boolean).sort((a, b) => a.localeCompare(b));
     return NextResponse.json({ ok: true, comandas, cardapio, mesasQtd: mesasDe(blob), clientes });
@@ -220,6 +227,19 @@ export async function POST(request) {
       if (eV) throw eV;
       const { error: eD } = await sb.from('pdm_dados').delete().eq('chave', chaveDe(id));
       if (eD) throw eD;
+      // Baixa do estoque pela ficha técnica dos itens vendidos. Best-effort: se
+      // algo falhar aqui, a venda NÃO é afetada (a reconciliação pega depois,
+      // via /api/estoque sincronizar, porque a venda ainda não está em baixas).
+      try {
+        const blobAtual = await lerPainel(sb);
+        const rb = aplicarBaixasVendas(arr(blobAtual.estoque), arr(blobAtual.fichas), [venda], arr(blobAtual.estoqueBaixas));
+        if (rb.mudou) {
+          await sb.from('pdm_dados').upsert(
+            { chave: PAINEL, valor: { ...blobAtual, estoque: rb.estoque, estoqueBaixas: rb.baixadas }, atualizado_em: new Date().toISOString() },
+            { onConflict: 'chave' }
+          );
+        }
+      } catch (e) { /* estoque nunca quebra a venda */ }
       return NextResponse.json({ ok: true, venda });
     }
 

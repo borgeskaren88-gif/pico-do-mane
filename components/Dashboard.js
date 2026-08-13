@@ -24,7 +24,6 @@ import Fiados from './Fiados';
 import Clientes from './Clientes';
 import Estoque from './Estoque';
 import FichasTecnicas from './FichasTecnicas';
-import { aplicarEntradasEstoque, aplicarBaixasVendas } from '../lib/estoque';
 import Auditoria from './Auditoria';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
@@ -86,8 +85,8 @@ export default function Dashboard() {
   const [cardapio, setCardapio] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [estoque, setEstoque] = useState([]);
-  const [fichas, setFichas] = useState([]);
-  const [estoqueBaixas, setEstoqueBaixas] = useState([]); // ids de vendas já baixadas do estoque
+  const [fichas, setFichas] = useState([]);         // fichas técnicas (fonte: /api/estoque)
+  const [estCarregado, setEstCarregado] = useState(false);
   const [subEstoque, setSubEstoque] = useState('itens'); // 'itens' | 'fichas'
   const [avisoBaixa, setAvisoBaixa] = useState(''); // resumo da última baixa automática
   const [vendas, setVendas] = useState([]); // vendas do salão (comandas fechadas)
@@ -122,9 +121,6 @@ export default function Dashboard() {
       setTarefasCozinha((salvo && Array.isArray(salvo.tarefasCozinha)) ? salvo.tarefasCozinha : []);
       setCardapio((salvo && Array.isArray(salvo.cardapio)) ? salvo.cardapio : []);
       setClientes((salvo && Array.isArray(salvo.clientes)) ? salvo.clientes : []);
-      setEstoque((salvo && Array.isArray(salvo.estoque)) ? salvo.estoque : []);
-      setFichas((salvo && Array.isArray(salvo.fichas)) ? salvo.fichas : []);
-      setEstoqueBaixas((salvo && Array.isArray(salvo.estoqueBaixas)) ? salvo.estoqueBaixas : []);
       // IMPORTANTE: preserva TODOS os campos ao re-salvar (a limpeza de nomes só
       // mexe em compras/cotações). Antes isso salvava só parte e apagava a lista
       // da cozinha, a Lista de Compras, marketing, etc. Espalhar `salvo` primeiro
@@ -155,26 +151,6 @@ export default function Dashboard() {
   useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario', 'backup', 'estoque'].includes(tab)) carregarVendas(); }, [tab]);
   useEffect(() => { if (tab === 'salao' && subSalao === 'fiados') carregarVendas(); }, [subSalao]);
 
-  // Baixa automática do estoque pelas vendas (comandas fechadas). Roda quando os
-  // dados já carregaram e sempre que a lista de vendas muda. É idempotente: cada
-  // venda só baixa uma vez (guardado em estoqueBaixas). Na primeiríssima vez —
-  // quando ainda não há fichas técnicas — nada é descontado; ela só marca as
-  // vendas atuais como "vistas", pra não descontar histórico retroativo.
-  useEffect(() => {
-    if (!loaded) return;
-    const { estoque: ne, baixadas, mudou, resumo } = aplicarBaixasVendas(estoque, fichas, vendas, estoqueBaixas);
-    if (mudou) {
-      setEstoque(ne);
-      setEstoqueBaixas(baixadas);
-      salvarTudo({ estoque: ne, estoqueBaixas: baixadas });
-      if (resumo.itens > 0) { setAvisoBaixa(`Estoque baixado automaticamente de ${resumo.vendas} venda(s).`); setTimeout(() => setAvisoBaixa(''), 6000); }
-    } else if (Array.isArray(baixadas) && baixadas !== estoqueBaixas) {
-      // Só houve poda de ids de vendas que não existem mais.
-      setEstoqueBaixas(baixadas);
-      salvarTudo({ estoqueBaixas: baixadas });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, vendas]);
 
   // FONTE DO FATURAMENTO: manual. As comandas são só operacionais (salão +
   // conferência de gaveta + fiados) e NÃO entram no DRE/Relatórios/Hoje. O caixa
@@ -210,9 +186,6 @@ export default function Dashboard() {
       listasModelo: parcial.listasModelo ?? listasModelo,
       cardapio: parcial.cardapio ?? cardapio,
       clientes: parcial.clientes ?? clientes,
-      estoque: parcial.estoque ?? estoque,
-      fichas: parcial.fichas ?? fichas,
-      estoqueBaixas: parcial.estoqueBaixas ?? estoqueBaixas,
     };
     // A lista e as tarefas da cozinha são compartilhadas com o acesso da cozinha
     // (que grava por /api/lista). Só as incluímos aqui quando a dona realmente as
@@ -247,8 +220,6 @@ export default function Dashboard() {
     tarefasCozinha: (v) => { setTarefasCozinha(v); salvarTudo({ tarefasCozinha: v }); },
     cardapio: (v) => { setCardapio(v); salvarTudo({ cardapio: v }); },
     clientes: (v) => { setClientes(v); salvarTudo({ clientes: v }); },
-    estoque: (v) => { setEstoque(v); salvarTudo({ estoque: v }); },
-    fichas: (v) => { setFichas(v); salvarTudo({ fichas: v }); },
   };
 
   // Aplica mudanças em compras E despesas numa tacada só (usado ao marcar/
@@ -268,15 +239,45 @@ export default function Dashboard() {
     if (nc) { setCompras(nc); parcial.compras = nc; }
     if (ncot) { setCotacoes(ncot); parcial.cotacoes = ncot; }
     if (nd) { setDespesas(nd); parcial.despesas = nd; }
-    // Entradas automáticas no estoque: os itens comprados que já estão no
-    // catálogo de estoque têm o saldo somado (e o custo atualizado). Produtos
-    // ainda não controlados são ignorados aqui (viram sugestão na aba Estoque).
-    if (comprasNovas && comprasNovas.length) {
-      const novoEstoque = aplicarEntradasEstoque(estoque, comprasNovas);
-      if (novoEstoque !== estoque) { setEstoque(novoEstoque); parcial.estoque = novoEstoque; }
-    }
     salvarTudo(parcial);
+    // Entradas automáticas no estoque (via API dedicada): os itens comprados que
+    // já estão no catálogo têm o saldo somado. Fire-and-forget — não trava a
+    // compra se o estoque falhar. Produtos não cadastrados viram sugestão.
+    if (comprasNovas && comprasNovas.length) {
+      fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'entradaCompras', comprasNovas }) })
+        .then((r) => r.json()).then((j) => { if (j?.ok && Array.isArray(j.itens)) setEstoque(j.itens); }).catch(() => {});
+    }
     if (nc) syncGoogle();
+  };
+
+  // Estoque e fichas técnicas: fonte é a API dedicada /api/estoque (para ficar
+  // em sincronia com a baixa feita ao fechar comandas por qualquer login).
+  const carregarEstoque = useCallback(async ({ sincronizar = false } = {}) => {
+    try {
+      if (sincronizar) {
+        const r = await fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'sincronizar' }) });
+        const j = await r.json();
+        if (j?.ok) { setEstoque(j.itens || []); if (Array.isArray(j.fichas)) setFichas(j.fichas); setEstCarregado(true); if (j.resumo && j.resumo.itens > 0) { setAvisoBaixa(`Estoque atualizado com ${j.resumo.vendas} venda(s).`); setTimeout(() => setAvisoBaixa(''), 6000); } return; }
+      }
+      const r = await fetch('/api/estoque', { cache: 'no-store' });
+      const j = await r.json();
+      if (j?.ok) { setEstoque(j.itens || []); setFichas(j.fichas || []); }
+    } catch { /* ignora */ }
+    finally { setEstCarregado(true); }
+  }, []);
+
+  // Ao abrir a aba Estoque, recarrega e reconcilia (rede de segurança) as vendas.
+  useEffect(() => { if (tab === 'estoque') carregarEstoque({ sincronizar: true }); }, [tab, carregarEstoque]);
+
+  // Uma ação do estoque (add/mov/edit/del/fichas): chama a API e atualiza o
+  // estado com a resposta. Retorna o JSON pra quem precisa (ex.: id do novo item).
+  const estoqueAcao = async (payload) => {
+    try {
+      const r = await fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const j = await r.json();
+      if (j?.ok) { if (Array.isArray(j.itens)) setEstoque(j.itens); if (Array.isArray(j.fichas)) setFichas(j.fichas); }
+      return j;
+    } catch { return { ok: false }; }
   };
 
   // Lista de compras: um único save aplica listaCompras/modelos e, quando um
@@ -452,8 +453,8 @@ export default function Dashboard() {
                 }}>{rot}</button>
               ))}
             </div>
-            {subEstoque === 'itens' && <Estoque dados={estoque} onChange={upd.estoque} compras={compras} onRepor={reporLista} />}
-            {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onFichas={upd.fichas} />}
+            {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} onRepor={reporLista} />}
+            {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={estoqueAcao} />}
           </>
         )}
         {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
@@ -500,20 +501,18 @@ export default function Dashboard() {
         )}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
-        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas, estoqueBaixas }} restore={(d) => {
+        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
             compras: d.compras || compras, cotacoes: d.cotacoes || cotacoes, garrafas: d.garrafas || garrafas,
             tarefas: d.tarefas || tarefas, marketing: d.marketing || marketing, visitantes: d.visitantes || visitantes,
             listaCompras: d.listaCompras || listaCompras, listasModelo: d.listasModelo || listasModelo,
             cardapio: d.cardapio || cardapio, clientes: d.clientes || clientes,
-            estoque: d.estoque || estoque, fichas: d.fichas || fichas, estoqueBaixas: d.estoqueBaixas || estoqueBaixas,
           };
           setDiario(dados.diario); setReceitas(dados.receitas); setDespesas(dados.despesas);
           setCompras(dados.compras); setCotacoes(dados.cotacoes); setGarrafas(dados.garrafas);
           setTarefas(dados.tarefas); setMarketing(dados.marketing); setVisitantes(dados.visitantes);
           setListaCompras(dados.listaCompras); setListasModelo(dados.listasModelo); setCardapio(dados.cardapio); setClientes(dados.clientes);
-          setEstoque(dados.estoque); setFichas(dados.fichas); setEstoqueBaixas(dados.estoqueBaixas);
           apiSalvar(dados);
         }} /><AgendaCalendario /></>)}
       </div>

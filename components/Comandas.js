@@ -151,13 +151,16 @@ export default function Comandas({ papel = 'dona' }) {
 
     const linhaProduto = (it) => {
       const q = qtdNaComanda(it.id);
+      const d = it.disp; // null = sem ficha; 0 = em falta; baixo = acabando
       return (
         <button key={it.id} onClick={() => addItem(it.id)} disabled={busy}
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
           <span style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: C.accent, color: '#fff', fontSize: 20, fontWeight: 800, lineHeight: '26px', textAlign: 'center' }}>+</span>
           <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{it.nome}</span>
-          {q > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: '#06101F', background: C.green, borderRadius: 999, padding: '2px 8px' }}>{q} na mesa</span>}
-          <span style={{ fontSize: 13, fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(num(it.preco))}</span>
+          {d === 0 && <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: C.red, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>em falta</span>}
+          {d != null && d > 0 && d <= 3 && <span style={{ fontSize: 11, fontWeight: 800, color: '#06101F', background: C.amber, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>só {d}</span>}
+          {q > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: '#06101F', background: C.green, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>{q} na mesa</span>}
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(num(it.preco))}</span>
         </button>
       );
     };

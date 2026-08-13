@@ -8,7 +8,7 @@ import { UNIDADES, podeProduzir } from '../lib/estoque';
 // ESTOQUE (com quantidade e unidade). É isso que faz a venda de um prato baixar
 // os insumos sozinha. `fichas` é uma lista de { cardapioId, itens:[{estoqueId,
 // qtd, unidade}] }.
-export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [], onFichas }) {
+export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [], onAcao }) {
   const [abertoId, setAbertoId] = useState(null); // cardapioId com a ficha em edição
   const [ing, setIng] = useState({ estoqueId: '', qtd: '', unidade: '' });
 
@@ -19,7 +19,7 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
   const setFicha = (cardapioId, itens) => {
     const outras = fichas.filter((f) => f.cardapioId !== cardapioId);
     const nova = itens.length ? [...outras, { cardapioId, itens }] : outras;
-    onFichas(nova);
+    onAcao({ acao: 'fichas', fichas: nova });
   };
 
   const addIngrediente = (cardapioId) => {
