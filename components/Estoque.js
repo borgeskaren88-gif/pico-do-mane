@@ -22,6 +22,8 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   const [busy, setBusy] = useState(false);
   const [corrigindo, setCorrigindo] = useState(false);
   const [msgCorrige, setMsgCorrige] = useState('');
+  const [catAberta, setCatAberta] = useState({}); // { [categoria]: true } — categoria expandida
+  const toggleCat = (cat) => setCatAberta((m) => ({ ...m, [cat]: !m[cat] }));
   const set = (k) => (v) => setNovo((f) => ({ ...f, [k]: v }));
 
   const corrigirCustos = async () => {
@@ -211,9 +213,20 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
       {itens.length > 6 && <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar item…" /></div>}
       {!carregado ? <Empty>Carregando…</Empty> : itens.length === 0 ? (
         <Empty>Seu estoque está vazio.<br />Cadastre um item acima, ou use as sugestões das suas compras. 👆</Empty>
-      ) : grupos.map((g) => (
-        <div key={g.cat} style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.06em', color: C.accent, fontWeight: 700, margin: '0 0 8px 2px' }}>{g.cat}</div>
+      ) : grupos.map((g) => {
+        const buscando = busca.trim().length > 0;
+        const aberto = buscando || !!catAberta[g.cat];
+        const valorCat = g.itens.reduce((s, it) => s + num(it.saldo) * num(it.custo), 0);
+        const baixoCat = g.itens.some((it) => num(it.minimo) > 0 && num(it.saldo) <= num(it.minimo));
+        return (
+        <div key={g.cat} style={{ marginBottom: aberto ? 14 : 8 }}>
+          <button onClick={() => toggleCat(g.cat)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', textAlign: 'left', boxShadow: C.cardShadow }}>
+            <span style={{ color: C.accent, fontSize: 12, fontWeight: 800, width: 12, flexShrink: 0 }}>{aberto ? '▾' : '▸'}</span>
+            <span style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '.06em', color: C.accent, fontWeight: 800, flex: 1, minWidth: 0 }}>{g.cat}</span>
+            {baixoCat && <span title="Tem item acabando" style={{ width: 8, height: 8, borderRadius: 999, background: C.red, flexShrink: 0 }} />}
+            <span style={{ fontSize: 12, color: C.faint, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{g.itens.length} · {brl(valorCat)}</span>
+          </button>
+          {aberto && <div style={{ marginTop: 8 }}>
           {g.itens.map((it) => {
             const saldo = num(it.saldo), minimo = num(it.minimo), custo = num(it.custo);
             const baixo = minimo > 0 && saldo <= minimo;
@@ -277,8 +290,10 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
               </Card>
             );
           })}
+          </div>}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
