@@ -56,6 +56,13 @@ export async function POST(request) {
     if (!('cardapio' in valor) && Array.isArray(anterior.cardapio)) valor.cardapio = anterior.cardapio;
     if (!('clientes' in valor) && Array.isArray(anterior.clientes)) valor.clientes = anterior.clientes;
     if (!('mesasQtd' in valor) && anterior.mesasQtd != null) valor.mesasQtd = anterior.mesasQtd;
+    // Estoque, fichas técnicas e baixas são donos de si mesmos (mexidos só via
+    // /api/estoque e pela baixa ao fechar a comanda). O salvamento geral da dona
+    // NUNCA os altera — sempre mantém o que já está no banco, pra não sobrescrever
+    // uma baixa feita por uma venda ao mesmo tempo.
+    if (Array.isArray(anterior.estoque)) valor.estoque = anterior.estoque; else delete valor.estoque;
+    if (Array.isArray(anterior.fichas)) valor.fichas = anterior.fichas; else delete valor.fichas;
+    if (Array.isArray(anterior.estoqueBaixas)) valor.estoqueBaixas = anterior.estoqueBaixas; else delete valor.estoqueBaixas;
     const { error } = await sb
       .from('pdm_dados')
       .upsert(

@@ -22,6 +22,8 @@ import Comandas from './Comandas';
 import Caixa from './Caixa';
 import Fiados from './Fiados';
 import Clientes from './Clientes';
+import Estoque from './Estoque';
+import FichasTecnicas from './FichasTecnicas';
 import Auditoria from './Auditoria';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
@@ -82,6 +84,11 @@ export default function Dashboard() {
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [cardapio, setCardapio] = useState([]);
   const [clientes, setClientes] = useState([]);
+  const [estoque, setEstoque] = useState([]);
+  const [fichas, setFichas] = useState([]);         // fichas técnicas (fonte: /api/estoque)
+  const [estCarregado, setEstCarregado] = useState(false);
+  const [subEstoque, setSubEstoque] = useState('itens'); // 'itens' | 'fichas'
+  const [avisoBaixa, setAvisoBaixa] = useState(''); // resumo da última baixa automática
   const [vendas, setVendas] = useState([]); // vendas do salão (comandas fechadas)
   const [qualLista, setQualLista] = useState('minha'); // 'minha' | 'cozinha'
   const [subSalao, setSubSalao] = useState('comandas'); // 'comandas' | 'cardapio' | 'fiados'
@@ -141,8 +148,9 @@ export default function Dashboard() {
     try { const r = await fetch('/api/vendas', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setVendas(Array.isArray(j.vendas) ? j.vendas : []); } catch { /* ignora */ }
   };
   useEffect(() => { carregarVendas(); }, []);
-  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario', 'backup'].includes(tab)) carregarVendas(); }, [tab]);
+  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario', 'backup', 'estoque'].includes(tab)) carregarVendas(); }, [tab]);
   useEffect(() => { if (tab === 'salao' && subSalao === 'fiados') carregarVendas(); }, [subSalao]);
+
 
   // FONTE DO FATURAMENTO: manual. As comandas são só operacionais (salão +
   // conferência de gaveta + fiados) e NÃO entram no DRE/Relatórios/Hoje. O caixa
@@ -226,13 +234,50 @@ export default function Dashboard() {
   // Registro de compra que alimenta compras + cotações + despesas de uma vez
   // (uma compra vira cotação de preço e, se paga, vira despesa), sem um save
   // sobrescrever o outro. Só aplica as listas que vierem no objeto.
-  const aplicarCompra = ({ compras: nc, cotacoes: ncot, despesas: nd }) => {
+  const aplicarCompra = ({ compras: nc, cotacoes: ncot, despesas: nd, comprasNovas }) => {
     const parcial = {};
     if (nc) { setCompras(nc); parcial.compras = nc; }
     if (ncot) { setCotacoes(ncot); parcial.cotacoes = ncot; }
     if (nd) { setDespesas(nd); parcial.despesas = nd; }
     salvarTudo(parcial);
+    // Entradas automáticas no estoque (via API dedicada): os itens comprados que
+    // já estão no catálogo têm o saldo somado. Fire-and-forget — não trava a
+    // compra se o estoque falhar. Produtos não cadastrados viram sugestão.
+    if (comprasNovas && comprasNovas.length) {
+      fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'entradaCompras', comprasNovas }) })
+        .then((r) => r.json()).then((j) => { if (j?.ok && Array.isArray(j.itens)) setEstoque(j.itens); }).catch(() => {});
+    }
     if (nc) syncGoogle();
+  };
+
+  // Estoque e fichas técnicas: fonte é a API dedicada /api/estoque (para ficar
+  // em sincronia com a baixa feita ao fechar comandas por qualquer login).
+  const carregarEstoque = useCallback(async ({ sincronizar = false } = {}) => {
+    try {
+      if (sincronizar) {
+        const r = await fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'sincronizar' }) });
+        const j = await r.json();
+        if (j?.ok) { setEstoque(j.itens || []); if (Array.isArray(j.fichas)) setFichas(j.fichas); setEstCarregado(true); if (j.resumo && j.resumo.itens > 0) { setAvisoBaixa(`Estoque atualizado com ${j.resumo.vendas} venda(s).`); setTimeout(() => setAvisoBaixa(''), 6000); } return; }
+      }
+      const r = await fetch('/api/estoque', { cache: 'no-store' });
+      const j = await r.json();
+      if (j?.ok) { setEstoque(j.itens || []); setFichas(j.fichas || []); }
+    } catch { /* ignora */ }
+    finally { setEstCarregado(true); }
+  }, []);
+
+  // Ao abrir a aba Estoque, recarrega e reconcilia (rede de segurança) as vendas.
+  useEffect(() => { if (tab === 'estoque') carregarEstoque({ sincronizar: true }); }, [tab, carregarEstoque]);
+
+  // Uma ação do estoque (add/mov/edit/del/fichas): chama a API e atualiza o
+  // estado com a resposta. Retorna o JSON pra quem precisa (ex.: id do novo item).
+  const estoqueAcao = async (payload) => {
+    try {
+      const r = await fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const j = await r.json();
+      if (j?.ok) { if (Array.isArray(j.itens)) setEstoque(j.itens); if (Array.isArray(j.fichas)) setFichas(j.fichas); }
+      return j;
+    } catch { return { ok: false }; }
   };
 
   // Lista de compras: um único save aplica listaCompras/modelos e, quando um
@@ -288,7 +333,7 @@ export default function Dashboard() {
 
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
-    ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
+    ['compras', 'Compras'], ['estoque', 'Estoque'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
     ['salao', 'Central de Operações'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
@@ -395,6 +440,23 @@ export default function Dashboard() {
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
+        {tab === 'estoque' && (
+          <>
+            {avisoBaixa && (
+              <div style={{ background: C.panel2, border: `1px solid ${C.green}`, color: C.green, borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{avisoBaixa}</div>
+            )}
+            <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
+              {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas']].map(([v, rot]) => (
+                <button key={v} onClick={() => setSubEstoque(v)} style={{
+                  flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700,
+                  background: subEstoque === v ? C.accent : 'transparent', color: subEstoque === v ? '#06101F' : C.muted,
+                }}>{rot}</button>
+              ))}
+            </div>
+            {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} onRepor={reporLista} />}
+            {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={estoqueAcao} />}
+          </>
+        )}
         {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
         {tab === 'lista' && (
           <>
@@ -439,7 +501,7 @@ export default function Dashboard() {
         )}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
-        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes }} restore={(d) => {
+        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
             compras: d.compras || compras, cotacoes: d.cotacoes || cotacoes, garrafas: d.garrafas || garrafas,
