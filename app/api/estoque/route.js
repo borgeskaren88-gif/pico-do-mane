@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque } from '../../../lib/estoque';
+import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras } from '../../../lib/estoque';
 import { limparNome } from '../../../lib/util';
 
 export const dynamic = 'force-dynamic';
@@ -98,6 +98,13 @@ export async function POST(request) {
       itens = itens.filter((it) => it.id !== id);
       const novo = await gravarEstoque(sb, blob, { estoque: itens });
       return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
+    }
+
+    // Corrige custos inflados recalculando pelo preço das Compras (fonte da verdade).
+    if (acao === 'corrigirCustos') {
+      const r = recalcularCustosPelasCompras(itens, arr(blob.compras));
+      if (r.corrigidos > 0) { const novo = await gravarEstoque(sb, blob, { estoque: r.estoque }); return NextResponse.json({ ok: true, itens: arr(novo.estoque), corrigidos: r.corrigidos }); }
+      return NextResponse.json({ ok: true, itens, corrigidos: 0 });
     }
 
     // Entrada automática vinda das Compras.

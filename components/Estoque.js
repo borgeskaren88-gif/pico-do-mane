@@ -20,7 +20,20 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   const [busca, setBusca] = useState('');
   const [reposto, setReposto] = useState('');
   const [busy, setBusy] = useState(false);
+  const [corrigindo, setCorrigindo] = useState(false);
+  const [msgCorrige, setMsgCorrige] = useState('');
   const set = (k) => (v) => setNovo((f) => ({ ...f, [k]: v }));
+
+  const corrigirCustos = async () => {
+    if (corrigindo) return;
+    if (typeof window !== 'undefined' && !window.confirm('Recalcular os custos do estoque pelo preço da compra mais recente de cada item?\n\nUse para consertar valores que ficaram inflados. Itens sem compra correspondente não mudam.')) return;
+    setCorrigindo(true); setMsgCorrige('');
+    const j = await onAcao({ acao: 'corrigirCustos' });
+    setCorrigindo(false);
+    if (j && j.ok) setMsgCorrige(j.corrigidos > 0 ? `${j.corrigidos} custo(s) corrigido(s) pelas compras.` : 'Nenhum custo precisou de ajuste (ou faltam compras pra comparar).');
+    else setMsgCorrige('Não consegui corrigir agora. Tente de novo.');
+    setTimeout(() => setMsgCorrige(''), 6000);
+  };
 
   const totais = useMemo(() => {
     let valor = 0, baixo = 0;
@@ -120,6 +133,17 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
       <PageTitle sub="Quanto você tem, o que está acabando e quanto está parado em mercadoria">Estoque</PageTitle>
 
       {reposto && <Card style={{ marginBottom: 12, borderColor: C.green }}><div style={{ fontSize: 14, color: C.green, fontWeight: 700 }}>{reposto}</div></Card>}
+
+      <Card style={{ marginBottom: 12, background: C.panel2 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>Custos com valor estranho?</div>
+            <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>Recalcula o custo de cada item pelo preço da compra mais recente. Conserta valores inflados de uma vez.</div>
+          </div>
+          <Btn small onClick={corrigirCustos}>{corrigindo ? 'Corrigindo…' : 'Corrigir custos'}</Btn>
+        </div>
+        {msgCorrige && <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginTop: 8 }}>{msgCorrige}</div>}
+      </Card>
 
       {abaixoDoMin.length > 0 && (
         <Card style={{ marginBottom: 14, borderColor: C.red }}>
