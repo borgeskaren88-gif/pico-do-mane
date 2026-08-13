@@ -5,6 +5,7 @@ import { C, Card, Btn, Field, TextInput, NumInput, Empty, SecTitle, PageTitle, L
 import { uid, num, fmtDate } from '../lib/util';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
+import EstoqueCozinha from './EstoqueCozinha';
 
 export default function Cozinha() {
   const router = useRouter();
@@ -76,6 +77,15 @@ export default function Cozinha() {
   };
   const editar = (it) => { setNome(it.nome || ''); setQuantidade(it.quantidade || ''); setEditId(it.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
+  // Joga o que está acabando no estoque pra dentro da lista de pedidos (sem
+  // duplicar o que já está lá em aberto). Retorna quantos foram adicionados.
+  const reporNaLista = (novos) => {
+    const existentes = new Set(itens.filter((i) => !i.comprado).map((i) => (i.nome || '').trim().toLowerCase()));
+    const add = novos.filter((n) => !existentes.has((n.nome || '').trim().toLowerCase()));
+    if (add.length) salvar([...add.map((n) => ({ id: uid(), nome: n.nome, quantidade: '', categoria: n.categoria || '', comprado: false, criadoEm: Date.now() })), ...itens]);
+    return add.length;
+  };
+
   // Marca/desmarca uma tarefa como feita (só o "feito"; o texto é da dona).
   const marcarTarefa = (id, feito) => {
     setTarefas((ts) => ts.map((t) => (t.id === id ? { ...t, feito, feitoEm: feito ? new Date().toISOString() : '' } : t)));
@@ -130,7 +140,7 @@ export default function Cozinha() {
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
-          {[['compras', 'Lista de Compras'], ['garrafas', 'Garrafas']].map(([v, rot]) => (
+          {[['compras', 'Lista de Compras'], ['estoque', 'Estoque'], ['garrafas', 'Garrafas']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
               flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 14, fontWeight: 700,
               background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
@@ -184,6 +194,8 @@ export default function Cozinha() {
           )}
         </div>
         </>)}
+
+        {aba === 'estoque' && <EstoqueCozinha onRepor={reporNaLista} />}
 
         {aba === 'garrafas' && (<>
         <PageTitle sub="Abra quando começar e encerre quando acabar">Controle de Garrafas</PageTitle>
