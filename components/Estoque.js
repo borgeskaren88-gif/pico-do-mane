@@ -2,38 +2,10 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, todayISO, fmtDate, uid, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
+import { UNIDADES, MOTIVOS_SAIDA } from '../lib/estoque';
 
-export const UNIDADES = ['un', 'cx', 'fardo', 'pct', 'grf', 'kg', 'g', 'L', 'ml', 'saco', 'lata'];
-export const MOTIVOS_SAIDA = ['Consumo / uso', 'Venda', 'Perda / vencido', 'Quebra', 'Cortesia', 'Ajuste', 'Outro'];
-const MAX_MOV = 50; // guarda os últimos movimentos por item, pra não inchar o banco
-
+const MAX_MOV = 60; // guarda os últimos movimentos por item, pra não inchar o banco
 const igualNome = (a, b) => limparNome(a).toLowerCase() === limparNome(b).toLowerCase();
-
-// Aplica as ENTRADAS de compra no estoque: para cada item comprado que já
-// existe no catálogo de estoque (mesmo nome), soma a quantidade no saldo e
-// atualiza o custo. Produtos que não estão no estoque são ignorados aqui (eles
-// aparecem como "sugestão" na tela de Estoque). Retorna um novo array só se
-// algo mudou; senão devolve o mesmo (pra não salvar à toa).
-export function aplicarEntradasEstoque(estoque, comprasNovas) {
-  if (!Array.isArray(estoque) || !estoque.length || !Array.isArray(comprasNovas) || !comprasNovas.length) return estoque;
-  let mudou = false;
-  const novo = estoque.map((it) => {
-    const compras = comprasNovas.filter((c) => igualNome(c.produto, it.nome) && num(c.quantidade) > 0);
-    if (!compras.length) return it;
-    mudou = true;
-    let saldo = num(it.saldo);
-    let custo = num(it.custo);
-    const movs = [];
-    for (const c of compras) {
-      const q = num(c.quantidade);
-      saldo += q;
-      if (num(c.valorUnit) > 0) custo = num(c.valorUnit);
-      movs.push({ id: uid(), tipo: 'compra', qtd: q, saldoDepois: saldo, motivo: c.fornecedor ? `Compra · ${limparNome(c.fornecedor)}` : 'Compra', data: c.data || todayISO(), ts: Date.now() });
-    }
-    return { ...it, saldo, custo, atualizadoEm: todayISO(), movimentos: [...movs, ...(it.movimentos || [])].slice(0, MAX_MOV) };
-  });
-  return mudou ? novo : estoque;
-}
 
 const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '' });
 
@@ -309,8 +281,8 @@ export default function Estoque({ dados = [], onChange, compras = [], onRepor })
                     {(it.movimentos || []).slice(0, 15).map((m) => (
                       <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: C.muted, padding: '3px 0' }}>
                         <span>{fmtDate(m.data)} · {m.motivo}</span>
-                        <span style={{ fontVariantNumeric: 'tabular-nums', color: m.tipo === 'saida' ? C.red : m.tipo === 'contagem' ? C.muted : C.green }}>
-                          {m.tipo === 'saida' ? '−' : m.tipo === 'contagem' ? '=' : '+'}{m.tipo === 'contagem' ? m.saldoDepois : num(m.qtd)} → {m.saldoDepois}
+                        <span style={{ fontVariantNumeric: 'tabular-nums', color: (m.tipo === 'saida' || m.tipo === 'venda') ? C.red : m.tipo === 'contagem' ? C.muted : C.green }}>
+                          {(m.tipo === 'saida' || m.tipo === 'venda') ? '−' : m.tipo === 'contagem' ? '=' : '+'}{m.tipo === 'contagem' ? m.saldoDepois : num(m.qtd)} → {m.saldoDepois}
                         </span>
                       </div>
                     ))}
