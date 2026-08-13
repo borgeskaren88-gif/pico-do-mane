@@ -201,7 +201,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
           </div>
         </Field>
         <div style={{ fontSize: 11, color: C.faint, margin: '-6px 0 12px', lineHeight: 1.4 }}>
-          Só pra quem vende em fração: garrafa de <b>1000 ml</b> → a ficha da taça usa <b>ml</b> e o estoque baixa a garrafa certinho.
+          Pra quem vende em fração ou usa parte da embalagem: garrafa de <b>1000 ml</b> → a ficha da taça usa <b>ml</b>; pacote de <b>50 un</b> (alumínio) → a ficha usa <b>1 un</b> e o estoque baixa o pacote certinho.
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvarItem}>{editId ? 'Salvar item' : 'Adicionar ao estoque'}</Btn>
