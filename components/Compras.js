@@ -83,7 +83,7 @@ export default function Compras({ dados, cotacoes, despesas = [], onChange, onRe
       if (novos.length) novasCotacoes = [...novos, ...cotacoes];
     }
 
-    onRegistrar({ compras: [...novasCompras, ...dados], cotacoes: novasCotacoes, despesas: novasDespesas });
+    onRegistrar({ compras: [...novasCompras, ...dados], cotacoes: novasCotacoes, despesas: novasDespesas, comprasNovas: novasCompras });
     setCompra(compraVazia()); setItem(itemVazio()); setCarrinho([]);
   };
 

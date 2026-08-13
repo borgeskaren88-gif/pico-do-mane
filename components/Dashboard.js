@@ -22,6 +22,7 @@ import Comandas from './Comandas';
 import Caixa from './Caixa';
 import Fiados from './Fiados';
 import Clientes from './Clientes';
+import Estoque, { aplicarEntradasEstoque } from './Estoque';
 import Auditoria from './Auditoria';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
@@ -82,6 +83,7 @@ export default function Dashboard() {
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [cardapio, setCardapio] = useState([]);
   const [clientes, setClientes] = useState([]);
+  const [estoque, setEstoque] = useState([]);
   const [vendas, setVendas] = useState([]); // vendas do salão (comandas fechadas)
   const [qualLista, setQualLista] = useState('minha'); // 'minha' | 'cozinha'
   const [subSalao, setSubSalao] = useState('comandas'); // 'comandas' | 'cardapio' | 'fiados'
@@ -114,6 +116,7 @@ export default function Dashboard() {
       setTarefasCozinha((salvo && Array.isArray(salvo.tarefasCozinha)) ? salvo.tarefasCozinha : []);
       setCardapio((salvo && Array.isArray(salvo.cardapio)) ? salvo.cardapio : []);
       setClientes((salvo && Array.isArray(salvo.clientes)) ? salvo.clientes : []);
+      setEstoque((salvo && Array.isArray(salvo.estoque)) ? salvo.estoque : []);
       // IMPORTANTE: preserva TODOS os campos ao re-salvar (a limpeza de nomes só
       // mexe em compras/cotações). Antes isso salvava só parte e apagava a lista
       // da cozinha, a Lista de Compras, marketing, etc. Espalhar `salvo` primeiro
@@ -178,6 +181,7 @@ export default function Dashboard() {
       listasModelo: parcial.listasModelo ?? listasModelo,
       cardapio: parcial.cardapio ?? cardapio,
       clientes: parcial.clientes ?? clientes,
+      estoque: parcial.estoque ?? estoque,
     };
     // A lista e as tarefas da cozinha são compartilhadas com o acesso da cozinha
     // (que grava por /api/lista). Só as incluímos aqui quando a dona realmente as
@@ -212,6 +216,7 @@ export default function Dashboard() {
     tarefasCozinha: (v) => { setTarefasCozinha(v); salvarTudo({ tarefasCozinha: v }); },
     cardapio: (v) => { setCardapio(v); salvarTudo({ cardapio: v }); },
     clientes: (v) => { setClientes(v); salvarTudo({ clientes: v }); },
+    estoque: (v) => { setEstoque(v); salvarTudo({ estoque: v }); },
   };
 
   // Aplica mudanças em compras E despesas numa tacada só (usado ao marcar/
@@ -226,11 +231,18 @@ export default function Dashboard() {
   // Registro de compra que alimenta compras + cotações + despesas de uma vez
   // (uma compra vira cotação de preço e, se paga, vira despesa), sem um save
   // sobrescrever o outro. Só aplica as listas que vierem no objeto.
-  const aplicarCompra = ({ compras: nc, cotacoes: ncot, despesas: nd }) => {
+  const aplicarCompra = ({ compras: nc, cotacoes: ncot, despesas: nd, comprasNovas }) => {
     const parcial = {};
     if (nc) { setCompras(nc); parcial.compras = nc; }
     if (ncot) { setCotacoes(ncot); parcial.cotacoes = ncot; }
     if (nd) { setDespesas(nd); parcial.despesas = nd; }
+    // Entradas automáticas no estoque: os itens comprados que já estão no
+    // catálogo de estoque têm o saldo somado (e o custo atualizado). Produtos
+    // ainda não controlados são ignorados aqui (viram sugestão na aba Estoque).
+    if (comprasNovas && comprasNovas.length) {
+      const novoEstoque = aplicarEntradasEstoque(estoque, comprasNovas);
+      if (novoEstoque !== estoque) { setEstoque(novoEstoque); parcial.estoque = novoEstoque; }
+    }
     salvarTudo(parcial);
     if (nc) syncGoogle();
   };
@@ -288,7 +300,7 @@ export default function Dashboard() {
 
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
-    ['compras', 'Compras'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
+    ['compras', 'Compras'], ['estoque', 'Estoque'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
     ['salao', 'Central de Operações'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
@@ -395,6 +407,7 @@ export default function Dashboard() {
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
+        {tab === 'estoque' && <Estoque dados={estoque} onChange={upd.estoque} compras={compras} onRepor={reporLista} />}
         {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
         {tab === 'lista' && (
           <>
@@ -439,18 +452,20 @@ export default function Dashboard() {
         )}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
-        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes }} restore={(d) => {
+        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
             compras: d.compras || compras, cotacoes: d.cotacoes || cotacoes, garrafas: d.garrafas || garrafas,
             tarefas: d.tarefas || tarefas, marketing: d.marketing || marketing, visitantes: d.visitantes || visitantes,
             listaCompras: d.listaCompras || listaCompras, listasModelo: d.listasModelo || listasModelo,
             cardapio: d.cardapio || cardapio, clientes: d.clientes || clientes,
+            estoque: d.estoque || estoque,
           };
           setDiario(dados.diario); setReceitas(dados.receitas); setDespesas(dados.despesas);
           setCompras(dados.compras); setCotacoes(dados.cotacoes); setGarrafas(dados.garrafas);
           setTarefas(dados.tarefas); setMarketing(dados.marketing); setVisitantes(dados.visitantes);
           setListaCompras(dados.listaCompras); setListasModelo(dados.listasModelo); setCardapio(dados.cardapio); setClientes(dados.clientes);
+          setEstoque(dados.estoque);
           apiSalvar(dados);
         }} /><AgendaCalendario /></>)}
       </div>
