@@ -88,6 +88,7 @@ export default function Dashboard() {
   const [fichas, setFichas] = useState([]);         // fichas técnicas (fonte: /api/estoque)
   const [estCarregado, setEstCarregado] = useState(false);
   const [subEstoque, setSubEstoque] = useState('itens'); // 'itens' | 'fichas'
+  const [subAbast, setSubAbast] = useState('estoque'); // 'estoque' | 'lista' | 'compras' | 'cotacoes'
   const [avisoBaixa, setAvisoBaixa] = useState(''); // resumo da última baixa automática
   const [vendas, setVendas] = useState([]); // vendas do salão (comandas fechadas)
   const [qualLista, setQualLista] = useState('minha'); // 'minha' | 'cozinha'
@@ -148,7 +149,7 @@ export default function Dashboard() {
     try { const r = await fetch('/api/vendas', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setVendas(Array.isArray(j.vendas) ? j.vendas : []); } catch { /* ignora */ }
   };
   useEffect(() => { carregarVendas(); }, []);
-  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario', 'backup', 'estoque'].includes(tab)) carregarVendas(); }, [tab]);
+  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario', 'backup', 'abastecimento'].includes(tab)) carregarVendas(); }, [tab]);
   useEffect(() => { if (tab === 'salao' && subSalao === 'fiados') carregarVendas(); }, [subSalao]);
 
 
@@ -267,7 +268,7 @@ export default function Dashboard() {
   }, []);
 
   // Ao abrir a aba Estoque, recarrega e reconcilia (rede de segurança) as vendas.
-  useEffect(() => { if (tab === 'estoque') carregarEstoque({ sincronizar: true }); }, [tab, carregarEstoque]);
+  useEffect(() => { if (tab === 'abastecimento') carregarEstoque({ sincronizar: true }); }, [tab, carregarEstoque]);
 
   // Uma ação do estoque (add/mov/edit/del/fichas): chama a API e atualiza o
   // estado com a resposta. Retorna o JSON pra quem precisa (ex.: id do novo item).
@@ -333,10 +334,18 @@ export default function Dashboard() {
 
   const tabs = [
     ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
-    ['compras', 'Compras'], ['estoque', 'Estoque'], ['pagar', 'Contas a Pagar'], ['lista', 'Lista de Compras'], ['garrafas', 'Controle'], ['cotacoes', 'Cotações'],
+    ['abastecimento', 'Abastecimento'], ['pagar', 'Contas a Pagar'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
   ];
+
+  // Navegação que entende os sub-destinos do setor Abastecimento: se pedirem
+  // 'compras'/'estoque'/'lista'/'cotacoes', abre a aba Abastecimento já na
+  // parte certa (usado pelos atalhos "Ver / + Compra" do Hoje).
+  const irParaTab = (destino) => {
+    if (['estoque', 'lista', 'compras', 'cotacoes'].includes(destino)) { setSubAbast(destino); setTab('abastecimento'); return; }
+    setTab(destino);
+  };
 
   // Selo do Diário: tarefas com data até hoje ainda não feitas.
   const hojeIso = todayISO();
@@ -435,49 +444,64 @@ export default function Dashboard() {
       </div>
 
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
-        {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={setTab} />}
+        {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={irParaTab} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
-        {tab === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
-        {tab === 'estoque' && (
+        {tab === 'abastecimento' && (
           <>
-            {avisoBaixa && (
-              <div style={{ background: C.panel2, border: `1px solid ${C.green}`, color: C.green, borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{avisoBaixa}</div>
-            )}
-            <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-              {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas']].map(([v, rot]) => (
-                <button key={v} onClick={() => setSubEstoque(v)} style={{
-                  flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700,
-                  background: subEstoque === v ? C.accent : 'transparent', color: subEstoque === v ? '#06101F' : C.muted,
+            <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
+              {[['estoque', 'Estoque'], ['lista', 'Lista de Compras'], ['compras', 'Compras'], ['cotacoes', 'Cotações']].map(([v, rot]) => (
+                <button key={v} onClick={() => setSubAbast(v)} style={{
+                  flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
+                  background: subAbast === v ? C.accent : 'transparent', color: subAbast === v ? '#06101F' : C.muted, whiteSpace: 'nowrap',
                 }}>{rot}</button>
               ))}
             </div>
-            {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} onRepor={reporLista} />}
-            {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={estoqueAcao} />}
+
+            {subAbast === 'estoque' && (
+              <>
+                {avisoBaixa && (
+                  <div style={{ background: C.panel2, border: `1px solid ${C.green}`, color: C.green, borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{avisoBaixa}</div>
+                )}
+                <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
+                  {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas']].map(([v, rot]) => (
+                    <button key={v} onClick={() => setSubEstoque(v)} style={{
+                      flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700,
+                      background: subEstoque === v ? C.accent : 'transparent', color: subEstoque === v ? '#06101F' : C.muted,
+                    }}>{rot}</button>
+                  ))}
+                </div>
+                {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} onRepor={reporLista} />}
+                {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={estoqueAcao} />}
+              </>
+            )}
+
+            {subAbast === 'lista' && (
+              <>
+                <div style={{ display: 'inline-flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
+                  {[['minha', 'Minha lista'], ['cozinha', 'Da cozinha']].map(([v, rot]) => (
+                    <button key={v} onClick={() => setQualLista(v)} style={{
+                      border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
+                      background: qualLista === v ? C.accent : 'transparent', color: qualLista === v ? '#06101F' : C.muted,
+                    }}>{rot}</button>
+                  ))}
+                </div>
+                <ListaCompras key={qualLista}
+                  itens={qualLista === 'cozinha' ? listaCozinha : listaCompras}
+                  modelos={listasModelo} cotacoes={cotacoes} compras={compras} despesas={despesas} onAplicar={aplicarLista}
+                  tarefasCozinha={tarefasCozinha} onTarefasCozinha={upd.tarefasCozinha}
+                  subtitulo={qualLista === 'cozinha' ? 'O que a cozinha pediu pra repor' : 'O que falta repor no bar'}
+                  mostrarTarefasCozinha={qualLista === 'cozinha'} />
+              </>
+            )}
+
+            {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
+            {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
           </>
         )}
         {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
-        {tab === 'lista' && (
-          <>
-            <div style={{ display: 'inline-flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-              {[['minha', 'Minha lista'], ['cozinha', 'Da cozinha']].map(([v, rot]) => (
-                <button key={v} onClick={() => setQualLista(v)} style={{
-                  border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
-                  background: qualLista === v ? C.accent : 'transparent', color: qualLista === v ? '#06101F' : C.muted,
-                }}>{rot}</button>
-              ))}
-            </div>
-            <ListaCompras key={qualLista}
-              itens={qualLista === 'cozinha' ? listaCozinha : listaCompras}
-              modelos={listasModelo} cotacoes={cotacoes} compras={compras} despesas={despesas} onAplicar={aplicarLista}
-              tarefasCozinha={tarefasCozinha} onTarefasCozinha={upd.tarefasCozinha}
-              subtitulo={qualLista === 'cozinha' ? 'O que a cozinha pediu pra repor' : 'O que falta repor no bar'}
-              mostrarTarefasCozinha={qualLista === 'cozinha'} />
-          </>
-        )}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
-        {tab === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
         {tab === 'salao' && (
           <>
             <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
