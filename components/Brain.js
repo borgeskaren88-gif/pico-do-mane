@@ -60,7 +60,7 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
         {/* Coluna esquerda: calendário + checklist */}
-        <div style={{ flex: '1 1 320px', minWidth: 0, maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ flex: '1 1 300px', minWidth: 0, maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <AgendaMes />
 
           <Card style={{ padding: 14 }}>
@@ -120,7 +120,7 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
         </div>
 
         {/* Coluna direita (maior): TO DO estilo Notion */}
-        <div style={{ flex: '2 1 460px', minWidth: 0 }}>
+        <div style={{ flex: '2 1 400px', minWidth: 0 }}>
           <Card style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Jogar uma ideia</div>
             <div style={{ display: 'flex', gap: 8 }}>

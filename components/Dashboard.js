@@ -447,7 +447,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: tab === 'brain' ? 1180 : 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={irParaTab} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
