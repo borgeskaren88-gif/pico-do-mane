@@ -27,6 +27,13 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
   const mover = (i, dir) => { const idx = ORDEM.indexOf(i.status); const ni = idx + dir; if (ni < 0 || ni >= ORDEM.length) return; moverIdeia(i.id, ORDEM[ni]); };
   const excluirIdeia = (id) => onIdeias(ideias.filter((i) => i.id !== id));
   const limparFeitos = () => { if (typeof window !== 'undefined' && !window.confirm('Apagar todas as ideias da coluna Feito?')) return; onIdeias(ideias.filter((i) => i.status !== 'feito')); };
+  // Edição do card (título + legenda/nota, estilo Notion).
+  const [editId, setEditId] = useState(null);
+  const [editTexto, setEditTexto] = useState('');
+  const [editNota, setEditNota] = useState('');
+  const abrirEdit = (i) => { setEditId(i.id); setEditTexto(i.texto || ''); setEditNota(i.nota || ''); };
+  const salvarEdit = () => { onIdeias(ideias.map((x) => (x.id === editId ? { ...x, texto: editTexto.trim() || x.texto, nota: editNota.trim() } : x))); setEditId(null); };
+  const cancelarEdit = () => setEditId(null);
 
   // ---- Checklist ----
   const [novaTarefa, setNovaTarefa] = useState('');
@@ -149,14 +156,33 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
                     <div style={{ fontSize: 12, color: C.faint, textAlign: 'center', padding: '10px 4px', border: `1px dashed ${C.line}`, borderRadius: 10 }}>—</div>
                   ) : cards.map((i) => {
                     const idx = ORDEM.indexOf(i.status);
+                    const editando = editId === i.id;
                     return (
                       <div key={i.id} style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderLeft: `3px solid ${cor}`, borderRadius: 10, padding: 10, marginBottom: 8, boxShadow: C.cardShadow }}>
-                        <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.4, marginBottom: 9, textDecoration: status === 'feito' ? 'line-through' : 'none', opacity: status === 'feito' ? 0.7 : 1 }}>{i.texto}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <button onClick={() => mover(i, -1)} disabled={idx === 0} aria-label="Voltar" style={setaBtn(idx > 0)}>‹</button>
-                          <button onClick={() => mover(i, 1)} disabled={idx === ORDEM.length - 1} aria-label="Avançar" style={setaBtn(idx < ORDEM.length - 1)}>›</button>
-                          <button onClick={() => excluirIdeia(i.id)} aria-label="Excluir" style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${C.line}`, color: C.faint, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '6px 10px', borderRadius: 8 }}>×</button>
-                        </div>
+                        {editando ? (
+                          <>
+                            <input value={editTexto} onChange={(e) => setEditTexto(e.target.value)} placeholder="Título da ideia" style={{ ...inputStyle, fontSize: 13.5, fontWeight: 700, padding: '8px 10px', marginBottom: 8 }} />
+                            <textarea value={editNota} onChange={(e) => setEditNota(e.target.value)} rows={3} placeholder="Legenda / lembrete… (ex: ela tem contato de tal jornalista)" style={{ ...inputStyle, fontSize: 13, padding: '8px 10px', marginBottom: 8, resize: 'vertical', lineHeight: 1.4 }} />
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <Btn small onClick={salvarEdit}>Salvar</Btn>
+                              <Btn kind="ghost" small onClick={cancelarEdit}>Cancelar</Btn>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => abrirEdit(i)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginBottom: 9 }}>
+                              <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.4, fontWeight: 600, textDecoration: status === 'feito' ? 'line-through' : 'none', opacity: status === 'feito' ? 0.7 : 1 }}>{i.texto}</div>
+                              {i.nota
+                                ? <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.4, marginTop: 4, whiteSpace: 'pre-wrap' }}>{i.nota}</div>
+                                : <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>+ adicionar nota</div>}
+                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <button onClick={() => mover(i, -1)} disabled={idx === 0} aria-label="Voltar" style={setaBtn(idx > 0)}>‹</button>
+                              <button onClick={() => mover(i, 1)} disabled={idx === ORDEM.length - 1} aria-label="Avançar" style={setaBtn(idx < ORDEM.length - 1)}>›</button>
+                              <button onClick={() => excluirIdeia(i.id)} aria-label="Excluir" style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${C.line}`, color: C.faint, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '6px 10px', borderRadius: 8 }}>×</button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     );
                   })}
