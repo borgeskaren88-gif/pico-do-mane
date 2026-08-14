@@ -29,6 +29,25 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
     } catch { setAgenda(null); }
   };
   useEffect(() => { carregarAgenda(); }, []);
+  // Caixa aberto: pra avisar se ficou aberto mais de 24h (e quem abriu).
+  const [caixaAberto, setCaixaAberto] = useState(null);
+  useEffect(() => {
+    const carregar = async () => {
+      try {
+        const r = await fetch('/api/caixa', { cache: 'no-store' });
+        const j = await r.json();
+        setCaixaAberto(j.ok && j.aberto ? j.aberto : null);
+      } catch { /* ignora */ }
+    };
+    carregar();
+    const t = setInterval(carregar, 60000);
+    return () => clearInterval(t);
+  }, []);
+  const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? 'Karen' : 'alguém');
+  const dataHoraBR = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+  const caixaHoras = caixaAberto?.abertoEm ? (Date.now() - new Date(caixaAberto.abertoEm).getTime()) / 3600000 : 0;
+  const caixaAlerta = !!caixaAberto && caixaHoras >= 24;
+
   // Movimento ao vivo: mesas abertas agora e nº de pessoas nelas.
   const [salaoAgora, setSalaoAgora] = useState({ mesas: 0, pessoas: 0 });
   useEffect(() => {
@@ -160,6 +179,20 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           {mostrarValores ? 'Ocultar' : 'Mostrar'}
         </button>
       </div>
+
+      {caixaAlerta && (
+        <Card style={{ marginBottom: 12, borderColor: C.red }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.red, fontWeight: 700 }}>Caixa aberto há +24h</div>
+              <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.4 }}>
+                Aberto por <b>{papelRot(caixaAberto.abertoPor)}</b> em <b>{dataHoraBR(caixaAberto.abertoEm)}</b> ({Math.floor(caixaHoras)}h atrás)
+              </div>
+            </div>
+            <Btn kind="ghost" small onClick={() => setTab('caixa')}>Ver</Btn>
+          </div>
+        </Card>
+      )}
 
       {salaoAgora.mesas > 0 && (
         <Card style={{ marginBottom: 12, borderColor: C.accent2 }}>
