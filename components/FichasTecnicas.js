@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, Select, NumInput, Empty, SecTitle, PageTitle, inputStyle } from './ui';
 import { num, uid } from '../lib/util';
 import { UNIDADES, podeProduzir } from '../lib/estoque';
+import { CATEGORIAS_CARDAPIO } from './Cardapio';
 
 // Modelo de fichas do Pico do Mané (extraído da ficha técnica em PDF). Só os
 // ingredientes com quantidade definida — itens "a gosto" (sal, páprica, orégano,
@@ -89,6 +90,18 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
   const opcoesEstoque = estoque.map((e) => e.nome);
   const nomeEstoquePorId = (id) => estoqueById.get(id)?.nome || '(item removido)';
 
+  // Agrupa os itens do cardápio por categoria (mesma ordem do cardápio), pra
+  // não virar uma lista gigante e confusa. Cada categoria abre/fecha.
+  const [catAberta, setCatAberta] = useState({});
+  const toggleCat = (cat) => setCatAberta((m) => ({ ...m, [cat]: !m[cat] }));
+  const gruposCardapio = useMemo(() => {
+    const ordem = [...CATEGORIAS_CARDAPIO, ''];
+    const map = new Map();
+    for (const c of cardapio) { const cat = c.categoria || ''; if (!map.has(cat)) map.set(cat, []); map.get(cat).push(c); }
+    return [...map.entries()].sort((a, b) => ordem.indexOf(a[0]) - ordem.indexOf(b[0]))
+      .map(([cat, itens]) => ({ cat: cat || 'Sem categoria', itens: itens.sort((x, y) => (x.nome || '').localeCompare(y.nome || '')) }));
+  }, [cardapio]);
+
   return (
     <div>
       <PageTitle sub="A receita de cada prato — é isso que faz a venda baixar os insumos sozinha">Fichas Técnicas</PageTitle>
@@ -135,11 +148,22 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
       <SecTitle>Itens do cardápio ({comFicha}/{cardapio.length} com ficha)</SecTitle>
       {cardapio.length === 0 ? (
         <Empty>Seu cardápio está vazio.<br />Cadastre os itens em Central de Operações → Cardápio primeiro.</Empty>
-      ) : cardapio.map((c) => {
-        const itens = fichaDe(c.id);
-        const aberto = abertoId === c.id;
-        const rende = itens.length ? podeProduzir(itens, estoque) : null;
+      ) : gruposCardapio.map((g) => {
+        const abertaCat = !!catAberta[g.cat];
+        const comFichaCat = g.itens.filter((c) => fichaDe(c.id).length > 0).length;
         return (
+        <div key={g.cat} style={{ marginBottom: abertaCat ? 14 : 8 }}>
+          <button onClick={() => toggleCat(g.cat)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', textAlign: 'left', boxShadow: C.cardShadow }}>
+            <span style={{ color: C.accent, fontSize: 12, fontWeight: 800, width: 12, flexShrink: 0 }}>{abertaCat ? '▾' : '▸'}</span>
+            <span style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '.06em', color: C.accent, fontWeight: 800, flex: 1, minWidth: 0 }}>{g.cat}</span>
+            <span style={{ fontSize: 12, color: comFichaCat === g.itens.length ? C.green : C.faint, flexShrink: 0 }}>{comFichaCat}/{g.itens.length} com ficha</span>
+          </button>
+          {abertaCat && <div style={{ marginTop: 8 }}>
+          {g.itens.map((c) => {
+            const itens = fichaDe(c.id);
+            const aberto = abertoId === c.id;
+            const rende = itens.length ? podeProduzir(itens, estoque) : null;
+            return (
           <Card key={c.id} style={{ marginBottom: 8, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
               <div style={{ minWidth: 0 }}>
@@ -188,6 +212,10 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
               </div>
             )}
           </Card>
+            );
+          })}
+          </div>}
+        </div>
         );
       })}
     </div>
