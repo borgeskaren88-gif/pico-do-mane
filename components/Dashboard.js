@@ -90,6 +90,7 @@ export default function Dashboard() {
   const [estCarregado, setEstCarregado] = useState(false);
   const [subEstoque, setSubEstoque] = useState('itens'); // 'itens' | 'fichas'
   const [subAbast, setSubAbast] = useState('estoque'); // 'estoque' | 'lista' | 'compras' | 'cotacoes'
+  const [subFinancas, setSubFinancas] = useState('receitas'); // 'receitas' | 'despesas' | 'relatorios'
   const [avisoBaixa, setAvisoBaixa] = useState(''); // resumo da última baixa automática
   const [vendas, setVendas] = useState([]); // vendas do salão (comandas fechadas)
   const [qualLista, setQualLista] = useState('minha'); // 'minha' | 'cozinha'
@@ -336,10 +337,10 @@ export default function Dashboard() {
   };
 
   const tabs = [
-    ['brain', 'Brain'], ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
+    ['brain', 'Brain'], ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['pagar', 'Contas a Pagar'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'],
-    ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
+    ['marketing', 'Marketing'], ['backup', 'Backup'],
   ];
 
   // Navegação que entende os sub-destinos do setor Abastecimento: se pedirem
@@ -348,6 +349,7 @@ export default function Dashboard() {
   const irParaTab = (destino) => {
     if (['estoque', 'lista', 'compras', 'cotacoes'].includes(destino)) { setSubAbast(destino); setTab('abastecimento'); return; }
     if (['caixa', 'comandas', 'fiados', 'clientes', 'cardapio'].includes(destino)) { setSubSalao(destino); setTab('salao'); return; }
+    if (['receitas', 'despesas', 'relatorios'].includes(destino)) { setSubFinancas(destino); setTab('financas'); return; }
     setTab(destino);
   };
 
@@ -451,8 +453,21 @@ export default function Dashboard() {
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={irParaTab} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
-        {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
-        {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
+        {tab === 'financas' && (
+          <>
+            <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
+              {[['receitas', 'Receitas'], ['despesas', 'Despesas'], ['relatorios', 'Relatórios']].map(([v, rot]) => (
+                <button key={v} onClick={() => setSubFinancas(v)} style={{
+                  flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
+                  background: subFinancas === v ? C.accent : 'transparent', color: subFinancas === v ? '#06101F' : C.muted, whiteSpace: 'nowrap',
+                }}>{rot}</button>
+              ))}
+            </div>
+            {subFinancas === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
+            {subFinancas === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
+            {subFinancas === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
+          </>
+        )}
         {tab === 'abastecimento' && (
           <>
             <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
@@ -529,7 +544,6 @@ export default function Dashboard() {
           </>
         )}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
-        {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
         {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, ideias, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
