@@ -5,11 +5,11 @@ import { C, LogoMark, pageBg } from './ui';
 import { ymOf, todayISO, limparNome, fiadoDaVenda } from '../lib/util';
 import SEED_DATA from '../data/seed.json';
 
+import Brain from './Brain';
 import Hoje from './Hoje';
 import Diario from './Diario';
 import Marketing from './Marketing';
 import ListaCompras from './ListaCompras';
-import AgendaCalendario from './AgendaCalendario';
 import Lancamentos from './Lancamentos';
 import Compras from './Compras';
 import ContasPagar from './ContasPagar';
@@ -67,9 +67,10 @@ function normalizarNomes(dados) {
 
 export default function Dashboard() {
   const router = useRouter();
-  const [tab, setTab] = useState('hoje');
+  const [tab, setTab] = useState('brain');
   const [loaded, setLoaded] = useState(false);
   const [diario, setDiario] = useState([]);
+  const [ideias, setIdeias] = useState([]);
   const [receitas, setReceitas] = useState([]);
   const [despesas, setDespesas] = useState([]);
   const [compras, setCompras] = useState([]);
@@ -114,6 +115,7 @@ export default function Dashboard() {
       setDiario(limpos.diario); setReceitas(limpos.receitas); setDespesas(limpos.despesas);
       setCompras(limpos.compras); setCotacoes(limpos.cotacoes); setGarrafas(limpos.garrafas);
       setTarefas((salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : []);
+      setIdeias((salvo && Array.isArray(salvo.ideias)) ? salvo.ideias : []);
       setMarketing((salvo && Array.isArray(salvo.marketing)) ? salvo.marketing : []);
       setVisitantes((salvo && Array.isArray(salvo.visitantes)) ? salvo.visitantes : []);
       setListaCompras((salvo && Array.isArray(salvo.listaCompras)) ? salvo.listaCompras : []);
@@ -181,7 +183,7 @@ export default function Dashboard() {
       diario: parcial.diario ?? diario, receitas: parcial.receitas ?? receitas,
       despesas: parcial.despesas ?? despesas, compras: parcial.compras ?? compras,
       cotacoes: parcial.cotacoes ?? cotacoes, garrafas: parcial.garrafas ?? garrafas,
-      tarefas: parcial.tarefas ?? tarefas, marketing: parcial.marketing ?? marketing,
+      tarefas: parcial.tarefas ?? tarefas, ideias: parcial.ideias ?? ideias, marketing: parcial.marketing ?? marketing,
       visitantes: parcial.visitantes ?? visitantes,
       listaCompras: parcial.listaCompras ?? listaCompras,
       listasModelo: parcial.listasModelo ?? listasModelo,
@@ -215,6 +217,7 @@ export default function Dashboard() {
     cotacoes: (v) => { setCotacoes(v); salvarTudo({ cotacoes: v }); },
     garrafas: (v) => { setGarrafas(v); salvarTudo({ garrafas: v }); },
     tarefas: (v) => { setTarefas(v); salvarTudo({ tarefas: v }); syncGoogle(); },
+    ideias: (v) => { setIdeias(v); salvarTudo({ ideias: v }); },
     marketing: (v) => { setMarketing(v); salvarTudo({ marketing: v }); },
     visitantes: (v) => { setVisitantes(v); salvarTudo({ visitantes: v }); },
     listaCompras: (v) => { setListaCompras(v); salvarTudo({ listaCompras: v }); },
@@ -333,7 +336,7 @@ export default function Dashboard() {
   };
 
   const tabs = [
-    ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
+    ['brain', 'Brain'], ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['receitas', 'Receitas'], ['despesas', 'Despesas'],
     ['abastecimento', 'Abastecimento'], ['pagar', 'Contas a Pagar'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'],
     ['marketing', 'Marketing'], ['relatorios', 'Relatórios'], ['backup', 'Backup'],
@@ -445,8 +448,9 @@ export default function Dashboard() {
       </div>
 
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
+        {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={irParaTab} />}
-        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} tarefas={tarefas} onTarefas={upd.tarefas} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
+        {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
         {tab === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
         {tab === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
         {tab === 'abastecimento' && (
@@ -526,20 +530,20 @@ export default function Dashboard() {
         )}
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
-        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas }} restore={(d) => {
+        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, ideias, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
             compras: d.compras || compras, cotacoes: d.cotacoes || cotacoes, garrafas: d.garrafas || garrafas,
-            tarefas: d.tarefas || tarefas, marketing: d.marketing || marketing, visitantes: d.visitantes || visitantes,
+            tarefas: d.tarefas || tarefas, ideias: d.ideias || ideias, marketing: d.marketing || marketing, visitantes: d.visitantes || visitantes,
             listaCompras: d.listaCompras || listaCompras, listasModelo: d.listasModelo || listasModelo,
             cardapio: d.cardapio || cardapio, clientes: d.clientes || clientes,
           };
           setDiario(dados.diario); setReceitas(dados.receitas); setDespesas(dados.despesas);
           setCompras(dados.compras); setCotacoes(dados.cotacoes); setGarrafas(dados.garrafas);
-          setTarefas(dados.tarefas); setMarketing(dados.marketing); setVisitantes(dados.visitantes);
+          setTarefas(dados.tarefas); setIdeias(dados.ideias); setMarketing(dados.marketing); setVisitantes(dados.visitantes);
           setListaCompras(dados.listaCompras); setListasModelo(dados.listasModelo); setCardapio(dados.cardapio); setClientes(dados.clientes);
           apiSalvar(dados);
-        }} /><AgendaCalendario /></>)}
+        }} /></>)}
       </div>
     </div>
   );
