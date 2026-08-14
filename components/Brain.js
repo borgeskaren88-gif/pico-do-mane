@@ -128,6 +128,7 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
 
         {/* Coluna direita (maior): TO DO estilo Notion */}
         <div style={{ flex: '2 1 400px', minWidth: 0 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '.02em', marginBottom: 12 }}>TO DO</div>
           <Card style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Jogar uma ideia</div>
             <div style={{ display: 'flex', gap: 8 }}>
