@@ -101,15 +101,16 @@ export default function Diario({ dados, onChange, receitas = [], onReceitas, vis
     <div>
       <PageTitle sub="Checklist do bar e fechamento do dia">Log Operacional</PageTitle>
 
-      <div style={{ marginBottom: 18, maxWidth: 440 }}>
-        <CalendarioPedidos dados={dados} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start', marginBottom: 18 }}>
+        <div style={{ flex: '1 1 300px', minWidth: 0, maxWidth: 440 }}>
+          <CalendarioPedidos dados={dados} />
+        </div>
+        <div style={{ flex: '1 1 220px', minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, alignContent: 'start' }}>
+          <KPI titulo="Dias registrados" valor={dados.length} />
+          <KPI titulo="Nota média" valor={media ? media.toFixed(1) : '—'} cor={C.accent} />
+          <KPI titulo="Receita lançada" valor={'R$ ' + Math.round(receitaTotal).toLocaleString('pt-BR')} cor={C.green} />
+        </div>
       </div>
-
-      <Resumo items={[
-        { t: 'Dias registrados', v: dados.length },
-        { t: 'Nota média', v: media ? media.toFixed(1) : '—', c: C.accent },
-        { t: 'Receita lançada', v: 'R$ ' + Math.round(receitaTotal).toLocaleString('pt-BR'), c: C.green },
-      ]} />
 
       <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
         {[['fechamento', 'Fechamento'], ['atrasados', 'Recebimentos atrasados']].map(([v, rot]) => (
