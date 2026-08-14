@@ -55,6 +55,7 @@ export async function POST(request) {
     if (!('tarefasCozinha' in valor) && Array.isArray(anterior.tarefasCozinha)) valor.tarefasCozinha = anterior.tarefasCozinha;
     if (!('cardapio' in valor) && Array.isArray(anterior.cardapio)) valor.cardapio = anterior.cardapio;
     if (!('clientes' in valor) && Array.isArray(anterior.clientes)) valor.clientes = anterior.clientes;
+    if (!('ideias' in valor) && Array.isArray(anterior.ideias)) valor.ideias = anterior.ideias;
     if (!('mesasQtd' in valor) && anterior.mesasQtd != null) valor.mesasQtd = anterior.mesasQtd;
     // Estoque, fichas técnicas e baixas são donos de si mesmos (mexidos só via
     // /api/estoque e pela baixa ao fechar a comanda). O salvamento geral da dona
