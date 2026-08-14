@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { C, Card, Btn, PageTitle, inputStyle } from './ui';
 import { uid, todayISO, fmtDate } from '../lib/util';
 import AgendaCalendario from './AgendaCalendario';
+import AgendaMes from './AgendaMes';
 
 // Colunas do quadro de ideias (estilo Notion): id, rótulo e cor.
 const COLS = [
@@ -169,7 +170,7 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
         </Card>
       )}
 
-      {aba === 'agenda' && <AgendaCalendario />}
+      {aba === 'agenda' && (<><AgendaMes /><AgendaCalendario /></>)}
     </div>
   );
 }
