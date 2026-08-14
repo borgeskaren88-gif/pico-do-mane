@@ -338,7 +338,7 @@ export default function Dashboard() {
 
   const tabs = [
     ['brain', 'Brain'], ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
-    ['abastecimento', 'Abastecimento'], ['pagar', 'Contas a Pagar'], ['garrafas', 'Controle'],
+    ['abastecimento', 'Abastecimento'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'],
     ['marketing', 'Marketing'], ['backup', 'Backup'],
   ];
@@ -349,7 +349,7 @@ export default function Dashboard() {
   const irParaTab = (destino) => {
     if (['estoque', 'lista', 'compras', 'cotacoes'].includes(destino)) { setSubAbast(destino); setTab('abastecimento'); return; }
     if (['caixa', 'comandas', 'fiados', 'clientes', 'cardapio'].includes(destino)) { setSubSalao(destino); setTab('salao'); return; }
-    if (['receitas', 'despesas', 'relatorios'].includes(destino)) { setSubFinancas(destino); setTab('financas'); return; }
+    if (['receitas', 'despesas', 'pagar', 'relatorios'].includes(destino)) { setSubFinancas(destino); setTab('financas'); return; }
     setTab(destino);
   };
 
@@ -456,7 +456,7 @@ export default function Dashboard() {
         {tab === 'financas' && (
           <>
             <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-              {[['receitas', 'Receitas'], ['despesas', 'Despesas'], ['relatorios', 'Relatórios']].map(([v, rot]) => (
+              {[['receitas', 'Receitas'], ['despesas', 'Despesas'], ['pagar', 'Contas a Pagar'], ['relatorios', 'Relatórios']].map(([v, rot]) => (
                 <button key={v} onClick={() => setSubFinancas(v)} style={{
                   flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
                   background: subFinancas === v ? C.accent : 'transparent', color: subFinancas === v ? '#06101F' : C.muted, whiteSpace: 'nowrap',
@@ -465,6 +465,7 @@ export default function Dashboard() {
             </div>
             {subFinancas === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
             {subFinancas === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
+            {subFinancas === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
             {subFinancas === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
           </>
         )}
@@ -520,7 +521,6 @@ export default function Dashboard() {
             {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
           </>
         )}
-        {tab === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
         {tab === 'salao' && (
           <>
