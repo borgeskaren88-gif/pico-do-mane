@@ -344,6 +344,7 @@ export default function Dashboard() {
   // parte certa (usado pelos atalhos "Ver / + Compra" do Hoje).
   const irParaTab = (destino) => {
     if (['estoque', 'lista', 'compras', 'cotacoes'].includes(destino)) { setSubAbast(destino); setTab('abastecimento'); return; }
+    if (['caixa', 'comandas', 'fiados', 'clientes', 'cardapio'].includes(destino)) { setSubSalao(destino); setTab('salao'); return; }
     setTab(destino);
   };
 

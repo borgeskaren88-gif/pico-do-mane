@@ -5,7 +5,8 @@ import { brl, fmtDate } from '../lib/util';
 
 const METODOS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
 const hora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
-const papelRot = (x) => (x === 'garcom' ? 'Garçom' : x === 'dona' ? 'Dona' : '');
+const dataHora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? 'Karen' : '');
 
 export default function Caixa() {
   const [dados, setDados] = useState(null);
@@ -56,6 +57,10 @@ export default function Caixa() {
   const aberto = dados?.aberto || null;
   const entradas = dados?.entradas || {};
   const historico = dados?.historico || [];
+  // Há quanto tempo o caixa está aberto (pra avisar se passou de 24h).
+  const horasAberto = aberto?.abertoEm ? (Date.now() - new Date(aberto.abertoEm).getTime()) / 3600000 : 0;
+  const alerta24 = !!aberto && horasAberto >= 24;
+  const quemAbriu = aberto ? (papelRot(aberto.abertoPor) || 'alguém') : '';
 
   return (
     <div>
@@ -73,8 +78,16 @@ export default function Caixa() {
         </Card>
       ) : (
         <>
+          {alerta24 && (
+            <Card style={{ marginBottom: 12, borderColor: C.red }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: C.red }}>Caixa aberto há mais de 24h</div>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
+                Aberto por <b style={{ color: C.text }}>{quemAbriu}</b> em <b style={{ color: C.text }}>{dataHora(aberto.abertoEm)}</b> — cerca de <b style={{ color: C.text }}>{Math.floor(horasAberto)}h</b> atrás. Confira e feche o caixa do turno.
+              </div>
+            </Card>
+          )}
           <div style={{ fontSize: 13, color: C.faint, marginBottom: 12 }}>
-            Aberto às <b style={{ color: C.muted }}>{hora(aberto.abertoEm)}</b>{papelRot(aberto.abertoPor) && <> · por {papelRot(aberto.abertoPor)}</>} · {dados.qtdVendas} venda(s)
+            Aberto em <b style={{ color: C.muted }}>{dataHora(aberto.abertoEm)}</b> · por <b style={{ color: alerta24 ? C.red : C.muted }}>{quemAbriu}</b> · {dados.qtdVendas} venda(s)
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
