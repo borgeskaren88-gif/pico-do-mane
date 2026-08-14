@@ -101,7 +101,7 @@ export default function Diario({ dados, onChange, receitas = [], onReceitas, vis
     <div>
       <PageTitle sub="Checklist do bar e fechamento do dia">Log Operacional</PageTitle>
 
-      <div style={{ marginBottom: 18 }}>
+      <div style={{ marginBottom: 18, maxWidth: 440 }}>
         <CalendarioPedidos dados={dados} />
       </div>
 
