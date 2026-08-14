@@ -62,6 +62,11 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
 
   const fichaDe = (cardapioId) => (fichas.find((f) => f.cardapioId === cardapioId)?.itens) || [];
   const estoqueById = useMemo(() => new Map(estoque.map((e) => [e.id, e])), [estoque]);
+  // Lista de ingredientes em ordem alfabética, pra achar fácil no seletor da ficha.
+  const estoqueOrdenado = useMemo(
+    () => [...estoque].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })),
+    [estoque],
+  );
 
   // Salva a lista de ingredientes de um item do cardápio.
   const setFicha = (cardapioId, itens) => {
@@ -201,7 +206,7 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
                     setIng((f) => ({ ...f, estoqueId: e.target.value, unidade: f.unidade || (it ? it.unidade : '') }));
                   }} style={{ ...inputStyle, appearance: 'none' }}>
                     <option value="">Selecione…</option>
-                    {estoque.map((e) => <option key={e.id} value={e.id}>{e.nome} ({e.unidade})</option>)}
+                    {estoqueOrdenado.map((e) => <option key={e.id} value={e.id}>{e.nome} ({e.unidade})</option>)}
                   </select>
                 </Field>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
