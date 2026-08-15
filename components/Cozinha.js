@@ -77,15 +77,6 @@ export default function Cozinha() {
   };
   const editar = (it) => { setNome(it.nome || ''); setQuantidade(it.quantidade || ''); setEditId(it.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
-  // Joga o que está acabando no estoque pra dentro da lista de pedidos (sem
-  // duplicar o que já está lá em aberto). Retorna quantos foram adicionados.
-  const reporNaLista = (novos) => {
-    const existentes = new Set(itens.filter((i) => !i.comprado).map((i) => (i.nome || '').trim().toLowerCase()));
-    const add = novos.filter((n) => !existentes.has((n.nome || '').trim().toLowerCase()));
-    if (add.length) salvar([...add.map((n) => ({ id: uid(), nome: n.nome, quantidade: '', categoria: n.categoria || '', comprado: false, criadoEm: Date.now() })), ...itens]);
-    return add.length;
-  };
-
   // Marca/desmarca uma tarefa como feita (só o "feito"; o texto é da dona).
   const marcarTarefa = (id, feito) => {
     setTarefas((ts) => ts.map((t) => (t.id === id ? { ...t, feito, feitoEm: feito ? new Date().toISOString() : '' } : t)));
@@ -195,7 +186,7 @@ export default function Cozinha() {
         </div>
         </>)}
 
-        {aba === 'estoque' && <EstoqueCozinha onRepor={reporNaLista} />}
+        {aba === 'estoque' && <EstoqueCozinha />}
 
         {aba === 'garrafas' && (<>
         <PageTitle sub="Abra quando começar e encerre quando acabar">Controle de Garrafas</PageTitle>
