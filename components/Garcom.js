@@ -6,12 +6,13 @@ import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 import Comandas from './Comandas';
 import Caixa from './Caixa';
+import PerdaGarcom from './PerdaGarcom';
 
 // Acesso do garçom (linha de frente): as comandas e o caixa do turno. Sem o
 // financeiro do bar, sem relatório — só o que precisa pra atender e bater o caixa.
 export default function Garcom() {
   const router = useRouter();
-  const [aba, setAba] = useState('comandas'); // 'comandas' | 'caixa'
+  const [aba, setAba] = useState('comandas'); // 'comandas' | 'caixa' | 'perdas'
 
   const [tema, setTema] = useState('escuro');
   useEffect(() => { setTema(document.documentElement.getAttribute('data-theme') === 'claro' ? 'claro' : 'escuro'); }, []);
@@ -60,14 +61,14 @@ export default function Garcom() {
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
-          {[['caixa', 'Caixa'], ['comandas', 'Comandas']].map(([v, rot]) => (
+          {[['caixa', 'Caixa'], ['comandas', 'Comandas'], ['perdas', 'Perdas']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
               flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 14, fontWeight: 700,
               background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
             }}>{rot}</button>
           ))}
         </div>
-        {aba === 'comandas' ? <Comandas papel="garcom" /> : <Caixa />}
+        {aba === 'comandas' ? <Comandas papel="garcom" /> : aba === 'perdas' ? <PerdaGarcom /> : <Caixa />}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { disponibilidadeCardapio, aplicarBaixasVendas } from '../../../lib/estoque';
+import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem } from '../../../lib/estoque';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,7 +73,13 @@ export async function GET() {
     const cardapio = cardapioAtivo.map((i) => ({ ...i, disp: disp[i.id] ? disp[i.id].disp : null }));
     // Só os nomes dos clientes, pro seletor de "quem ficou devendo" no fiado.
     const clientes = (Array.isArray(blob.clientes) ? blob.clientes : []).map((c) => (c && c.nome ? String(c.nome) : '')).filter(Boolean).sort((a, b) => a.localeCompare(b));
-    return NextResponse.json({ ok: true, comandas, cardapio, mesasQtd: mesasDe(blob), clientes });
+    // Itens do estoque (só nome/unidade, SEM custo/saldo) pro garçom registrar
+    // perda/quebra sem ver os números do bar.
+    const estoqueItens = (Array.isArray(blob.estoque) ? blob.estoque : [])
+      .map((it) => ({ id: it.id, nome: it.nome, unidade: it.unidade || 'un', categoria: it.categoria || '' }))
+      .filter((it) => it.id && it.nome)
+      .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    return NextResponse.json({ ok: true, comandas, cardapio, mesasQtd: mesasDe(blob), clientes, estoqueItens });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar comandas.' }, { status: 500 });
   }
@@ -133,6 +139,27 @@ export async function POST(request) {
       );
       if (error) throw error;
       return NextResponse.json({ ok: true, cliente: novo });
+    }
+
+    // Registrar perda/quebra: o garçom (ou a dona) baixa um item do estoque por
+    // perda (quebrou, congelou, estragou, venceu). Não vira venda nem toca no
+    // caixa/DRE — é só ajuste do estoque, com o motivo no histórico do item.
+    if (acao === 'perda') {
+      const itemId = txt(body?.itemId, 40);
+      const qtd = Number(body?.qtd);
+      const motivo = (txt(body?.motivo, 40) || 'Perda');
+      if (!itemId || !(qtd > 0)) return NextResponse.json({ ok: false, erro: 'Escolha o item e diga quanto se perdeu.' }, { status: 400 });
+      const blob = await lerPainel(sb);
+      const estoque = Array.isArray(blob.estoque) ? blob.estoque : [];
+      let achou = false;
+      const novos = estoque.map((it) => { if (it.id !== itemId) return it; achou = true; return aplicarMovimentoItem(it, 'saida', qtd, motivo + ' (atendimento)'); });
+      if (!achou) return NextResponse.json({ ok: false, erro: 'Item não encontrado no estoque.' }, { status: 404 });
+      const { error } = await sb.from('pdm_dados').upsert(
+        { chave: PAINEL, valor: { ...blob, estoque: novos }, atualizado_em: new Date().toISOString() },
+        { onConflict: 'chave' }
+      );
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
     }
 
     // Ações que mexem numa comanda existente: sempre lê -> altera -> grava
