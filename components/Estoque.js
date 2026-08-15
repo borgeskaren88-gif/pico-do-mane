@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
-import { brl, num, fmtDate, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
+import { brl, num, fmtDate, limparNome, todayISO, CATEGORIAS_PRODUTO } from '../lib/util';
 import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome } from '../lib/estoque';
 
 const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '' });
@@ -47,6 +47,43 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   }, [itens]);
 
   const abaixoDoMin = useMemo(() => itens.filter((it) => num(it.minimo) > 0 && num(it.saldo) <= num(it.minimo)), [itens]);
+
+  // "Para onde foi o estoque" no mês atual: junta as saídas de todos os itens e
+  // separa por tipo (venda, perda/quebra, consumo da casa, outros), com o valor
+  // em R$ (qtd baixada × custo do item). Lê o histórico que cada item já guarda.
+  const saidasMes = useMemo(() => {
+    const ym = todayISO().slice(0, 7);
+    const cats = {
+      vendas: { valor: 0, n: 0, itens: {} },
+      perdas: { valor: 0, n: 0, itens: {} },
+      consumo: { valor: 0, n: 0, itens: {} },
+      outros: { valor: 0, n: 0, itens: {} },
+    };
+    const catDe = (m) => {
+      if (m.tipo === 'venda') return 'vendas';
+      if (m.tipo !== 'saida') return null;
+      const mo = (m.motivo || '').toLowerCase();
+      if (/(perda|quebr|congel|estrag|venc)/.test(mo)) return 'perdas';
+      if (/(consumo|cortesia|uso)/.test(mo)) return 'consumo';
+      if (/venda/.test(mo)) return 'vendas';
+      return 'outros';
+    };
+    for (const it of itens) {
+      for (const m of (it.movimentos || [])) {
+        if (!m.data || m.data.slice(0, 7) !== ym) continue;
+        const c = catDe(m);
+        if (!c) continue;
+        const val = num(m.qtd) * num(it.custo);
+        cats[c].valor += val; cats[c].n += 1;
+        cats[c].itens[it.nome] = (cats[c].itens[it.nome] || 0) + val;
+      }
+    }
+    const total = cats.vendas.valor + cats.perdas.valor + cats.consumo.valor + cats.outros.valor;
+    const listaDe = (c) => Object.entries(c.itens).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor);
+    return { cats, total, listaDe, temAlgo: (cats.vendas.n + cats.perdas.n + cats.consumo.n + cats.outros.n) > 0 };
+  }, [itens]);
+  const [verSaidas, setVerSaidas] = useState(false);
+  const [catSaidaAberta, setCatSaidaAberta] = useState('');
 
   // Produtos já comprados que ainda não estão no estoque (sugestões).
   const sugestoes = useMemo(() => {
@@ -145,6 +182,59 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
           <Btn small onClick={corrigirCustos}>{corrigindo ? 'Corrigindo…' : 'Corrigir custos'}</Btn>
         </div>
         {msgCorrige && <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginTop: 8 }}>{msgCorrige}</div>}
+      </Card>
+
+      {/* Para onde foi o estoque este mês: venda x perda x consumo da casa. */}
+      <Card style={{ marginBottom: 14 }}>
+        <button onClick={() => setVerSaidas((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+          <span style={{ color: C.accent, fontSize: 12, fontWeight: 800, width: 12, flexShrink: 0 }}>{verSaidas ? '▾' : '▸'}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: C.text }}>Para onde foi o estoque</span>
+            <span style={{ fontSize: 12, color: C.muted, display: 'block', marginTop: 1 }}>Este mês · saídas por venda, perda e consumo da casa</span>
+          </span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(saidasMes.total)}</span>
+        </button>
+        {verSaidas && (
+          <div style={{ marginTop: 12, borderTop: `1px solid ${C.hair}`, paddingTop: 10 }}>
+            {!saidasMes.temAlgo ? (
+              <div style={{ fontSize: 13, color: C.faint }}>Nenhuma saída registrada este mês ainda.</div>
+            ) : (
+              [
+                { k: 'vendas', rot: 'Vendas', desc: 'virou prato/drink vendido', cor: C.green },
+                { k: 'perdas', rot: 'Perdas e quebras', desc: 'quebrou, congelou, estragou, venceu', cor: C.red },
+                { k: 'consumo', rot: 'Consumo da casa', desc: 'consumo próprio e cortesias', cor: C.amber },
+                { k: 'outros', rot: 'Outros ajustes', desc: 'ajustes e saídas diversas', cor: C.muted },
+              ].map(({ k, rot, desc, cor }) => {
+                const c = saidasMes.cats[k];
+                if (c.n === 0) return null;
+                const aberta = catSaidaAberta === k;
+                return (
+                  <div key={k} style={{ borderTop: `1px solid ${C.hair}`, paddingTop: 8, marginTop: 8 }}>
+                    <button onClick={() => setCatSaidaAberta(aberta ? '' : k)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                      <span style={{ width: 9, height: 9, borderRadius: 999, background: cor, flexShrink: 0 }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700 }}>{rot}</span>
+                        <span style={{ fontSize: 11, color: C.faint, display: 'block' }}>{desc} · {c.n} saída(s)</span>
+                      </span>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(c.valor)}</span>
+                    </button>
+                    {aberta && (
+                      <div style={{ marginTop: 8, marginLeft: 19 }}>
+                        {saidasMes.listaDe(c).map((x) => (
+                          <div key={x.nome} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, padding: '3px 0', color: C.muted }}>
+                            <span style={{ minWidth: 0 }}>{x.nome}</span>
+                            <span style={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(x.valor)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+            <div style={{ fontSize: 11, color: C.faint, marginTop: 10, lineHeight: 1.4 }}>Valores estimados pelo custo de cada item. Isso não é o DRE — é só pra você ver para onde a mercadoria está indo.</div>
+          </div>
+        )}
       </Card>
 
       {abaixoDoMin.length > 0 && (
