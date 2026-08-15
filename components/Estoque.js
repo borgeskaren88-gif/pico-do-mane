@@ -17,6 +17,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   const [acaoQtd, setAcaoQtd] = useState('');
   const [acaoMotivo, setAcaoMotivo] = useState(MOTIVOS_SAIDA[0]);
   const [verMov, setVerMov] = useState(null);
+  const [menuMov, setMenuMov] = useState(null); // id do movimento com o menu corrigir/desfazer aberto
   const [busca, setBusca] = useState('');
   const [reposto, setReposto] = useState('');
   const [busy, setBusy] = useState(false);
@@ -132,11 +133,19 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   };
   const cancelar = () => { setNovo(itemVazio()); setEditId(null); };
   const excluir = async (id) => { if (!window.confirm('Excluir este item do estoque?')) return; if (id === editId) cancelar(); await onAcao({ acao: 'del', id }); };
-  // Apaga uma linha do histórico (ex.: uma saída digitada errada). NÃO mexe no
-  // saldo atual — só tira o registro da conta do resumo "Para onde foi".
+  // "Desfazer": reverte o movimento no saldo (o que saiu volta; o que entrou
+  // sai) E tira a linha. É o que usar quando o lançamento foi errado.
+  const desfazerMov = async (itemId, movId) => {
+    if (typeof window !== 'undefined' && !window.confirm('Desfazer este movimento?\n\nA quantidade volta ao estoque (ou sai, se era uma entrada). Use quando o lançamento foi errado.')) return;
+    await onAcao({ acao: 'estornarMov', id: itemId, movId });
+    setMenuMov(null);
+  };
+  // "Só apagar": tira a linha do histórico mas NÃO mexe no saldo — pra limpar um
+  // registro antigo cujo saldo já foi acertado no Contar (ex.: some do resumo).
   const excluirMov = async (itemId, movId) => {
-    if (typeof window !== 'undefined' && !window.confirm('Apagar esta linha do histórico?\n\nO saldo de hoje NÃO muda — isso só tira este registro do resumo "Para onde foi".')) return;
+    if (typeof window !== 'undefined' && !window.confirm('Só apagar esta linha do histórico?\n\nO saldo de hoje NÃO muda — isso só tira o registro do resumo "Para onde foi". (Se você quer a quantidade de volta, use "Desfazer".)')) return;
     await onAcao({ acao: 'delMov', id: itemId, movId });
+    setMenuMov(null);
   };
 
   const adicionarSugestao = async (s) => {
@@ -373,17 +382,30 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
 
                 {aberto && (
                   <div style={{ marginTop: 10, borderTop: `1px solid ${C.hair}`, paddingTop: 8 }}>
-                    {(it.movimentos || []).slice(0, 15).map((m) => (
-                      <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: C.muted, padding: '3px 0', alignItems: 'center' }}>
-                        <span style={{ minWidth: 0 }}>{fmtDate(m.data)} · {m.motivo}</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                          <span style={{ fontVariantNumeric: 'tabular-nums', color: (m.tipo === 'saida' || m.tipo === 'venda') ? C.red : m.tipo === 'contagem' ? C.muted : C.green }}>
-                            {(m.tipo === 'saida' || m.tipo === 'venda') ? '−' : m.tipo === 'contagem' ? '=' : '+'}{m.tipo === 'contagem' ? m.saldoDepois : num(m.qtd)} → {m.saldoDepois}
+                    {(it.movimentos || []).slice(0, 15).map((m) => {
+                      const podeDesfazer = ['saida', 'venda', 'entrada', 'compra'].includes(m.tipo);
+                      const menu = menuMov === m.id;
+                      return (
+                      <div key={m.id} style={{ padding: '3px 0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: C.muted, alignItems: 'center' }}>
+                          <span style={{ minWidth: 0 }}>{fmtDate(m.data)} · {m.motivo}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                            <span style={{ fontVariantNumeric: 'tabular-nums', color: (m.tipo === 'saida' || m.tipo === 'venda') ? C.red : m.tipo === 'contagem' ? C.muted : C.green }}>
+                              {(m.tipo === 'saida' || m.tipo === 'venda') ? '−' : m.tipo === 'contagem' ? '=' : '+'}{m.tipo === 'contagem' ? m.saldoDepois : num(m.qtd)} → {m.saldoDepois}
+                            </span>
+                            <button onClick={() => setMenuMov(menu ? null : m.id)} title="Corrigir esta linha" style={{ background: 'none', border: 'none', color: menu ? C.accent : C.faint, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 2px' }}>×</button>
                           </span>
-                          <button onClick={() => excluirMov(it.id, m.id)} title="Apagar esta linha do histórico" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 2px' }}>×</button>
-                        </span>
+                        </div>
+                        {menu && (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 6, marginBottom: 4 }}>
+                            {podeDesfazer && <Btn kind="ok" small onClick={() => desfazerMov(it.id, m.id)}>Desfazer (volta o estoque)</Btn>}
+                            <Btn kind="ghost" small onClick={() => excluirMov(it.id, m.id)}>Só apagar do histórico</Btn>
+                            <Btn kind="ghost" small onClick={() => setMenuMov(null)}>Cancelar</Btn>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </Card>

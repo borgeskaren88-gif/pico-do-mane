@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras } from '../../../lib/estoque';
-import { limparNome } from '../../../lib/util';
+import { limparNome, num } from '../../../lib/util';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,6 +112,30 @@ export async function POST(request) {
         const movs = (it.movimentos || []).filter((m) => m.id !== movId);
         if (movs.length !== (it.movimentos || []).length) achou = true;
         return { ...it, movimentos: movs };
+      });
+      if (!achou) return NextResponse.json({ ok: false, erro: 'Movimento não encontrado.' }, { status: 404 });
+      const novo = await gravarEstoque(sb, blob, { estoque: itens });
+      return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
+    }
+
+    // Desfazer (estornar) um movimento: reverte o efeito no saldo E remove a
+    // linha. Saída/venda voltam ao estoque; entrada/compra saem. Contagem não dá
+    // pra estornar com segurança (não guarda o "antes"), então só é removida.
+    if (acao === 'estornarMov') {
+      const id = String(body?.id || '');
+      const movId = String(body?.movId || '');
+      let achou = false;
+      itens = itens.map((it) => {
+        if (it.id !== id) return it;
+        const mov = (it.movimentos || []).find((m) => m.id === movId);
+        if (!mov) return it;
+        achou = true;
+        let saldo = num(it.saldo);
+        const q = num(mov.qtd);
+        if (mov.tipo === 'saida' || mov.tipo === 'venda') saldo = saldo + q;
+        else if (mov.tipo === 'entrada' || mov.tipo === 'compra') saldo = Math.max(0, saldo - q);
+        saldo = Math.round(saldo * 1000) / 1000;
+        return { ...it, saldo, movimentos: (it.movimentos || []).filter((m) => m.id !== movId) };
       });
       if (!achou) return NextResponse.json({ ok: false, erro: 'Movimento não encontrado.' }, { status: 404 });
       const novo = await gravarEstoque(sb, blob, { estoque: itens });
