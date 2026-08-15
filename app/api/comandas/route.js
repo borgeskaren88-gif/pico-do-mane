@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem } from '../../../lib/estoque';
+import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
 
 export const dynamic = 'force-dynamic';
 
@@ -160,6 +160,42 @@ export async function POST(request) {
       );
       if (error) throw error;
       return NextResponse.json({ ok: true });
+    }
+
+    // Cortesia: um produto do CARDÁPIO liberado de graça. Baixa os ingredientes
+    // da ficha técnica (igual a uma venda), com motivo "Cortesia · <prato>". Não
+    // vira venda nem toca no caixa/DRE — é só ajuste do estoque.
+    if (acao === 'cortesia') {
+      const cardapioId = txt(body?.cardapioId, 40);
+      const qtd = Math.max(1, Math.floor(Number(body?.qtd) || 1));
+      if (!cardapioId) return NextResponse.json({ ok: false, erro: 'Escolha o produto da cortesia.' }, { status: 400 });
+      const blob = await lerPainel(sb);
+      const estoque = Array.isArray(blob.estoque) ? blob.estoque : [];
+      const fichas = Array.isArray(blob.fichas) ? blob.fichas : [];
+      const cardapio = Array.isArray(blob.cardapio) ? blob.cardapio : [];
+      const ficha = fichas.find((f) => f.cardapioId === cardapioId);
+      const prato = cardapio.find((c) => c.id === cardapioId)?.nome || 'Cortesia';
+      if (!ficha || !Array.isArray(ficha.itens) || !ficha.itens.length) {
+        return NextResponse.json({ ok: false, erro: `"${prato}" não tem ficha técnica, então não dá pra baixar os ingredientes. A dona precisa montar a ficha primeiro.` }, { status: 400 });
+      }
+      const novoEstoque = estoque.slice();
+      const motivo = `Cortesia · ${prato}`;
+      let mudou = false;
+      for (const ing of ficha.itens) {
+        const idx = novoEstoque.findIndex((x) => x.id === ing.estoqueId);
+        if (idx < 0) continue;
+        const baixa = qtd * qtdNaUnidadeDoItem(ing.qtd, ing.unidade, novoEstoque[idx]);
+        if (!(baixa > 0)) continue;
+        novoEstoque[idx] = aplicarMovimentoItem(novoEstoque[idx], 'saida', baixa, motivo);
+        mudou = true;
+      }
+      if (!mudou) return NextResponse.json({ ok: false, erro: 'Não achei ingredientes pra baixar (confira a ficha).' }, { status: 400 });
+      const { error } = await sb.from('pdm_dados').upsert(
+        { chave: PAINEL, valor: { ...blob, estoque: novoEstoque }, atualizado_em: new Date().toISOString() },
+        { onConflict: 'chave' }
+      );
+      if (error) throw error;
+      return NextResponse.json({ ok: true, prato });
     }
 
     // Ações que mexem numa comanda existente: sempre lê -> altera -> grava
