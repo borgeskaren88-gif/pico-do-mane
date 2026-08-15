@@ -160,7 +160,6 @@ export default function Dashboard() {
   // conferência de gaveta + fiados) e NÃO entram no DRE/Relatórios/Hoje. O caixa
   // oficial é o que a dona lança à mão, verificado nas máquinas. Por isso o
   // financeiro usa só `receitas` (o que ela digita), não as vendas do salão.
-  const fiadosAbertos = vendas.filter((v) => fiadoDaVenda(v) > 0.005 && !v.pago).length;
   // Pessoas atendidas por dia (somado do nº de pessoas de cada mesa fechada).
   const pessoasPorDia = useMemo(() => {
     const m = {};
@@ -356,7 +355,9 @@ export default function Dashboard() {
   // Selo do Diário: tarefas com data até hoje ainda não feitas.
   const hojeIso = todayISO();
   const tarefasAlerta = tarefas.filter((t) => !t.feito && t.data && t.data <= hojeIso).length;
-  const badges = { diario: tarefasAlerta, salao: fiadosAbertos };
+  // Fiado não vira "notificação" no topo: com vários em aberto pareceria alarme.
+  // A conta de quem está devendo aparece na própria tela de Fiados.
+  const badges = { diario: tarefasAlerta };
 
   // Navegação por gesto: deslizar o dedo para o lado troca de aba.
   const toqueRef = useRef(null);
@@ -532,7 +533,6 @@ export default function Dashboard() {
                   display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
                 }}>
                   {rot}
-                  {v === 'fiados' && fiadosAbertos > 0 && <span style={{ background: subSalao === v ? '#06101F' : C.red, color: subSalao === v ? C.accent : '#fff', fontSize: 11, fontWeight: 800, lineHeight: 1, borderRadius: 999, padding: '2px 6px' }}>{fiadosAbertos}</span>}
                 </button>
               ))}
             </div>
