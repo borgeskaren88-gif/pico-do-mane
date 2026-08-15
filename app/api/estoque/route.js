@@ -100,6 +100,24 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
     }
 
+    // Apaga UMA linha do histórico de um item (ex.: saída digitada errada). NÃO
+    // altera o saldo — o saldo atual continua sendo a verdade (a dona já ajustou
+    // com o Contar). Só remove o registro, pra ele parar de contar no resumo.
+    if (acao === 'delMov') {
+      const id = String(body?.id || '');
+      const movId = String(body?.movId || '');
+      let achou = false;
+      itens = itens.map((it) => {
+        if (it.id !== id) return it;
+        const movs = (it.movimentos || []).filter((m) => m.id !== movId);
+        if (movs.length !== (it.movimentos || []).length) achou = true;
+        return { ...it, movimentos: movs };
+      });
+      if (!achou) return NextResponse.json({ ok: false, erro: 'Movimento não encontrado.' }, { status: 404 });
+      const novo = await gravarEstoque(sb, blob, { estoque: itens });
+      return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
+    }
+
     // Corrige custos inflados recalculando pelo preço das Compras (fonte da verdade).
     if (acao === 'corrigirCustos') {
       const r = recalcularCustosPelasCompras(itens, arr(blob.compras));
