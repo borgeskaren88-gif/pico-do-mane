@@ -115,6 +115,26 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, comanda });
     }
 
+    // Salvar um nome novo na lista de clientes (usado quando fecha um fiado com
+    // um nome que ainda não está cadastrado). Não duplica se já existir.
+    if (acao === 'novoCliente') {
+      const nome = txt(body?.nome, 60);
+      if (!nome) return NextResponse.json({ ok: false, erro: 'Informe o nome.' }, { status: 400 });
+      const norm = (s) => (s || '').trim().toLowerCase();
+      const blob = await lerPainel(sb);
+      const clientes = Array.isArray(blob.clientes) ? blob.clientes : [];
+      if (clientes.some((cli) => norm(cli?.nome) === norm(nome))) {
+        return NextResponse.json({ ok: true, jaExistia: true });
+      }
+      const novo = { id: uid(), nome, telefone: '', limite: '', bloquear: false };
+      const { error } = await sb.from('pdm_dados').upsert(
+        { chave: PAINEL, valor: { ...blob, clientes: [novo, ...clientes] }, atualizado_em: new Date().toISOString() },
+        { onConflict: 'chave' }
+      );
+      if (error) throw error;
+      return NextResponse.json({ ok: true, cliente: novo });
+    }
+
     // Ações que mexem numa comanda existente: sempre lê -> altera -> grava
     // (read-modify-write), pra dois garçons na mesma mesa não apagarem o item
     // um do outro.
