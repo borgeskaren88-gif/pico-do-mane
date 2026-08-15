@@ -58,6 +58,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
       vendas: { valor: 0, n: 0, itens: {} },
       perdas: { valor: 0, n: 0, itens: {} },
       consumo: { valor: 0, n: 0, itens: {} },
+      cortesia: { valor: 0, n: 0, itens: {} },
       outros: { valor: 0, n: 0, itens: {} },
     };
     const catDe = (m) => {
@@ -65,7 +66,8 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
       if (m.tipo !== 'saida') return null;
       const mo = (m.motivo || '').toLowerCase();
       if (/(perda|desperd|quebr|congel|estrag|venc)/.test(mo)) return 'perdas';
-      if (/(consumo|cortesia|uso|casa)/.test(mo)) return 'consumo';
+      if (/cortesia/.test(mo)) return 'cortesia';
+      if (/(consumo|uso|casa)/.test(mo)) return 'consumo';
       if (/venda/.test(mo)) return 'vendas';
       return 'outros';
     };
@@ -79,9 +81,9 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
         cats[c].itens[it.nome] = (cats[c].itens[it.nome] || 0) + val;
       }
     }
-    const total = cats.vendas.valor + cats.perdas.valor + cats.consumo.valor + cats.outros.valor;
+    const total = cats.vendas.valor + cats.perdas.valor + cats.consumo.valor + cats.cortesia.valor + cats.outros.valor;
     const listaDe = (c) => Object.entries(c.itens).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor);
-    return { cats, total, listaDe, temAlgo: (cats.vendas.n + cats.perdas.n + cats.consumo.n + cats.outros.n) > 0 };
+    return { cats, total, listaDe, temAlgo: (cats.vendas.n + cats.perdas.n + cats.consumo.n + cats.cortesia.n + cats.outros.n) > 0 };
   }, [itens]);
   const [verSaidas, setVerSaidas] = useState(false);
   const [catSaidaAberta, setCatSaidaAberta] = useState('');
@@ -217,7 +219,8 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
               [
                 { k: 'vendas', rot: 'Vendas', desc: 'virou prato/drink vendido', cor: C.green },
                 { k: 'perdas', rot: 'Perdas e desperdício', desc: 'desperdício, vencido, quebra', cor: C.red },
-                { k: 'consumo', rot: 'Consumo da casa', desc: 'consumo próprio e cortesias', cor: C.amber },
+                { k: 'consumo', rot: 'Consumo da casa', desc: 'consumo próprio da casa', cor: C.amber },
+                { k: 'cortesia', rot: 'Cortesias', desc: 'liberadas de graça pro cliente', cor: C.accent2 },
                 { k: 'outros', rot: 'Outros ajustes', desc: 'ajustes e saídas diversas', cor: C.muted },
               ].map(({ k, rot, desc, cor }) => {
                 const c = saidasMes.cats[k];
