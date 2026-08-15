@@ -93,9 +93,19 @@ export default function Comandas({ papel = 'dona' }) {
   };
   const confirmarFechar = async () => {
     const pagamentos = FORMAS_PAG.map((f) => ({ forma: f, valor: num(fecharForm.valores[f] || '') })).filter((x) => x.valor > 0);
-    const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: fecharForm.nome || '' }) });
+    const nomeCli = (fecharForm.nome || '').trim();
+    const fiadoVal = num(fecharForm.valores['Fiado'] || '');
+    const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: nomeCli }) });
     const j = await r.json();
     if (!j.ok) { setErro(j.erro || 'Não consegui fechar.'); return; }
+    // Ficou fiado com um nome que não está cadastrado? Oferece salvar como cliente,
+    // pra da próxima ser só clicar no nome (e poder definir um limite depois).
+    const norm = (s) => (s || '').trim().toLowerCase();
+    if (fiadoVal > 0.005 && nomeCli && !clientes.some((n) => norm(n) === norm(nomeCli))) {
+      if (typeof window !== 'undefined' && window.confirm(`Salvar "${nomeCli}" na sua lista de clientes?\n\nAssim, da próxima vez é só clicar no nome — e dá pra definir um limite de fiado pra ele na aba Clientes.`)) {
+        try { await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'novoCliente', nome: nomeCli }) }); } catch { /* se falhar, a venda já está salva; ela cadastra depois */ }
+      }
+    }
     setFecharForm(null);
     setSelId(null);
     await carregar();
