@@ -6,7 +6,7 @@ import { num } from '../lib/util';
 // Registro de perda/quebra pela linha de frente (garçom). Ele escolhe o item,
 // diz quanto se perdeu e o motivo — baixa do estoque na hora, SEM ver custos nem
 // mexer no caixa. A dona vê tudo no histórico do item.
-const MOTIVOS = ['Quebrou', 'Congelou', 'Estragou', 'Venceu'];
+const MOTIVOS = ['Quebrou', 'Congelou', 'Estragou', 'Venceu', 'Cortesia'];
 
 export default function PerdaGarcom() {
   const [itens, setItens] = useState([]);
@@ -49,8 +49,8 @@ export default function PerdaGarcom() {
   return (
     <div>
       <Card style={{ marginBottom: 14, background: C.panel2 }}>
-        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Registrar perda / quebra</div>
-        <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Quebrou uma cerveja? Congelou, estragou, venceu? Escolha o item e diga quanto se perdeu. Baixa do estoque na hora — não mexe no caixa.</div>
+        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Registrar baixa (perda ou cortesia)</div>
+        <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Quebrou uma cerveja? Congelou, estragou, venceu — ou a dona liberou uma cortesia? Escolha o item, diga quanto saiu e o motivo. Baixa do estoque na hora — não mexe no caixa.</div>
       </Card>
 
       {msg && <Card style={{ marginBottom: 12, borderColor: C.green }}><div style={{ color: C.green, fontSize: 14, fontWeight: 700 }}>✓ {msg}</div></Card>}
@@ -78,7 +78,7 @@ export default function PerdaGarcom() {
       {sel && (
         <Card style={{ borderColor: C.accent }}>
           <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>{sel.nome}</div>
-          <Field label={`Quanto se perdeu? (em ${sel.unidade})`}>
+          <Field label={`Quanto saiu? (em ${sel.unidade})`}>
             <NumInput value={qtd} onChange={setQtd} />
           </Field>
           <Field label="O que aconteceu?">
