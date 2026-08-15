@@ -16,6 +16,8 @@ export default function EstoqueCozinha() {
   const [busy, setBusy] = useState(false);
   const [verMov, setVerMov] = useState(null);
   const [busca, setBusca] = useState('');
+  const [catAberta, setCatAberta] = useState({}); // { [categoria]: true } — categoria expandida
+  const toggleCat = (cat) => setCatAberta((m) => ({ ...m, [cat]: !m[cat] }));
 
   const carregar = useCallback(async () => {
     try {
@@ -72,9 +74,17 @@ export default function EstoqueCozinha() {
         <Empty>A dona ainda não cadastrou itens no estoque.</Empty>
       ) : grupos.length === 0 ? (
         <Empty>Nenhum item encontrado.</Empty>
-      ) : grupos.map((g) => (
-        <div key={g.cat} style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.06em', color: C.accent, fontWeight: 700, margin: '0 0 8px 2px' }}>{g.cat}</div>
+      ) : grupos.map((g) => {
+        const buscando = busca.trim().length > 0;
+        const abertaCat = buscando || !!catAberta[g.cat];
+        return (
+        <div key={g.cat} style={{ marginBottom: abertaCat ? 14 : 8 }}>
+          <button onClick={() => toggleCat(g.cat)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', textAlign: 'left', boxShadow: C.cardShadow, marginBottom: abertaCat ? 8 : 0 }}>
+            <span style={{ color: C.accent, fontSize: 12, fontWeight: 800, width: 12, flexShrink: 0 }}>{abertaCat ? '▾' : '▸'}</span>
+            <span style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '.06em', color: C.accent, fontWeight: 800, flex: 1, minWidth: 0 }}>{g.cat}</span>
+            <span style={{ fontSize: 12, color: C.faint, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{g.itens.length}</span>
+          </button>
+          {abertaCat && <div>
           {g.itens.map((it) => {
             const saldo = num(it.saldo);
             const aberto = verMov === it.id;
@@ -131,8 +141,10 @@ export default function EstoqueCozinha() {
               </Card>
             );
           })}
+          </div>}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
