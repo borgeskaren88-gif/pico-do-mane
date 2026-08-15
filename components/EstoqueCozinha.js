@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { C, Card, Btn, NumInput, Select, Empty, SecTitle, PageTitle } from './ui';
-import { num, fmtDate } from '../lib/util';
+import { C, Card, Btn, TextInput, NumInput, Select, Empty, SecTitle, PageTitle } from './ui';
+import { num, fmtDate, CATEGORIAS_PRODUTO } from '../lib/util';
 import { MOTIVOS_SAIDA } from '../lib/estoque';
 
 // Estoque na visão da COZINHA: ver o que tem e fazer as ações físicas que são
@@ -15,6 +15,7 @@ export default function EstoqueCozinha() {
   const [acaoMotivo, setAcaoMotivo] = useState(MOTIVOS_SAIDA[0]);
   const [busy, setBusy] = useState(false);
   const [verMov, setVerMov] = useState(null);
+  const [busca, setBusca] = useState('');
 
   const carregar = useCallback(async () => {
     try {
@@ -26,11 +27,21 @@ export default function EstoqueCozinha() {
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
+  // Agrupa por categoria (Bebidas, Cozinha…) em ordem fixa, com os itens em
+  // ordem alfabética. A busca filtra pelo nome do item.
   const grupos = useMemo(() => {
+    const filtro = busca.trim().toLowerCase();
+    const ordem = [...CATEGORIAS_PRODUTO, ''];
     const map = new Map();
-    for (const it of itens) { const cat = it.categoria || 'Outros'; if (!map.has(cat)) map.set(cat, []); map.get(cat).push(it); }
-    return [...map.entries()].map(([cat, is]) => ({ cat, itens: is.sort((a, b) => (a.nome || '').localeCompare(b.nome || '')) }));
-  }, [itens]);
+    for (const it of itens) {
+      if (filtro && !(it.nome || '').toLowerCase().includes(filtro)) continue;
+      const cat = it.categoria || '';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat).push(it);
+    }
+    return [...map.entries()].sort((a, b) => ordem.indexOf(a[0]) - ordem.indexOf(b[0]))
+      .map(([cat, is]) => ({ cat: cat || 'Outros', itens: is.sort((a, b) => (a.nome || '').localeCompare(b.nome || '')) }));
+  }, [itens, busca]);
 
   const abrirAcao = (id, tipo) => { setAcao({ id, tipo }); setAcaoQtd(''); setAcaoMotivo(MOTIVOS_SAIDA[0]); };
   const confirmarAcao = async () => {
@@ -52,9 +63,15 @@ export default function EstoqueCozinha() {
     <div>
       <PageTitle sub="O que tem — e dá pra ajustar (contar, entrada, saída)">Estoque</PageTitle>
 
+      <div style={{ marginBottom: 14 }}>
+        <TextInput value={busca} onChange={setBusca} placeholder="Buscar item (ex.: Aperol)" />
+      </div>
+
       <SecTitle>Itens ({itens.length})</SecTitle>
       {!carregado ? <Empty>Carregando…</Empty> : itens.length === 0 ? (
         <Empty>A dona ainda não cadastrou itens no estoque.</Empty>
+      ) : grupos.length === 0 ? (
+        <Empty>Nenhum item encontrado.</Empty>
       ) : grupos.map((g) => (
         <div key={g.cat} style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.06em', color: C.accent, fontWeight: 700, margin: '0 0 8px 2px' }}>{g.cat}</div>
