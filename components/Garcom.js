@@ -8,6 +8,7 @@ import Comandas from './Comandas';
 import Caixa from './Caixa';
 import PerdaGarcom from './PerdaGarcom';
 import PontoCozinha from './PontoCozinha';
+import LembretePonto from './LembretePonto';
 
 // Acesso do garçom (linha de frente): as comandas e o caixa do turno. Sem o
 // financeiro do bar, sem relatório — só o que precisa pra atender e bater o caixa.
@@ -69,6 +70,8 @@ export default function Garcom() {
             }}>{rot}</button>
           ))}
         </div>
+        {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
+
         {aba === 'comandas' ? <Comandas papel="garcom" /> : aba === 'perdas' ? <PerdaGarcom /> : aba === 'ponto' ? <PontoCozinha /> : <Caixa />}
       </div>
     </div>
