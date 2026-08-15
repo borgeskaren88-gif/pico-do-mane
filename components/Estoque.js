@@ -63,8 +63,8 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
       if (m.tipo === 'venda') return 'vendas';
       if (m.tipo !== 'saida') return null;
       const mo = (m.motivo || '').toLowerCase();
-      if (/(perda|quebr|congel|estrag|venc)/.test(mo)) return 'perdas';
-      if (/(consumo|cortesia|uso)/.test(mo)) return 'consumo';
+      if (/(perda|desperd|quebr|congel|estrag|venc)/.test(mo)) return 'perdas';
+      if (/(consumo|cortesia|uso|casa)/.test(mo)) return 'consumo';
       if (/venda/.test(mo)) return 'vendas';
       return 'outros';
     };
@@ -201,7 +201,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
             ) : (
               [
                 { k: 'vendas', rot: 'Vendas', desc: 'virou prato/drink vendido', cor: C.green },
-                { k: 'perdas', rot: 'Perdas e quebras', desc: 'quebrou, congelou, estragou, venceu', cor: C.red },
+                { k: 'perdas', rot: 'Perdas e desperdício', desc: 'desperdício, vencido, quebra', cor: C.red },
                 { k: 'consumo', rot: 'Consumo da casa', desc: 'consumo próprio e cortesias', cor: C.amber },
                 { k: 'outros', rot: 'Outros ajustes', desc: 'ajustes e saídas diversas', cor: C.muted },
               ].map(({ k, rot, desc, cor }) => {
