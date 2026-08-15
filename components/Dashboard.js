@@ -9,6 +9,7 @@ import Brain from './Brain';
 import Hoje from './Hoje';
 import Diario from './Diario';
 import Marketing from './Marketing';
+import PontoDona from './PontoDona';
 import ListaCompras from './ListaCompras';
 import Lancamentos from './Lancamentos';
 import Compras from './Compras';
@@ -339,7 +340,7 @@ export default function Dashboard() {
     ['brain', 'Brain'], ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'],
-    ['marketing', 'Marketing'], ['backup', 'Backup'],
+    ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['backup', 'Backup'],
   ];
 
   // Navegação que entende os sub-destinos do setor Abastecimento: se pedirem
@@ -543,6 +544,8 @@ export default function Dashboard() {
             {subSalao === 'clientes' && <Clientes dados={clientes} onChange={upd.clientes} vendas={vendas} />}
           </>
         )}
+        {tab === 'ponto' && <PontoDona />}
+
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, ideias, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas }} restore={(d) => {
           const dados = {
