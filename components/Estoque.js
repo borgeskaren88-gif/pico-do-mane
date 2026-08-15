@@ -132,6 +132,12 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   };
   const cancelar = () => { setNovo(itemVazio()); setEditId(null); };
   const excluir = async (id) => { if (!window.confirm('Excluir este item do estoque?')) return; if (id === editId) cancelar(); await onAcao({ acao: 'del', id }); };
+  // Apaga uma linha do histórico (ex.: uma saída digitada errada). NÃO mexe no
+  // saldo atual — só tira o registro da conta do resumo "Para onde foi".
+  const excluirMov = async (itemId, movId) => {
+    if (typeof window !== 'undefined' && !window.confirm('Apagar esta linha do histórico?\n\nO saldo de hoje NÃO muda — isso só tira este registro do resumo "Para onde foi".')) return;
+    await onAcao({ acao: 'delMov', id: itemId, movId });
+  };
 
   const adicionarSugestao = async (s) => {
     if (itens.some((it) => igualNome(it.nome, s.nome)) || busy) return;
@@ -368,10 +374,13 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                 {aberto && (
                   <div style={{ marginTop: 10, borderTop: `1px solid ${C.hair}`, paddingTop: 8 }}>
                     {(it.movimentos || []).slice(0, 15).map((m) => (
-                      <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: C.muted, padding: '3px 0' }}>
-                        <span>{fmtDate(m.data)} · {m.motivo}</span>
-                        <span style={{ fontVariantNumeric: 'tabular-nums', color: (m.tipo === 'saida' || m.tipo === 'venda') ? C.red : m.tipo === 'contagem' ? C.muted : C.green }}>
-                          {(m.tipo === 'saida' || m.tipo === 'venda') ? '−' : m.tipo === 'contagem' ? '=' : '+'}{m.tipo === 'contagem' ? m.saldoDepois : num(m.qtd)} → {m.saldoDepois}
+                      <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: C.muted, padding: '3px 0', alignItems: 'center' }}>
+                        <span style={{ minWidth: 0 }}>{fmtDate(m.data)} · {m.motivo}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                          <span style={{ fontVariantNumeric: 'tabular-nums', color: (m.tipo === 'saida' || m.tipo === 'venda') ? C.red : m.tipo === 'contagem' ? C.muted : C.green }}>
+                            {(m.tipo === 'saida' || m.tipo === 'venda') ? '−' : m.tipo === 'contagem' ? '=' : '+'}{m.tipo === 'contagem' ? m.saldoDepois : num(m.qtd)} → {m.saldoDepois}
+                          </span>
+                          <button onClick={() => excluirMov(it.id, m.id)} title="Apagar esta linha do histórico" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 2px' }}>×</button>
                         </span>
                       </div>
                     ))}
