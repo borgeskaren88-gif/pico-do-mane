@@ -10,7 +10,7 @@ import PontoCozinha from './PontoCozinha';
 
 export default function Cozinha() {
   const router = useRouter();
-  const [aba, setAba] = useState('compras'); // 'compras' | 'estoque' | 'garrafas' | 'ponto'
+  const [aba, setAba] = useState('ponto'); // 'ponto' | 'compras' | 'estoque' | 'garrafas'
   const [itens, setItens] = useState([]);
   const [tarefas, setTarefas] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -132,7 +132,7 @@ export default function Cozinha() {
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
-          {[['compras', 'Lista de Compras'], ['estoque', 'Estoque'], ['garrafas', 'Garrafas'], ['ponto', 'Ponto']].map(([v, rot]) => (
+          {[['ponto', 'Ponto'], ['compras', 'Lista de Compras'], ['estoque', 'Estoque'], ['garrafas', 'Garrafas']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
               flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 14, fontWeight: 700,
               background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
