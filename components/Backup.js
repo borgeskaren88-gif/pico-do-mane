@@ -1,7 +1,7 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, KPI, Area, PageTitle, inputStyle } from './ui';
-import { todayISO, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
+import { todayISO, fmtDate, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
 import SEED_DATA from '../data/seed.json';
 
 // Monta um relatório em texto (Markdown) para análise: um RESUMO com os
@@ -125,6 +125,25 @@ export default function Backup({ all, restore }) {
   const jsonStr = JSON.stringify(all, null, 2);
   const analise = montarAnalise(all);
 
+  // Backups automáticos na nuvem (uma cópia por dia, feita sozinho).
+  const [autoBackups, setAutoBackups] = useState([]);
+  const [restaurando, setRestaurando] = useState('');
+  const carregarAuto = useCallback(async () => {
+    try { const r = await fetch('/api/backup', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setAutoBackups(Array.isArray(j.backups) ? j.backups : []); } catch { /* ignora */ }
+  }, []);
+  useEffect(() => { carregarAuto(); }, [carregarAuto]);
+  const restaurarAuto = async (data) => {
+    if (typeof window !== 'undefined' && !window.confirm(`Restaurar o backup de ${data}?\n\nISSO SUBSTITUI os dados atuais pelos desse dia. Use só se algo deu errado.`)) return;
+    setRestaurando(data); setMsg('');
+    try {
+      const r = await fetch('/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'restaurar', data }) });
+      const j = await r.json();
+      if (j.ok) { setMsg('Backup restaurado! Recarregando…'); setTimeout(() => { try { window.location.reload(); } catch { /* ignora */ } }, 900); }
+      else setMsg(j.erro || 'Não consegui restaurar.');
+    } catch { setMsg('Sem conexão pra restaurar.'); }
+    finally { setRestaurando(''); }
+  };
+
   const baixar = (conteudo, nome, tipo) => {
     const blob = new Blob([conteudo], { type: tipo });
     const url = URL.createObjectURL(blob);
@@ -245,6 +264,28 @@ export default function Backup({ all, restore }) {
           <summary style={{ cursor: 'pointer', fontWeight: 600, color: C.muted, fontSize: 13 }}>Ver resumo gerado</summary>
           <textarea readOnly value={analise} style={{ ...inputStyle, marginTop: 10, height: 240, fontSize: 11, fontFamily: 'monospace', whiteSpace: 'pre' }} />
         </details>
+      </Card>
+
+      <Card style={{ marginBottom: 14, borderColor: C.green }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Backup automático na nuvem ✓</div>
+        <div style={{ fontSize: 13, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
+          O PicoOS guarda uma cópia de tudo sozinho, todo dia que você abre o app (mantém os últimos 14 dias). Se algo der errado, dá pra voltar pra um dia anterior aqui.
+        </div>
+        {autoBackups.length === 0 ? (
+          <div style={{ fontSize: 13, color: C.faint }}>Ainda sem cópias — a primeira é feita quando você abrir o app amanhã (ou recarregue agora).</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {autoBackups.map((b) => (
+              <div key={b.data} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.hair}`, paddingTop: 8 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{fmtDate(b.data)}</div>
+                  {b.resumo && <div style={{ fontSize: 11, color: C.faint }}>{b.resumo.lancamentos} lançamentos · {b.resumo.estoque} itens de estoque · {b.resumo.fichas} fichas</div>}
+                </div>
+                <Btn kind="ghost" small onClick={() => restaurarAuto(b.data)} disabled={!!restaurando}>{restaurando === b.data ? 'Restaurando…' : 'Restaurar'}</Btn>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       <Card style={{ marginBottom: 14 }}>

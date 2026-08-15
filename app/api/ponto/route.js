@@ -14,10 +14,10 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const norm = (s) => (s || '').trim().toLowerCase();
 const hojeBrasil = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
-// A cozinha bate o ponto; a dona também vê e pode corrigir.
+// A cozinha e o atendimento batem o ponto; a dona também vê e pode corrigir.
 function papel() {
   const p = papelDaSessao(cookies().get(nomeCookie())?.value);
-  return p === 'dona' || p === 'cozinha' ? p : null;
+  return p === 'dona' || p === 'cozinha' || p === 'garcom' ? p : null;
 }
 
 async function lerRegistros(sb) {

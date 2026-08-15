@@ -153,6 +153,18 @@ export default function Dashboard() {
     try { const r = await fetch('/api/vendas', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setVendas(Array.isArray(j.vendas) ? j.vendas : []); } catch { /* ignora */ }
   };
   useEffect(() => { carregarVendas(); }, []);
+  // Backup automático diário na nuvem: dispara uma cópia quando a dona abre o
+  // app (o servidor não refaz se a de hoje já existe). Guarda no aparelho o dia
+  // pra não repetir o pedido. Best-effort — nunca atrapalha o uso.
+  useEffect(() => {
+    try {
+      const hoje = todayISO();
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('picoos-backup-dia') === hoje) return;
+      fetch('/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'auto' }) })
+        .then((r) => r.ok && (() => { try { localStorage.setItem('picoos-backup-dia', hoje); } catch { /* ignora */ } })())
+        .catch(() => { /* ignora */ });
+    } catch { /* ignora */ }
+  }, []);
   useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario', 'backup', 'abastecimento'].includes(tab)) carregarVendas(); }, [tab]);
   useEffect(() => { if (tab === 'salao' && subSalao === 'fiados') carregarVendas(); }, [subSalao]);
 
