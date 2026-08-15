@@ -32,9 +32,10 @@ export async function GET() {
   try {
     const sb = supabaseServer();
     // Privacidade: cada setor vê só o próprio ponto (cozinha ↔ atendimento). A
-    // dona vê todos. Registros antigos sem "papel" só aparecem pra dona.
+    // dona vê todos. Registros antigos sem "papel" (feitos antes da privacidade)
+    // aparecem pra qualquer setor, pra não sumir com turno aberto de ninguém.
     const registros = (await lerRegistros(sb))
-      .filter((r) => p === 'dona' || r.papel === p)
+      .filter((r) => p === 'dona' || !r.papel || r.papel === p)
       .sort((a, b) => (b.entrada || '').localeCompare(a.entrada || ''));
     return NextResponse.json({ ok: true, registros });
   } catch (e) {
@@ -54,7 +55,7 @@ export async function POST(request) {
 
     if (acao === 'entrada') {
       if (!nome) return NextResponse.json({ ok: false, erro: 'Diga o nome de quem está entrando.' }, { status: 400 });
-      const abertos = (await lerRegistros(sb)).filter((v) => !v.saida && norm(v.nome) === norm(nome) && v.papel === p);
+      const abertos = (await lerRegistros(sb)).filter((v) => !v.saida && norm(v.nome) === norm(nome) && (!v.papel || v.papel === p));
       if (abertos.length) return NextResponse.json({ ok: true, jaAberto: true, registro: abertos[0] });
       const reg = { id: uid(), nome, entrada: new Date().toISOString(), saida: null, data: hojeBrasil(), papel: p };
       const { error } = await sb.from('pdm_dados').upsert({ chave: PREFIXO + reg.id, valor: reg, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
@@ -64,7 +65,7 @@ export async function POST(request) {
 
     if (acao === 'saida') {
       if (!nome) return NextResponse.json({ ok: false, erro: 'Diga o nome de quem está saindo.' }, { status: 400 });
-      const abertos = (await lerRegistros(sb)).filter((v) => !v.saida && norm(v.nome) === norm(nome) && v.papel === p);
+      const abertos = (await lerRegistros(sb)).filter((v) => !v.saida && norm(v.nome) === norm(nome) && (!v.papel || v.papel === p));
       if (!abertos.length) return NextResponse.json({ ok: false, erro: 'Não há entrada aberta com esse nome.' }, { status: 400 });
       abertos.sort((a, b) => (b.entrada || '').localeCompare(a.entrada || ''));
       const reg = { ...abertos[0], saida: new Date().toISOString() };
