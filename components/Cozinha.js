@@ -7,6 +7,7 @@ import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 import EstoqueCozinha from './EstoqueCozinha';
 import PontoCozinha from './PontoCozinha';
+import LembretePonto from './LembretePonto';
 
 export default function Cozinha() {
   const router = useRouter();
@@ -139,6 +140,8 @@ export default function Cozinha() {
             }}>{rot}</button>
           ))}
         </div>
+
+        {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
 
         {aba === 'compras' && (<>
         <PageTitle sub="Anote o que está faltando no bar">Lista de Compras</PageTitle>
