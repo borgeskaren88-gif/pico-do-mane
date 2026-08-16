@@ -24,6 +24,7 @@ export default function Comandas({ papel = 'dona' }) {
   const [picker, setPicker] = useState(false); // tela de adicionar produtos (carrinho)
   const [catSel, setCatSel] = useState(null); // categoria escolhida na tela de adicionar
   const [saborDe, setSaborDe] = useState(null); // item cujo seletor de sabor está aberto
+  const [dividirPor, setDividirPor] = useState(2); // divisor da conta (quantas pessoas rachando)
   const [info, setInfo] = useState({ nome: '', pessoas: '', obs: '' });
   const infoDe = useRef(null); // id da comanda cujo info está carregado
   const editandoRef = useRef(false);
@@ -326,6 +327,20 @@ export default function Comandas({ papel = 'dona' }) {
               <Card style={{ marginBottom: 14, padding: 14, borderColor: C.green }}>
                 <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Fechar conta — {brl(total)}</div>
                 <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Quanto entrou em cada forma? Dá pra dividir. Use “resto” pra completar.</div>
+
+                {/* Dividir a conta (calculadora de rachar) — só pra ver quanto fica por pessoa */}
+                <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>Dividir a conta entre</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button onClick={() => setDividirPor((n) => Math.max(1, n - 1))} style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${C.line}`, background: 'transparent', color: C.text, fontSize: 20, fontWeight: 800, cursor: 'pointer', lineHeight: 1 }}>–</button>
+                      <span style={{ minWidth: 46, textAlign: 'center', fontSize: 15, fontWeight: 800 }}>{dividirPor} {dividirPor === 1 ? 'pessoa' : 'pessoas'}</span>
+                      <button onClick={() => setDividirPor((n) => Math.min(50, n + 1))} style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${C.line}`, background: 'transparent', color: C.text, fontSize: 20, fontWeight: 800, cursor: 'pointer', lineHeight: 1 }}>+</button>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: C.accent, marginTop: 8, textAlign: 'center' }}>{brl(total / dividirPor)} <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>por pessoa</span></div>
+                </div>
+
                 {FORMAS_PAG.map((f) => (
                   <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ width: 82, flexShrink: 0, fontSize: 13, fontWeight: 700, color: f === 'Fiado' ? C.amber : C.text }}>{f}</span>
@@ -363,7 +378,7 @@ export default function Comandas({ papel = 'dona' }) {
             );
           })() : (
             <div style={{ marginBottom: 14 }}>
-              <Btn kind="ok" onClick={() => { setOutroCliente(!!(sel.nome && !clientes.includes(sel.nome))); setFecharForm({ valores: {}, nome: sel.nome || '', pessoas: sel.pessoas > 0 ? sel.pessoas : 1 }); }}>Fechar conta · {brl(total)}</Btn>
+              <Btn kind="ok" onClick={() => { setOutroCliente(!!(sel.nome && !clientes.includes(sel.nome))); setDividirPor(sel.pessoas > 0 ? sel.pessoas : 2); setFecharForm({ valores: {}, nome: sel.nome || '', pessoas: sel.pessoas > 0 ? sel.pessoas : 1 }); }}>Fechar conta · {brl(total)}</Btn>
             </div>
           )
         )}
