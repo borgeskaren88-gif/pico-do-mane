@@ -78,11 +78,13 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
         if (!c) continue;
         const val = num(m.qtd) * num(it.custo);
         cats[c].valor += val; cats[c].n += 1;
-        cats[c].itens[it.nome] = (cats[c].itens[it.nome] || 0) + val;
+        const e = cats[c].itens[it.nome] || { valor: 0, qtd: 0, unidade: it.unidade || '' };
+        e.valor += val; e.qtd += num(m.qtd);
+        cats[c].itens[it.nome] = e;
       }
     }
     const total = cats.vendas.valor + cats.perdas.valor + cats.consumo.valor + cats.cortesia.valor + cats.outros.valor;
-    const listaDe = (c) => Object.entries(c.itens).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor);
+    const listaDe = (c) => Object.entries(c.itens).map(([nome, d]) => ({ nome, ...d })).sort((a, b) => b.valor - a.valor);
     return { cats, total, listaDe, temAlgo: (cats.vendas.n + cats.perdas.n + cats.consumo.n + cats.cortesia.n + cats.outros.n) > 0 };
   }, [itens]);
   const [verSaidas, setVerSaidas] = useState(false);
@@ -241,7 +243,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                         {saidasMes.listaDe(c).map((x) => (
                           <div key={x.nome} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, padding: '3px 0', color: C.muted }}>
                             <span style={{ minWidth: 0 }}>{x.nome}</span>
-                            <span style={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(x.valor)}</span>
+                            <span style={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{Number((x.qtd || 0).toFixed(3)).toLocaleString('pt-BR')} {x.unidade} · {brl(x.valor)}</span>
                           </div>
                         ))}
                       </div>
