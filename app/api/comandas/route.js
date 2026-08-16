@@ -211,13 +211,25 @@ export async function POST(request) {
       // O preço vem SEMPRE do cardápio no servidor (não do cliente), pra ninguém
       // adulterar valor. Item repetido só soma a quantidade.
       const cardapioId = txt(body?.cardapioId, 40);
+      const saborNome = txt(body?.sabor, 40);
       const cardapio = await lerCardapio(sb);
       const prod = cardapio.find((x) => x && x.id === cardapioId);
       if (!prod) return NextResponse.json({ ok: false, erro: 'Item não está no cardápio.' }, { status: 400 });
       const preco = Number(String(prod.preco).replace(/\./g, '').replace(',', '.')) || 0;
-      const existe = c.itens.find((it) => it.cardapioId === cardapioId);
+      // Sabor/variação: se o item tem sabores, guarda a fruta escolhida em
+      // "extras" pra baixar do estoque no fechamento. Itens de sabores diferentes
+      // ficam em linhas separadas.
+      let sabor, extras;
+      if (Array.isArray(prod.sabores) && prod.sabores.length) {
+        const s = prod.sabores.find((x) => (x.nome || '').trim().toLowerCase() === saborNome.trim().toLowerCase());
+        if (!s) return NextResponse.json({ ok: false, erro: 'Escolha o sabor.' }, { status: 400 });
+        sabor = s.nome;
+        extras = [{ estoqueId: String(s.estoqueId), qtd: String(s.qtd), unidade: String(s.unidade || '') }];
+      }
+      const nomeItem = txt(prod.nome, 200) + (sabor ? ` (${sabor})` : '');
+      const existe = c.itens.find((it) => it.cardapioId === cardapioId && (it.sabor || '') === (sabor || ''));
       if (existe) existe.qtd = (Number(existe.qtd) || 0) + 1;
-      else c.itens.push({ id: uid(), cardapioId, nome: txt(prod.nome, 200), preco, qtd: 1 });
+      else c.itens.push({ id: uid(), cardapioId, nome: nomeItem, preco, qtd: 1, ...(sabor ? { sabor, extras } : {}) });
       await gravarComanda(sb, c);
       return NextResponse.json({ ok: true, comanda: c });
     }

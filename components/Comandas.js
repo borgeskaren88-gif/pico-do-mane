@@ -23,6 +23,7 @@ export default function Comandas({ papel = 'dona' }) {
   const [busca, setBusca] = useState('');
   const [picker, setPicker] = useState(false); // tela de adicionar produtos (carrinho)
   const [catSel, setCatSel] = useState(null); // categoria escolhida na tela de adicionar
+  const [saborDe, setSaborDe] = useState(null); // item cujo seletor de sabor está aberto
   const [info, setInfo] = useState({ nome: '', pessoas: '', obs: '' });
   const infoDe = useRef(null); // id da comanda cujo info está carregado
   const editandoRef = useRef(false);
@@ -83,7 +84,7 @@ export default function Comandas({ papel = 'dona' }) {
     const j = await acao({ acao: 'config', mesasQtd: n }, { manterSel: true });
     if (j?.ok) { setMesasQtd(n); setConfigAberto(false); }
   };
-  const addItem = (cardapioId) => acao({ acao: 'add', comandaId: selId, cardapioId });
+  const addItem = (cardapioId, sabor) => acao({ acao: 'add', comandaId: selId, cardapioId, ...(sabor ? { sabor } : {}) });
   const setQtd = (itemId, qtd) => acao({ acao: 'setQtd', comandaId: selId, itemId, qtd });
   const remover = (itemId) => acao({ acao: 'remover', comandaId: selId, itemId });
   const cancelar = async (id) => {
@@ -165,11 +166,13 @@ export default function Comandas({ papel = 'dona' }) {
     const linhaProduto = (it) => {
       const q = qtdNaComanda(it.id);
       const d = it.disp; // null = sem ficha; 0 = em falta; baixo = acabando
+      const temSabores = Array.isArray(it.sabores) && it.sabores.length > 0;
       return (
-        <button key={it.id} onClick={() => addItem(it.id)} disabled={busy}
+        <button key={it.id} onClick={() => (temSabores ? setSaborDe(it) : addItem(it.id))} disabled={busy}
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
           <span style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: C.accent, color: '#fff', fontSize: 20, fontWeight: 800, lineHeight: '26px', textAlign: 'center' }}>+</span>
           <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{it.nome}</span>
+          {temSabores && <span style={{ fontSize: 10, fontWeight: 800, color: C.accent, border: `1px solid ${C.accent}`, borderRadius: 999, padding: '1px 7px', flexShrink: 0 }}>sabores</span>}
           {d === 0 && <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: C.red, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>em falta</span>}
           {d != null && d > 0 && d <= 3 && <span style={{ fontSize: 11, fontWeight: 800, color: '#06101F', background: C.amber, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>só {d}</span>}
           {q > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: '#06101F', background: C.green, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>{q} na mesa</span>}
@@ -184,6 +187,19 @@ export default function Comandas({ papel = 'dona' }) {
           <button onClick={() => { setPicker(false); setBusca(''); }} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>‹ Voltar</button>
           <div style={{ fontSize: 18, fontWeight: 900 }}>Adicionar · Mesa {sel.mesa}</div>
         </div>
+
+        {saborDe && (
+          <Card style={{ marginBottom: 12, borderColor: C.accent }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>{saborDe.nome} — qual sabor?</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {saborDe.sabores.map((s) => (
+                <button key={s.nome} onClick={() => { addItem(saborDe.id, s.nome); setSaborDe(null); }} disabled={busy}
+                  style={{ border: 'none', background: C.accent, color: '#06101F', borderRadius: 999, padding: '10px 16px', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>{s.nome}</button>
+              ))}
+            </div>
+            <button onClick={() => setSaborDe(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '10px 0 0' }}>Cancelar</button>
+          </Card>
+        )}
 
         {cardapio.length > 0 && (
           <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar produto…" /></div>
