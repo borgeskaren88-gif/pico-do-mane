@@ -5,6 +5,9 @@ import { brl, fmtDate } from '../lib/util';
 
 const METODOS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
 const hora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+// Dia no fuso do Brasil (YYYY-MM-DD). Cortar o ISO direto dava dia errado à
+// noite, porque o ISO é UTC e depois das 21h já virou o dia seguinte.
+const diaBR = (iso) => { if (!iso) return ''; try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso)); } catch { return String(iso).slice(0, 10); } };
 const dataHora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
 const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? 'Karen' : '');
 
@@ -170,7 +173,7 @@ export default function Caixa() {
                 <Card key={c.id} style={{ marginBottom: 8, padding: '12px 14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{fmtDate((c.fechadoEm || '').slice(0, 10))} · {hora(c.abertoEm)}–{hora(c.fechadoEm)}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{fmtDate(diaBR(c.abertoEm || c.fechadoEm))} · {hora(c.abertoEm)}–{hora(c.fechadoEm)}</div>
                       <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Recebido {brl(c.recebido)} · gaveta {brl(c.dinheiroFinal)}{(c.servico || 0) > 0 ? ` · serviço ${brl(c.servico)}` : ''}{c.contado != null ? ` · contado ${brl(c.contado)}` : ''}</div>
                     </div>
                     {c.diferenca != null && Math.abs(c.diferenca) > 0.005 && (
