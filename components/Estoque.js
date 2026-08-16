@@ -52,8 +52,11 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   // "Para onde foi o estoque" no mês atual: junta as saídas de todos os itens e
   // separa por tipo (venda, perda/quebra, consumo da casa, outros), com o valor
   // em R$ (qtd baixada × custo do item). Lê o histórico que cada item já guarda.
+  const [periodoSaidas, setPeriodoSaidas] = useState('mes'); // 'hoje' | 'mes'
   const saidasMes = useMemo(() => {
-    const ym = todayISO().slice(0, 7);
+    const hoje = todayISO();
+    const ym = hoje.slice(0, 7);
+    const noPeriodo = (data) => (periodoSaidas === 'hoje' ? data === hoje : data.slice(0, 7) === ym);
     const cats = {
       vendas: { valor: 0, n: 0, itens: {} },
       perdas: { valor: 0, n: 0, itens: {} },
@@ -73,7 +76,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     };
     for (const it of itens) {
       for (const m of (it.movimentos || [])) {
-        if (!m.data || m.data.slice(0, 7) !== ym) continue;
+        if (!m.data || !noPeriodo(m.data)) continue;
         const c = catDe(m);
         if (!c) continue;
         const val = num(m.qtd) * num(it.custo);
@@ -86,7 +89,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     const total = cats.vendas.valor + cats.perdas.valor + cats.consumo.valor + cats.cortesia.valor + cats.outros.valor;
     const listaDe = (c) => Object.entries(c.itens).map(([nome, d]) => ({ nome, ...d })).sort((a, b) => b.valor - a.valor);
     return { cats, total, listaDe, temAlgo: (cats.vendas.n + cats.perdas.n + cats.consumo.n + cats.cortesia.n + cats.outros.n) > 0 };
-  }, [itens]);
+  }, [itens, periodoSaidas]);
   const [verSaidas, setVerSaidas] = useState(false);
   const [catSaidaAberta, setCatSaidaAberta] = useState('');
 
@@ -209,14 +212,19 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
           <span style={{ color: C.accent, fontSize: 12, fontWeight: 800, width: 12, flexShrink: 0 }}>{verSaidas ? '▾' : '▸'}</span>
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: 14, fontWeight: 800, color: C.text }}>Para onde foi o estoque</span>
-            <span style={{ fontSize: 12, color: C.muted, display: 'block', marginTop: 1 }}>Este mês · saídas por venda, perda e consumo da casa</span>
+            <span style={{ fontSize: 12, color: C.muted, display: 'block', marginTop: 1 }}>{periodoSaidas === 'hoje' ? 'Hoje' : 'Este mês'} · saídas por venda, perda e consumo da casa</span>
           </span>
           <span style={{ fontSize: 14, fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(saidasMes.total)}</span>
         </button>
         {verSaidas && (
           <div style={{ marginTop: 12, borderTop: `1px solid ${C.hair}`, paddingTop: 10 }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              {[['hoje', 'Hoje'], ['mes', 'Este mês']].map(([v, rot]) => (
+                <button key={v} onClick={() => setPeriodoSaidas(v)} style={{ border: `1px solid ${periodoSaidas === v ? C.accent : C.line}`, background: periodoSaidas === v ? C.accent : 'transparent', color: periodoSaidas === v ? '#06101F' : C.muted, borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{rot}</button>
+              ))}
+            </div>
             {!saidasMes.temAlgo ? (
-              <div style={{ fontSize: 13, color: C.faint }}>Nenhuma saída registrada este mês ainda.</div>
+              <div style={{ fontSize: 13, color: C.faint }}>Nenhuma saída registrada {periodoSaidas === 'hoje' ? 'hoje' : 'este mês'} ainda.</div>
             ) : (
               [
                 { k: 'vendas', rot: 'Vendas', desc: 'virou prato/drink vendido', cor: C.green },
