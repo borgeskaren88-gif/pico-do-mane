@@ -12,6 +12,7 @@ export default function Comandas({ papel = 'dona' }) {
   const [clientes, setClientes] = useState([]);
   const [mesasQtd, setMesasQtd] = useState(20);
   const [carregado, setCarregado] = useState(false);
+  const [verValores, setVerValores] = useState(true); // mostrar/ocultar os R$ nas mesas (fica lembrado no aparelho)
   const [erro, setErro] = useState('');
   const [selId, setSelId] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -37,6 +38,8 @@ export default function Comandas({ papel = 'dona' }) {
   }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => { try { if (localStorage.getItem('picoos-ver-valores-mesa') === '0') setVerValores(false); } catch { /* ignora */ } }, []);
+  const toggleValores = () => setVerValores((v) => { const nv = !v; try { localStorage.setItem('picoos-ver-valores-mesa', nv ? '1' : '0'); } catch { /* ignora */ } return nv; });
   // Atualiza sozinho de tempos em tempos, pra um garçom ver as mesas do outro.
   // Não recarrega enquanto está mexendo numa comanda, pra não atrapalhar.
   useEffect(() => {
@@ -371,6 +374,13 @@ export default function Comandas({ papel = 'dona' }) {
     <div>
       <PageTitle sub={`${nAbertas} mesa${nAbertas === 1 ? '' : 's'} ocupada${nAbertas === 1 ? '' : 's'} de ${mesasQtd}`}>Comandas</PageTitle>
 
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -6, marginBottom: 10 }}>
+        <button onClick={toggleValores} title="Mostrar ou esconder os valores das mesas"
+          style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+          {verValores ? 'Ocultar valores' : 'Mostrar valores'}
+        </button>
+      </div>
+
       {erro && <div style={{ fontSize: 13, color: C.red, marginBottom: 10 }}>{erro}</div>}
 
       {!carregado ? <Empty>Carregando…</Empty> : (
@@ -397,7 +407,7 @@ export default function Comandas({ papel = 'dona' }) {
                 <span style={{ fontSize: 21, fontWeight: 800, lineHeight: 1, color: ocupada ? '#06101F' : C.accent }}>{m}</span>
                 {!ocupada && <span style={{ fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '.02em' }}>toque p/ abrir</span>}
                 {ocupada && c.nome && <span style={{ fontSize: 11, fontWeight: 600, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: escuroSobreAzul }}>{c.nome}</span>}
-                {ocupada && <span style={{ fontSize: 14, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</span>}
+                {ocupada && <span style={{ fontSize: 14, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{verValores ? brl(total) : 'R$ •••'}</span>}
                 {ocupada && c.pessoas > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: escuroSobreAzul }}>{c.pessoas} pessoa{c.pessoas === 1 ? '' : 's'}</span>}
               </button>
             );
