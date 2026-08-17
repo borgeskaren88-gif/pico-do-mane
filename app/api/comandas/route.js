@@ -327,7 +327,7 @@ export async function POST(request) {
       // via /api/estoque sincronizar, porque a venda ainda não está em baixas).
       try {
         const blobAtual = await lerPainel(sb);
-        const rb = aplicarBaixasVendas(arr(blobAtual.estoque), arr(blobAtual.fichas), [venda], arr(blobAtual.estoqueBaixas));
+        const rb = aplicarBaixasVendas(arr(blobAtual.estoque), arr(blobAtual.fichas), [venda], arr(blobAtual.estoqueBaixas), false);
         if (rb.mudou) {
           await sb.from('pdm_dados').upsert(
             { chave: PAINEL, valor: { ...blobAtual, estoque: rb.estoque, estoqueBaixas: rb.baixadas }, atualizado_em: new Date().toISOString() },
