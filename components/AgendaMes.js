@@ -34,14 +34,16 @@ export default function AgendaMes() {
   };
   useEffect(() => { carregarAgenda(); }, []);
 
-  // "Dar ok" numa tarefa: marca como concluída no Google e some da agenda.
-  const concluirTarefaAg = async (ev) => {
+  // "Dar ok" numa tarefa: risca (marca como feita) ou desmarca no Google. Ela
+  // fica na lista, só riscada — como num calendário digital.
+  const alternarTarefaAg = async (ev) => {
     if (concluindo) return;
     setConcluindo(ev.id);
+    const novo = !ev.concluida;
     try {
-      const r = await fetch('/api/google/concluir-tarefa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ev.id }) });
+      const r = await fetch('/api/google/concluir-tarefa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ev.id, concluida: novo }) });
       const j = await r.json();
-      if (j.ok) setAgenda((a) => (a || []).filter((x) => x.id !== ev.id));
+      if (j.ok) setAgenda((a) => (a || []).map((x) => (x.id === ev.id ? { ...x, concluida: novo } : x)));
     } catch { /* ignora */ }
     setConcluindo('');
   };
@@ -89,11 +91,11 @@ export default function AgendaMes() {
           return (
             <div key={ev.id} style={{ display: 'flex', gap: 12, alignItems: 'center', background: `color-mix(in srgb, ${cor} 14%, transparent)`, borderRadius: 12, padding: '11px 14px' }}>
               <span style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: cor, flexShrink: 0 }} />
-              <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{ev.titulo}</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 700, color: ev.concluida ? C.faint : C.text, lineHeight: 1.3, textDecoration: ev.concluida ? 'line-through' : 'none' }}>{ev.titulo}</span>
               {ev.tarefa && !ehBoleto(ev) ? (
-                <button onClick={() => concluirTarefaAg(ev)} disabled={concluindo === ev.id}
-                  style={{ flexShrink: 0, border: `1px solid ${cor}`, background: 'transparent', color: cor, borderRadius: 999, padding: '5px 13px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {concluindo === ev.id ? '…' : '✓ ok'}
+                <button onClick={() => alternarTarefaAg(ev)} disabled={concluindo === ev.id} title={ev.concluida ? 'Desmarcar' : 'Marcar como feito'}
+                  style={{ flexShrink: 0, border: `1px solid ${cor}`, background: ev.concluida ? cor : 'transparent', color: ev.concluida ? '#06101F' : cor, borderRadius: 999, padding: '5px 13px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  {concluindo === ev.id ? '…' : ev.concluida ? '✓ feito' : 'ok'}
                 </button>
               ) : (
                 <span style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{etiquetaEvento(ev)}</span>

@@ -12,8 +12,9 @@ export async function POST(request) {
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
   // A agenda manda o id com prefixo "task-"; aqui tiramos pra falar com o Google.
   const id = String(body?.id || '').replace(/^task-/, '');
+  const concluida = body?.concluida !== false; // padrão: concluir
   try {
-    await concluirTarefa(id);
+    await concluirTarefa(id, concluida);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao concluir a tarefa.' }, { status: 500 });
