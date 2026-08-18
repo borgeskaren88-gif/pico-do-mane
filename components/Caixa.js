@@ -11,7 +11,7 @@ const diaBR = (iso) => { if (!iso) return ''; try { return new Intl.DateTimeForm
 const dataHora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
 const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? 'Karen' : '');
 
-export default function Caixa() {
+export default function Caixa({ papel = 'dona' }) {
   const [dados, setDados] = useState(null);
   const [carregado, setCarregado] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -134,7 +134,7 @@ export default function Caixa() {
             )}
           </Card>
 
-          {(dados.servico || 0) > 0 && (
+          {papel !== 'garcom' && (dados.servico || 0) > 0 && (
             <Card style={{ marginBottom: 14, padding: '12px 14px', borderColor: C.accent2 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                 <div style={{ minWidth: 0 }}>
@@ -174,7 +174,7 @@ export default function Caixa() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{fmtDate(diaBR(c.abertoEm || c.fechadoEm))} · {hora(c.abertoEm)}–{hora(c.fechadoEm)}</div>
-                      <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Recebido {brl(c.recebido)} · gaveta {brl(c.dinheiroFinal)}{(c.servico || 0) > 0 ? ` · serviço ${brl(c.servico)}` : ''}{c.contado != null ? ` · contado ${brl(c.contado)}` : ''}</div>
+                      <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Recebido {brl(c.recebido)} · gaveta {brl(c.dinheiroFinal)}{papel !== 'garcom' && (c.servico || 0) > 0 ? ` · serviço ${brl(c.servico)}` : ''}{c.contado != null ? ` · contado ${brl(c.contado)}` : ''}</div>
                     </div>
                     {c.diferenca != null && Math.abs(c.diferenca) > 0.005 && (
                       <div style={{ fontSize: 12, fontWeight: 800, color: c.diferenca < 0 ? C.red : C.amber, flexShrink: 0 }}>{c.diferenca > 0 ? '+' : ''}{brl(c.diferenca)}</div>

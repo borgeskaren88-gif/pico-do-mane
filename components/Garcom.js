@@ -72,7 +72,7 @@ export default function Garcom() {
         </div>
         {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
 
-        {aba === 'comandas' ? <Comandas papel="garcom" /> : aba === 'perdas' ? <PerdaGarcom /> : aba === 'ponto' ? <PontoCozinha /> : <Caixa />}
+        {aba === 'comandas' ? <Comandas papel="garcom" /> : aba === 'perdas' ? <PerdaGarcom /> : aba === 'ponto' ? <PontoCozinha /> : <Caixa papel="garcom" />}
       </div>
     </div>
   );
