@@ -77,6 +77,13 @@ export async function POST(request) {
 
     if (acao === 'abrir') {
       if (aberto) return NextResponse.json({ ok: false, erro: 'Já existe um caixa aberto.' }, { status: 400 });
+      // O garçom (atendimento) só abre o caixa se tiver batido o ponto (entrada
+      // aberta). A dona abre livremente.
+      if (p === 'garcom') {
+        const { data: prows } = await sb.from('pdm_dados').select('valor').like('chave', 'ponto:%');
+        const temPontoAberto = (prows || []).map((r) => r.valor).some((v) => v && !v.saida && (!v.papel || v.papel === 'garcom'));
+        if (!temPontoAberto) return NextResponse.json({ ok: false, semPonto: true, erro: 'Bata seu ponto (Entrada) antes de abrir o caixa.' }, { status: 400 });
+      }
       const saldoInicial = n2(body?.saldoInicial);
       const caixa = { id: uid(), aberto: true, saldoInicial, abertoEm: new Date().toISOString(), abertoPor: p };
       const { error } = await sb.from('pdm_dados').upsert({ chave: CX + caixa.id, valor: caixa, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
