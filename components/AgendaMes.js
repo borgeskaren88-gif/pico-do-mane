@@ -23,6 +23,8 @@ export default function AgendaMes() {
   const [salvandoEv, setSalvandoEv] = useState(false);
   const [evErro, setEvErro] = useState('');
 
+  const [concluindo, setConcluindo] = useState('');
+
   const carregarAgenda = async () => {
     try {
       const r = await fetch('/api/google/eventos', { cache: 'no-store' });
@@ -31,6 +33,18 @@ export default function AgendaMes() {
     } catch { setAgenda(null); }
   };
   useEffect(() => { carregarAgenda(); }, []);
+
+  // "Dar ok" numa tarefa: marca como concluída no Google e some da agenda.
+  const concluirTarefaAg = async (ev) => {
+    if (concluindo) return;
+    setConcluindo(ev.id);
+    try {
+      const r = await fetch('/api/google/concluir-tarefa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ev.id }) });
+      const j = await r.json();
+      if (j.ok) setAgenda((a) => (a || []).filter((x) => x.id !== ev.id));
+    } catch { /* ignora */ }
+    setConcluindo('');
+  };
 
   const agendaGrupos = useMemo(() => {
     if (!agenda || !agenda.length) return [];
@@ -76,7 +90,14 @@ export default function AgendaMes() {
             <div key={ev.id} style={{ display: 'flex', gap: 12, alignItems: 'center', background: `color-mix(in srgb, ${cor} 14%, transparent)`, borderRadius: 12, padding: '11px 14px' }}>
               <span style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: cor, flexShrink: 0 }} />
               <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{ev.titulo}</span>
-              <span style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{etiquetaEvento(ev)}</span>
+              {ev.tarefa && !ehBoleto(ev) ? (
+                <button onClick={() => concluirTarefaAg(ev)} disabled={concluindo === ev.id}
+                  style={{ flexShrink: 0, border: `1px solid ${cor}`, background: 'transparent', color: cor, borderRadius: 999, padding: '5px 13px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  {concluindo === ev.id ? '…' : '✓ ok'}
+                </button>
+              ) : (
+                <span style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{etiquetaEvento(ev)}</span>
+              )}
             </div>
           );
         })}
