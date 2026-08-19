@@ -270,7 +270,12 @@ export async function POST(request) {
       // Taxa de serviço (10%): ligada por padrão; a dona/garçom pode tirar na mesa.
       const servicoOn = c.servico !== false;
       const servico = servicoOn ? Math.round(subtotal * 0.10 * 100) / 100 : 0;
-      const total = Math.round((subtotal + servico) * 100) / 100;
+      const totalBruto = Math.round((subtotal + servico) * 100) / 100;
+      // Desconto (%) dado na hora de fechar. Abate do total; o que o cliente
+      // paga (e o que as formas de pagamento têm que somar) é o total já com desconto.
+      const descontoPct = Math.max(0, Math.min(100, Number(body?.descontoPct) || 0));
+      const desconto = Math.round(totalBruto * descontoPct / 100 * 100) / 100;
+      const total = Math.round((totalBruto - desconto) * 100) / 100;
       const pessoas = Math.max(1, Math.floor(Number(body?.pessoas) || 1));
       // Pagamento pode ser dividido em várias formas (novo) ou uma só (compat).
       let pags = [];
@@ -309,7 +314,7 @@ export async function POST(request) {
       const { data: caixaRows } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
       const caixaAberto = (caixaRows || []).map((r) => r.valor).find((x) => x && x.aberto);
       const venda = {
-        id: uid(), data: hojeBrasil(), mesa: c.mesa, total, subtotal, servico, pessoas,
+        id: uid(), data: hojeBrasil(), mesa: c.mesa, total, subtotal, servico, desconto, descontoPct, pessoas,
         pagamentos: pags, pagamento: pags.length === 1 ? pags[0].forma : 'Dividido', fiado,
         nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens, caixaId: caixaAberto ? caixaAberto.id : null,
         // Só fica "não pago" (na lista de fiados) o que ficou no fiado.
