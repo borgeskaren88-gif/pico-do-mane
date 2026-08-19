@@ -37,10 +37,15 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
 
   const salvar = () => {
     if (!novo.nome.trim()) return;
+    const nomeLimpo = limparNome(novo.nome);
+    // Avisa se já existe um item com esse nome (evita duplicar sem querer, ex.: narguilé).
+    if (!editId && dados.some((i) => (i.nome || '').trim().toLowerCase() === nomeLimpo.toLowerCase())) {
+      if (typeof window !== 'undefined' && !window.confirm(`Já existe um item chamado "${nomeLimpo}" no cardápio. Quer mesmo criar outro igual?`)) return;
+    }
     const saboresLimpos = (novo.sabores || [])
       .map((s) => ({ nome: limparNome(s.nome), estoqueId: String(s.estoqueId || ''), qtd: String(s.qtd || ''), unidade: String(s.unidade || '') }))
       .filter((s) => s.nome && s.estoqueId && num(s.qtd) > 0);
-    const limpo = { nome: limparNome(novo.nome), preco: novo.preco || '0', categoria: novo.categoria, sabores: saboresLimpos };
+    const limpo = { nome: nomeLimpo, preco: novo.preco || '0', categoria: novo.categoria, sabores: saboresLimpos };
     if (editId) onChange(dados.map((i) => (i.id === editId ? { ...i, ...limpo } : i)));
     else onChange([{ id: uid(), ...limpo, ativo: true }, ...dados]);
     setNovo(itemVazio()); setEditId(null);
