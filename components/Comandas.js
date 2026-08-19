@@ -100,7 +100,7 @@ export default function Comandas({ papel = 'dona' }) {
     const pagamentos = FORMAS_PAG.map((f) => ({ forma: f, valor: num(fecharForm.valores[f] || '') })).filter((x) => x.valor > 0);
     const nomeCli = (fecharForm.nome || '').trim();
     const fiadoVal = num(fecharForm.valores['Fiado'] || '');
-    const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: nomeCli }) });
+    const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: nomeCli, descontoPct: num(fecharForm.descontoPct || 0) }) });
     const j = await r.json();
     if (!j.ok) { setErro(j.erro || 'Não consegui fechar.'); return; }
     // Ficou fiado com um nome que não está cadastrado? Oferece salvar como cliente,
@@ -313,20 +313,39 @@ export default function Comandas({ papel = 'dona' }) {
 
         {total > 0 && (
           fecharForm ? (() => {
+            const descontoPct = Math.max(0, Math.min(100, num(fecharForm.descontoPct || 0)));
+            const desconto = Math.round(total * descontoPct / 100 * 100) / 100;
+            const totalFinal = Math.round((total - desconto) * 100) / 100;
             const soma = FORMAS_PAG.reduce((s, f) => s + num(fecharForm.valores[f] || ''), 0);
-            const falta = Math.round((total - soma) * 100) / 100;
+            const falta = Math.round((totalFinal - soma) * 100) / 100;
             const fiadoVal = num(fecharForm.valores['Fiado'] || '');
             const confere = Math.abs(falta) <= 0.005;
             const setVal = (f) => (v) => setFecharForm((s) => ({ ...s, valores: { ...s.valores, [f]: v } }));
+            const setDesc = (p) => setFecharForm((s) => ({ ...s, descontoPct: p, valores: {} }));
             const preencherResto = (f) => {
               const outros = FORMAS_PAG.filter((x) => x !== f).reduce((s, x) => s + num(fecharForm.valores[x] || ''), 0);
-              const resto = Math.round((total - outros) * 100) / 100;
+              const resto = Math.round((totalFinal - outros) * 100) / 100;
               setFecharForm((s) => ({ ...s, valores: { ...s.valores, [f]: resto > 0 ? resto.toFixed(2).replace('.', ',') : '' } }));
             };
             return (
               <Card style={{ marginBottom: 14, padding: 14, borderColor: C.green }}>
                 <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Fechar conta — {brl(total)}</div>
                 <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Quanto entrou em cada forma? Dá pra dividir. Use “resto” pra completar.</div>
+
+                {/* Desconto (%) — abate do total da conta */}
+                <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Desconto</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {[0, 5, 10, 15].map((p) => (
+                      <button key={p} onClick={() => setDesc(p)} style={{ border: `1px solid ${descontoPct === p ? C.accent : C.line}`, background: descontoPct === p ? C.accent : 'transparent', color: descontoPct === p ? '#06101F' : C.muted, borderRadius: 999, padding: '7px 13px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{p === 0 ? 'Sem' : p + '%'}</button>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 2 }}>
+                      <div style={{ width: 62 }}><NumInput value={descontoPct ? String(descontoPct) : ''} onChange={(v) => setDesc(num(v))} placeholder="outro" /></div>
+                      <span style={{ fontSize: 13, color: C.muted, fontWeight: 700 }}>%</span>
+                    </div>
+                  </div>
+                  {descontoPct > 0 && <div style={{ fontSize: 14, fontWeight: 800, color: C.accent, marginTop: 8 }}>− {brl(desconto)} · Total com desconto: {brl(totalFinal)}</div>}
+                </div>
 
                 {/* Dividir a conta (calculadora de rachar) — só pra ver quanto fica por pessoa */}
                 <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
@@ -338,7 +357,7 @@ export default function Comandas({ papel = 'dona' }) {
                       <button onClick={() => setDividirPor((n) => Math.min(50, n + 1))} style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${C.line}`, background: 'transparent', color: C.text, fontSize: 20, fontWeight: 800, cursor: 'pointer', lineHeight: 1 }}>+</button>
                     </div>
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: C.accent, marginTop: 8, textAlign: 'center' }}>{brl(total / dividirPor)} <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>por pessoa</span></div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: C.accent, marginTop: 8, textAlign: 'center' }}>{brl(totalFinal / dividirPor)} <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>por pessoa</span></div>
                 </div>
 
                 {FORMAS_PAG.map((f) => (
@@ -350,7 +369,7 @@ export default function Comandas({ papel = 'dona' }) {
                 ))}
                 <div style={{ fontSize: 13, marginTop: 4, marginBottom: fiadoVal > 0 ? 10 : 6, fontWeight: 700, color: confere ? C.green : C.amber }}>
                   {confere ? 'Confere!' : falta > 0 ? `Falta ${brl(falta)}` : `Passou ${brl(-falta)}`}
-                  <span style={{ color: C.faint, fontWeight: 500 }}> · somado {brl(soma)} de {brl(total)}</span>
+                  <span style={{ color: C.faint, fontWeight: 500 }}> · somado {brl(soma)} de {brl(totalFinal)}</span>
                 </div>
                 {fiadoVal > 0 && (
                   <div style={{ marginBottom: 10 }}>
