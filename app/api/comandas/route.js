@@ -168,18 +168,21 @@ export async function POST(request) {
     if (acao === 'cortesia') {
       const cardapioId = txt(body?.cardapioId, 40);
       const qtd = Math.max(1, Math.floor(Number(body?.qtd) || 1));
-      if (!cardapioId) return NextResponse.json({ ok: false, erro: 'Escolha o produto da cortesia.' }, { status: 400 });
+      // Motivo: 'Cortesia' (padrão) ou 'Consumo da casa'. Vai no histórico e
+      // manda a baixa pra categoria certa do resumo "Para onde foi".
+      const motivoBase = txt(body?.motivo, 30) === 'Consumo da casa' ? 'Consumo da casa' : 'Cortesia';
+      if (!cardapioId) return NextResponse.json({ ok: false, erro: 'Escolha o produto.' }, { status: 400 });
       const blob = await lerPainel(sb);
       const estoque = Array.isArray(blob.estoque) ? blob.estoque : [];
       const fichas = Array.isArray(blob.fichas) ? blob.fichas : [];
       const cardapio = Array.isArray(blob.cardapio) ? blob.cardapio : [];
       const ficha = fichas.find((f) => f.cardapioId === cardapioId);
-      const prato = cardapio.find((c) => c.id === cardapioId)?.nome || 'Cortesia';
+      const prato = cardapio.find((c) => c.id === cardapioId)?.nome || motivoBase;
       if (!ficha || !Array.isArray(ficha.itens) || !ficha.itens.length) {
         return NextResponse.json({ ok: false, erro: `"${prato}" não tem ficha técnica, então não dá pra baixar os ingredientes. A dona precisa montar a ficha primeiro.` }, { status: 400 });
       }
       const novoEstoque = estoque.slice();
-      const motivo = `Cortesia · ${prato}`;
+      const motivo = `${motivoBase} · ${prato}`;
       let mudou = false;
       for (const ing of ficha.itens) {
         const idx = novoEstoque.findIndex((x) => x.id === ing.estoqueId);

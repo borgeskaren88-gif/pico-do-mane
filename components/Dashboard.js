@@ -10,6 +10,7 @@ import Hoje from './Hoje';
 import Diario from './Diario';
 import Marketing from './Marketing';
 import PontoDona from './PontoDona';
+import CortesiaConsumo from './CortesiaConsumo';
 import ListaCompras from './ListaCompras';
 import Lancamentos from './Lancamentos';
 import Compras from './Compras';
@@ -500,15 +501,16 @@ export default function Dashboard() {
                   <div style={{ background: C.panel2, border: `1px solid ${C.green}`, color: C.green, borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{avisoBaixa}</div>
                 )}
                 <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-                  {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas']].map(([v, rot]) => (
+                  {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas'], ['cortesia', 'Cortesia / Consumo']].map(([v, rot]) => (
                     <button key={v} onClick={() => setSubEstoque(v)} style={{
-                      flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700,
+                      flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 10px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
                       background: subEstoque === v ? C.accent : 'transparent', color: subEstoque === v ? '#06101F' : C.muted,
                     }}>{rot}</button>
                   ))}
                 </div>
                 {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} onRepor={reporLista} />}
                 {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={estoqueAcao} />}
+                {subEstoque === 'cortesia' && <CortesiaConsumo onFeito={() => carregarEstoque({})} />}
               </>
             )}
 
