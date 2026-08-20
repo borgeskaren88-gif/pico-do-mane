@@ -4,7 +4,7 @@ import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, SecTitle, Page
 import { brl, num, uid, limparNome } from '../lib/util';
 import { UNIDADES } from '../lib/estoque';
 
-export const CATEGORIAS_CARDAPIO = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Outros'];
+export const CATEGORIAS_CARDAPIO = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Combos', 'Outros'];
 
 const itemVazio = () => ({ nome: '', preco: '', categoria: '', sabores: [] });
 
