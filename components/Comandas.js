@@ -419,12 +419,9 @@ export default function Comandas({ papel = 'dona' }) {
   const numeros = [];
   for (let i = 1; i <= mesasQtd; i++) numeros.push(String(i));
   for (const c of comandas) { const m = String(c.mesa); if (!numeros.includes(m)) numeros.push(m); }
-  // Mesas ocupadas primeiro (agrupadas no começo), depois as livres — cada grupo
-  // em ordem de número. Assim as mesas ativas ficam juntas, sem uma perdida no meio.
-  numeros.sort((a, b) => {
-    const oa = abertasPorMesa.has(a) ? 0 : 1, ob = abertasPorMesa.has(b) ? 0 : 1;
-    return oa !== ob ? oa - ob : Number(a) - Number(b);
-  });
+  // Ordem numérica fixa: cada mesa sempre no mesmo lugar, pra o garçom não se
+  // confundir (a posição não muda quando abre/fecha).
+  numeros.sort((a, b) => Number(a) - Number(b));
   const nAbertas = comandas.length;
 
   return (
