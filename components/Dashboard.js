@@ -373,31 +373,9 @@ export default function Dashboard() {
   // A conta de quem está devendo aparece na própria tela de Fiados.
   const badges = { diario: tarefasAlerta };
 
-  // Navegação por gesto: deslizar o dedo para o lado troca de aba.
-  const toqueRef = useRef(null);
   const tabBarRef = useRef(null);
-  const irParaAba = (delta) => {
-    const idx = tabs.findIndex(([id]) => id === tab);
-    const novo = idx + delta;
-    if (idx < 0 || novo < 0 || novo >= tabs.length) return;
-    setTab(tabs[novo][0]);
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0 });
-  };
-  const onTouchStart = (e) => {
-    const t = e.changedTouches[0];
-    toqueRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
-  };
-  const onTouchEnd = (e) => {
-    const ini = toqueRef.current; toqueRef.current = null;
-    if (!ini) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - ini.x, dy = t.clientY - ini.y;
-    if (Date.now() - ini.t > 700) return;          // gesto muito lento
-    if (Math.abs(dx) < 60) return;                 // deslize curto demais
-    if (Math.abs(dx) < Math.abs(dy) * 1.5) return; // muito vertical (é rolagem)
-    irParaAba(dx < 0 ? 1 : -1);                     // esquerda = próxima; direita = anterior
-  };
-  // Mantém a aba ativa visível na barra ao trocar (inclusive por gesto).
+  // Mantém a aba ativa visível na barra ao trocar (só pelo botão da aba agora;
+  // o gesto de deslizar pra trocar de aba foi removido, porque trocava sem querer).
   useEffect(() => {
     const bar = tabBarRef.current;
     if (!bar) return;
@@ -464,7 +442,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: tab === 'brain' ? 1180 : 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
+      <div style={{ maxWidth: tab === 'brain' ? 1180 : 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={irParaTab} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
