@@ -356,6 +356,15 @@ export default function Dashboard() {
     ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['backup', 'Backup'],
   ];
 
+  // Lembra a última área aberta (no aparelho), pra que atualizar a página caia na
+  // mesma aba em vez de voltar pro início. Restaura só na montagem.
+  useEffect(() => {
+    try { const t = localStorage.getItem('picoos-tab'); if (t && tabs.some(([id]) => id === t)) setTab(t); } catch { /* ignora */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    try { localStorage.setItem('picoos-tab', tab); } catch { /* ignora */ }
+  }, [tab]);
+
   // Navegação que entende os sub-destinos do setor Abastecimento: se pedirem
   // 'compras'/'estoque'/'lista'/'cotacoes', abre a aba Abastecimento já na
   // parte certa (usado pelos atalhos "Ver / + Compra" do Hoje).
