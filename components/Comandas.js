@@ -190,16 +190,18 @@ export default function Comandas({ papel = 'dona' }) {
         </div>
 
         {saborDe && (
-          <Card style={{ marginBottom: 12, borderColor: C.accent }}>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>{saborDe.nome} — qual sabor?</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {saborDe.sabores.map((s) => (
-                <button key={s.nome} onClick={() => { addItem(saborDe.id, s.nome); setSaborDe(null); }} disabled={busy}
-                  style={{ border: 'none', background: C.accent, color: '#06101F', borderRadius: 999, padding: '10px 16px', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>{s.nome}</button>
-              ))}
+          <div onClick={() => setSaborDe(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 1000 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 16, padding: 18, width: '100%', maxWidth: 360, boxShadow: '0 12px 44px rgba(0,0,0,.4)' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>{saborDe.nome} — qual sabor?</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {saborDe.sabores.map((s) => (
+                  <button key={s.nome} onClick={() => { addItem(saborDe.id, s.nome); setSaborDe(null); }} disabled={busy}
+                    style={{ border: 'none', background: C.accent, color: '#06101F', borderRadius: 999, padding: '11px 18px', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>{s.nome}</button>
+                ))}
+              </div>
+              <button onClick={() => setSaborDe(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '14px 0 0' }}>Cancelar</button>
             </div>
-            <button onClick={() => setSaborDe(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '10px 0 0' }}>Cancelar</button>
-          </Card>
+          </div>
         )}
 
         {cardapio.length > 0 && (
