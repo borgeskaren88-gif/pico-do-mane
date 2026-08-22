@@ -6,6 +6,10 @@ import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome } from '../lib/es
 
 const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '' });
 
+// Mostra a quantidade no jeito brasileiro: vírgula no decimal e ponto no milhar.
+// Sem isso, um saldo fracionário (ex.: barril de chopp em 1.817) parecia "1817".
+const fmtQtd = (v) => Number(num(v).toFixed(3)).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+
 // Aba Estoque: catálogo de itens com saldo, mínimo, custo e "conteúdo por
 // unidade" (pra diluir garrafa em doses). Toda mudança de saldo passa por ações
 // atômicas na API (/api/estoque), pra ficar em sincronia com a baixa feita ao
@@ -274,7 +278,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
           {abaixoDoMin.map((it) => (
             <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, borderTop: `1px solid ${C.hair}`, padding: '7px 0', fontSize: 14 }}>
               <span>{it.nome}</span>
-              <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{num(it.saldo)} / mín. {num(it.minimo)} {it.unidade}</span>
+              <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmtQtd(it.saldo)} / mín. {fmtQtd(it.minimo)} {it.unidade}</span>
             </div>
           ))}
         </Card>
@@ -357,11 +361,11 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{it.nome}</div>
                     <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
                       {custo > 0 ? `${brl(custo)}/${it.unidade} · em estoque ${brl(saldo * custo)}` : `unidade: ${it.unidade}`}
-                      {minimo > 0 ? ` · mín. ${minimo}` : ''}{conteudoTxt}
+                      {minimo > 0 ? ` · mín. ${fmtQtd(minimo)}` : ''}{conteudoTxt}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: baixo ? C.red : C.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{saldo}</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: baixo ? C.red : C.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{fmtQtd(saldo)}</div>
                     <div style={{ fontSize: 11, color: C.faint }}>{it.unidade}{baixo ? ' · acabando' : ''}</div>
                   </div>
                 </div>
