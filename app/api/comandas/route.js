@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
+import { num } from '../../../lib/util';
 
 export const dynamic = 'force-dynamic';
 
@@ -215,18 +216,35 @@ export async function POST(request) {
       const prod = cardapio.find((x) => x && x.id === cardapioId);
       if (!prod) return NextResponse.json({ ok: false, erro: 'Item não está no cardápio.' }, { status: 400 });
       const preco = Number(String(prod.preco).replace(/\./g, '').replace(',', '.')) || 0;
-      // Sabor/variação: se o item tem sabores, guarda a fruta escolhida em
-      // "extras" pra baixar do estoque no fechamento. Itens de sabores diferentes
-      // ficam em linhas separadas.
-      let sabor, extras;
-      if (Array.isArray(prod.sabores) && prod.sabores.length) {
+      // Sabor/variação: se o item tem sabores, guarda a escolha em "extras" pra
+      // baixar do estoque no fechamento. Dois modos:
+      //  - Combo com saboresTotal > 0: o garçom distribui N unidades entre os
+      //    sabores (ex.: 3 Tropical + 2 Melancia = 5). Baixa a soma de cada.
+      //  - Sabor único (saboresTotal vazio): escolhe 1 sabor (ex.: caipirinha).
+      // qStr em vírgula pra o num() ler certo (evita "1.5" virar milhar).
+      const qStr = (v) => String(v).replace('.', ',');
+      const temSabores = Array.isArray(prod.sabores) && prod.sabores.length;
+      const total = Math.floor(Number(prod.saboresTotal) || 0);
+      let sabor, extras, mergeKey = '';
+      if (temSabores && total > 0) {
+        const dist = (body && typeof body.saboresQtd === 'object' && body.saboresQtd) ? body.saboresQtd : {};
+        const escolhidos = prod.sabores
+          .map((s) => ({ s, n: Math.max(0, Math.floor(Number(dist[s.nome]) || 0)) }))
+          .filter((x) => x.n > 0);
+        const soma = escolhidos.reduce((a, x) => a + x.n, 0);
+        if (soma !== total) return NextResponse.json({ ok: false, erro: `Escolha ${total} no total (você marcou ${soma}).` }, { status: 400 });
+        extras = escolhidos.map((x) => ({ estoqueId: String(x.s.estoqueId), qtd: qStr(num(x.s.qtd) * x.n), unidade: String(x.s.unidade || '') }));
+        sabor = escolhidos.map((x) => `${x.n} ${x.s.nome}`).join(', ');
+        mergeKey = null; // cada distribuição é uma linha própria (nunca junta)
+      } else if (temSabores) {
         const s = prod.sabores.find((x) => (x.nome || '').trim().toLowerCase() === saborNome.trim().toLowerCase());
         if (!s) return NextResponse.json({ ok: false, erro: 'Escolha o sabor.' }, { status: 400 });
         sabor = s.nome;
         extras = [{ estoqueId: String(s.estoqueId), qtd: String(s.qtd), unidade: String(s.unidade || '') }];
+        mergeKey = sabor;
       }
       const nomeItem = txt(prod.nome, 200) + (sabor ? ` (${sabor})` : '');
-      const existe = c.itens.find((it) => it.cardapioId === cardapioId && (it.sabor || '') === (sabor || ''));
+      const existe = mergeKey != null ? c.itens.find((it) => it.cardapioId === cardapioId && (it.sabor || '') === mergeKey) : null;
       if (existe) existe.qtd = (Number(existe.qtd) || 0) + 1;
       else c.itens.push({ id: uid(), cardapioId, nome: nomeItem, preco, qtd: 1, ...(sabor ? { sabor, extras } : {}) });
       await gravarComanda(sb, c);

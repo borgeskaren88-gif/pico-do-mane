@@ -24,6 +24,8 @@ export default function Comandas({ papel = 'dona' }) {
   const [picker, setPicker] = useState(false); // tela de adicionar produtos (carrinho)
   const [catSel, setCatSel] = useState(null); // categoria escolhida na tela de adicionar
   const [saborDe, setSaborDe] = useState(null); // item cujo seletor de sabor está aberto
+  const [comboQtds, setComboQtds] = useState({}); // distribuição de sabores do combo (nome -> qtd)
+  useEffect(() => { setComboQtds({}); }, [saborDe]);
   const [dividirPor, setDividirPor] = useState(2); // divisor da conta (quantas pessoas rachando)
   const [info, setInfo] = useState({ nome: '', pessoas: '', obs: '' });
   const infoDe = useRef(null); // id da comanda cujo info está carregado
@@ -95,6 +97,8 @@ export default function Comandas({ papel = 'dona' }) {
     if (j?.ok) { setMesasQtd(n); setConfigAberto(false); }
   };
   const addItem = (cardapioId, sabor) => acao({ acao: 'add', comandaId: selId, cardapioId, ...(sabor ? { sabor } : {}) });
+  // Combo: distribui N unidades entre os sabores (ex.: 3 Tropical + 2 Melancia).
+  const addCombo = (cardapioId, saboresQtd) => acao({ acao: 'add', comandaId: selId, cardapioId, saboresQtd });
   const setQtd = (itemId, qtd) => acao({ acao: 'setQtd', comandaId: selId, itemId, qtd });
   const remover = (itemId) => acao({ acao: 'remover', comandaId: selId, itemId });
   const cancelar = async (id) => {
@@ -214,14 +218,52 @@ export default function Comandas({ papel = 'dona' }) {
         {saborDe && (
           <div onClick={() => setSaborDe(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 1000 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 16, padding: 18, width: '100%', maxWidth: 360, boxShadow: '0 12px 44px rgba(0,0,0,.4)' }}>
-              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>{saborDe.nome} — qual sabor?</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {saborDe.sabores.map((s) => (
-                  <button key={s.nome} onClick={() => { addItem(saborDe.id, s.nome); setSaborDe(null); }} disabled={busy}
-                    style={{ border: 'none', background: C.accent, color: '#06101F', borderRadius: 999, padding: '11px 18px', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>{s.nome}</button>
-                ))}
-              </div>
-              <button onClick={() => setSaborDe(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '14px 0 0' }}>Cancelar</button>
+              {(() => {
+                const total = Math.floor(Number(saborDe.saboresTotal) || 0);
+                if (total > 0) {
+                  // Modo combo: distribui `total` unidades entre os sabores.
+                  const soma = saborDe.sabores.reduce((a, s) => a + (Number(comboQtds[s.nome]) || 0), 0);
+                  const falta = total - soma;
+                  const completo = soma === total;
+                  return (
+                    <>
+                      <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>{saborDe.nome}</div>
+                      <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>Escolha {total} no total (pode misturar).</div>
+                      {saborDe.sabores.map((s) => {
+                        const n = Number(comboQtds[s.nome]) || 0;
+                        return (
+                          <div key={s.nome} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.line}` }}>
+                            <span style={{ fontSize: 15, fontWeight: 600 }}>{s.nome}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <button onClick={() => setComboQtds((m) => ({ ...m, [s.nome]: Math.max(0, n - 1) }))} style={estBtn}>–</button>
+                              <span style={{ minWidth: 22, textAlign: 'center', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+                              <button disabled={soma >= total} onClick={() => setComboQtds((m) => ({ ...m, [s.nome]: n + 1 }))} style={{ ...estBtn, opacity: soma >= total ? 0.4 : 1 }}>+</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div style={{ fontSize: 13, fontWeight: 700, marginTop: 10, marginBottom: 10, color: completo ? C.green : C.amber }}>
+                        {completo ? 'Completo!' : `Faltam ${falta}`} <span style={{ color: C.faint, fontWeight: 500 }}>· {soma}/{total}</span>
+                      </div>
+                      <Btn kind="ok" onClick={() => { addCombo(saborDe.id, comboQtds); setSaborDe(null); }} disabled={busy || !completo}>Adicionar</Btn>
+                      <button onClick={() => setSaborDe(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '14px 0 0' }}>Cancelar</button>
+                    </>
+                  );
+                }
+                // Modo sabor único (ex.: caipirinha).
+                return (
+                  <>
+                    <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>{saborDe.nome} — qual sabor?</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {saborDe.sabores.map((s) => (
+                        <button key={s.nome} onClick={() => { addItem(saborDe.id, s.nome); setSaborDe(null); }} disabled={busy}
+                          style={{ border: 'none', background: C.accent, color: '#06101F', borderRadius: 999, padding: '11px 18px', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>{s.nome}</button>
+                      ))}
+                    </div>
+                    <button onClick={() => setSaborDe(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '14px 0 0' }}>Cancelar</button>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}
