@@ -6,7 +6,7 @@ import { UNIDADES } from '../lib/estoque';
 
 export const CATEGORIAS_CARDAPIO = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Combos', 'Outros'];
 
-const itemVazio = () => ({ nome: '', preco: '', categoria: '', sabores: [] });
+const itemVazio = () => ({ nome: '', preco: '', categoria: '', sabores: [], saboresTotal: '' });
 
 export default function Cardapio({ dados = [], onChange, estoque = [] }) {
   const [novo, setNovo] = useState(itemVazio());
@@ -45,12 +45,16 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
     const saboresLimpos = (novo.sabores || [])
       .map((s) => ({ nome: limparNome(s.nome), estoqueId: String(s.estoqueId || ''), qtd: String(s.qtd || ''), unidade: String(s.unidade || '') }))
       .filter((s) => s.nome && s.estoqueId && num(s.qtd) > 0);
-    const limpo = { nome: nomeLimpo, preco: novo.preco || '0', categoria: novo.categoria, sabores: saboresLimpos };
+    // Total de escolhas por sabor (combo): >0 = o garçom distribui N unidades
+    // entre os sabores (ex.: 5 energéticos = 3 Tropical + 2 Melancia). Vazio/0 =
+    // escolhe 1 sabor só (ex.: caipirinha).
+    const total = Math.max(0, Math.floor(num(novo.saboresTotal)));
+    const limpo = { nome: nomeLimpo, preco: novo.preco || '0', categoria: novo.categoria, sabores: saboresLimpos, saboresTotal: saboresLimpos.length ? total : 0 };
     if (editId) onChange(dados.map((i) => (i.id === editId ? { ...i, ...limpo } : i)));
     else onChange([{ id: uid(), ...limpo, ativo: true }, ...dados]);
     setNovo(itemVazio()); setEditId(null);
   };
-  const editar = (it) => { setNovo({ nome: it.nome || '', preco: it.preco || '', categoria: it.categoria || '', sabores: Array.isArray(it.sabores) ? it.sabores.map((s) => ({ ...s })) : [] }); setEditId(it.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const editar = (it) => { setNovo({ nome: it.nome || '', preco: it.preco || '', categoria: it.categoria || '', sabores: Array.isArray(it.sabores) ? it.sabores.map((s) => ({ ...s })) : [], saboresTotal: it.saboresTotal ? String(it.saboresTotal) : '' }); setEditId(it.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const cancelar = () => { setNovo(itemVazio()); setEditId(null); };
   const excluir = (id) => { if (id === editId) cancelar(); onChange(dados.filter((i) => i.id !== id)); };
   const alternarAtivo = (it) => onChange(dados.map((i) => (i.id === it.id ? { ...i, ativo: i.ativo === false ? true : false } : i)));
@@ -75,6 +79,12 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>
             Pra itens com sabores (caipirinha de limão, maracujá, morango…). O garçom escolhe o sabor na venda e o estoque baixa a <b style={{ color: C.text }}>fruta certa</b>. A base (cachaça/vodka, açúcar) fica na ficha técnica normal.
           </div>
+          <Field label="Cliente escolhe quantas no total? (combo)">
+            <NumInput value={novo.saboresTotal} onChange={set('saboresTotal')} placeholder="Ex.: 5 — deixe vazio p/ escolher 1 sabor só" />
+          </Field>
+          {num(novo.saboresTotal) > 0
+            ? <div style={{ fontSize: 12, color: C.accent, marginBottom: 10, lineHeight: 1.45 }}>Modo combo: na venda o garçom distribui <b>{Math.floor(num(novo.saboresTotal))}</b> unidades entre os sabores (ex.: 3 + 2). Em cada sabor abaixo, ponha a quantidade de <b>1 unidade</b> (ex.: 1 lata).</div>
+            : <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>Vazio = o garçom escolhe <b>1 sabor</b> por item (ex.: caipirinha).</div>}
           {(novo.sabores || []).map((s, i) => (
             <div key={i} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, marginBottom: 8 }}>
               <Field label="Nome do sabor"><TextInput value={s.nome} onChange={(v) => setSabor(i, { nome: v })} placeholder="Ex.: Morango" /></Field>
