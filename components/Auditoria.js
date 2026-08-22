@@ -61,6 +61,20 @@ export default function Auditoria({ receitas = [], despesas = [], compras = [], 
     return Object.values(porDia).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   }, [vendas]);
 
+  // Soma quanto foi vendido de cada produto num dia (junta os itens de todas as
+  // comandas fechadas do dia). Responde "quanto vendi de cada coisa".
+  const produtosDoDia = (vd) => {
+    const m = new Map();
+    for (const v of vd) for (const it of (v.itens || [])) {
+      const nome = it.nome || '—';
+      const q = Number(it.qtd) || 0;
+      if (q <= 0) continue;
+      const cur = m.get(nome) || { nome, qtd: 0, total: 0 };
+      cur.qtd += q; cur.total += q * (Number(it.preco) || 0); m.set(nome, cur);
+    }
+    return [...m.values()].sort((a, b) => b.qtd - a.qtd);
+  };
+
   const totalProblemas = dupReceitas.length + dupDespesas.length + dupCompras.length;
 
   const Grupo = ({ g, tipo }) => (
@@ -110,6 +124,22 @@ export default function Auditoria({ receitas = [], despesas = [], compras = [], 
                     </button>
                     <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>comandas {brl(d.vendasDia)}</span>
                   </div>
+                  {aberto[d.data] && (() => {
+                    const prods = produtosDoDia(vd);
+                    const totalItens = prods.reduce((s, p) => s + p.qtd, 0);
+                    if (!prods.length) return null;
+                    return (
+                      <div style={{ marginTop: 8, marginLeft: 14, padding: 10, background: C.panel2, borderRadius: 10 }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: C.accent, marginBottom: 6 }}>Produtos vendidos ({totalItens} no total)</div>
+                        {prods.map((p) => (
+                          <div key={p.nome} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, padding: '3px 0' }}>
+                            <span style={{ minWidth: 0, color: C.text }}><b style={{ fontVariantNumeric: 'tabular-nums' }}>{p.qtd}×</b> {p.nome}</span>
+                            <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(p.total)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   {aberto[d.data] && vd.map((v) => (
                     <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, paddingLeft: 14, marginTop: 6 }}>
                       <span style={{ flex: 1, minWidth: 0, color: C.text }}>Mesa {v.mesa} · {v.pagamento || '—'}{hora(v.fechadaEm) ? ` · ${hora(v.fechadaEm)}` : ''}</span>
