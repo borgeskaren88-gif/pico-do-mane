@@ -285,7 +285,13 @@ export default function Dashboard() {
   }, []);
 
   // Ao abrir a aba Estoque, recarrega e reconcilia (rede de segurança) as vendas.
-  useEffect(() => { if (tab === 'abastecimento') carregarEstoque({ sincronizar: true }); }, [tab, carregarEstoque]);
+  // Na Central de Operações (salão), carrega o estoque SÓ pra leitura (GET) — o
+  // Cardápio precisa da lista de itens no seletor de "Fruta (do estoque)" dos
+  // sabores/combos. Sem isso, quem ia direto pro Cardápio via a lista vazia.
+  useEffect(() => {
+    if (tab === 'abastecimento') carregarEstoque({ sincronizar: true });
+    else if (tab === 'salao') carregarEstoque({});
+  }, [tab, carregarEstoque]);
 
   // Uma ação do estoque (add/mov/edit/del/fichas): chama a API e atualiza o
   // estado com a resposta. Retorna o JSON pra quem precisa (ex.: id do novo item).
