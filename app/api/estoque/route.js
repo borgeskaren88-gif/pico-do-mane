@@ -23,7 +23,14 @@ async function lerPainel(sb) {
 }
 
 async function gravarEstoque(sb, blob, patch) {
-  const novo = { ...blob, ...patch };
+  // Relê o blob MAIS RECENTE agora (não usa a cópia lida no início do request) e
+  // troca só as chaves do patch (estoque/fichas/estoqueBaixas). Assim um
+  // salvamento paralelo do cardápio/clientes (feito pela dona em outra tela, via
+  // /api/data) NÃO é apagado por uma cópia velha — era isso que sumia com o
+  // cardápio/combos quando a sincronização do estoque rodava ao mesmo tempo.
+  const { data: atual } = await sb.from('pdm_dados').select('valor').eq('chave', PAINEL).maybeSingle();
+  const base = (atual?.valor && typeof atual.valor === 'object') ? atual.valor : (blob || {});
+  const novo = { ...base, ...patch };
   const { error } = await sb.from('pdm_dados').upsert(
     { chave: PAINEL, valor: novo, atualizado_em: new Date().toISOString() },
     { onConflict: 'chave' }

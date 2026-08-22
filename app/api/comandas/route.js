@@ -42,6 +42,19 @@ async function lerComanda(sb, id) {
   return data?.valor || null;
 }
 
+// Grava SÓ algumas chaves do painel (estoque/clientes/mesasQtd…), relendo o
+// blob mais recente na hora da gravação. Assim não apaga cardápio/clientes que a
+// dona salvou em paralelo por outra tela (bug do cardápio que sumia).
+async function gravarPainelParcial(sb, patch) {
+  const { data } = await sb.from('pdm_dados').select('valor').eq('chave', PAINEL).maybeSingle();
+  const base = (data?.valor && typeof data.valor === 'object') ? data.valor : {};
+  const { error } = await sb.from('pdm_dados').upsert(
+    { chave: PAINEL, valor: { ...base, ...patch }, atualizado_em: new Date().toISOString() },
+    { onConflict: 'chave' }
+  );
+  if (error) throw error;
+}
+
 async function gravarComanda(sb, c) {
   const { error } = await sb.from('pdm_dados').upsert(
     { chave: chaveDe(c.id), valor: c, atualizado_em: new Date().toISOString() },
@@ -99,12 +112,7 @@ export async function POST(request) {
       if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona configura as mesas.' }, { status: 403 });
       const n = Math.floor(Number(body?.mesasQtd));
       if (!(n >= 1 && n <= 80)) return NextResponse.json({ ok: false, erro: 'Número de mesas inválido (1 a 80).' }, { status: 400 });
-      const blob = await lerPainel(sb);
-      const { error } = await sb.from('pdm_dados').upsert(
-        { chave: PAINEL, valor: { ...blob, mesasQtd: n }, atualizado_em: new Date().toISOString() },
-        { onConflict: 'chave' }
-      );
-      if (error) throw error;
+      await gravarPainelParcial(sb, { mesasQtd: n });
       return NextResponse.json({ ok: true, mesasQtd: n });
     }
 
@@ -133,11 +141,7 @@ export async function POST(request) {
         return NextResponse.json({ ok: true, jaExistia: true });
       }
       const novo = { id: uid(), nome, telefone: '', limite: '', bloquear: false };
-      const { error } = await sb.from('pdm_dados').upsert(
-        { chave: PAINEL, valor: { ...blob, clientes: [novo, ...clientes] }, atualizado_em: new Date().toISOString() },
-        { onConflict: 'chave' }
-      );
-      if (error) throw error;
+      await gravarPainelParcial(sb, { clientes: [novo, ...clientes] });
       return NextResponse.json({ ok: true, cliente: novo });
     }
 
@@ -154,11 +158,7 @@ export async function POST(request) {
       let achou = false;
       const novos = estoque.map((it) => { if (it.id !== itemId) return it; achou = true; return aplicarMovimentoItem(it, 'saida', qtd, motivo + ' (atendimento)'); });
       if (!achou) return NextResponse.json({ ok: false, erro: 'Item não encontrado no estoque.' }, { status: 404 });
-      const { error } = await sb.from('pdm_dados').upsert(
-        { chave: PAINEL, valor: { ...blob, estoque: novos }, atualizado_em: new Date().toISOString() },
-        { onConflict: 'chave' }
-      );
-      if (error) throw error;
+      await gravarPainelParcial(sb, { estoque: novos });
       return NextResponse.json({ ok: true });
     }
 
@@ -193,11 +193,7 @@ export async function POST(request) {
         mudou = true;
       }
       if (!mudou) return NextResponse.json({ ok: false, erro: 'Não achei ingredientes pra baixar (confira a ficha).' }, { status: 400 });
-      const { error } = await sb.from('pdm_dados').upsert(
-        { chave: PAINEL, valor: { ...blob, estoque: novoEstoque }, atualizado_em: new Date().toISOString() },
-        { onConflict: 'chave' }
-      );
-      if (error) throw error;
+      await gravarPainelParcial(sb, { estoque: novoEstoque });
       return NextResponse.json({ ok: true, prato });
     }
 
@@ -337,10 +333,7 @@ export async function POST(request) {
         const blobAtual = await lerPainel(sb);
         const rb = aplicarBaixasVendas(arr(blobAtual.estoque), arr(blobAtual.fichas), [venda], arr(blobAtual.estoqueBaixas), false);
         if (rb.mudou) {
-          await sb.from('pdm_dados').upsert(
-            { chave: PAINEL, valor: { ...blobAtual, estoque: rb.estoque, estoqueBaixas: rb.baixadas }, atualizado_em: new Date().toISOString() },
-            { onConflict: 'chave' }
-          );
+          await gravarPainelParcial(sb, { estoque: rb.estoque, estoqueBaixas: rb.baixadas });
         }
       } catch (e) { /* estoque nunca quebra a venda */ }
       return NextResponse.json({ ok: true, venda });
