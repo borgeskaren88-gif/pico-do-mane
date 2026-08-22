@@ -51,25 +51,34 @@ export default function Comandas({ papel = 'dona' }) {
     return () => { clearInterval(t); window.removeEventListener('focus', onFoco); };
   }, [carregar]);
 
-  const acao = async (payload, { manterSel = true } = {}) => {
-    setBusy(true);
-    try {
-      const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const j = await r.json();
-      if (!j.ok) { setErro(j.erro || 'Erro.'); return null; }
-      if (j.comanda) {
-        setComandas((cs) => {
-          const outras = cs.filter((c) => c.id !== j.comanda.id);
-          return [...outras, j.comanda].sort((a, b) => Number(a.mesa) - Number(b.mesa));
-        });
-        if (manterSel) setSelId(j.comanda.id);
-      } else {
-        await carregar();
-      }
-      setErro('');
-      return j;
-    } catch { setErro('Sem conexão.'); return null; }
-    finally { setBusy(false); }
+  // As ações de comanda deste aparelho rodam UMA DE CADA VEZ (fila). Assim,
+  // salvar o nome e lançar um item não "brigam" no servidor: sem a fila, um
+  // pedido podia ler a comanda antes do outro gravar e apagar o nome sem querer.
+  const filaRef = useRef(Promise.resolve());
+  const acao = (payload, { manterSel = true } = {}) => {
+    const run = async () => {
+      setBusy(true);
+      try {
+        const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const j = await r.json();
+        if (!j.ok) { setErro(j.erro || 'Erro.'); return null; }
+        if (j.comanda) {
+          setComandas((cs) => {
+            const outras = cs.filter((c) => c.id !== j.comanda.id);
+            return [...outras, j.comanda].sort((a, b) => Number(a.mesa) - Number(b.mesa));
+          });
+          if (manterSel) setSelId(j.comanda.id);
+        } else {
+          await carregar();
+        }
+        setErro('');
+        return j;
+      } catch { setErro('Sem conexão.'); return null; }
+      finally { setBusy(false); }
+    };
+    const p = filaRef.current.then(run, run);
+    filaRef.current = p.then(() => {}, () => {});
+    return p;
   };
 
   // Toca numa mesa do grid: se já tem comanda, entra; se não, abre e entra.
@@ -136,7 +145,20 @@ export default function Comandas({ papel = 'dona' }) {
     if (!sel) { infoDe.current = null; }
   }, [sel]);
 
-  const salvarInfos = (parcial) => acao({ acao: 'infos', comandaId: selId, ...parcial }, { manterSel: true });
+  // Salvar infos NUNCA muda a mesa selecionada (manterSel:false), pra um save
+  // atrasado (do nome) não jogar a garçom de volta pra uma mesa antiga.
+  const salvarInfos = (parcial) => acao({ acao: 'infos', comandaId: selId, ...parcial }, { manterSel: false });
+
+  // Salva o nome sozinho pouco depois de parar de digitar (além de salvar ao
+  // sair do campo), pra não perder o nome se a tela recarregar antes disso.
+  const nomeTimer = useRef(null);
+  const mudarNome = (v) => {
+    setInfo((s) => ({ ...s, nome: v }));
+    if (nomeTimer.current) clearTimeout(nomeTimer.current);
+    nomeTimer.current = setTimeout(() => { nomeTimer.current = null; salvarInfos({ nome: v }); }, 900);
+  };
+  const salvarNomeAgora = () => { if (nomeTimer.current) { clearTimeout(nomeTimer.current); nomeTimer.current = null; } salvarInfos({ nome: info.nome }); };
+  useEffect(() => () => { if (nomeTimer.current) clearTimeout(nomeTimer.current); }, []);
 
   // Formata o horário de abertura (HH:MM).
   const horaAbertura = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
@@ -256,7 +278,7 @@ export default function Comandas({ papel = 'dona' }) {
             {rotuloPapel(sel.abertaPor) && <> · por {rotuloPapel(sel.abertaPor)}</>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end' }}>
-            <Field label="Nome do cliente (opcional)"><TextInput value={info.nome} onChange={(v) => setInfo((s) => ({ ...s, nome: v }))} onBlur={() => salvarInfos({ nome: info.nome })} placeholder="Ex.: João do balcão" /></Field>
+            <Field label="Nome do cliente (opcional)"><TextInput value={info.nome} onChange={mudarNome} onBlur={salvarNomeAgora} placeholder="Ex.: João do balcão" /></Field>
             <Field label="Pessoas">
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <button onClick={() => { const n = Math.max(0, (Number(info.pessoas) || 0) - 1); setInfo((s) => ({ ...s, pessoas: n ? String(n) : '' })); salvarInfos({ pessoas: n }); }} style={estBtn}>–</button>
