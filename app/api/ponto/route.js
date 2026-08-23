@@ -37,7 +37,10 @@ export async function GET() {
     const registros = (await lerRegistros(sb))
       .filter((r) => p === 'dona' || !r.papel || r.papel === p)
       .sort((a, b) => (b.entrada || '').localeCompare(a.entrada || ''));
-    return NextResponse.json({ ok: true, registros });
+    // Jornada esperada por setor (dona configura): { cozinha:{dias,entrada,saida}, garcom:{...} }.
+    const { data: jr } = await sb.from('pdm_dados').select('valor').eq('chave', 'jornadas').maybeSingle();
+    const jornadas = (jr?.valor && typeof jr.valor === 'object') ? jr.valor : {};
+    return NextResponse.json({ ok: true, registros, jornadas });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar o ponto.' }, { status: 500 });
   }
@@ -72,6 +75,26 @@ export async function POST(request) {
       const { error } = await sb.from('pdm_dados').upsert({ chave: PREFIXO + reg.id, valor: reg, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
       return NextResponse.json({ ok: true, registro: reg });
+    }
+
+    // Salvar a jornada esperada por setor (só a dona). Valida dias (0=Dom..6=Sáb)
+    // e horários HH:MM. Guarda na linha 'jornadas' (fora do prefixo 'ponto:').
+    if (acao === 'jornadas') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona configura a jornada.' }, { status: 403 });
+      const entra = (body?.jornadas && typeof body.jornadas === 'object') ? body.jornadas : {};
+      const hhmm = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '')); if (!m) return ''; const h = Math.min(23, Math.max(0, +m[1])); const mi = Math.min(59, Math.max(0, +m[2])); return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`; };
+      const limpo = {};
+      for (const key of ['cozinha', 'garcom', 'dona']) {
+        const j = entra[key];
+        if (!j || typeof j !== 'object') continue;
+        const dias = Array.isArray(j.dias) ? [...new Set(j.dias.map(Number).filter((d) => d >= 0 && d <= 6))].sort((a, b) => a - b) : [];
+        const entrada = hhmm(j.entrada), saida = hhmm(j.saida);
+        if (!dias.length || !entrada || !saida) continue;
+        limpo[key] = { dias, entrada, saida };
+      }
+      const { error } = await sb.from('pdm_dados').upsert({ chave: 'jornadas', valor: limpo, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, jornadas: limpo });
     }
 
     // Apagar um registro de ponto (só a dona) — pra corrigir um ponto errado.
