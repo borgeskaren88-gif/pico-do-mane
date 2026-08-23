@@ -97,6 +97,29 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, jornadas: limpo });
     }
 
+    // Lançar um turno passado à mão (só a dona): pra registrar os dias que a
+    // equipe trabalhou antes de começar a bater ponto. Recebe data (YYYY-MM-DD)
+    // e horários HH:MM; monta os horários no fuso do Brasil (UTC-3, sem horário
+    // de verão). Se a saída for <= entrada, a saída cai no dia seguinte (vira a
+    // meia-noite, ex.: 16:00 → 00:00).
+    if (acao === 'lancar') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona lança turno à mão.' }, { status: 403 });
+      const setor = ['cozinha', 'garcom', 'dona'].includes(body?.setor) ? body.setor : '';
+      const data = txt(body?.data, 10);
+      const hm = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '')); if (!m) return null; return `${String(Math.min(23, Math.max(0, +m[1]))).padStart(2, '0')}:${String(Math.min(59, Math.max(0, +m[2]))).padStart(2, '0')}`; };
+      const eHM = hm(body?.entrada), sHM = hm(body?.saida);
+      if (!nome || !/^\d{4}-\d{2}-\d{2}$/.test(data) || !eHM || !sHM) return NextResponse.json({ ok: false, erro: 'Preencha nome, dia e horários.' }, { status: 400 });
+      const mins = (x) => (+x.slice(0, 2)) * 60 + (+x.slice(3, 5));
+      const proxDia = (d) => { const dt = new Date(d + 'T12:00:00-03:00'); dt.setDate(dt.getDate() + 1); return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt); };
+      const dataSaida = mins(sHM) <= mins(eHM) ? proxDia(data) : data;
+      const entradaISO = new Date(`${data}T${eHM}:00-03:00`).toISOString();
+      const saidaISO = new Date(`${dataSaida}T${sHM}:00-03:00`).toISOString();
+      const reg = { id: uid(), nome, entrada: entradaISO, saida: saidaISO, data, papel: setor, manual: true };
+      const { error } = await sb.from('pdm_dados').upsert({ chave: PREFIXO + reg.id, valor: reg, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, registro: reg });
+    }
+
     // Apagar um registro de ponto (só a dona) — pra corrigir um ponto errado.
     if (acao === 'excluir') {
       if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona pode apagar um ponto.' }, { status: 403 });
