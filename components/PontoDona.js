@@ -26,6 +26,9 @@ export default function PontoDona() {
   const [configAberto, setConfigAberto] = useState(false);
   const [form, setForm] = useState({}); // cópia editável das jornadas
   const [msg, setMsg] = useState('');
+  const [lancarAberto, setLancarAberto] = useState(false);
+  const [lanc, setLanc] = useState({ nome: '', setor: 'cozinha', data: '', entrada: '16:00', saida: '00:00' });
+  const [msgLanc, setMsgLanc] = useState('');
 
   const carregar = useCallback(async () => {
     try {
@@ -65,6 +68,26 @@ export default function PontoDona() {
       if (j.ok) { setJornadas(j.jornadas || {}); setMsg('Jornada salva!'); setConfigAberto(false); }
       else setMsg(j.erro || 'Não consegui salvar.');
     } catch { setMsg('Sem conexão.'); }
+    finally { setBusy(false); }
+  };
+
+  // ---- Lançar turno passado (dias que faltaram) ----
+  const nomesConhecidos = useMemo(() => [...new Set(registros.map((r) => r.nome).filter(Boolean))], [registros]);
+  const abrirLancar = () => {
+    const j = jornadas.cozinha;
+    setLanc({ nome: '', setor: 'cozinha', data: todayISO(), entrada: j?.entrada || '16:00', saida: j?.saida || '00:00' });
+    setMsgLanc(''); setLancarAberto(true);
+  };
+  const setLancSetor = (setor) => setLanc((l) => { const j = jornadas[setor]; return { ...l, setor, entrada: j?.entrada || l.entrada, saida: j?.saida || l.saida }; });
+  const lancarTurno = async () => {
+    if (!lanc.nome.trim() || !lanc.data) { setMsgLanc('Preencha o nome e o dia.'); return; }
+    setBusy(true); setMsgLanc('');
+    try {
+      const r = await fetch('/api/ponto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'lancar', nome: lanc.nome.trim(), setor: lanc.setor, data: lanc.data, entrada: lanc.entrada, saida: lanc.saida }) });
+      const j = await r.json();
+      if (j.ok) { setMsgLanc('Turno lançado! Troque o dia e lance o próximo.'); await carregar(); }
+      else setMsgLanc(j.erro || 'Não consegui lançar.');
+    } catch { setMsgLanc('Sem conexão.'); }
     finally { setBusy(false); }
   };
 
@@ -165,6 +188,53 @@ export default function PontoDona() {
             </div>
           </Card>
         )}
+      </div>
+
+      {/* Lançar turno passado (dias que faltaram antes de começar a bater ponto) */}
+      <div style={{ marginBottom: 14 }}>
+        {!lancarAberto ? (
+          <button onClick={abrirLancar} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            + Lançar turno que faltou (semanas anteriores)
+          </button>
+        ) : (() => {
+          const inp = { background: C.panel2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 8, padding: '9px 10px', fontSize: 14, width: '100%' };
+          const h = horasJornada({ entrada: lanc.entrada, saida: lanc.saida });
+          return (
+            <Card style={{ padding: 14, borderColor: C.accent }}>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Lançar turno à mão</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.45 }}>Pra registrar os dias que a equipe trabalhou <b style={{ color: C.text }}>antes</b> de começar a bater ponto. Preencha e salve; dá pra lançar vários dias seguidos (é só trocar o dia).</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 4 }}>Quem</div>
+                  <input list="nomes-ponto" value={lanc.nome} onChange={(e) => setLanc((l) => ({ ...l, nome: e.target.value }))} placeholder="Nome" style={inp} />
+                  <datalist id="nomes-ponto">{nomesConhecidos.map((n) => <option key={n} value={n} />)}</datalist>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 4 }}>Setor</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {SETORES.map(([k, rot]) => (
+                      <button key={k} onClick={() => setLancSetor(k)} style={{ flex: 1, border: `1px solid ${lanc.setor === k ? C.accent : C.line}`, background: lanc.setor === k ? C.accent : 'transparent', color: lanc.setor === k ? '#06101F' : C.muted, borderRadius: 9, padding: '9px 8px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{rot}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 4 }}>Dia</div>
+                  <input type="date" value={lanc.data} max={todayISO()} onChange={(e) => setLanc((l) => ({ ...l, data: e.target.value }))} style={inp} />
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <label style={{ flex: 1, fontSize: 12, color: C.muted, fontWeight: 700 }}>Entrou<input type="time" value={lanc.entrada} onChange={(e) => setLanc((l) => ({ ...l, entrada: e.target.value }))} style={{ ...inp, marginTop: 4 }} /></label>
+                  <label style={{ flex: 1, fontSize: 12, color: C.muted, fontWeight: 700 }}>Saiu<input type="time" value={lanc.saida} onChange={(e) => setLanc((l) => ({ ...l, saida: e.target.value }))} style={{ ...inp, marginTop: 4 }} /></label>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.accent }}>Esse turno = {fmtHoras(h)}</div>
+              </div>
+              {msgLanc && <div style={{ fontSize: 13, color: msgLanc.includes('lançado') ? C.green : C.red, marginTop: 10 }}>{msgLanc}</div>}
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <Btn onClick={lancarTurno} disabled={busy}>{busy ? 'Lançando…' : 'Lançar turno'}</Btn>
+                <Btn kind="ghost" onClick={() => setLancarAberto(false)}>Fechar</Btn>
+              </div>
+            </Card>
+          );
+        })()}
       </div>
 
       {trabalhandoAgora.length > 0 && (
