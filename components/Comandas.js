@@ -16,6 +16,7 @@ export default function Comandas({ papel = 'dona' }) {
   const [erro, setErro] = useState('');
   const [selId, setSelId] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [fechando, setFechando] = useState(false); // trava o botão de fechar conta (evita toque duplo no agito)
   const [configAberto, setConfigAberto] = useState(false);
   const [mesasInput, setMesasInput] = useState('');
   const [fecharForm, setFecharForm] = useState(null); // { pagamento, pessoas } quando fechando
@@ -110,23 +111,38 @@ export default function Comandas({ papel = 'dona' }) {
     setSelId(null);
   };
   const confirmarFechar = async () => {
+    if (fechando) return; // já está fechando: ignora toque duplo
+    setFechando(true);
+    setErro('');
     const pagamentos = FORMAS_PAG.map((f) => ({ forma: f, valor: num(fecharForm.valores[f] || '') })).filter((x) => x.valor > 0);
     const nomeCli = (fecharForm.nome || '').trim();
     const fiadoVal = num(fecharForm.valores['Fiado'] || '');
-    const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: nomeCli, descontoPct: num(fecharForm.descontoPct || 0) }) });
-    const j = await r.json();
-    if (!j.ok) { setErro(j.erro || 'Não consegui fechar.'); return; }
-    // Ficou fiado com um nome que não está cadastrado? Oferece salvar como cliente,
-    // pra da próxima ser só clicar no nome (e poder definir um limite depois).
-    const norm = (s) => (s || '').trim().toLowerCase();
-    if (fiadoVal > 0.005 && nomeCli && !clientes.some((n) => norm(n) === norm(nomeCli))) {
-      if (typeof window !== 'undefined' && window.confirm(`Salvar "${nomeCli}" na sua lista de clientes?\n\nAssim, da próxima vez é só clicar no nome — e dá pra definir um limite de fiado pra ele na aba Clientes.`)) {
-        try { await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'novoCliente', nome: nomeCli }) }); } catch { /* se falhar, a venda já está salva; ela cadastra depois */ }
+    try {
+      const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: nomeCli, descontoPct: num(fecharForm.descontoPct || 0) }) });
+      const j = await r.json();
+      if (!j.ok) {
+        // A conta já não existe? Provável: um toque anterior já fechou e a
+        // resposta se perdeu no agito. Trata como fechada — não assusta.
+        if (/não encontrada|já fechada/i.test(j.erro || '')) { setFecharForm(null); setSelId(null); await carregar(); return; }
+        setErro(j.erro || 'Não consegui fechar.');
+        return;
       }
+      // Ficou fiado com um nome que não está cadastrado? Oferece salvar como cliente,
+      // pra da próxima ser só clicar no nome (e poder definir um limite depois).
+      const norm = (s) => (s || '').trim().toLowerCase();
+      if (fiadoVal > 0.005 && nomeCli && !clientes.some((n) => norm(n) === norm(nomeCli))) {
+        if (typeof window !== 'undefined' && window.confirm(`Salvar "${nomeCli}" na sua lista de clientes?\n\nAssim, da próxima vez é só clicar no nome — e dá pra definir um limite de fiado pra ele na aba Clientes.`)) {
+          try { await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'novoCliente', nome: nomeCli }) }); } catch { /* se falhar, a venda já está salva; ela cadastra depois */ }
+        }
+      }
+      setFecharForm(null);
+      setSelId(null);
+      await carregar();
+    } catch {
+      setErro('Sem conexão — a conta pode não ter fechado. Confira a mesa e tente de novo.');
+    } finally {
+      setFechando(false);
     }
-    setFecharForm(null);
-    setSelId(null);
-    await carregar();
   };
 
   const totalDe = (c) => (c.itens || []).reduce((s, it) => s + (Number(it.qtd) || 0) * (Number(it.preco) || 0), 0);
@@ -456,7 +472,7 @@ export default function Comandas({ papel = 'dona' }) {
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <Btn kind="ok" onClick={confirmarFechar} disabled={busy || !confere}>Confirmar</Btn>
+                  <Btn kind="ok" onClick={confirmarFechar} disabled={busy || fechando || !confere}>{fechando ? 'Fechando…' : 'Confirmar'}</Btn>
                   <Btn kind="ghost" onClick={() => setFecharForm(null)}>Voltar</Btn>
                 </div>
               </Card>
