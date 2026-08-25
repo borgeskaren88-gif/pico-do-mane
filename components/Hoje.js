@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, inputStyle } from './ui';
-import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_RECEITA, FONTES_NAO_OPERACIONAL, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], setTab }) {
   const [mostrarValores, setMostrarValores] = useState(true);
@@ -41,8 +41,10 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   }, []);
   const hoje = todayISO();
   const mes = ymOf(hoje);
-  const rec = receitas.filter((r) => ymOf(r.data) === mes).reduce((s, r) => s + num(r.valor), 0);
-  const desp = despesas.filter((d) => ymOf(d.data) === mes).reduce((s, d) => s + num(d.valor), 0);
+  // Lucro OPERACIONAL: exclui investimento e empréstimo/dívida/aporte (movem
+  // caixa, mas não são resultado da operação).
+  const rec = receitas.filter((r) => ymOf(r.data) === mes && !FONTES_NAO_OPERACIONAL.includes(r.categoria)).reduce((s, r) => s + num(r.valor), 0);
+  const desp = despesas.filter((d) => ymOf(d.data) === mes && !DESPESA_NAO_OPERACIONAL.includes(d.categoria)).reduce((s, d) => s + num(d.valor), 0);
   const lucro = rec - desp;
   const margem = rec ? (lucro / rec) * 100 : 0;
   const jaTem = diario.some((d) => d.data === hoje);
