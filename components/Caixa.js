@@ -20,6 +20,7 @@ export default function Caixa({ papel = 'dona' }) {
   const [contado, setContado] = useState('');
   const [fechando, setFechando] = useState(false);
   const [verHist, setVerHist] = useState(false);
+  const [histAberto, setHistAberto] = useState(''); // id do caixa fechado com o detalhe aberto
   const [editSaldo, setEditSaldo] = useState(false);
   const [saldoEdit, setSaldoEdit] = useState('');
 
@@ -169,19 +170,40 @@ export default function Caixa({ papel = 'dona' }) {
           </button>
           {verHist && (
             <div style={{ marginTop: 10 }}>
-              {historico.map((c) => (
+              {historico.map((c) => {
+                const ab = histAberto === c.id;
+                const ent = c.entradas || {};
+                const temDetalhe = METODOS.some((m) => (ent[m] || 0) > 0);
+                return (
                 <Card key={c.id} style={{ marginBottom: 8, padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                  <button onClick={() => { if (temDetalhe) setHistAberto(ab ? '' : c.id); }} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: temDetalhe ? 'pointer' : 'default', textAlign: 'left', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{fmtDate(diaBR(c.abertoEm || c.fechadoEm))} · {hora(c.abertoEm)}–{hora(c.fechadoEm)}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{temDetalhe ? (ab ? '▾ ' : '▸ ') : ''}{fmtDate(diaBR(c.abertoEm || c.fechadoEm))} · {hora(c.abertoEm)}–{hora(c.fechadoEm)}</div>
                       <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Recebido {brl(c.recebido)} · gaveta {brl(c.dinheiroFinal)}{papel !== 'garcom' && (c.servico || 0) > 0 ? ` · serviço ${brl(c.servico)}` : ''}{c.contado != null ? ` · contado ${brl(c.contado)}` : ''}</div>
                     </div>
                     {c.diferenca != null && Math.abs(c.diferenca) > 0.005 && (
                       <div style={{ fontSize: 12, fontWeight: 800, color: c.diferenca < 0 ? C.red : C.amber, flexShrink: 0 }}>{c.diferenca > 0 ? '+' : ''}{brl(c.diferenca)}</div>
                     )}
-                  </div>
+                  </button>
+                  {ab && temDetalhe && (
+                    <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
+                      {METODOS.map((m) => (
+                        <div key={m} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                          <span style={{ color: C.muted }}>{m}</span>
+                          <span style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(ent[m] || 0)}</span>
+                        </div>
+                      ))}
+                      {(ent.Fiado || 0) > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderTop: `1px solid ${C.line}`, marginTop: 2 }}>
+                          <span style={{ color: C.amber }}>Fiado (não é caixa)</span>
+                          <span style={{ fontWeight: 700, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{brl(ent.Fiado)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
