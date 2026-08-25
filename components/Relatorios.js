@@ -65,7 +65,12 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
   const totalRec = recMes.reduce((s, r) => s + num(r.valor), 0);
   const custoVar = despMes.filter((d) => CUSTO_VARIAVEL.includes(d.categoria)).reduce((s, d) => s + num(d.valor), 0);
   const despOp = despMes.filter((d) => DESPESA_OPERACIONAL.includes(d.categoria)).reduce((s, d) => s + num(d.valor), 0);
-  const lucro = totalRec - custoVar - despOp;
+  // O lucro subtrai TODAS as despesas do mês — inclusive as de categoria em
+  // branco ou fora das listas. Sem isso, uma despesa "solta" sumia do cálculo e
+  // o lucro aparecia mais alto do que o real.
+  const totalDespMes = despMes.reduce((s, d) => s + num(d.valor), 0);
+  const despOutras = Math.round((totalDespMes - custoVar - despOp) * 100) / 100;
+  const lucro = totalRec - totalDespMes;
   const margem = totalRec ? (lucro / totalRec) * 100 : 0;
 
   const evolucao = useMemo(() => {
@@ -96,9 +101,8 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
   const resumoDe = (ym) => {
     const r = receitas.filter((x) => ymOf(x.data) === ym).reduce((s, x) => s + num(x.valor), 0);
     const dd = despesas.filter((x) => ymOf(x.data) === ym);
-    const cv = dd.filter((x) => CUSTO_VARIAVEL.includes(x.categoria)).reduce((s, x) => s + num(x.valor), 0);
-    const op = dd.filter((x) => DESPESA_OPERACIONAL.includes(x.categoria)).reduce((s, x) => s + num(x.valor), 0);
-    return { rec: r, desp: cv + op, lucro: r - cv - op };
+    const totalDD = dd.reduce((s, x) => s + num(x.valor), 0);
+    return { rec: r, desp: totalDD, lucro: r - totalDD };
   };
   const prev = useMemo(() => resumoDe(prevMes), [prevMes, receitas, despesas]);
 
@@ -125,7 +129,7 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 700, marginBottom: 4 }}>Crescimento</div>
         <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Comparado com {mesLabel(prevMes)}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[['Receita', totalRec, prev.rec, C.green, true], ['Despesa', custoVar + despOp, prev.desp, C.amber, false], ['Lucro', lucro, prev.lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, atual, ant, cor, boa]) => (
+          {[['Receita', totalRec, prev.rec, C.green, true], ['Despesa', totalDespMes, prev.desp, C.amber, false], ['Lucro', lucro, prev.lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, atual, ant, cor, boa]) => (
             <div key={nome} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: C.panel2, borderRadius: 12, padding: '11px 14px' }}>
               <span style={{ fontSize: 13, color: C.muted, fontWeight: 600, flexShrink: 0 }}>{nome}</span>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, minWidth: 0 }}>
@@ -139,7 +143,7 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
 
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.accent, fontWeight: 700, marginBottom: 12 }}>DRE — {mesLabel(mes)}</div>
-        {[['Receita bruta', totalRec, C.green, false], ['(–) Custo variável', custoVar, C.amber, false], ['(–) Despesas operacionais', despOp, C.amber, false], ['(=) Lucro operacional', lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, val, cor, bold]) => (
+        {[['Receita bruta', totalRec, C.green, false], ['(–) Custo variável', custoVar, C.amber, false], ['(–) Despesas operacionais', despOp, C.amber, false], ...(despOutras > 0.005 ? [['(–) Outras despesas', despOutras, C.amber, false]] : []), ['(=) Lucro operacional', lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, val, cor, bold]) => (
           <div key={nome} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderTop: bold ? `1px solid ${C.line}` : 'none' }}>
             <span style={{ fontWeight: bold ? 800 : 500, color: bold ? C.text : C.muted }}>{nome}</span>
             <span style={{ fontWeight: bold ? 800 : 600, color: cor, fontVariantNumeric: 'tabular-nums' }}>{brl(val)}</span>
