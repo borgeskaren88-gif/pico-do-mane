@@ -55,22 +55,29 @@ function Delta({ atual, anterior, boaSubida = true }) {
     </span>
   );
 }
-import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, FONTES_NAO_OPERACIONAL, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
 export default function Relatorios({ diario, receitas, despesas, mes, setMes }) {
   const mesesDisp = [...new Set([...receitas, ...despesas].map((d) => ymOf(d.data)))].sort().reverse();
   const opts = mesesDisp.length ? mesesDisp : [ymOf(todayISO())];
   const recMes = receitas.filter((r) => ymOf(r.data) === mes);
   const despMes = despesas.filter((d) => ymOf(d.data) === mes);
-  const totalRec = recMes.reduce((s, r) => s + num(r.valor), 0);
-  const custoVar = despMes.filter((d) => CUSTO_VARIAVEL.includes(d.categoria)).reduce((s, d) => s + num(d.valor), 0);
-  const despOp = despMes.filter((d) => DESPESA_OPERACIONAL.includes(d.categoria)).reduce((s, d) => s + num(d.valor), 0);
-  // O lucro subtrai TODAS as despesas do mês — inclusive as de categoria em
-  // branco ou fora das listas. Sem isso, uma despesa "solta" sumia do cálculo e
-  // o lucro aparecia mais alto do que o real.
-  const totalDespMes = despMes.reduce((s, d) => s + num(d.valor), 0);
+  // O lucro OPERACIONAL usa só a operação: exclui investimento, empréstimo/dívida
+  // e aporte (movem caixa, mas não são resultado da operação). Dentro do
+  // operacional, subtrai TODAS as despesas (inclusive categoria em branco).
+  const recOp = recMes.filter((r) => !FONTES_NAO_OPERACIONAL.includes(r.categoria));
+  const despOpAll = despMes.filter((d) => !DESPESA_NAO_OPERACIONAL.includes(d.categoria));
+  const totalRec = recOp.reduce((s, r) => s + num(r.valor), 0);
+  const custoVar = despOpAll.filter((d) => CUSTO_VARIAVEL.includes(d.categoria)).reduce((s, d) => s + num(d.valor), 0);
+  const despOp = despOpAll.filter((d) => DESPESA_OPERACIONAL.includes(d.categoria)).reduce((s, d) => s + num(d.valor), 0);
+  const totalDespMes = despOpAll.reduce((s, d) => s + num(d.valor), 0);
   const despOutras = Math.round((totalDespMes - custoVar - despOp) * 100) / 100;
   const lucro = totalRec - totalDespMes;
+  // Fora do lucro (só movimenta o caixa): aporte/empréstimo recebido, investimento
+  // e pagamento de dívida/empréstimo.
+  const entradaNaoOp = recMes.filter((r) => FONTES_NAO_OPERACIONAL.includes(r.categoria)).reduce((s, r) => s + num(r.valor), 0);
+  const investimento = despMes.filter((d) => d.categoria === 'Investimento').reduce((s, d) => s + num(d.valor), 0);
+  const dividaPaga = despMes.filter((d) => d.categoria === 'Empréstimo/Dívida').reduce((s, d) => s + num(d.valor), 0);
   const margem = totalRec ? (lucro / totalRec) * 100 : 0;
 
   const evolucao = useMemo(() => {
@@ -99,8 +106,8 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
     return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
   }, [mes]);
   const resumoDe = (ym) => {
-    const r = receitas.filter((x) => ymOf(x.data) === ym).reduce((s, x) => s + num(x.valor), 0);
-    const dd = despesas.filter((x) => ymOf(x.data) === ym);
+    const r = receitas.filter((x) => ymOf(x.data) === ym && !FONTES_NAO_OPERACIONAL.includes(x.categoria)).reduce((s, x) => s + num(x.valor), 0);
+    const dd = despesas.filter((x) => ymOf(x.data) === ym && !DESPESA_NAO_OPERACIONAL.includes(x.categoria));
     const totalDD = dd.reduce((s, x) => s + num(x.valor), 0);
     return { rec: r, desp: totalDD, lucro: r - totalDD };
   };
@@ -154,6 +161,19 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
           <span style={{ fontWeight: 800, color: margem >= 0 ? C.accent : C.red }}>{margem.toFixed(1)}%</span>
         </div>
       </Card>
+
+      {(entradaNaoOp > 0.005 || investimento > 0.005 || dividaPaga > 0.005) && (
+        <Card style={{ marginBottom: 14, background: C.panel2 }}>
+          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 700, marginBottom: 4 }}>Fora do lucro (não é operação)</div>
+          <div style={{ fontSize: 12, color: C.faint, marginBottom: 10, lineHeight: 1.45 }}>Movimenta o caixa, mas <b style={{ color: C.text }}>não</b> entra no lucro operacional acima — pra o resultado da operação ficar limpo.</div>
+          {[['Empréstimo/aporte que entrou', entradaNaoOp, C.green], ['Investimento (equipamento/reforma)', investimento, C.amber], ['Empréstimo/dívida que você pagou', dividaPaga, C.amber]].filter(([, v]) => v > 0.005).map(([nome, val, cor]) => (
+            <div key={nome} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderTop: `1px solid ${C.line}`, fontSize: 14 }}>
+              <span style={{ color: C.muted, minWidth: 0 }}>{nome}</span>
+              <span style={{ fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(val)}</span>
+            </div>
+          ))}
+        </Card>
+      )}
 
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontWeight: 700, marginBottom: 12 }}>Evolução (receita × despesa)</div>
