@@ -163,7 +163,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
 
       {/* O que de fato sobrou no caixa (lucro − investimento/dívida + aportes) */}
       <div style={{ marginBottom: 12 }}>
-        <KPI titulo="Quanto sobrou de fato" valor={oculto(brl(resultadoFinal))} cor={resultadoFinal >= 0 ? C.accent : C.red}
+        <KPI titulo="Saldo Final" valor={oculto(brl(resultadoFinal))} cor={resultadoFinal >= 0 ? C.accent : C.red}
           sub={temForaOperacao ? 'lucro operacional − investimento/dívida + aportes' : 'igual ao lucro (sem investimento/dívida no mês)'} />
       </div>
 
