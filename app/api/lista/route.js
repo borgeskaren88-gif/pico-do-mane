@@ -60,12 +60,13 @@ export async function POST(request) {
     const { data, error } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
     if (error) throw error;
     const blob = data?.valor || {};
-    const novoBlob = { ...blob };
+    // Monta só as chaves que a cozinha pode mexer (listaCozinha / tarefasCozinha).
+    const patch = {};
     // Lista da cozinha: só mexe se veio no corpo. Preserva os itens já comprados
     // (histórico) e substitui só os itens em aberto pelo que veio.
     if (Array.isArray(body?.listaCompras)) {
       const comprados = Array.isArray(blob.listaCozinha) ? blob.listaCozinha.filter((i) => i.comprado) : [];
-      novoBlob.listaCozinha = [...limparItens(body.listaCompras), ...comprados];
+      patch.listaCozinha = [...limparItens(body.listaCompras), ...comprados];
     }
     // Marcar/desmarcar tarefa como feita: só troca o "feito" de tarefas que já
     // existem. A cozinha nunca cria, apaga ou edita o texto (isso é da dona).
@@ -73,15 +74,20 @@ export async function POST(request) {
       const feitos = body.tarefasFeito;
       const tarefas = Array.isArray(blob.tarefasCozinha) ? blob.tarefasCozinha : [];
       const agora = new Date().toISOString();
-      novoBlob.tarefasCozinha = tarefas.map((t) => {
+      patch.tarefasCozinha = tarefas.map((t) => {
         if (!t || !Object.prototype.hasOwnProperty.call(feitos, t.id)) return t;
         const feito = !!feitos[t.id];
         // Carimba a hora (do servidor) em que a cozinha deu OK; ao desmarcar, limpa.
         return { ...t, feito, feitoEm: feito ? agora : '' };
       });
     }
+    // Relê o blob mais recente e troca SÓ as chaves da cozinha. Nunca toca em
+    // compras/receitas/despesas/cardápio etc. — assim uma ação da cozinha jamais
+    // reverte um dado que a dona acabou de gravar (ex.: conta marcada paga).
+    const { data: atual } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
+    const base = (atual?.valor && typeof atual.valor === 'object') ? atual.valor : {};
     const { error: err2 } = await sb.from('pdm_dados').upsert(
-      { chave: CHAVE, valor: novoBlob, atualizado_em: new Date().toISOString() },
+      { chave: CHAVE, valor: { ...base, ...patch }, atualizado_em: new Date().toISOString() },
       { onConflict: 'chave' }
     );
     if (err2) throw err2;

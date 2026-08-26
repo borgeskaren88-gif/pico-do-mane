@@ -50,7 +50,10 @@ export async function POST(request) {
     // um salvamento da dona que não as incluiu.
     const { data: atual } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
     const anterior = atual?.valor || {};
-    const valor = { ...dados };
+    // Mescla os campos recebidos SOBRE o que já está salvo. Campos não enviados
+    // são preservados (o cliente manda só o que mudou). Isso evita que um
+    // salvamento parcial apague dados que ele não incluiu.
+    const valor = { ...anterior, ...dados };
     if (!('listaCozinha' in valor) && Array.isArray(anterior.listaCozinha)) valor.listaCozinha = anterior.listaCozinha;
     if (!('tarefasCozinha' in valor) && Array.isArray(anterior.tarefasCozinha)) valor.tarefasCozinha = anterior.tarefasCozinha;
     if (!('cardapio' in valor) && Array.isArray(anterior.cardapio)) valor.cardapio = anterior.cardapio;
