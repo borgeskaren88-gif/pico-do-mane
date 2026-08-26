@@ -37,16 +37,24 @@ async function apiCarregar() {
   return json.ok ? json.dados : null;
 }
 
-async function apiSalvar(dados) {
-  try {
-    await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dados),
-    });
-  } catch (e) {
-    console.error('Erro ao salvar:', e);
-  }
+// Os salvamentos deste aparelho rodam UM DE CADA VEZ (fila). Como o servidor
+// agora mescla só os campos enviados, salvar em ordem garante que um não
+// sobrescreva o outro (ex.: marcar tarefa não reverte conta paga).
+let filaSalvar = Promise.resolve();
+function apiSalvar(dados) {
+  const run = async () => {
+    try {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dados),
+      });
+    } catch (e) {
+      console.error('Erro ao salvar:', e);
+    }
+  };
+  filaSalvar = filaSalvar.then(run, run);
+  return filaSalvar;
 }
 
 // Passa um "trim" em produto/fornecedor de compras e cotações. Retorna os
@@ -193,24 +201,12 @@ export default function Dashboard() {
   }, [vendas]);
 
   const salvarTudo = (parcial) => {
-    const dados = {
-      diario: parcial.diario ?? diario, receitas: parcial.receitas ?? receitas,
-      despesas: parcial.despesas ?? despesas, compras: parcial.compras ?? compras,
-      cotacoes: parcial.cotacoes ?? cotacoes, garrafas: parcial.garrafas ?? garrafas,
-      tarefas: parcial.tarefas ?? tarefas, ideias: parcial.ideias ?? ideias, marketing: parcial.marketing ?? marketing,
-      visitantes: parcial.visitantes ?? visitantes,
-      listaCompras: parcial.listaCompras ?? listaCompras,
-      listasModelo: parcial.listasModelo ?? listasModelo,
-      cardapio: parcial.cardapio ?? cardapio,
-      clientes: parcial.clientes ?? clientes,
-    };
-    // A lista e as tarefas da cozinha são compartilhadas com o acesso da cozinha
-    // (que grava por /api/lista). Só as incluímos aqui quando a dona realmente as
-    // editou; senão o servidor preserva o que a cozinha salvou (evita apagar por
-    // cima com uma cópia velha na memória).
-    if ('listaCozinha' in parcial) dados.listaCozinha = parcial.listaCozinha;
-    if ('tarefasCozinha' in parcial) dados.tarefasCozinha = parcial.tarefasCozinha;
-    apiSalvar(dados);
+    // Envia SÓ os campos que realmente mudaram. O servidor mescla esses campos
+    // no que já está salvo e PRESERVA todo o resto. Antes, cada salvamento
+    // reenviava TODO o painel a partir da memória do aparelho — então uma tela
+    // (ou outro aparelho) com uma cópia velha podia sobrescrever o que outra
+    // acabou de gravar (ex.: uma conta marcada como paga voltava a aberta).
+    apiSalvar({ ...parcial });
   };
 
   // Se o Google Agenda estiver conectado, sincroniza (com um pequeno atraso pra
