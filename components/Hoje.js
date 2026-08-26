@@ -46,6 +46,13 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const rec = receitas.filter((r) => ymOf(r.data) === mes && !FONTES_NAO_OPERACIONAL.includes(r.categoria)).reduce((s, r) => s + num(r.valor), 0);
   const desp = despesas.filter((d) => ymOf(d.data) === mes && !DESPESA_NAO_OPERACIONAL.includes(d.categoria)).reduce((s, d) => s + num(d.valor), 0);
   const lucro = rec - desp;
+  // Fora da operação (movem o caixa, não entram no lucro) + o que de fato sobrou
+  // no mês: lucro + aporte/empréstimo que entrou − investimento − dívida paga.
+  const entradaNaoOp = receitas.filter((r) => ymOf(r.data) === mes && FONTES_NAO_OPERACIONAL.includes(r.categoria)).reduce((s, r) => s + num(r.valor), 0);
+  const investimento = despesas.filter((d) => ymOf(d.data) === mes && d.categoria === 'Investimento').reduce((s, d) => s + num(d.valor), 0);
+  const dividaPaga = despesas.filter((d) => ymOf(d.data) === mes && d.categoria === 'Empréstimo/Dívida').reduce((s, d) => s + num(d.valor), 0);
+  const resultadoFinal = Math.round((lucro + entradaNaoOp - investimento - dividaPaga) * 100) / 100;
+  const temForaOperacao = entradaNaoOp > 0.005 || investimento > 0.005 || dividaPaga > 0.005;
   const margem = rec ? (lucro / rec) * 100 : 0;
   const jaTem = diario.some((d) => d.data === hoje);
   const abertas = compras.filter((c) => c.pago !== 'Sim');
@@ -152,6 +159,12 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
         <KPI titulo="Despesas do mês" valor={oculto(brl(desp))} cor={C.red} />
         <KPI titulo="Lucro operacional" valor={oculto(brl(lucro))} cor={lucro >= 0 ? C.accent : C.red} />
         <KPI titulo="Margem" valor={mostrarValores ? margem.toFixed(1) + '%' : '••••'} cor={margem >= 0 ? C.accent : C.red} />
+      </div>
+
+      {/* O que de fato sobrou no caixa (lucro − investimento/dívida + aportes) */}
+      <div style={{ marginBottom: 12 }}>
+        <KPI titulo="Quanto sobrou de fato" valor={oculto(brl(resultadoFinal))} cor={resultadoFinal >= 0 ? C.accent : C.red}
+          sub={temForaOperacao ? 'lucro operacional − investimento/dívida + aportes' : 'igual ao lucro (sem investimento/dívida no mês)'} />
       </div>
 
       {abertas.length > 0 && (
