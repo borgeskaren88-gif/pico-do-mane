@@ -78,6 +78,9 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
   const entradaNaoOp = recMes.filter((r) => FONTES_NAO_OPERACIONAL.includes(r.categoria)).reduce((s, r) => s + num(r.valor), 0);
   const investimento = despMes.filter((d) => d.categoria === 'Investimento').reduce((s, d) => s + num(d.valor), 0);
   const dividaPaga = despMes.filter((d) => d.categoria === 'Empréstimo/Dívida').reduce((s, d) => s + num(d.valor), 0);
+  // O que de fato sobrou no caixa depois de TUDO: lucro da operação + o que
+  // entrou de aporte/empréstimo − o que saiu de investimento e pagamento de dívida.
+  const resultadoFinal = Math.round((lucro + entradaNaoOp - investimento - dividaPaga) * 100) / 100;
   const margem = totalRec ? (lucro / totalRec) * 100 : 0;
 
   const evolucao = useMemo(() => {
@@ -172,6 +175,13 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
               <span style={{ fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(val)}</span>
             </div>
           ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, paddingTop: 10, marginTop: 6, borderTop: `2px solid ${C.line}` }}>
+            <span style={{ fontWeight: 800, color: C.text }}>Resultado do mês (o que sobrou)</span>
+            <span style={{ fontWeight: 900, fontSize: 18, color: resultadoFinal >= 0 ? C.accent : C.red, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(resultadoFinal)}</span>
+          </div>
+          <div style={{ fontSize: 11, color: C.faint, marginTop: 6, lineHeight: 1.45 }}>
+            Lucro operacional {brl(lucro)}{entradaNaoOp > 0.005 ? ` + aporte ${brl(entradaNaoOp)}` : ''}{investimento > 0.005 ? ` − investimento ${brl(investimento)}` : ''}{dividaPaga > 0.005 ? ` − dívida ${brl(dividaPaga)}` : ''} = o que <b style={{ color: C.text }}>de fato sobrou no caixa</b> depois de tudo.
+          </div>
         </Card>
       )}
 
