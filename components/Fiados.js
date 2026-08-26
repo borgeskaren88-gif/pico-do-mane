@@ -12,6 +12,7 @@ export default function Fiados({ onMudou, clientes = [] }) {
   const [erro, setErro] = useState('');
   const [verPagos, setVerPagos] = useState(false);
   const [itensAbertos, setItensAbertos] = useState({}); // { [vendaId]: true } — mostra os itens
+  const [abertoCliente, setAbertoCliente] = useState({}); // { [chave]: true } — abre o histórico do cliente
 
   const carregar = useCallback(async () => {
     try {
@@ -84,10 +85,14 @@ export default function Fiados({ onMudou, clientes = [] }) {
               const cor = noLimite ? C.red : C.amber;
               return (
                 <Card key={g.chave} style={{ marginBottom: 10, padding: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
-                    <div style={{ fontSize: 16, fontWeight: 800, minWidth: 0 }}>{g.nome}</div>
+                  {/* Clicar no nome abre/fecha o histórico (datas + consumo) do cliente. */}
+                  <button onClick={() => setAbertoCliente((m) => ({ ...m, [g.chave]: !m[g.chave] }))} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, textAlign: 'left' }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, minWidth: 0, color: C.text, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: C.accent, fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{abertoCliente[g.chave] ? '▾' : '▸'}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.nome}</span>
+                    </div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(g.total)}</div>
-                  </div>
+                  </button>
                   {/* Gráfico do limite: o quanto está chegando no teto de fiado. */}
                   {g.limite > 0 ? (
                     <div style={{ marginTop: 8 }}>
@@ -102,7 +107,10 @@ export default function Fiados({ onMudou, clientes = [] }) {
                     <div style={{ fontSize: 11, color: C.faint, marginTop: 6 }}>sem limite cadastrado</div>
                   )}
 
-                  {/* Compras por data */}
+                  {/* Histórico (datas + consumo): fica escondido e abre ao clicar no nome. */}
+                  {!abertoCliente[g.chave] ? (
+                    <div style={{ fontSize: 12, color: C.faint, marginTop: 10 }}>{g.vendas.length} fiado(s) · toque no nome pra ver as datas e o que consumiu</div>
+                  ) : (
                   <div style={{ marginTop: 12, borderTop: `1px solid ${C.line}`, paddingTop: 4 }}>
                     {g.vendas.map((v) => {
                       const aberto = itensAbertos[v.id];
@@ -138,6 +146,7 @@ export default function Fiados({ onMudou, clientes = [] }) {
                       );
                     })}
                   </div>
+                  )}
                 </Card>
               );
             })}
