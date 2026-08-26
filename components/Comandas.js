@@ -117,6 +117,8 @@ export default function Comandas({ papel = 'dona' }) {
     const pagamentos = FORMAS_PAG.map((f) => ({ forma: f, valor: num(fecharForm.valores[f] || '') })).filter((x) => x.valor > 0);
     const nomeCli = (fecharForm.nome || '').trim();
     const fiadoVal = num(fecharForm.valores['Fiado'] || '');
+    // Trava: fiado sem nome não fecha (senão a dívida some numa "Mesa X").
+    if (fiadoVal > 0.005 && !nomeCli) { setErro('Escreva o nome de quem ficou devendo pra fechar no fiado.'); setFechando(false); return; }
     try {
       const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: nomeCli, descontoPct: num(fecharForm.descontoPct || 0) }) });
       const j = await r.json();
@@ -402,6 +404,8 @@ export default function Comandas({ papel = 'dona' }) {
             const falta = Math.round((totalFinal - soma) * 100) / 100;
             const fiadoVal = num(fecharForm.valores['Fiado'] || '');
             const confere = Math.abs(falta) <= 0.005;
+            // Fiado SEM nome não pode: senão vira "Mesa X" e você não sabe quem deve.
+            const precisaNome = fiadoVal > 0.005 && !(fecharForm.nome || '').trim();
             const setVal = (f) => (v) => setFecharForm((s) => ({ ...s, valores: { ...s.valores, [f]: v } }));
             const setDesc = (p) => setFecharForm((s) => ({ ...s, descontoPct: p, valores: {} }));
             const preencherResto = (f) => {
@@ -455,7 +459,7 @@ export default function Comandas({ papel = 'dona' }) {
                 </div>
                 {fiadoVal > 0 && (
                   <div style={{ marginBottom: 10 }}>
-                    <Field label="Quem ficou devendo?">
+                    <Field label="Quem ficou devendo? (obrigatório)">
                       {clientes.length > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                           <Select
@@ -469,10 +473,11 @@ export default function Comandas({ papel = 'dona' }) {
                       )}
                     </Field>
                     <div style={{ fontSize: 11, color: C.amber, marginTop: 6 }}>{brl(fiadoVal)} vai pra lista de Fiados (não entra no caixa até você marcar “Recebi”).</div>
+                    {precisaNome && <div style={{ fontSize: 12, color: C.red, fontWeight: 700, marginTop: 6 }}>⚠️ Escreva o nome de quem ficou devendo pra poder fechar no fiado.</div>}
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <Btn kind="ok" onClick={confirmarFechar} disabled={busy || fechando || !confere}>{fechando ? 'Fechando…' : 'Confirmar'}</Btn>
+                  <Btn kind="ok" onClick={confirmarFechar} disabled={busy || fechando || !confere || precisaNome}>{fechando ? 'Fechando…' : 'Confirmar'}</Btn>
                   <Btn kind="ghost" onClick={() => setFecharForm(null)}>Voltar</Btn>
                 </div>
               </Card>

@@ -308,6 +308,8 @@ export async function POST(request) {
       if (Math.abs(soma - total) > 0.05) return NextResponse.json({ ok: false, erro: 'A soma das formas de pagamento não bate com o total.' }, { status: 400 });
       const fiado = Math.round(pags.filter((x) => x.forma === 'Fiado').reduce((s, x) => s + x.valor, 0) * 100) / 100;
       const nomeCli = txt(body?.nome, 60) || c.nome || '';
+      // Trava: fiado SEM nome não pode — senão a dívida vira uma "Mesa X" sem dono.
+      if (fiado > 0.005 && !nomeCli) return NextResponse.json({ ok: false, erro: 'Fiado precisa do nome de quem ficou devendo.' }, { status: 400 });
       // Limite de fiado: se o cliente está cadastrado com limite e "bloquear",
       // barra o novo fiado que passaria do limite (soma o que já está em aberto).
       if (fiado > 0.005 && nomeCli) {
