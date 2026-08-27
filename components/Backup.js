@@ -132,8 +132,13 @@ export default function Backup({ all, restore }) {
     try { const r = await fetch('/api/backup', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setAutoBackups(Array.isArray(j.backups) ? j.backups : []); } catch { /* ignora */ }
   }, []);
   useEffect(() => { carregarAuto(); }, [carregarAuto]);
-  const restaurarAuto = async (data) => {
-    if (typeof window !== 'undefined' && !window.confirm(`Restaurar o backup de ${data}?\n\nISSO SUBSTITUI os dados atuais pelos desse dia. Use só se algo deu errado.`)) return;
+  const restaurarAuto = async (b) => {
+    const data = typeof b === 'string' ? b : b.data;
+    const semEstoque = typeof b === 'object' && b.resumo && Number(b.resumo.estoque) === 0;
+    const aviso = semEstoque
+      ? `Restaurar o backup de ${data}?\n\nATENÇÃO: esse dia está SEM estoque. Seu estoque atual será mantido (não vai ser apagado). O resto (financeiro, cardápio…) volta pra esse dia.`
+      : `Restaurar o backup de ${data}?\n\nISSO SUBSTITUI os dados atuais pelos desse dia. Use só se algo deu errado.`;
+    if (typeof window !== 'undefined' && !window.confirm(aviso)) return;
     setRestaurando(data); setMsg('');
     try {
       const r = await fetch('/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'restaurar', data }) });
@@ -143,6 +148,22 @@ export default function Backup({ all, restore }) {
     } catch { setMsg('Sem conexão pra restaurar.'); }
     finally { setRestaurando(''); }
   };
+
+  // Recuperar SÓ o estoque + fichas de um dia bom, sem mexer no financeiro/cardápio.
+  const restaurarSoEstoque = async (data) => {
+    if (typeof window !== 'undefined' && !window.confirm(`Recuperar o estoque do dia ${data}?\n\nIsso traz de volta o estoque e as fichas técnicas desse dia. O restante (financeiro, cardápio, clientes) NÃO muda.`)) return;
+    setRestaurando(data); setMsg('');
+    try {
+      const r = await fetch('/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'restaurarEstoque', data }) });
+      const j = await r.json();
+      if (j.ok) { setMsg(`Estoque recuperado (${j.estoque} itens)! Recarregando…`); setTimeout(() => { try { window.location.reload(); } catch { /* ignora */ } }, 900); }
+      else setMsg(j.erro || 'Não consegui recuperar o estoque.');
+    } catch { setMsg('Sem conexão pra recuperar.'); }
+    finally { setRestaurando(''); }
+  };
+  // O estoque de hoje está vazio? Então oferece recuperar do backup mais recente que tenha itens.
+  const estoqueAtualVazio = Array.isArray(all.estoque) && all.estoque.length === 0;
+  const melhorEstoque = autoBackups.filter((b) => b.resumo && Number(b.resumo.estoque) > 0).sort((a, b) => Number(b.resumo.estoque) - Number(a.resumo.estoque) || (b.data || '').localeCompare(a.data || ''))[0];
 
   const baixar = (conteudo, nome, tipo) => {
     const blob = new Blob([conteudo], { type: tipo });
@@ -266,6 +287,18 @@ export default function Backup({ all, restore }) {
         </details>
       </Card>
 
+      {estoqueAtualVazio && melhorEstoque && (
+        <Card style={{ marginBottom: 14, borderColor: C.red }}>
+          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.red, fontWeight: 700, marginBottom: 6 }}>Seu estoque está vazio</div>
+          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
+            Encontrei uma cópia de <b style={{ color: C.text }}>{fmtDate(melhorEstoque.data)}</b> com <b style={{ color: C.text }}>{melhorEstoque.resumo.estoque} itens de estoque</b> e {melhorEstoque.resumo.fichas} fichas técnicas. Posso trazer só o estoque de volta — o financeiro e o cardápio de agora <b>não mudam</b>.
+          </div>
+          <Btn kind="danger" onClick={() => restaurarSoEstoque(melhorEstoque.data)} disabled={!!restaurando}>
+            {restaurando === melhorEstoque.data ? 'Recuperando…' : `Recuperar meu estoque (${melhorEstoque.resumo.estoque} itens)`}
+          </Btn>
+        </Card>
+      )}
+
       <Card style={{ marginBottom: 14, borderColor: C.green }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Backup automático na nuvem ✓</div>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
@@ -281,7 +314,12 @@ export default function Backup({ all, restore }) {
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{fmtDate(b.data)}</div>
                   {b.resumo && <div style={{ fontSize: 11, color: C.faint }}>{b.resumo.lancamentos} lançamentos · {b.resumo.estoque} itens de estoque · {b.resumo.fichas} fichas</div>}
                 </div>
-                <Btn kind="ghost" small onClick={() => restaurarAuto(b.data)} disabled={!!restaurando}>{restaurando === b.data ? 'Restaurando…' : 'Restaurar'}</Btn>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  {b.resumo && Number(b.resumo.estoque) > 0 && (
+                    <Btn kind="ghost" small onClick={() => restaurarSoEstoque(b.data)} disabled={!!restaurando}>{restaurando === b.data ? '…' : 'Só o estoque'}</Btn>
+                  )}
+                  <Btn kind="ghost" small onClick={() => restaurarAuto(b)} disabled={!!restaurando}>{restaurando === b.data ? 'Restaurando…' : 'Restaurar tudo'}</Btn>
+                </div>
               </div>
             ))}
           </div>
