@@ -358,6 +358,17 @@ export default function Dashboard() {
     ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['backup', 'Backup'],
   ];
 
+  // Barra lateral: as áreas agrupadas por assunto (no PC fica fixa na lateral;
+  // no celular abre com o botão de menu ☰).
+  const [menuAberto, setMenuAberto] = useState(false);
+  const grupos = [
+    { titulo: 'Início', itens: [['hoje', 'Hoje'], ['brain', 'Brain']] },
+    { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
+    { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento']] },
+    { titulo: 'Financeiro', itens: [['financas', 'Finanças'], ['diario', 'Log Operacional']] },
+    { titulo: 'Gestão', itens: [['marketing', 'Marketing'], ['backup', 'Backup']] },
+  ];
+
   // Lembra a última área aberta (no aparelho), pra que atualizar a página caia na
   // mesma aba em vez de voltar pro início. Restaura só na montagem.
   useEffect(() => {
@@ -401,57 +412,78 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <PullToRefresh />
-      <div style={{ padding: 'calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', borderBottom: `1px solid ${C.hair}`, background: 'transparent' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <LogoMark size={42} radius={12} />
-            <div>
-              <div style={{ fontSize: 19, fontWeight: 900, letterSpacing: '.02em', lineHeight: 1 }}>PicoOS</div>
-              <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 3, fontWeight: 600 }}>Central de Gestão</div>
+      <style>{`
+.pos-shell{display:flex;align-items:stretch;min-height:100vh}
+.pos-sidebar{width:236px;flex-shrink:0;box-sizing:border-box;display:flex;flex-direction:column;background:${C.panel};border-right:1px solid ${C.hair};position:sticky;top:0;height:100vh}
+.pos-side-head{display:flex;align-items:center;gap:10px;padding:18px 16px 14px;border-bottom:1px solid ${C.hair}}
+.pos-nav{flex:1;overflow-y:auto;padding:12px 10px}
+.pos-group{margin-bottom:12px}
+.pos-group-title{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:${C.faint};font-weight:800;padding:4px 10px 6px}
+.pos-navitem{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:none;background:transparent;color:${C.muted};border-radius:10px;padding:10px 12px;font-size:14px;font-weight:700;cursor:pointer;text-align:left;margin-bottom:2px}
+.pos-navitem:hover{background:${C.panel2};color:${C.text}}
+.pos-navitem.pos-active{background:${C.accent};color:#06101F}
+.pos-badge{background:${C.red};color:#fff;font-size:11px;font-weight:800;min-width:18px;height:18px;border-radius:999px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.pos-navitem.pos-active .pos-badge{background:#06101F}
+.pos-side-foot{border-top:1px solid ${C.hair};padding:12px;display:flex;align-items:center;gap:8px}
+.pos-content{flex:1;min-width:0}
+.pos-topbar{display:none}
+.pos-overlay{display:none}
+.pos-burger{background:transparent;border:1px solid ${C.line};color:${C.text};border-radius:10px;width:42px;height:42px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+@media (max-width:819px){
+.pos-sidebar{position:fixed;top:0;left:0;z-index:60;transform:translateX(-100%);transition:transform .22s ease;box-shadow:0 0 40px rgba(0,0,0,.4)}
+.pos-sidebar.pos-open{transform:translateX(0)}
+.pos-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:55}
+.pos-topbar{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;border-bottom:1px solid ${C.hair};position:sticky;top:0;background:${C.barBg};backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:10}
+}
+`}</style>
+
+      <div className="pos-shell">
+        {menuAberto && <div className="pos-overlay" onClick={() => setMenuAberto(false)} />}
+        <aside className={`pos-sidebar${menuAberto ? ' pos-open' : ''}`}>
+          <div className="pos-side-head">
+            <LogoMark size={34} radius={10} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 900, lineHeight: 1 }}>PicoOS</div>
+              <div style={{ fontSize: 10, color: C.accent, letterSpacing: '.12em', textTransform: 'uppercase', marginTop: 2, fontWeight: 600 }}>Central de Gestão</div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <nav className="pos-nav">
+            {grupos.map((g) => (
+              <div key={g.titulo} className="pos-group">
+                <div className="pos-group-title">{g.titulo}</div>
+                {g.itens.map(([id, nome]) => (
+                  <button key={id} onClick={() => { setTab(id); setMenuAberto(false); }} className={`pos-navitem${tab === id ? ' pos-active' : ''}`}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
+                    {badges[id] > 0 && <span className="pos-badge">{badges[id]}</span>}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </nav>
+          <div className="pos-side-foot">
             <BotaoAtualizar />
             <button onClick={trocarTema} title={tema === 'claro' ? 'Mudar para escuro' : 'Mudar para claro'} aria-label="Trocar tema"
-              style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {tema === 'claro' ? (
-                // Lua (está claro -> toca pra escurecer)
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-                </svg>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
               ) : (
-                // Sol (está escuro -> toca pra clarear)
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="4.2" />
-                  <path d="M12 2.5v2.2M12 19.3v2.2M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.4 19.6l1.6-1.6M18 6l1.6-1.6" />
-                </svg>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.2M12 19.3v2.2M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.4 19.6l1.6-1.6M18 6l1.6-1.6" /></svg>
               )}
             </button>
-            <button onClick={sair} style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Sair</button>
+            <button onClick={sair} style={{ flex: 1, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Sair</button>
           </div>
-        </div>
-      </div>
-
-      <div ref={tabBarRef} style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: 'calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', position: 'sticky', top: 0, background: C.barBg, backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', zIndex: 10, borderBottom: `1px solid ${C.hair}` }}>
-        {tabs.map(([id, nome]) => (
-          <button key={id} data-tab={id} onClick={() => setTab(id)} style={{
-            flexShrink: 0, padding: '8px 15px', borderRadius: 999, fontSize: 14, fontWeight: 700, cursor: 'pointer',
-            border: `1px solid ${tab === id ? C.accent : C.line}`,
-            background: tab === id ? C.accent : 'transparent',
-            color: tab === id ? '#06101F' : C.muted,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            {nome}
-            {badges[id] > 0 && (
-              <span style={{
-                background: C.red, color: '#fff', fontSize: 11, fontWeight: 800, lineHeight: 1,
-                minWidth: 18, height: 18, borderRadius: 999, padding: '0 5px',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              }}>{badges[id]}</span>
-            )}
-          </button>
-        ))}
-      </div>
+        </aside>
+        <div className="pos-content">
+          <div className="pos-topbar">
+            <button className="pos-burger" onClick={() => setMenuAberto(true)} aria-label="Abrir menu">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
+              <LogoMark size={28} radius={9} />
+              <div style={{ fontSize: 16, fontWeight: 900 }}>PicoOS</div>
+            </div>
+            <BotaoAtualizar />
+          </div>
 
       <div style={{ maxWidth: tab === 'brain' ? 1180 : 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
@@ -564,6 +596,8 @@ export default function Dashboard() {
           setListaCompras(dados.listaCompras); setListasModelo(dados.listasModelo); setCardapio(dados.cardapio); setClientes(dados.clientes);
           apiSalvar(dados);
         }} /></>)}
+      </div>
+        </div>
       </div>
     </div>
   );
