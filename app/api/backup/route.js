@@ -81,9 +81,37 @@ export async function POST(request) {
       const { data: snapRow } = await sb.from('pdm_dados').select('valor').eq('chave', PREFIXO + data).maybeSingle();
       const painel = snapRow?.valor?.painel;
       if (!painel) return NextResponse.json({ ok: false, erro: 'Backup não encontrado.' }, { status: 404 });
+      // Rede de segurança: se o backup escolhido está SEM estoque/fichas mas o
+      // painel atual TEM, preserva o atual — pra uma restauração antiga (feita pra
+      // recuperar o financeiro, por ex.) não apagar o estoque que já está cheio.
+      // Foi assim que o estoque sumiu uma vez. Pra trocar o estoque de propósito,
+      // use a ação 'restaurarEstoque', que é explícita.
+      const { data: atualRow } = await sb.from('pdm_dados').select('valor').eq('chave', PAINEL).maybeSingle();
+      const atual = (atualRow?.valor && typeof atualRow.valor === 'object') ? atualRow.valor : {};
+      if (arr(painel.estoque).length === 0 && arr(atual.estoque).length > 0) painel.estoque = atual.estoque;
+      if (arr(painel.fichas).length === 0 && arr(atual.fichas).length > 0) painel.fichas = atual.fichas;
       const { error } = await sb.from('pdm_dados').upsert({ chave: PAINEL, valor: painel, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, estoquePreservado: arr(painel.estoque).length });
+    }
+
+    // Restaurar SÓ o estoque (e fichas técnicas) de um backup, mantendo TODO o
+    // resto do painel atual (financeiro, cardápio, clientes…) intacto. É o jeito
+    // seguro de recuperar o estoque de um dia bom sem mexer no que já foi lançado
+    // depois. Relê o painel mais recente e troca só essas chaves.
+    if (acao === 'restaurarEstoque') {
+      const data = String(body?.data || '');
+      if (!data) return NextResponse.json({ ok: false, erro: 'Backup não informado.' }, { status: 400 });
+      const { data: snapRow } = await sb.from('pdm_dados').select('valor').eq('chave', PREFIXO + data).maybeSingle();
+      const painel = snapRow?.valor?.painel;
+      if (!painel) return NextResponse.json({ ok: false, erro: 'Backup não encontrado.' }, { status: 404 });
+      if (arr(painel.estoque).length === 0) return NextResponse.json({ ok: false, erro: 'Esse dia não tem estoque salvo. Escolha um dia com itens de estoque.' }, { status: 400 });
+      const { data: atualRow } = await sb.from('pdm_dados').select('valor').eq('chave', PAINEL).maybeSingle();
+      const atual = (atualRow?.valor && typeof atualRow.valor === 'object') ? atualRow.valor : {};
+      const novo = { ...atual, estoque: arr(painel.estoque), fichas: arr(painel.fichas), estoqueBaixas: arr(painel.estoqueBaixas) };
+      const { error } = await sb.from('pdm_dados').upsert({ chave: PAINEL, valor: novo, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, estoque: arr(painel.estoque).length, fichas: arr(painel.fichas).length });
     }
 
     return NextResponse.json({ ok: false, erro: 'Ação inválida.' }, { status: 400 });
