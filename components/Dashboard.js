@@ -18,6 +18,7 @@ import ContasPagar from './ContasPagar';
 import Garrafas from './Garrafas';
 import Cotacoes from './Cotacoes';
 import Relatorios from './Relatorios';
+import RaioX from './RaioX';
 import Backup from './Backup';
 import Cardapio from './Cardapio';
 import Comandas from './Comandas';
@@ -287,7 +288,7 @@ export default function Dashboard() {
   // sabores/combos. Sem isso, quem ia direto pro Cardápio via a lista vazia.
   useEffect(() => {
     if (tab === 'abastecimento') carregarEstoque({ sincronizar: true });
-    else if (tab === 'salao') carregarEstoque({});
+    else if (tab === 'salao' || tab === 'financas') carregarEstoque({});
   }, [tab, carregarEstoque]);
 
   // Uma ação do estoque (add/mov/edit/del/fichas): chama a API e atualiza o
@@ -509,7 +510,7 @@ export default function Dashboard() {
         {tab === 'financas' && (
           <>
             <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-              {[['receitas', 'Receitas'], ['despesas', 'Despesas'], ['pagar', 'Contas a Pagar'], ['relatorios', 'Relatórios']].map(([v, rot]) => (
+              {[['raiox', 'Raio-X'], ['receitas', 'Receitas'], ['despesas', 'Despesas'], ['pagar', 'Contas a Pagar'], ['relatorios', 'Relatórios']].map(([v, rot]) => (
                 <button key={v} onClick={() => setSubFinancas(v)} style={{
                   flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
                   background: subFinancas === v ? C.accent : 'transparent', color: subFinancas === v ? '#06101F' : C.muted, whiteSpace: 'nowrap',
@@ -519,6 +520,7 @@ export default function Dashboard() {
             {subFinancas === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
             {subFinancas === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
             {subFinancas === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
+            {subFinancas === 'raiox' && <RaioX receitas={receitas} despesas={despesas} cardapio={cardapio} fichas={fichas} estoque={estoque} />}
             {subFinancas === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
           </>
         )}
