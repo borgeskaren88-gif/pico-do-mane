@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { C, Card, KPI, Empty, PageTitle, TextInput } from './ui';
 import { brl, num } from '../lib/util';
-import { custoDaFicha } from '../lib/estoque';
+import { custoDaFicha, custoDosSabores } from '../lib/estoque';
 
 // Margem por produto: cruza o CUSTO da ficha técnica com o PREÇO do cardápio,
 // pra mostrar quanto cada item dá de lucro. Piores margens primeiro — é onde o
@@ -21,10 +21,12 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [] }) {
       const preco = num(c.preco);
       const ficha = fichaPorId.get(c.id);
       if (!ficha || !ficha.length) { arr.push({ id: c.id, nome: c.nome, preco, semFicha: true }); continue; }
-      const { custo, completo } = custoDaFicha(ficha, estoque);
+      const base = custoDaFicha(ficha, estoque);
+      const sab = custoDosSabores(c.sabores, estoque); // custo médio da fruta escolhida na venda
+      const custo = Math.round((base.custo + sab.medio) * 100) / 100;
       const lucro = Math.round((preco - custo) * 100) / 100;
       const margem = preco > 0 ? (lucro / preco) * 100 : 0;
-      arr.push({ id: c.id, nome: c.nome, preco, custo, lucro, margem, completo, temSabores: Array.isArray(c.sabores) && c.sabores.length > 0 });
+      arr.push({ id: c.id, nome: c.nome, preco, custo, lucro, margem, completo: base.completo, temSabores: sab.n > 0, sabMin: base.custo + sab.min, sabMax: base.custo + sab.max });
     }
     return arr.sort((a, b) => {
       if (a.semFicha !== b.semFicha) return a.semFicha ? 1 : -1;
@@ -73,7 +75,7 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [] }) {
                 <div style={{ fontSize: 12, color: C.faint }}>preço {brl(l.preco)} · sem ficha técnica</div>
               ) : (
                 <div style={{ fontSize: 12, color: C.faint }}>
-                  preço {brl(l.preco)} · custo {brl(l.custo)}{!l.completo ? ' (parcial)' : ''}{l.temSabores ? ' · sabores variam' : ''}
+                  preço {brl(l.preco)} · custo {brl(l.custo)}{l.temSabores ? ` (c/ fruta média; varia ${brl(l.sabMin)}–${brl(l.sabMax)})` : ''}{!l.completo ? ' · parcial' : ''}
                 </div>
               )}
             </div>
