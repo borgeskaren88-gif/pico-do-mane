@@ -361,6 +361,11 @@ export default function Dashboard() {
   // Barra lateral: as áreas agrupadas por assunto (no PC fica fixa na lateral;
   // no celular abre com o botão de menu ☰).
   const [menuAberto, setMenuAberto] = useState(false);
+  // No PC, dá pra recolher a lateral (ganha espaço) e mostrar de novo. Lembra a
+  // preferência no aparelho.
+  const [lateralRecolhida, setLateralRecolhida] = useState(false);
+  useEffect(() => { try { if (localStorage.getItem('picoos-lateral') === 'recolhida') setLateralRecolhida(true); } catch { /* ignora */ } }, []);
+  const recolherLateral = (v) => setLateralRecolhida((cur) => { const nv = v == null ? !cur : v; try { localStorage.setItem('picoos-lateral', nv ? 'recolhida' : 'aberta'); } catch { /* ignora */ } return nv; });
   const grupos = [
     { titulo: 'Início', itens: [['hoje', 'Hoje'], ['brain', 'Brain']] },
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
@@ -428,16 +433,22 @@ export default function Dashboard() {
 .pos-content{flex:1;min-width:0}
 .pos-topbar{display:none}
 .pos-overlay{display:none}
+.pos-shell.pos-recolhida .pos-sidebar{display:none}
+.pos-shell.pos-recolhida .pos-topbar{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid ${C.hair};position:sticky;top:0;background:${C.barBg};backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:10}
+.pos-recolher{background:transparent;border:none;color:${C.faint};border-radius:8px;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pos-recolher:hover{background:${C.panel2};color:${C.text}}
 .pos-burger{background:transparent;border:1px solid ${C.line};color:${C.text};border-radius:10px;width:42px;height:42px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 @media (max-width:819px){
 .pos-sidebar{position:fixed;top:0;left:0;z-index:60;transform:translateX(-100%);transition:transform .22s ease;box-shadow:0 0 40px rgba(0,0,0,.4)}
 .pos-sidebar.pos-open{transform:translateX(0)}
+.pos-shell.pos-recolhida .pos-sidebar{display:flex}
+.pos-recolher{display:none}
 .pos-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:55}
 .pos-topbar{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;border-bottom:1px solid ${C.hair};position:sticky;top:0;background:${C.barBg};backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:10}
 }
 `}</style>
 
-      <div className="pos-shell">
+      <div className={`pos-shell${lateralRecolhida ? ' pos-recolhida' : ''}`}>
         {menuAberto && <div className="pos-overlay" onClick={() => setMenuAberto(false)} />}
         <aside className={`pos-sidebar${menuAberto ? ' pos-open' : ''}`}>
           <div className="pos-side-head">
@@ -446,6 +457,9 @@ export default function Dashboard() {
               <div style={{ fontSize: 16, fontWeight: 900, lineHeight: 1 }}>PicoOS</div>
               <div style={{ fontSize: 10, color: C.accent, letterSpacing: '.12em', textTransform: 'uppercase', marginTop: 2, fontWeight: 600 }}>Central de Gestão</div>
             </div>
+            <button className="pos-recolher" onClick={() => recolherLateral(true)} title="Recolher a lateral" aria-label="Recolher a lateral" style={{ marginLeft: 'auto' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+            </button>
           </div>
           <nav className="pos-nav">
             {grupos.map((g) => (
@@ -475,7 +489,7 @@ export default function Dashboard() {
         </aside>
         <div className="pos-content">
           <div className="pos-topbar">
-            <button className="pos-burger" onClick={() => setMenuAberto(true)} aria-label="Abrir menu">
+            <button className="pos-burger" onClick={() => { if (typeof window !== 'undefined' && window.innerWidth >= 820) recolherLateral(false); else setMenuAberto(true); }} aria-label="Abrir menu">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
