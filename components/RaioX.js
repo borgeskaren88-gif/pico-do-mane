@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { C, Card, KPI, Empty, PageTitle, Select } from './ui';
 import { brl, num, ymOf, todayISO, mesLabel, FONTES_NAO_OPERACIONAL, DESPESA_NAO_OPERACIONAL } from '../lib/util';
-import { custoDaFicha } from '../lib/estoque';
+import { custoDaFicha, custoDosSabores } from '../lib/estoque';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
@@ -38,8 +38,9 @@ export default function RaioX({ receitas = [], despesas = [], cardapio = [], fic
       const ficha = fichaPorId.get(c.id);
       if (!ficha || !ficha.length) continue;
       const preco = num(c.preco);
-      const { custo } = custoDaFicha(ficha, estoque);
-      const lucroItem = Math.round((preco - custo) * 100) / 100;
+      const base = custoDaFicha(ficha, estoque);
+      const sab = custoDosSabores(c.sabores, estoque);
+      const lucroItem = Math.round((preco - base.custo - sab.medio) * 100) / 100;
       arr.push({ nome: c.nome, margem: preco > 0 ? (lucroItem / preco) * 100 : 0, lucro: lucroItem });
     }
     return arr;
