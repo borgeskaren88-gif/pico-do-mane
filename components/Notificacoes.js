@@ -94,6 +94,17 @@ export default function Notificacoes() {
     finally { setBusy(false); }
   };
 
+  const resumoAgora = async () => {
+    setBusy(true); setMsg('');
+    try {
+      const r = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'digest' }) });
+      const j = await r.json();
+      if (j.ok) setMsg(j.vazio ? 'Hoje não há nada pra avisar (sem estoque baixo, fiado no limite ou conta vencendo). 👍' : `Resumo enviado pra ${j.enviados} aparelho(s)!`);
+      else setMsg(j.erro || 'Não consegui enviar o resumo.');
+    } catch { setMsg('Sem conexão pra enviar o resumo.'); }
+    finally { setBusy(false); }
+  };
+
   // iPhone/iPad sem estar instalado na tela inicial: o iOS não deixa ativar push.
   const precisaInstalar = ios && !instalado;
 
@@ -152,12 +163,22 @@ export default function Notificacoes() {
               ) : (
                 <>
                   <Btn onClick={testar} disabled={busy}>{busy ? '…' : 'Enviar teste'}</Btn>
+                  <Btn kind="ghost" onClick={resumoAgora} disabled={busy}>Ver resumo agora</Btn>
                   <Btn kind="ghost" onClick={desativar} disabled={busy}>Desativar neste aparelho</Btn>
                 </>
               )}
             </div>
           )}
           {msg && <div style={{ marginTop: 12, fontSize: 13, color: msg.includes('Não') || msg.includes('precisa') || msg.includes('Nenhum') ? C.amber : C.accent, lineHeight: 1.5 }}>{msg}</div>}
+        </Card>
+      )}
+
+      {suporta && !precisaInstalar && inscrito && (
+        <Card style={{ marginBottom: 14, background: C.panel2 }}>
+          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 8 }}>O que você recebe</div>
+          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>
+            Todo dia de manhã (por volta das <b style={{ color: C.text }}>10h</b>) chega um <b style={{ color: C.text }}>resumo</b> com o que precisa de atenção: quanto vendeu ontem, contas vencendo hoje, estoque no mínimo e fiados no limite. E <b style={{ color: C.text }}>na hora</b>, quando um fiado bate o limite de alguém. Toque em <b style={{ color: C.text }}>“Ver resumo agora”</b> pra ver como fica.
+          </div>
         </Card>
       )}
     </div>

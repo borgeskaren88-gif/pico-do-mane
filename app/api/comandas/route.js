@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
-import { num } from '../../../lib/util';
+import { num, limparNome, fiadoDaVenda, brl } from '../../../lib/util';
+import { enviarPush } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -356,6 +357,22 @@ export async function POST(request) {
           await gravarPainelParcial(sb, { estoque: rb.estoque, estoqueBaixas: rb.baixadas });
         }
       } catch (e) { /* estoque nunca quebra a venda */ }
+      // Aviso na hora: se essa venda no fiado levou o cliente a bater o limite,
+      // manda um push. Best-effort — nunca quebra a venda.
+      if (fiado > 0.005 && venda.nome) {
+        try {
+          const nomeNorm = limparNome(venda.nome).toLowerCase();
+          const cli = arr(blob.clientes).find((c) => limparNome(c.nome).toLowerCase() === nomeNorm);
+          const limite = cli ? num(cli.limite) : 0;
+          if (limite > 0) {
+            const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
+            const devido = (vrows || []).map((r) => r.valor).filter((v) => v && !v.pago && limparNome(v.nome).toLowerCase() === nomeNorm).reduce((s, v) => s + fiadoDaVenda(v), 0);
+            if (devido >= limite - 0.005) {
+              await enviarPush(sb, { titulo: '💳 Fiado no limite', corpo: `${limparNome(venda.nome)} está em ${brl(devido)} de ${brl(limite)}.`, url: '/', tag: 'fiado-' + nomeNorm });
+            }
+          }
+        } catch (e) { /* push nunca quebra a venda */ }
+      }
       return NextResponse.json({ ok: true, venda });
     }
 
