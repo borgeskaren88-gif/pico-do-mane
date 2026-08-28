@@ -30,6 +30,7 @@ import Margem from './Margem';
 import FichasTecnicas from './FichasTecnicas';
 import Auditoria from './Auditoria';
 import Notificacoes from './Notificacoes';
+import DespesaRapida from './DespesaRapida';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 
@@ -357,7 +358,7 @@ export default function Dashboard() {
   const tabs = [
     ['brain', 'Brain'], ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['garrafas', 'Controle'],
-    ['salao', 'Central de Operações'],
+    ['salao', 'Central de Operações'], ['despesarapida', 'Despesa Rápida'],
     ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['backup', 'Backup'],
   ];
 
@@ -373,7 +374,7 @@ export default function Dashboard() {
     { titulo: 'Início', itens: [['hoje', 'Hoje'], ['brain', 'Brain']] },
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento']] },
-    { titulo: 'Financeiro', itens: [['financas', 'Finanças'], ['diario', 'Log Operacional']] },
+    { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
     { titulo: 'Gestão', itens: [['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['backup', 'Backup']] },
   ];
 
@@ -385,6 +386,23 @@ export default function Dashboard() {
   useEffect(() => {
     try { localStorage.setItem('picoos-tab', tab); } catch { /* ignora */ }
   }, [tab]);
+
+  // Atalho externo (ex.: Botão de Ação do iPhone). Abre direto a Despesa Rápida,
+  // e se vier um texto ditado (?despesa=...), já preenche pra confirmar.
+  // Aceita: ?despesa=texto, ?tela=despesa, ?add=despesa.
+  const [despesaInicial, setDespesaInicial] = useState('');
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const txt = q.get('despesa');
+      const tela = (q.get('tela') || q.get('add') || '').toLowerCase();
+      if (txt != null || tela === 'despesa' || tela === 'despesarapida') {
+        if (txt) setDespesaInicial(txt);
+        setTab('despesarapida');
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch { /* ignora */ }
+  }, []);
 
   // Navegação que entende os sub-destinos do setor Abastecimento: se pedirem
   // 'compras'/'estoque'/'lista'/'cotacoes', abre a aba Abastecimento já na
@@ -604,6 +622,7 @@ export default function Dashboard() {
 
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'notificacoes' && <Notificacoes />}
+        {tab === 'despesarapida' && <DespesaRapida dados={despesas} onChange={upd.despesas} textoInicial={despesaInicial} />}
         {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, ideias, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
