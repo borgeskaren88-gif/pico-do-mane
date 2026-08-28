@@ -57,17 +57,31 @@ async function apiCarregar() {
 // agora mescla só os campos enviados, salvar em ordem garante que um não
 // sobrescreva o outro (ex.: marcar tarefa não reverte conta paga).
 let filaSalvar = Promise.resolve();
+// A tela avisa aqui quando um salvamento falha de vez (pra mostrar um aviso e a
+// dona saber que a última alteração NÃO gravou — antes falhava em silêncio e o
+// dado "sumia" ao recarregar).
+let notificarSalvamento = null;
 function apiSalvar(dados) {
   const run = async () => {
-    try {
-      await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dados),
-      });
-    } catch (e) {
-      console.error('Erro ao salvar:', e);
+    // Tenta VÁRIAS vezes: internet/cold start falham às vezes, e um salvamento
+    // que falha em silêncio faz o dado sumir depois. Só considera salvo quando o
+    // servidor confirma (res.ok + json.ok).
+    for (let tentativa = 0; tentativa < 5; tentativa++) {
+      try {
+        const res = await fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dados),
+        });
+        if (res.ok) {
+          const j = await res.json().catch(() => ({}));
+          if (j && j.ok !== false) { if (notificarSalvamento) notificarSalvamento(true); return true; }
+        }
+      } catch (e) { /* rede: tenta de novo */ }
+      await new Promise((r) => setTimeout(r, 700 * (tentativa + 1)));
     }
+    if (notificarSalvamento) notificarSalvamento(false); // avisou: não gravou
+    return false;
   };
   filaSalvar = filaSalvar.then(run, run);
   return filaSalvar;
@@ -96,9 +110,12 @@ export default function Dashboard() {
   const [tab, setTab] = useState('brain');
   const [loaded, setLoaded] = useState(false);
   const [erroLoad, setErroLoad] = useState(false);
+  const [salvarFalhou, setSalvarFalhou] = useState(false);
   // Trava de segurança: só permite SALVAR depois que os dados carregaram de
   // verdade. Sem isso, um salvamento com o estado ainda vazio apagava tudo.
   const loadedRef = useRef(false);
+  // Liga o aviso de salvamento (apiSalvar chama isto): false = falhou de vez.
+  useEffect(() => { notificarSalvamento = (ok) => setSalvarFalhou(!ok); return () => { notificarSalvamento = null; }; }, []);
   const [diario, setDiario] = useState([]);
   const [ideias, setIdeias] = useState([]);
   const [receitas, setReceitas] = useState([]);
@@ -494,6 +511,12 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <PullToRefresh />
+      {salvarFalhou && (
+        <div style={{ position: 'fixed', zIndex: 200, left: 0, right: 0, top: 0, background: C.red, color: '#fff', padding: 'calc(8px + env(safe-area-inset-top)) 14px 8px', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', textAlign: 'center', lineHeight: 1.35 }}>
+          <span>⚠️ Não consegui salvar sua última alteração (internet). Refaça quando a conexão voltar.</span>
+          <button onClick={() => setSalvarFalhou(false)} style={{ background: 'rgba(255,255,255,.25)', color: '#fff', border: 'none', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>OK</button>
+        </div>
+      )}
       <style>{`
 .pos-shell{display:flex;align-items:stretch;min-height:100vh}
 .pos-sidebar{width:236px;flex-shrink:0;box-sizing:border-box;display:flex;flex-direction:column;background:${C.panel};border-right:1px solid ${C.hair};position:sticky;top:0;height:100vh}
