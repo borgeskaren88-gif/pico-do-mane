@@ -34,6 +34,29 @@ export default function Diario({ dados, onChange, receitas = [], onReceitas, vis
   const [msgFaltou, setMsgFaltou] = useState('');
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
+  // Anotação rápida do dia: guarda AGORA (não espera o fechamento), pra não
+  // esquecer o que aconteceu. Cada anotação vira uma linha com a hora no
+  // "Relatório do dia" de HOJE — cria o registro de hoje se ainda não existe, ou
+  // acrescenta ao que já tem. Assim dá pra ir anotando ao longo do dia.
+  const hojeStr = todayISO();
+  const [notaRapida, setNotaRapida] = useState('');
+  const registroHoje = useMemo(() => dados.find((d) => d.data === hojeStr), [dados, hojeStr]);
+  const horaAgora = () => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(new Date());
+  const anotarRapido = () => {
+    const txt = notaRapida.trim();
+    if (!txt) return;
+    const linha = `[${horaAgora()}] ${txt}`;
+    const existente = dados.find((d) => d.data === hojeStr);
+    if (existente) {
+      const novoRelato = existente.relato ? `${existente.relato}\n${linha}` : linha;
+      onChange(dados.map((d) => (d.id === existente.id ? { ...d, relato: novoRelato } : d)));
+      if (editId === existente.id) setForm((f) => ({ ...f, relato: novoRelato }));
+    } else {
+      onChange([{ ...diarioVazio(), data: hojeStr, relato: linha, id: uid() }, ...dados]);
+    }
+    setNotaRapida('');
+  };
+
   // Preenche sozinho o nº de pedidos e de fiados com as comandas do dia quando a
   // data muda (igual a receita). Só ao registrar um dia novo (não ao editar um
   // dia salvo), e só quando há comandas naquele dia — dá pra ajustar na mão.
@@ -74,8 +97,23 @@ export default function Diario({ dados, onChange, receitas = [], onReceitas, vis
     if (!form.data) return;
     const recCalc = caixaDoDia(form.data);
     const registro = { ...form, receita: recCalc > 0 ? recCalc.toFixed(2).replace('.', ',') : form.receita };
-    if (editId) onChange(dados.map((d) => d.id === editId ? { ...registro, id: editId } : d));
-    else onChange([{ ...registro, id: uid() }, ...dados]);
+    if (editId) {
+      onChange(dados.map((d) => d.id === editId ? { ...registro, id: editId } : d));
+    } else {
+      // Se já existe um registro nessa data (ex.: anotações rápidas de hoje),
+      // JUNTA em vez de criar um dia duplicado: mantém o que já tinha e sobrescreve
+      // só com os campos que você preencheu; o relato é somado.
+      const existente = dados.find((d) => d.data === form.data);
+      if (existente) {
+        const merged = { ...existente };
+        for (const k of Object.keys(registro)) { const v = registro[k]; if (v !== '' && v != null) merged[k] = v; }
+        merged.id = existente.id;
+        merged.relato = [existente.relato, form.relato].filter(Boolean).join('\n').trim();
+        onChange(dados.map((d) => (d.id === existente.id ? merged : d)));
+      } else {
+        onChange([{ ...registro, id: uid() }, ...dados]);
+      }
+    }
     setForm(diarioVazio()); setEditId(null);
   };
   const editar = (d) => { setForm({ ...diarioVazio(), ...d, relato: migrarRelato(d) }); setEditId(d.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
@@ -122,6 +160,23 @@ export default function Diario({ dados, onChange, receitas = [], onReceitas, vis
       </div>
 
       {abaLog === 'fechamento' && (<>
+      {/* Anotação rápida: registra AGORA algo que está acontecendo, pra não
+          esquecer até o fechamento. Vai pro relatório de hoje com a hora. */}
+      <Card style={{ marginBottom: 14, borderColor: C.accent }}>
+        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Anotar agora ✍️</div>
+        <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>Aconteceu algo? Anote na hora que já fica guardado no relatório de hoje (com o horário). Você pode ir anotando o dia todo.</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, minWidth: 0 }}><AreaVoz value={notaRapida} onChange={setNotaRapida} placeholder="Ex.: acabou o gelo, cliente reclamou da fila, faltou garçom…" rows={2} /></div>
+          <MicBtn value={notaRapida} onChange={setNotaRapida} />
+        </div>
+        <div style={{ marginTop: 8 }}><Btn onClick={anotarRapido} disabled={!notaRapida.trim()}>Anotar</Btn></div>
+        {registroHoje && registroHoje.relato && (
+          <div style={{ marginTop: 12, borderTop: `1px solid ${C.hair}`, paddingTop: 10 }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: C.faint, fontWeight: 700, marginBottom: 6 }}>Anotações de hoje</div>
+            <div style={{ fontSize: 13, color: C.text, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{registroHoje.relato}</div>
+          </div>
+        )}
+      </Card>
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 14 }}>{editId ? 'Editar dia' : 'Fechamento do dia'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
