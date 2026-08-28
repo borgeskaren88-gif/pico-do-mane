@@ -134,7 +134,7 @@ export default function Notificacoes() {
         <Card style={{ marginBottom: 14, background: C.panel2 }}>
           <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 8 }}>O que você recebe</div>
           <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>
-            Todo dia de manhã (por volta das <b style={{ color: C.text }}>10h</b>) chega um <b style={{ color: C.text }}>resumo</b> com o que precisa de atenção: quanto vendeu ontem, contas vencendo hoje, estoque no mínimo e fiados no limite. E <b style={{ color: C.text }}>na hora</b>, quando um fiado bate o limite de alguém. Toque em <b style={{ color: C.text }}>“Ver resumo agora”</b> pra ver como fica.
+            Todo dia de manhã (por volta das <b style={{ color: C.text }}>8h</b>) chega um <b style={{ color: C.text }}>resumo</b> com o que precisa de atenção: quanto vendeu ontem, contas vencendo hoje, estoque no mínimo e fiados no limite. E <b style={{ color: C.text }}>na hora</b>, quando um fiado bate o limite de alguém. Toque em <b style={{ color: C.text }}>“Ver resumo agora”</b> pra ver como fica.
           </div>
         </Card>
       )}
