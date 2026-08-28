@@ -53,17 +53,16 @@ export default function Compras({ dados, cotacoes, despesas = [], onChange, onRe
     const forn = limparNome(compra.fornecedor);
 
     let despId = '';
-    let novasDespesas = null;
+    let despesaNova = null;
     if (pago === 'Sim' && totalCarrinho > 0) {
       despId = uid();
-      const desp = {
+      despesaNova = {
         id: despId, data: compra.data, categoria: 'Fornecedores de insumo',
         descricao: [forn, compra.nota && `Nota ${compra.nota}`].filter(Boolean).join(' · ') || 'Compra',
         valor: totalCarrinho.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         obs: `Compra ${compra.formaPagto.toLowerCase()} · ${carrinho.length} ${carrinho.length > 1 ? 'itens' : 'item'}`,
         origem: 'compra',
       };
-      novasDespesas = [desp, ...despesas];
     }
 
     const novasCompras = carrinho.map((it) => ({
@@ -74,16 +73,19 @@ export default function Compras({ dados, cotacoes, despesas = [], onChange, onRe
       despesaId: despId || undefined,
     }));
 
-    let novasCotacoes = null;
+    let cotacoesNovas = null;
     if (gerarCotacao) {
       const novos = carrinho.filter((it) => num(it.valorUnit) > 0).map((it) => ({
         id: uid(), data: compra.data, produto: limparNome(it.produto), fornecedor: forn,
         preco: it.valorUnit, categoria: it.categoria,
       }));
-      if (novos.length) novasCotacoes = [...novos, ...cotacoes];
+      if (novos.length) cotacoesNovas = novos;
     }
 
-    onRegistrar({ compras: [...novasCompras, ...dados], cotacoes: novasCotacoes, despesas: novasDespesas, comprasNovas: novasCompras });
+    // Envia SÓ os itens novos (deltas). O pai junta ao que já existe usando o
+    // estado mais recente — assim registrar uma compra logo depois de outra
+    // nunca apaga a despesa/compra da anterior.
+    onRegistrar({ comprasNovas: novasCompras, despesaNova, cotacoesNovas });
     setCompra(compraVazia()); setItem(itemVazio()); setCarrinho([]);
   };
 

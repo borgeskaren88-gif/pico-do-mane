@@ -263,24 +263,42 @@ export default function Dashboard() {
     clientes: (v) => { setClientes(v); salvarTudo({ clientes: v }); },
   };
 
-  // Aplica mudanças em compras E despesas numa tacada só (usado ao marcar/
-  // desfazer pagamento de contas), pra um save não sobrescrever o outro.
-  const aplicarComprasDespesas = (novasCompras, novasDespesas) => {
-    setCompras(novasCompras);
-    setDespesas(novasDespesas);
-    salvarTudo({ compras: novasCompras, despesas: novasDespesas });
-    syncGoogle();
+  // Marca/desfaz pagamento de contas aplicando a mudança no estado ATUAL (fresco)
+  // — nunca numa lista reconstruída pela tela, que podia estar um passo atrás e
+  // apagar uma compra/despesa recém-lançada. Recebe a INTENÇÃO (quais ids pagar/
+  // estornar, a despesa a lançar/remover) e aplica sobre compras/despesas atuais.
+  const aplicarPagamento = (op) => {
+    const parcial = {};
+    if (op.pagarIds && op.pagarIds.length) {
+      const ids = new Set(op.pagarIds);
+      const nc = compras.map((x) => (ids.has(x.id) ? { ...x, pago: 'Sim', dataPagamento: op.hoje, despesaId: op.despId } : x));
+      setCompras(nc); parcial.compras = nc;
+      if (op.despesaNova) { const nd = [op.despesaNova, ...despesas]; setDespesas(nd); parcial.despesas = nd; }
+    }
+    if (op.estornarIds && op.estornarIds.length) {
+      const ids = new Set(op.estornarIds);
+      const nc = compras.map((x) => (ids.has(x.id) ? { ...x, pago: 'Não', dataPagamento: '', despesaId: '' } : x));
+      setCompras(nc); parcial.compras = nc;
+      if (op.removerDespesaIds && op.removerDespesaIds.length) {
+        const rm = new Set(op.removerDespesaIds);
+        const nd = despesas.filter((d) => !rm.has(d.id)); setDespesas(nd); parcial.despesas = nd;
+      }
+    }
+    if (Object.keys(parcial).length) { salvarTudo(parcial); syncGoogle(); }
   };
 
   // Registro de compra que alimenta compras + cotações + despesas de uma vez
   // (uma compra vira cotação de preço e, se paga, vira despesa), sem um save
   // sobrescrever o outro. Só aplica as listas que vierem no objeto.
-  const aplicarCompra = ({ compras: nc, cotacoes: ncot, despesas: nd, comprasNovas }) => {
+  const aplicarCompra = ({ comprasNovas, despesaNova, cotacoesNovas }) => {
+    // Junta os itens novos ao estado ATUAL (fresco) e salva só esses campos.
+    // Nunca reconstrói a lista inteira a partir de uma cópia da tela, que podia
+    // estar um passo atrás e apagar o que a compra anterior acabou de gravar.
     const parcial = {};
-    if (nc) { setCompras(nc); parcial.compras = nc; }
-    if (ncot) { setCotacoes(ncot); parcial.cotacoes = ncot; }
-    if (nd) { setDespesas(nd); parcial.despesas = nd; }
-    salvarTudo(parcial);
+    if (comprasNovas && comprasNovas.length) { const next = [...comprasNovas, ...compras]; setCompras(next); parcial.compras = next; }
+    if (cotacoesNovas && cotacoesNovas.length) { const next = [...cotacoesNovas, ...cotacoes]; setCotacoes(next); parcial.cotacoes = next; }
+    if (despesaNova) { const next = [despesaNova, ...despesas]; setDespesas(next); parcial.despesas = next; }
+    if (Object.keys(parcial).length) salvarTudo(parcial);
     // Entradas automáticas no estoque (via API dedicada): os itens comprados que
     // já estão no catálogo têm o saldo somado. Fire-and-forget — não trava a
     // compra se o estoque falhar. Produtos não cadastrados viram sugestão.
@@ -288,7 +306,7 @@ export default function Dashboard() {
       fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'entradaCompras', comprasNovas }) })
         .then((r) => r.json()).then((j) => { if (j?.ok && Array.isArray(j.itens)) setEstoque(j.itens); }).catch(() => {});
     }
-    if (nc) syncGoogle();
+    if (comprasNovas && comprasNovas.length) syncGoogle();
   };
 
   // Estoque e fichas técnicas: fonte é a API dedicada /api/estoque (para ficar
@@ -334,14 +352,18 @@ export default function Dashboard() {
     // a da cozinha, redireciona pra "listaCozinha" sem mudar o componente.
     const p = { ...parcial };
     if (qualLista === 'cozinha' && 'listaCompras' in p) { p.listaCozinha = p.listaCompras; delete p.listaCompras; }
-    if (p.listaCompras) setListaCompras(p.listaCompras);
-    if (p.listaCozinha) setListaCozinha(p.listaCozinha);
-    if (p.listasModelo) setListasModelo(p.listasModelo);
-    if (p.compras) setCompras(p.compras);
-    if (p.despesas) setDespesas(p.despesas);
-    if (p.cotacoes) setCotacoes(p.cotacoes);
-    salvarTudo(p);
-    if (p.compras) syncGoogle();
+    // Listas: substituição direta (é a própria lista, gerida aqui). Financeiro
+    // (compras/despesas/cotações): junta só os NOVOS ao estado atual, pra não
+    // apagar lançamentos recentes com uma cópia velha da tela.
+    const salvar = {};
+    if (p.listaCompras) { setListaCompras(p.listaCompras); salvar.listaCompras = p.listaCompras; }
+    if (p.listaCozinha) { setListaCozinha(p.listaCozinha); salvar.listaCozinha = p.listaCozinha; }
+    if (p.listasModelo) { setListasModelo(p.listasModelo); salvar.listasModelo = p.listasModelo; }
+    if (p.comprasNovas && p.comprasNovas.length) { const next = [...p.comprasNovas, ...compras]; setCompras(next); salvar.compras = next; }
+    if (p.cotacoesNovas && p.cotacoesNovas.length) { const next = [...p.cotacoesNovas, ...cotacoes]; setCotacoes(next); salvar.cotacoes = next; }
+    if (p.despesaNova) { const next = [p.despesaNova, ...despesas]; setDespesas(next); salvar.despesas = next; }
+    if (Object.keys(salvar).length) salvarTudo(salvar);
+    if (salvar.compras) syncGoogle();
   };
 
   // Repor na Lista de Compras a partir de outras abas (estoque crítico no
@@ -578,7 +600,7 @@ export default function Dashboard() {
             </div>
             {subFinancas === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
             {subFinancas === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
-            {subFinancas === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarComprasDespesas} />}
+            {subFinancas === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarPagamento} />}
             {subFinancas === 'raiox' && <RaioX receitas={receitas} despesas={despesas} cardapio={cardapio} fichas={fichas} estoque={estoque} />}
             {subFinancas === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} />}
           </>

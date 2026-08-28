@@ -104,10 +104,10 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
     };
     const payload = {
       listaCompras: itens.map((x) => (x.id === it.id ? { ...x, comprado: true, lancado: true, compradoEm: Date.now() } : x)),
-      compras: [compraEntry, ...compras],
+      comprasNovas: [compraEntry],
     };
-    if (aVista) payload.despesas = [{ id: despId, data: hoje, categoria: 'Fornecedores de insumo', descricao: [forn, it.nome].filter(Boolean).join(' · ') || it.nome, valor: totalStr, obs: 'Compra à vista (lista de compras)', origem: 'lista-compras' }, ...despesas];
-    if (num(unit) > 0 && forn) payload.cotacoes = [{ id: uid(), data: hoje, produto: it.nome, fornecedor: forn, preco: unit, categoria: it.categoria || '' }, ...cotacoes];
+    if (aVista) payload.despesaNova = { id: despId, data: hoje, categoria: 'Fornecedores de insumo', descricao: [forn, it.nome].filter(Boolean).join(' · ') || it.nome, valor: totalStr, obs: 'Compra à vista (lista de compras)', origem: 'lista-compras' };
+    if (num(unit) > 0 && forn) payload.cotacoesNovas = [{ id: uid(), data: hoje, produto: it.nome, fornecedor: forn, preco: unit, categoria: it.categoria || '' }];
     onAplicar(payload);
     setMarcandoId(null);
   };
@@ -157,12 +157,12 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
     }
     const payload = {
       listaCompras: itens.map((x) => (idsSel.has(x.id) ? { ...x, comprado: true, lancado: true, compradoEm: Date.now() } : x)),
-      compras: [...novasCompras, ...compras],
+      comprasNovas: novasCompras,
     };
-    if (novasCotacoes.length) payload.cotacoes = [...novasCotacoes, ...cotacoes];
+    if (novasCotacoes.length) payload.cotacoesNovas = novasCotacoes;
     if (aVista) {
       const nomes = selecionados.map((it) => it.nome).slice(0, 3).join(', ') + (selecionados.length > 3 ? '…' : '');
-      payload.despesas = [{ id: despId, data: hoje, categoria: 'Fornecedores de insumo', descricao: [forn, nomes].filter(Boolean).join(' · ') || nomes, valor: total.toFixed(2).replace('.', ','), obs: `Compra à vista (lista de compras · ${selecionados.length} itens)`, origem: 'lista-compras' }, ...despesas];
+      payload.despesaNova = { id: despId, data: hoje, categoria: 'Fornecedores de insumo', descricao: [forn, nomes].filter(Boolean).join(' · ') || nomes, valor: total.toFixed(2).replace('.', ','), obs: `Compra à vista (lista de compras · ${selecionados.length} itens)`, origem: 'lista-compras' };
     }
     onAplicar(payload);
     cancelarBoleto();
