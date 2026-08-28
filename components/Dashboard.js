@@ -677,16 +677,16 @@ export default function Dashboard() {
                 </div>
                 <ListaCompras key={qualLista}
                   itens={qualLista === 'cozinha' ? listaCozinha : listaCompras}
-                  modelos={listasModelo} cotacoes={cotacoes} compras={compras} despesas={despesas} onAplicar={aplicarLista}
+                  modelos={listasModelo} cotacoes={cotacoes} compras={compras} despesas={despesas} estoque={estoque} onAplicar={aplicarLista}
                   tarefasCozinha={tarefasCozinha} onTarefasCozinha={upd.tarefasCozinha}
                   subtitulo={qualLista === 'cozinha' ? 'O que a cozinha pediu pra repor' : 'O que falta repor no bar'}
                   mostrarTarefasCozinha={qualLista === 'cozinha'} />
               </>
             )}
 
-            {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} onChange={upd.compras} onRegistrar={aplicarCompra} />}
+            {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} estoque={estoque} onChange={upd.compras} onRegistrar={aplicarCompra} />}
             {subAbast === 'margem' && <Margem cardapio={cardapio} fichas={fichas} estoque={estoque} />}
-            {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} />}
+            {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} estoque={estoque} compras={compras} />}
           </>
         )}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}

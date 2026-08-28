@@ -1,12 +1,17 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
+import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle, Sugestoes } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, limparNome, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import MicBtn from './MicBtn';
 
-export default function Cotacoes({ dados, onChange }) {
+export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }) {
   const vazio = { data: todayISO(), produto: '', fornecedor: '', preco: '', categoria: '' };
   const [form, setForm] = useState(vazio);
+  const sugestoesProdutos = useMemo(() => [
+    ...estoque.map((e) => e && e.nome),
+    ...(Array.isArray(dados) ? dados : []).map((c) => c && c.produto),
+    ...(Array.isArray(compras) ? compras : []).map((c) => c && c.produto),
+  ].filter(Boolean), [estoque, dados, compras]);
   const [editId, setEditId] = useState(null);
   const [busca, setBusca] = useState('');
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
@@ -59,8 +64,9 @@ export default function Cotacoes({ dados, onChange }) {
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
           <Field label="Produto">
             <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ flex: 1, minWidth: 0 }}><TextInput value={form.produto} onChange={set('produto')} placeholder="Original 600ml…" /></div>
+              <div style={{ flex: 1, minWidth: 0 }}><TextInput value={form.produto} onChange={set('produto')} placeholder="Comece a digitar — sugere o que já existe" list="cotacoes-produtos" /></div>
               <MicBtn value={form.produto} onChange={set('produto')} />
+              <Sugestoes id="cotacoes-produtos" itens={sugestoesProdutos} />
             </div>
           </Field>
           <Field label="Preço (R$)"><NumInput value={form.preco} onChange={set('preco')} /></Field>

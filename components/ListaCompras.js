@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle } from './ui';
+import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle, Sugestoes } from './ui';
 import { brl, num, todayISO, addDays, fmtDate, uid, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
 import MicBtn from './MicBtn';
 
@@ -16,7 +16,12 @@ const fmtQuando = (v) => {
   return `${dia} às ${hora}`;
 };
 
-export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], compras = [], despesas = [], onAplicar, tarefasCozinha = [], onTarefasCozinha, subtitulo, mostrarTarefasCozinha = false }) {
+export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], compras = [], despesas = [], estoque = [], onAplicar, tarefasCozinha = [], onTarefasCozinha, subtitulo, mostrarTarefasCozinha = false }) {
+  const sugestoesProdutos = useMemo(() => [
+    ...estoque.map((e) => e && e.nome),
+    ...(Array.isArray(compras) ? compras : []).map((c) => c && c.produto),
+    ...(Array.isArray(cotacoes) ? cotacoes : []).map((c) => c && c.produto),
+  ].filter(Boolean), [estoque, compras, cotacoes]);
   const [novo, setNovo] = useState(itemVazio());
   const [novaTarefaCoz, setNovaTarefaCoz] = useState('');
   const addTarefaCoz = () => { if (!novaTarefaCoz.trim() || !onTarefasCozinha) return; onTarefasCozinha([{ id: uid(), texto: novaTarefaCoz.trim() }, ...tarefasCozinha]); setNovaTarefaCoz(''); };
@@ -197,8 +202,9 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
         <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>{editId ? 'Editar item' : 'Adicionar item'}</div>
         <Field label="O que falta?">
           <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1, minWidth: 0 }}><TextInput value={novo.nome} onChange={set('nome')} placeholder="Gelo, limão, Skol 269…" /></div>
+            <div style={{ flex: 1, minWidth: 0 }}><TextInput value={novo.nome} onChange={set('nome')} placeholder="Comece a digitar — sugere o que já existe" list="lista-produtos" /></div>
             <MicBtn value={novo.nome} onChange={set('nome')} />
+            <Sugestoes id="lista-produtos" itens={sugestoesProdutos} />
           </div>
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle } from './ui';
+import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
 import { brl, num, todayISO, ymOf, fmtDate, addDays, uid, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
 
 // Dados compartilhados da compra (valem pra todos os itens do carrinho).
@@ -8,7 +8,15 @@ const compraVazia = () => ({ data: todayISO(), fornecedor: '', formaPagto: 'À v
 // Item que está sendo digitado antes de entrar no carrinho.
 const itemVazio = () => ({ produto: '', categoria: '', quantidade: '', valorUnit: '' });
 
-export default function Compras({ dados, cotacoes, despesas = [], onChange, onRegistrar }) {
+export default function Compras({ dados, cotacoes, despesas = [], estoque = [], onChange, onRegistrar }) {
+  // Sugestões de produto: os itens do ESTOQUE primeiro (esses fazem a compra
+  // entrar automático), mais o que já foi comprado/cotado. Digitar e escolher a
+  // sugestão garante o nome IGUAL — sem precisar decorar.
+  const sugestoesProdutos = useMemo(() => [
+    ...estoque.map((e) => e && e.nome),
+    ...(Array.isArray(dados) ? dados : []).map((d) => d && d.produto),
+    ...(Array.isArray(cotacoes) ? cotacoes : []).map((c) => c && c.produto),
+  ].filter(Boolean), [estoque, dados, cotacoes]);
   const [compra, setCompra] = useState(compraVazia());
   const [item, setItem] = useState(itemVazio());
   const [carrinho, setCarrinho] = useState([]);
@@ -155,7 +163,8 @@ export default function Compras({ dados, cotacoes, despesas = [], onChange, onRe
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.06em', color: C.muted, fontWeight: 700, marginBottom: 8 }}>
           {editId ? 'Produto' : 'Adicionar item'}
         </div>
-        <Field label="Produto"><TextInput value={item.produto} onChange={setI('produto')} placeholder="Arroz 5kg, Original 600ml…" /></Field>
+        <Field label="Produto"><TextInput value={item.produto} onChange={setI('produto')} placeholder="Comece a digitar — sugere o que já existe" list="compras-produtos" /></Field>
+        <Sugestoes id="compras-produtos" itens={sugestoesProdutos} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
           <Field label="Categoria"><Select value={item.categoria} onChange={setI('categoria')} options={CATEGORIAS_PRODUTO} /></Field>
           <Field label="Qtd"><NumInput value={item.quantidade} onChange={setI('quantidade')} /></Field>
