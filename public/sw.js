@@ -3,7 +3,7 @@
 // "trava" numa versão antiga) e só cai no cache quando está offline / sem
 // internet. As chamadas de dados (/api/...) nunca são cacheadas, pra não
 // mostrar número velho nem atrapalhar o salvamento.
-const CACHE = 'picoos-v1';
+const CACHE = 'picoos-v2';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
@@ -34,5 +34,34 @@ self.addEventListener('fetch', (e) => {
         return res;
       })
       .catch(() => caches.match(req).then((hit) => hit || caches.match('/')))
+  );
+});
+
+// --- Notificações (push) ---
+// Chega um aviso do servidor mesmo com o app fechado: mostra a notificação.
+self.addEventListener('push', (e) => {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch (err) { data = {}; }
+  const title = data.title || 'PicoOS';
+  const options = {
+    body: data.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    data: { url: data.url || '/' },
+    tag: data.tag || undefined,
+    renotify: !!data.tag,
+  };
+  e.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Tocar na notificação: foca uma aba já aberta ou abre o app na tela certa.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const alvo = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((lista) => {
+      for (const c of lista) { if ('focus' in c) { c.navigate && c.navigate(alvo); return c.focus(); } }
+      if (self.clients.openWindow) return self.clients.openWindow(alvo);
+    })
   );
 });
