@@ -83,18 +83,17 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
       obs: 'Baixa de conta a pagar' + (g.itens.length > 1 ? ` · ${g.itens.length} itens` : ''),
       origem: 'conta-a-pagar',
     };
-    const novasCompras = dados.map((x) => ids.has(x.id) ? { ...x, pago: 'Sim', dataPagamento: hoje, despesaId: despId } : x);
-    onPagamento(novasCompras, [despesa, ...despesas]);
+    // Manda a INTENÇÃO (quais contas pagar + a despesa a lançar); o pai aplica
+    // no estado mais recente, sem risco de apagar algo lançado no meio.
+    onPagamento({ pagarIds: [...ids], hoje, despId, despesaNova: despesa });
   };
 
   // Desfazer: volta a conta pra "em aberto" e remove a despesa lançada
   // automaticamente (se houver).
   const desfazerGrupo = (g) => {
     const ids = new Set(g.itens.map((x) => x.id));
-    const despIds = new Set(g.itens.map((x) => x.despesaId).filter(Boolean));
-    const novasCompras = dados.map((x) => ids.has(x.id) ? { ...x, pago: 'Não', dataPagamento: '', despesaId: '' } : x);
-    const novasDespesas = despIds.size ? despesas.filter((d) => !despIds.has(d.id)) : despesas;
-    onPagamento(novasCompras, novasDespesas);
+    const despIds = [...new Set(g.itens.map((x) => x.despesaId).filter(Boolean))];
+    onPagamento({ estornarIds: [...ids], removerDespesaIds: despIds });
   };
 
   // Editar uma conta em aberto (fornecedor/categoria em comum + cada parcela).
