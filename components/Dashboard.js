@@ -519,6 +519,12 @@ export default function Dashboard() {
               <LogoMark size={28} radius={9} />
               <div style={{ fontSize: 16, fontWeight: 900 }}>PicoOS</div>
             </div>
+            {tab !== 'despesarapida' && (
+              <button onClick={() => setTab('despesarapida')} aria-label="Despesa rápida" title="Despesa rápida"
+                style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.accent, borderRadius: 10, padding: '7px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+              </button>
+            )}
             <BotaoAtualizar />
           </div>
 
@@ -641,25 +647,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Botão flutuante: leva à Despesa Rápida de qualquer tela (um toque pra
-          lançar por voz). Escondido quando já está lá ou com o menu aberto. */}
-      {tab !== 'despesarapida' && !menuAberto && (
-        <button
-          onClick={() => setTab('despesarapida')}
-          aria-label="Despesa rápida"
-          style={{
-            position: 'fixed', zIndex: 60,
-            right: 'calc(18px + env(safe-area-inset-right))',
-            bottom: 'calc(18px + env(safe-area-inset-bottom))',
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: C.accent, color: '#06101F', border: 'none', cursor: 'pointer',
-            borderRadius: 999, padding: '13px 18px', fontSize: 15, fontWeight: 800,
-            boxShadow: '0 6px 20px rgba(0,0,0,.28)',
-          }}
-        >
-          <span style={{ fontSize: 18, lineHeight: 1 }}>＋</span>Despesa
-        </button>
-      )}
     </div>
   );
 }
