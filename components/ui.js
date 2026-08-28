@@ -58,10 +58,21 @@ export function Label({ children }) {
   );
 }
 
-export function TextInput({ value, onChange, placeholder, type = 'text', inputMode, onBlur }) {
+export function TextInput({ value, onChange, placeholder, type = 'text', inputMode, onBlur, list }) {
   return (
-    <input type={type} value={value} placeholder={placeholder} inputMode={inputMode} onBlur={onBlur}
+    <input type={type} value={value} placeholder={placeholder} inputMode={inputMode} onBlur={onBlur} list={list}
       onChange={(e) => onChange(e.target.value)} style={inputStyle} />
+  );
+}
+
+// Lista de sugestões pra um input (autocompletar). Usa <datalist> nativo, que
+// funciona no iPhone e no PC. Passe um id único e ligue no TextInput via list={id}.
+export function Sugestoes({ id, itens = [] }) {
+  const unicos = [...new Set(itens.map((s) => String(s || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+  return (
+    <datalist id={id}>
+      {unicos.map((s) => <option key={s} value={s} />)}
+    </datalist>
   );
 }
 
