@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, Select, NumInput, Empty, SecTitle, PageTitle, inputStyle } from './ui';
 import { num, uid } from '../lib/util';
-import { UNIDADES, podeProduzir } from '../lib/estoque';
+import { UNIDADES, detalheProducao } from '../lib/estoque';
 import { CATEGORIAS_CARDAPIO } from './Cardapio';
 
 // Modelo de fichas do Pico do Mané (extraído da ficha técnica em PDF). Só os
@@ -167,7 +167,9 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
           {g.itens.map((c) => {
             const itens = fichaDe(c.id);
             const aberto = abertoId === c.id;
-            const rende = itens.length ? podeProduzir(itens, estoque) : null;
+            const prod = itens.length ? detalheProducao(itens, estoque) : null;
+            const rende = prod ? prod.rende : null;
+            const possivelPorId = new Map((prod ? prod.linhas : []).map((l) => [l.estoqueId, l]));
             return (
           <Card key={c.id} style={{ marginBottom: 8, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
@@ -177,6 +179,11 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
                   {itens.length === 0 ? 'Sem ficha ainda' : `${itens.length} ingrediente(s)`}
                   {rende != null && itens.length > 0 && <span style={{ color: rende > 0 ? C.green : C.red }}> · rende ~{rende}</span>}
                 </div>
+                {prod && prod.gargalo && itens.length > 1 && (
+                  <div style={{ fontSize: 12, color: rende > 0 ? C.amber : C.red, marginTop: 3, fontWeight: 600 }}>
+                    {rende > 0 ? '⚠️ trava no ' : '✗ falta '}<b>{prod.gargalo.nome}</b>{prod.gargalo.saldo != null ? ` (só dá pra ~${prod.gargalo.possivel}; tem ${num(prod.gargalo.saldo)} ${prod.gargalo.unidade || ''})` : ''}
+                  </div>
+                )}
               </div>
               <Btn kind="ghost" small onClick={() => abrir(c.id)}>{aberto ? 'Fechar' : itens.length ? 'Editar' : 'Criar ficha'}</Btn>
             </div>
@@ -184,15 +191,24 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
             {/* Ingredientes já na ficha */}
             {itens.length > 0 && (
               <div style={{ marginTop: 10, borderTop: `1px solid ${C.hair}`, paddingTop: 8 }}>
-                {itens.map((x) => (
+                {itens.map((x) => {
+                  const lin = possivelPorId.get(x.estoqueId);
+                  const ehGargalo = prod && prod.gargalo && prod.gargalo.estoqueId === x.estoqueId && itens.length > 1;
+                  const capacidade = lin && !lin.aGosto && lin.possivel !== Infinity ? `dá ~${lin.possivel}` : (lin && lin.aGosto ? 'a gosto' : null);
+                  return (
                   <div key={x.estoqueId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 14 }}>
-                    <span>{nomeEstoquePorId(x.estoqueId)}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      {ehGargalo && <span title="Ingrediente que trava a produção" style={{ color: C.amber }}>⚠️</span>}
+                      <span style={{ color: ehGargalo ? C.amber : C.text, fontWeight: ehGargalo ? 700 : 400 }}>{nomeEstoquePorId(x.estoqueId)}</span>
+                    </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {capacidade && <span style={{ fontSize: 12, color: ehGargalo ? C.amber : C.faint, fontVariantNumeric: 'tabular-nums' }}>{capacidade}</span>}
                       <b style={{ fontVariantNumeric: 'tabular-nums' }}>{num(x.qtd)} {x.unidade}</b>
                       {aberto && <button onClick={() => removerIngrediente(c.id, x.estoqueId)} title="Remover" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>×</button>}
                     </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
