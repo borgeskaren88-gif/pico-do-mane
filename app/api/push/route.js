@@ -34,16 +34,17 @@ export async function POST(request) {
     const sb = supabaseServer();
 
     if (acao === 'inscrever') {
-      await salvarInscricao(sb, body?.sub, body?.apelido);
+      await salvarInscricao(sb, body?.sub, body?.apelido, p);
       return NextResponse.json({ ok: true });
     }
     if (acao === 'desinscrever') {
       await removerInscricao(sb, body?.sub);
       return NextResponse.json({ ok: true });
     }
-    // Teste: manda um push pra todos os aparelhos (a dona confere se chega).
+    // Teste: manda um push pros aparelhos do MESMO papel de quem pediu (a dona
+    // testa nos aparelhos da dona; a cozinha nos da cozinha).
     if (acao === 'teste') {
-      const r = await enviarPush(sb, { titulo: 'PicoOS ✅', corpo: 'Notificações ativadas! É assim que você vai receber os avisos.', url: '/', tag: 'teste' });
+      const r = await enviarPush(sb, { titulo: 'PicoOS ✅', corpo: 'Notificações ativadas! É assim que você vai receber os avisos.', url: '/', tag: 'teste', audiencia: p });
       return NextResponse.json({ ok: true, ...r });
     }
     // Manda o resumo diário AGORA (a dona quer ver como fica, sem esperar a manhã).
@@ -51,7 +52,7 @@ export async function POST(request) {
       if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona.' }, { status: 403 });
       const resumo = await montarResumoDiario(sb);
       if (!resumo) return NextResponse.json({ ok: true, enviados: 0, vazio: true });
-      const r = await enviarPush(sb, { ...resumo, tag: 'resumo-diario' });
+      const r = await enviarPush(sb, { ...resumo, tag: 'resumo-diario', audiencia: 'dona' });
       return NextResponse.json({ ok: true, ...r });
     }
     return NextResponse.json({ ok: false, erro: 'Ação inválida.' }, { status: 400 });
