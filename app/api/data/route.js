@@ -55,6 +55,16 @@ export async function POST(request) {
     // são preservados (o cliente manda só o que mudou). Isso evita que um
     // salvamento parcial apague dados que ele não incluiu.
     const valor = { ...anterior, ...dados };
+    // Rede de segurança: NÃO deixa um salvamento zerar uma lista financeira que
+    // já tem dados. Esvaziar receitas/despesas/etc. por completo praticamente
+    // nunca é intencional — é a assinatura de um aparelho com cópia vazia/velha
+    // gravando por cima. Nesses casos, preserva o que já estava salvo.
+    for (const campo of ['diario', 'receitas', 'despesas', 'compras', 'cotacoes', 'garrafas']) {
+      if (campo in dados && Array.isArray(dados[campo]) && dados[campo].length === 0
+          && Array.isArray(anterior[campo]) && anterior[campo].length > 0) {
+        valor[campo] = anterior[campo];
+      }
+    }
     if (!('listaCozinha' in valor) && Array.isArray(anterior.listaCozinha)) valor.listaCozinha = anterior.listaCozinha;
     if (!('tarefasCozinha' in valor) && Array.isArray(anterior.tarefasCozinha)) valor.tarefasCozinha = anterior.tarefasCozinha;
     if (!('cardapio' in valor) && Array.isArray(anterior.cardapio)) valor.cardapio = anterior.cardapio;
