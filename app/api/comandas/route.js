@@ -368,7 +368,7 @@ export async function POST(request) {
             const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
             const devido = (vrows || []).map((r) => r.valor).filter((v) => v && !v.pago && limparNome(v.nome).toLowerCase() === nomeNorm).reduce((s, v) => s + fiadoDaVenda(v), 0);
             if (devido >= limite - 0.005) {
-              await enviarPush(sb, { titulo: '💳 Fiado no limite', corpo: `${limparNome(venda.nome)} está em ${brl(devido)} de ${brl(limite)}.`, url: '/', tag: 'fiado-' + nomeNorm });
+              await enviarPush(sb, { titulo: '💳 Fiado no limite', corpo: `${limparNome(venda.nome)} está em ${brl(devido)} de ${brl(limite)}.`, url: '/', tag: 'fiado-' + nomeNorm, audiencia: 'dona' });
             }
           }
         } catch (e) { /* push nunca quebra a venda */ }

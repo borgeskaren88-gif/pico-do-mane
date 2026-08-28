@@ -1,26 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, PageTitle, SecTitle } from './ui';
-
-// Converte a chave pública (base64url) pro formato que o navegador pede.
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
-  const arr = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-  return arr;
-}
-
-const ehIOS = () => {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent || '';
-  return /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-};
-const estaInstalado = () => {
-  if (typeof window === 'undefined') return false;
-  return window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-};
+import { pushSuportado, ehIOS, estaInstalado, statusPush, ativarPush, desativarPush, testarPush } from '../lib/pushClient';
 
 export default function Notificacoes() {
   const [suporta, setSuporta] = useState(true);
@@ -32,62 +13,38 @@ export default function Notificacoes() {
   const [msg, setMsg] = useState('');
 
   const conferir = useCallback(async () => {
-    const temAPI = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     setIos(ehIOS());
     setInstalado(estaInstalado());
-    setSuporta(temAPI);
-    if (!temAPI) return;
-    setPermissao(Notification.permission);
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      setInscrito(!!sub);
-    } catch { /* ignora */ }
+    const s = await statusPush();
+    setSuporta(s.suporta);
+    setPermissao(s.permissao);
+    setInscrito(s.inscrito);
   }, []);
   useEffect(() => { conferir(); }, [conferir]);
 
   const ativar = async () => {
     setBusy(true); setMsg('');
     try {
-      const perm = await Notification.requestPermission();
-      setPermissao(perm);
-      if (perm !== 'granted') { setMsg('Você precisa permitir as notificações no aparelho pra ativar.'); return; }
-      const r = await fetch('/api/push', { cache: 'no-store' });
-      const j = await r.json();
-      if (!j.ok || !j.publicKey) { setMsg(j.erro || 'Não consegui preparar as notificações.'); return; }
-      const reg = await navigator.serviceWorker.ready;
-      let sub = await reg.pushManager.getSubscription();
-      if (!sub) {
-        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(j.publicKey) });
-      }
-      const apelido = ios ? 'iPhone/iPad' : (/android/i.test(navigator.userAgent) ? 'Android' : 'Computador');
-      const rs = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'inscrever', sub, apelido }) });
-      const js = await rs.json();
-      if (!js.ok) { setMsg(js.erro || 'Não consegui salvar a inscrição.'); return; }
+      const r = await ativarPush();
+      if (!r.ok) { setMsg(r.erro || 'Não consegui ativar.'); setPermissao(typeof Notification !== 'undefined' ? Notification.permission : 'default'); return; }
       setInscrito(true);
       setMsg('Notificações ativadas neste aparelho! ✅ Toque em "Enviar teste" pra confirmar.');
-    } catch (e) {
-      setMsg('Não consegui ativar: ' + (e?.message || 'erro'));
-    } finally { setBusy(false); }
+    } catch (e) { setMsg('Não consegui ativar: ' + (e?.message || 'erro')); }
+    finally { setBusy(false); }
   };
 
   const desativar = async () => {
     setBusy(true); setMsg('');
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) { await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'desinscrever', sub }) }); await sub.unsubscribe(); }
-      setInscrito(false);
-      setMsg('Notificações desativadas neste aparelho.');
-    } catch (e) { setMsg('Não consegui desativar: ' + (e?.message || 'erro')); }
-    finally { setBusy(false); }
+    const r = await desativarPush();
+    setInscrito(false);
+    setMsg(r.ok ? 'Notificações desativadas neste aparelho.' : 'Não consegui desativar.');
+    setBusy(false);
   };
 
   const testar = async () => {
     setBusy(true); setMsg('');
     try {
-      const r = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'teste' }) });
-      const j = await r.json();
+      const j = await testarPush();
       if (j.ok) setMsg(j.enviados > 0 ? `Teste enviado pra ${j.enviados} aparelho(s)! Deve chegar em segundos.` : 'Nenhum aparelho ativado ainda. Ative acima primeiro.');
       else setMsg(j.erro || 'Não consegui enviar o teste.');
     } catch { setMsg('Sem conexão pra enviar o teste.'); }

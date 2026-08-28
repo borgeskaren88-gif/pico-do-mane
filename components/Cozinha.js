@@ -8,6 +8,7 @@ import PullToRefresh from './PullToRefresh';
 import EstoqueCozinha from './EstoqueCozinha';
 import PontoCozinha from './PontoCozinha';
 import LembretePonto from './LembretePonto';
+import SinoNotificacoes from './SinoNotificacoes';
 
 export default function Cozinha() {
   const router = useRouter();
@@ -174,6 +175,7 @@ export default function Cozinha() {
 
         <div style={{ marginTop: 24 }}>
           <SecTitle>Tarefas</SecTitle>
+          <SinoNotificacoes titulo="Avisos de tarefas" descricao="Receba no celular quando a Karen te passar uma tarefa nova." />
           {tarefas.length === 0 ? <Empty>Nenhuma tarefa por aqui.</Empty> : (
             <Card style={{ padding: 6 }}>
               {tarefas.map((t, i) => (

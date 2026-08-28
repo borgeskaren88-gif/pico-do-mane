@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, sessaoEhValida } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
+import { notificarNovasTarefasCozinha } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,6 +75,10 @@ export async function POST(request) {
         { onConflict: 'chave' }
       );
     if (error) throw error;
+    // Se a dona criou tarefa(s) nova(s) pra cozinha, avisa a cozinha no celular.
+    if (Array.isArray(dados?.tarefasCozinha)) {
+      await notificarNovasTarefasCozinha(sb, dados.tarefasCozinha, anterior.tarefasCozinha);
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(

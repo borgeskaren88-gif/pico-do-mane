@@ -23,7 +23,7 @@ export async function GET(request) {
     if (await jaMandouResumoHoje(sb)) return NextResponse.json({ ok: true, enviado: false, motivo: 'já enviado hoje' });
     const resumo = await montarResumoDiario(sb);
     if (!resumo) { await marcarResumoEnviado(sb); return NextResponse.json({ ok: true, enviado: false, motivo: 'nada a avisar' }); }
-    const r = await enviarPush(sb, { ...resumo, tag: 'resumo-diario' });
+    const r = await enviarPush(sb, { ...resumo, tag: 'resumo-diario', audiencia: 'dona' });
     await marcarResumoEnviado(sb);
     return NextResponse.json({ ok: true, enviado: true, ...r });
   } catch (e) {
