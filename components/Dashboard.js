@@ -34,11 +34,23 @@ import DespesaRapida from './DespesaRapida';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 
+const arr = (v) => (Array.isArray(v) ? v : []);
+
+// Carrega o painel com TENTATIVAS (rede/cold start falham às vezes). Devolve
+// { ok, dados }: ok=false quando NÃO conseguiu ler de jeito nenhum — nesse caso
+// o app NUNCA deve semear/salvar por cima, senão apaga os dados reais.
 async function apiCarregar() {
-  const res = await fetch('/api/data', { cache: 'no-store' });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.ok ? json.dados : null;
+  for (let tentativa = 0; tentativa < 4; tentativa++) {
+    try {
+      const res = await fetch('/api/data', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.ok) return { ok: true, dados: json.dados };
+      }
+    } catch { /* rede: tenta de novo */ }
+    await new Promise((r) => setTimeout(r, 500 * (tentativa + 1)));
+  }
+  return { ok: false, dados: null };
 }
 
 // Os salvamentos deste aparelho rodam UM DE CADA VEZ (fila). Como o servidor
@@ -83,6 +95,10 @@ export default function Dashboard() {
   const router = useRouter();
   const [tab, setTab] = useState('brain');
   const [loaded, setLoaded] = useState(false);
+  const [erroLoad, setErroLoad] = useState(false);
+  // Trava de segurança: só permite SALVAR depois que os dados carregaram de
+  // verdade. Sem isso, um salvamento com o estado ainda vazio apagava tudo.
+  const loadedRef = useRef(false);
   const [diario, setDiario] = useState([]);
   const [ideias, setIdeias] = useState([]);
   const [receitas, setReceitas] = useState([]);
@@ -114,38 +130,42 @@ export default function Dashboard() {
 
   useEffect(() => {
     (async () => {
-      const salvo = await apiCarregar();
-      const vazio = !salvo || typeof salvo !== 'object';
-      const dados = vazio ? SEED_DATA : {
-        diario: (salvo.diario && salvo.diario.length) ? salvo.diario : SEED_DATA.diario,
-        receitas: (salvo.receitas && salvo.receitas.length) ? salvo.receitas : SEED_DATA.receitas,
-        despesas: (salvo.despesas && salvo.despesas.length) ? salvo.despesas : SEED_DATA.despesas,
-        compras: (salvo.compras && salvo.compras.length) ? salvo.compras : SEED_DATA.compras,
-        cotacoes: (salvo.cotacoes && salvo.cotacoes.length) ? salvo.cotacoes : SEED_DATA.cotacoes,
-        garrafas: (salvo.garrafas && salvo.garrafas.length) ? salvo.garrafas : SEED_DATA.garrafas,
+      const r = await apiCarregar();
+      // Falhou ao ler (rede/servidor): NÃO carrega seed e NÃO salva nada — assim
+      // uma falha de rede nunca apaga os dados reais gravando por cima. Mostra a
+      // tela de erro com "tentar de novo".
+      if (!r.ok) { setErroLoad(true); return; }
+      const salvo = r.dados;
+      // Só é "primeira vez" quando o servidor está de fato vazio (sem linha /
+      // objeto vazio) — aí semear é seguro. Se há dados, usa EXATAMENTE o que veio
+      // (sem misturar seed campo a campo, que era outra forma de "reverter").
+      const primeiraVez = !salvo || typeof salvo !== 'object' || Object.keys(salvo).length === 0;
+      const dados = primeiraVez ? SEED_DATA : {
+        diario: arr(salvo.diario), receitas: arr(salvo.receitas), despesas: arr(salvo.despesas),
+        compras: arr(salvo.compras), cotacoes: arr(salvo.cotacoes), garrafas: arr(salvo.garrafas),
       };
       // Limpa nomes de produto/fornecedor (espaços sobrando) uma vez, ao abrir.
-      // Assim "Copal " vira "Copal" nos dados já salvos e para de duplicar.
       const { dados: limpos, mudou } = normalizarNomes(dados);
       setDiario(limpos.diario); setReceitas(limpos.receitas); setDespesas(limpos.despesas);
       setCompras(limpos.compras); setCotacoes(limpos.cotacoes); setGarrafas(limpos.garrafas);
-      setTarefas((salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : []);
-      setIdeias((salvo && Array.isArray(salvo.ideias)) ? salvo.ideias : []);
-      setMarketing((salvo && Array.isArray(salvo.marketing)) ? salvo.marketing : []);
-      setVisitantes((salvo && Array.isArray(salvo.visitantes)) ? salvo.visitantes : []);
-      setListaCompras((salvo && Array.isArray(salvo.listaCompras)) ? salvo.listaCompras : []);
-      setListaCozinha((salvo && Array.isArray(salvo.listaCozinha)) ? salvo.listaCozinha : []);
-      setListasModelo((salvo && Array.isArray(salvo.listasModelo)) ? salvo.listasModelo : []);
-      setTarefasCozinha((salvo && Array.isArray(salvo.tarefasCozinha)) ? salvo.tarefasCozinha : []);
-      setCardapio((salvo && Array.isArray(salvo.cardapio)) ? salvo.cardapio : []);
-      setClientes((salvo && Array.isArray(salvo.clientes)) ? salvo.clientes : []);
-      // IMPORTANTE: preserva TODOS os campos ao re-salvar (a limpeza de nomes só
-      // mexe em compras/cotações). Antes isso salvava só parte e apagava a lista
-      // da cozinha, a Lista de Compras, marketing, etc. Espalhar `salvo` primeiro
-      // garante que nada some.
-      if (vazio || mudou) {
-        const base = (salvo && typeof salvo === 'object') ? salvo : {};
-        await apiSalvar({ ...base, ...limpos, tarefas: (salvo && Array.isArray(salvo.tarefas)) ? salvo.tarefas : [] });
+      setTarefas(arr(salvo && salvo.tarefas));
+      setIdeias(arr(salvo && salvo.ideias));
+      setMarketing(arr(salvo && salvo.marketing));
+      setVisitantes(arr(salvo && salvo.visitantes));
+      setListaCompras(arr(salvo && salvo.listaCompras));
+      setListaCozinha(arr(salvo && salvo.listaCozinha));
+      setListasModelo(arr(salvo && salvo.listasModelo));
+      setTarefasCozinha(arr(salvo && salvo.tarefasCozinha));
+      setCardapio(arr(salvo && salvo.cardapio));
+      setClientes(arr(salvo && salvo.clientes));
+      // Grava SÓ em dois casos seguros: (1) primeira vez de verdade (servidor
+      // vazio) pra semear; (2) a limpeza de nomes mudou algo — e aí a base é o
+      // `salvo` REAL, nunca o seed. Fora isso, abrir o app não escreve nada.
+      loadedRef.current = true;
+      if (primeiraVez) {
+        await apiSalvar({ ...SEED_DATA });
+      } else if (mudou) {
+        await apiSalvar({ ...salvo, ...limpos });
       }
       setLoaded(true);
     })();
@@ -205,6 +225,9 @@ export default function Dashboard() {
   }, [vendas]);
 
   const salvarTudo = (parcial) => {
+    // Nunca salva antes de os dados carregarem: evita gravar um estado ainda
+    // vazio por cima do que está no servidor (era uma das formas de "sumir tudo").
+    if (!loadedRef.current) return;
     // Envia SÓ os campos que realmente mudaram. O servidor mescla esses campos
     // no que já está salvo e PRESERVA todo o resto. Antes, cada salvamento
     // reenviava TODO o painel a partir da memória do aparelho — então uma tela
@@ -430,6 +453,17 @@ export default function Dashboard() {
     const el = bar.querySelector(`[data-tab="${tab}"]`);
     if (el && el.scrollIntoView) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   }, [tab]);
+
+  // Falha ao carregar: mostra erro e botão de tentar de novo — NUNCA segue pro
+  // app com dados vazios (senão qualquer edição salvaria por cima do que existe).
+  if (erroLoad) return (
+    <div style={{ minHeight: '100vh', background: C.ink, color: C.text, display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', fontFamily: 'system-ui' }}>
+      <div style={{ fontSize: 40 }}>📡</div>
+      <div style={{ fontSize: 17, fontWeight: 800 }}>Não consegui carregar seus dados agora.</div>
+      <div style={{ fontSize: 14, color: C.muted, maxWidth: 320, lineHeight: 1.5 }}>Pode ser a internet. Seus dados estão salvos e seguros — só não consegui buscá-los. Toque pra tentar de novo.</div>
+      <button onClick={() => { try { window.location.reload(); } catch { /* ignora */ } }} style={{ background: C.accent, color: '#06101F', border: 'none', borderRadius: 12, padding: '13px 22px', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>Tentar de novo</button>
+    </div>
+  );
 
   if (!loaded) return (
     <div style={{ minHeight: '100vh', background: C.ink, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>Carregando seus dados…</div>
