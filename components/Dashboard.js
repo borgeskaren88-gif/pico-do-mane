@@ -29,6 +29,7 @@ import Estoque from './Estoque';
 import Margem from './Margem';
 import FichasTecnicas from './FichasTecnicas';
 import Auditoria from './Auditoria';
+import Notificacoes from './Notificacoes';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 
@@ -357,7 +358,7 @@ export default function Dashboard() {
     ['brain', 'Brain'], ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'],
-    ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['backup', 'Backup'],
+    ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['backup', 'Backup'],
   ];
 
   // Barra lateral: as áreas agrupadas por assunto (no PC fica fixa na lateral;
@@ -373,7 +374,7 @@ export default function Dashboard() {
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento']] },
     { titulo: 'Financeiro', itens: [['financas', 'Finanças'], ['diario', 'Log Operacional']] },
-    { titulo: 'Gestão', itens: [['marketing', 'Marketing'], ['backup', 'Backup']] },
+    { titulo: 'Gestão', itens: [['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['backup', 'Backup']] },
   ];
 
   // Lembra a última área aberta (no aparelho), pra que atualizar a página caia na
@@ -602,6 +603,7 @@ export default function Dashboard() {
         {tab === 'ponto' && <PontoDona />}
 
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
+        {tab === 'notificacoes' && <Notificacoes />}
         {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, ideias, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
