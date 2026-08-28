@@ -6,14 +6,17 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Disparado pela Vercel (cron) uma vez por dia — ver vercel.json. Manda o resumo
-// diário no celular. Protegido: só o cron da Vercel chega aqui (ou um teste com
-// o segredo), e há trava de 1x por dia mesmo que bata mais de uma vez.
+// diário no celular. Segurança: se houver um CRON_SECRET configurado, exige ele
+// (ou o cabeçalho do cron da Vercel). Se NÃO houver segredo (caso normal, sem
+// configuração), libera — a trava de 1x por dia já impede qualquer abuso, e o
+// pior que alguém consegue é disparar o próprio resumo da dona uma vez. Assim o
+// despertador funciona sem a dona precisar mexer em variável de ambiente.
 function autorizado(request) {
-  const ua = request.headers.get('user-agent') || '';
-  if (ua.toLowerCase().includes('vercel-cron')) return true;
+  const ua = (request.headers.get('user-agent') || '').toLowerCase();
+  if (ua.includes('vercel-cron')) return true;
   const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get('authorization') === `Bearer ${secret}`) return true;
-  return false;
+  if (secret) return request.headers.get('authorization') === `Bearer ${secret}`;
+  return true;
 }
 
 export async function GET(request) {
