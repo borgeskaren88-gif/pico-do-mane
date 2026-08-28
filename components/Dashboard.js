@@ -321,7 +321,14 @@ export default function Dashboard() {
     // compra se o estoque falhar. Produtos não cadastrados viram sugestão.
     if (comprasNovas && comprasNovas.length) {
       fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'entradaCompras', comprasNovas }) })
-        .then((r) => r.json()).then((j) => { if (j?.ok && Array.isArray(j.itens)) setEstoque(j.itens); }).catch(() => {});
+        .then((r) => r.json()).then((j) => {
+          if (j?.ok && Array.isArray(j.itens)) setEstoque(j.itens);
+          // Avisa se algum produto comprado não achou item no estoque (não entrou sozinho).
+          if (j?.ok && Array.isArray(j.naoEntraram) && j.naoEntraram.length) {
+            setAvisoBaixa(`Compra registrada. Só que ${j.naoEntraram.length > 1 ? 'estes não estão no estoque' : 'este não está no estoque'}: ${j.naoEntraram.join(', ')}. Cadastre com esse nome (Abastecimento → Estoque) pra entrar automático nas próximas.`);
+            setTimeout(() => setAvisoBaixa(''), 12000);
+          }
+        }).catch(() => {});
     }
     if (comprasNovas && comprasNovas.length) syncGoogle();
   };
@@ -639,11 +646,11 @@ export default function Dashboard() {
               ))}
             </div>
 
+            {avisoBaixa && (
+              <div style={{ background: C.panel2, border: `1px solid ${C.accent}`, color: C.text, borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 600, marginBottom: 12, lineHeight: 1.45 }}>{avisoBaixa}</div>
+            )}
             {subAbast === 'estoque' && (
               <>
-                {avisoBaixa && (
-                  <div style={{ background: C.panel2, border: `1px solid ${C.green}`, color: C.green, borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{avisoBaixa}</div>
-                )}
                 <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
                   {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas'], ['cortesia', 'Cortesia / Consumo']].map(([v, rot]) => (
                     <button key={v} onClick={() => setSubEstoque(v)} style={{

@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras } from '../../../lib/estoque';
+import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, igualNome } from '../../../lib/estoque';
 import { limparNome, num } from '../../../lib/util';
 
 export const dynamic = 'force-dynamic';
@@ -158,9 +158,17 @@ export async function POST(request) {
 
     // Entrada automática vinda das Compras.
     if (acao === 'entradaCompras') {
-      const novoEstoque = aplicarEntradasEstoque(itens, arr(body?.comprasNovas));
-      if (novoEstoque !== itens) { const novo = await gravarEstoque(sb, blob, { estoque: novoEstoque }); return NextResponse.json({ ok: true, itens: arr(novo.estoque) }); }
-      return NextResponse.json({ ok: true, itens });
+      const comprasNovas = arr(body?.comprasNovas);
+      const novoEstoque = aplicarEntradasEstoque(itens, comprasNovas);
+      // Quais produtos comprados NÃO acharam um item de estoque com o mesmo nome
+      // (por isso não entraram sozinhos). Serve pra avisar a dona.
+      const naoEntraram = [...new Set(
+        comprasNovas
+          .filter((c) => num(c.quantidade) > 0 && !itens.some((it) => igualNome(c.produto, it.nome)))
+          .map((c) => limparNome(c.produto)).filter(Boolean)
+      )];
+      if (novoEstoque !== itens) { const novo = await gravarEstoque(sb, blob, { estoque: novoEstoque }); return NextResponse.json({ ok: true, itens: arr(novo.estoque), naoEntraram }); }
+      return NextResponse.json({ ok: true, itens, naoEntraram });
     }
 
     if (acao === 'fichas') {
