@@ -640,6 +640,26 @@ export default function Dashboard() {
       </div>
         </div>
       </div>
+
+      {/* Botão flutuante: leva à Despesa Rápida de qualquer tela (um toque pra
+          lançar por voz). Escondido quando já está lá ou com o menu aberto. */}
+      {tab !== 'despesarapida' && !menuAberto && (
+        <button
+          onClick={() => setTab('despesarapida')}
+          aria-label="Despesa rápida"
+          style={{
+            position: 'fixed', zIndex: 60,
+            right: 'calc(18px + env(safe-area-inset-right))',
+            bottom: 'calc(18px + env(safe-area-inset-bottom))',
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: C.accent, color: '#06101F', border: 'none', cursor: 'pointer',
+            borderRadius: 999, padding: '13px 18px', fontSize: 15, fontWeight: 800,
+            boxShadow: '0 6px 20px rgba(0,0,0,.28)',
+          }}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1 }}>＋</span>Despesa
+        </button>
+      )}
     </div>
   );
 }
