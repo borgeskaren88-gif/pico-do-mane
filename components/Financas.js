@@ -1,15 +1,12 @@
 'use client';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { C, Card, Field, Label, LogoMark, pageBg, inputStyle, Btn, Empty, KPI } from './ui';
+import { C, Card, Field, Label, inputStyle, Empty, KPI } from './ui';
 import {
   brl, num, todayISO, ymHoje, mesLabel, passoMes, fmtDate,
   CATEGORIAS_DESPESA, CATEGORIAS_RECEITA,
 } from '../lib/util';
 
-export default function Financas({ usuario }) {
-  const router = useRouter();
-  const [tema, setTema] = useState('escuro');
+export default function Financas({ usuario, tema = 'escuro' }) {
   const [mes, setMes] = useState(ymHoje());
   const [lancamentos, setLancamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -22,22 +19,6 @@ export default function Financas({ usuario }) {
   const [descricao, setDescricao] = useState('');
   const [data, setData] = useState(todayISO());
   const [salvando, setSalvando] = useState(false);
-
-  useEffect(() => {
-    try {
-      const t = localStorage.getItem('financas-tema');
-      if (t === 'claro' || t === 'escuro') setTema(t);
-    } catch {}
-  }, []);
-
-  const trocarTema = () => {
-    const novo = tema === 'escuro' ? 'claro' : 'escuro';
-    setTema(novo);
-    try {
-      localStorage.setItem('financas-tema', novo);
-      document.documentElement.setAttribute('data-theme', novo);
-    } catch {}
-  };
 
   const carregar = useCallback(async (ym) => {
     setCarregando(true);
@@ -94,11 +75,6 @@ export default function Financas({ usuario }) {
     carregar(mes);
   };
 
-  const sair = async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    router.refresh();
-  };
-
   // Cálculos do mês
   const resumo = useMemo(() => {
     let despesas = 0, receitas = 0;
@@ -132,21 +108,7 @@ export default function Financas({ usuario }) {
   const ehMesAtual = mes === ymHoje();
 
   return (
-    <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      {/* Barra do topo */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: C.barBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${C.hair}`, padding: 'calc(10px + env(safe-area-inset-top)) 16px 10px' }}>
-        <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <LogoMark size={30} radius={9} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.1 }}>Nossas Finanças</div>
-            <div style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Olá, {usuario.nome}</div>
-          </div>
-          <button onClick={trocarTema} title="Trocar tema" style={iconBtn}>{tema === 'escuro' ? '☀️' : '🌙'}</button>
-          <button onClick={sair} style={{ ...iconBtn, width: 'auto', padding: '0 12px', fontSize: 13, fontWeight: 600 }}>Sair</button>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '16px 16px calc(40px + env(safe-area-inset-bottom))' }}>
+    <div>
         {/* Navegação de mês */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14 }}>
           <button onClick={() => setMes((m) => passoMes(m, -1))} style={navBtn}>‹</button>
@@ -284,15 +246,10 @@ export default function Financas({ usuario }) {
             ))
           )}
         </div>
-      </div>
     </div>
   );
 }
 
-const iconBtn = {
-  width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.line}`, background: C.panel2,
-  color: C.text, cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-};
 const navBtn = {
   width: 40, height: 40, borderRadius: 10, border: `1px solid ${C.line}`, background: C.panel2,
   color: C.text, cursor: 'pointer', fontSize: 22, lineHeight: 1, flexShrink: 0,

@@ -38,8 +38,8 @@ export default function LoginForm() {
       <div style={{ width: '100%', maxWidth: 360 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ width: 56, margin: '0 auto 14px' }}><LogoMark size={56} radius={16} /></div>
-          <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '.02em' }}>Nossas Finanças</div>
-          <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 4, fontWeight: 600 }}>Controle do casal</div>
+          <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '.02em' }}>Nossa Casa</div>
+          <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 4, fontWeight: 600 }}>Finanças · Hábitos · Lista</div>
         </div>
 
         <Card>

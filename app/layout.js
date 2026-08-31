@@ -1,13 +1,13 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Nossas Finanças',
-  description: 'Controle de gastos do casal, com um login para cada um.',
+  title: 'Nossa Casa',
+  description: 'Finanças, hábitos e lista de compras do casal, com um login para cada um.',
   manifest: '/manifest.webmanifest',
-  applicationName: 'Nossas Finanças',
+  applicationName: 'Nossa Casa',
   appleWebApp: {
     capable: true,
-    title: 'Nossas Finanças',
+    title: 'Nossa Casa',
     statusBarStyle: 'black-translucent',
   },
   icons: {

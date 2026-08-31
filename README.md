@@ -1,9 +1,15 @@
-# Nossas Finanças — controle de gastos do casal
+# Nossa Casa — finanças, hábitos e lista de compras do casal
 
-Um app simples para você e sua parceira/parceiro anotarem os gastos e as
-entradas do mês. **Cada um tem a sua própria senha**, os dois enxergam **todos
-os gastos juntos**, e o app mostra quem lançou cada coisa, quanto cada um
-gastou e para onde o dinheiro está indo.
+Um app simples para você e sua parceira/parceiro organizarem a casa juntos.
+**Cada um tem a sua própria senha.** Tem três partes:
+
+- **Finanças** — anotar gastos e entradas do mês; mostra quem lançou, quanto
+  cada um gastou e para onde o dinheiro está indo (os dois veem tudo).
+- **Hábitos** — cada um cria e marca os seus hábitos do dia a dia, com a
+  sequência de dias (🔥) pra motivar a rotina. Os hábitos são separados por
+  pessoa, mas as duas veem os hábitos uma da outra.
+- **Lista de Compras** — uma lista compartilhada do que falta em casa; qualquer
+  um dos dois adiciona e marca como comprado.
 
 Funciona no navegador de qualquer aparelho (celular, computador) e dá para
 "instalar" na tela inicial do celular como se fosse um aplicativo.
