@@ -1,6 +1,6 @@
 'use client';
 import React, { useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, Cell, LabelList, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, CartesianGrid, LabelList, ResponsiveContainer } from 'recharts';
 import { C, Empty, PageTitle } from './ui';
 import { num, weekday, todayISO, addDays, limparNome, DIAS } from '../lib/util';
 import { qtdNaUnidadeDoItem } from '../lib/estoque';
@@ -8,19 +8,16 @@ import { qtdNaUnidadeDoItem } from '../lib/estoque';
 const norm = (s) => limparNome(s).toLowerCase();
 const FDS = 'Fim de semana (Sex + Sáb + Dom)';
 const CURTO = { Domingo: 'Dom', 'Segunda-Feira': 'Seg', 'Terça-Feira': 'Ter', 'Quarta-Feira': 'Qua', 'Quinta-Feira': 'Qui', 'Sexta-Feira': 'Sex', 'Sábado': 'Sáb' };
-const PALETA = ['#6C8CFF', '#7BD389', '#F0A93B', '#E5799A', '#9B8CFF', '#4FC3C7', '#F2C14E', '#5AB1E0'];
 const K = 8;
+const TAB = { fontVariantNumeric: 'tabular-nums' };
 
-// Card de KPI (estilo painel analítico): degradê translúcido na cor do dado.
-function Stat({ label, valor, sub, cor }) {
+// Tile de KPI, estilo terminal financeiro: rótulo micro, número tabular grande.
+function Stat({ label, valor, sub, forte }) {
   return (
-    <div style={{ background: `linear-gradient(155deg, color-mix(in srgb, ${cor} 14%, transparent), color-mix(in srgb, ${cor} 2%, transparent) 62%), ${C.panel}`, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 16, minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ width: 8, height: 8, borderRadius: 999, background: cor, flexShrink: 0 }} />
-        <span style={{ fontSize: 10.5, fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '.05em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-      </div>
-      <div style={{ fontSize: 27, fontWeight: 900, color: C.text, lineHeight: 1 }}>{valor}</div>
-      {sub && <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>{sub}</div>}
+    <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: '13px 15px', minWidth: 0 }}>
+      <div style={{ fontSize: 10, fontWeight: 800, color: C.faint, textTransform: 'uppercase', letterSpacing: '.09em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ fontSize: 25, fontWeight: 800, color: forte || C.text, lineHeight: 1.1, marginTop: 8, ...TAB }}>{valor}</div>
+      {sub && <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>{sub}</div>}
     </div>
   );
 }
@@ -105,87 +102,89 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
   const fmt = (x) => { const r = Math.round(x * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1).replace('.', ','); };
   const diasBase = useMemo(() => { const s = new Set(); for (const wd of wdsAlvo) for (const d of (hist.datasPorWd[wd] || [])) s.add(d); return s.size; }, [hist, alvo]); // eslint-disable-line react-hooks/exhaustive-deps
   const totalEsperado = previsoes.reduce((s, p) => s + p.esperado, 0);
+  const maxEsp = previsoes[0]?.esperado || 1;
   const faltamCompras = preparo.filter((x) => x.falta > 0.001);
   const nomeAlvo = alvo === FDS ? 'Fim de semana' : alvo.replace('-Feira', '');
-
   const top = previsoes.slice(0, 8);
-  const chartData = top.map((p, i) => ({ nome: p.nome, curto: p.nome.length > 9 ? p.nome.slice(0, 8) + '…' : p.nome, esperado: Math.round(p.esperado * 10) / 10, cor: PALETA[i % PALETA.length] }));
+  const chartData = top.map((p) => ({ curto: p.nome.length > 8 ? p.nome.slice(0, 7) + '…' : p.nome, esperado: Math.round(p.esperado * 10) / 10 }));
 
   return (
     <div>
       <style>{`
-        .prev-pills{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px;-webkit-overflow-scrolling:touch}
-        .prev-pill{flex:0 0 auto;border:1px solid ${C.line};background:${C.panel};color:${C.muted};border-radius:999px;padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s}
-        .prev-pill.on{background:${C.accent};color:#06101F;border-color:${C.accent}}
-        .prev-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
-        .prev-card{background:${C.panel};border:1px solid ${C.cardBorder};border-radius:16px;padding:16px}
-        .prev-glass{background:linear-gradient(160deg,color-mix(in srgb,${C.accent} 9%,transparent),transparent 58%),${C.panel}}
-        .prev-track{height:7px;border-radius:999px;background:${C.panel2};overflow:hidden;margin-top:9px}
-        .prev-fill{height:100%;border-radius:999px;transition:width .4s ease}
-        .prev-tag{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;flex-shrink:0}
-        .prev-leg{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid ${C.hair};font-size:13px}
-        .prev-sec{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:${C.faint};margin:0 2px 10px}
+        .pv-pills{display:flex;gap:7px;overflow-x:auto;padding:2px 0 8px;-webkit-overflow-scrolling:touch}
+        .pv-pill{flex:0 0 auto;border:1px solid ${C.line};background:transparent;color:${C.muted};border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s}
+        .pv-pill.on{background:${C.accent};color:#06101F;border-color:${C.accent}}
+        .pv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:14px}
+        .pv-card{background:${C.panel};border:1px solid ${C.cardBorder};border-radius:14px;padding:16px}
+        .pv-row{display:flex;align-items:center;gap:12px;padding:11px 2px;border-top:1px solid ${C.hair}}
+        .pv-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${C.faint};margin:0 2px 9px}
+        .pv-mini{flex:0 0 64px;height:5px;border-radius:999px;background:color-mix(in srgb,${C.accent} 14%,transparent);overflow:hidden}
+        .pv-mini > i{display:block;height:100%;border-radius:999px;background:${C.accent}}
+        .pv-track{height:5px;border-radius:999px;background:${C.panel2};overflow:hidden;margin-top:9px}
+        .pv-fill{height:100%;border-radius:999px}
       `}</style>
 
       <PageTitle sub="Baseado no seu histórico de vendas por dia da semana">Previsão de demanda</PageTitle>
 
-      <div className="prev-pills">
-        <button className={`prev-pill${alvo === FDS ? ' on' : ''}`} onClick={() => setAlvo(FDS)}>Fim de semana</button>
-        {DIAS.map((d) => <button key={d} className={`prev-pill${alvo === d ? ' on' : ''}`} onClick={() => setAlvo(d)}>{CURTO[d]}</button>)}
+      <div className="pv-pills">
+        <button className={`pv-pill${alvo === FDS ? ' on' : ''}`} onClick={() => setAlvo(FDS)}>Fim de semana</button>
+        {DIAS.map((d) => <button key={d} className={`pv-pill${alvo === d ? ' on' : ''}`} onClick={() => setAlvo(d)}>{CURTO[d]}</button>)}
       </div>
 
       {previsoes.length === 0 ? (
         <Empty>Ainda não há histórico desse dia.<br />Conforme você for fechando comandas, a previsão vai ficando boa.</Empty>
       ) : (
         <>
-          {/* KPIs analíticos */}
-          <div className="prev-grid" style={{ marginTop: 12 }}>
-            <Stat label={nomeAlvo} valor={fmt(totalEsperado)} sub="itens esperados no período" cor={C.accent} />
-            <Stat label="Produtos" valor={String(previsoes.length)} sub="com previsão" cor="#7BD389" />
-            <Stat label="Base" valor={String(diasBase)} sub="dias parecidos" cor="#9B8CFF" />
-            <Stat label="Podem faltar" valor={String(faltamCompras.length)} sub={faltamCompras.length ? 'ingredientes' : 'tudo ok'} cor={faltamCompras.length ? C.red : C.green} />
+          <div className="pv-grid" style={{ marginTop: 12 }}>
+            <Stat label={nomeAlvo} valor={fmt(totalEsperado)} sub="itens esperados" forte={C.accent} />
+            <Stat label="Produtos" valor={String(previsoes.length)} sub="com previsão" />
+            <Stat label="Dias de base" valor={String(diasBase)} sub="no histórico" />
+            <Stat label="Podem faltar" valor={String(faltamCompras.length)} sub={faltamCompras.length ? 'ingredientes' : 'nada'} forte={faltamCompras.length ? C.red : C.green} />
           </div>
 
-          {/* Gráfico dos mais pedidos */}
-          <div className="prev-card prev-glass" style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Top do {nomeAlvo.toLowerCase()}</div>
-            <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Os itens que mais devem sair (esperado)</div>
-            <div style={{ width: '100%', height: 210 }}>
+          <div className="pv-card" style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+              <span style={{ fontSize: 15, fontWeight: 800 }}>Top do {nomeAlvo.toLowerCase()}</span>
+              <span style={{ fontSize: 11, color: C.faint, ...TAB }}>{diasBase} dia(s) de base</span>
+            </div>
+            <div style={{ fontSize: 12, color: C.faint, marginBottom: 10 }}>Quanto deve sair de cada item</div>
+            <div style={{ width: '100%', height: 180 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 22, right: 6, left: 6, bottom: 4 }}>
+                <BarChart data={chartData} margin={{ top: 20, right: 4, left: 4, bottom: 2 }}>
                   <defs>
-                    {PALETA.map((c, i) => (
-                      <linearGradient key={i} id={`prevGrad${i}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={c} stopOpacity={0.95} />
-                        <stop offset="100%" stopColor={c} stopOpacity={0.28} />
-                      </linearGradient>
-                    ))}
+                    <linearGradient id="pvBar" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={C.accent} stopOpacity={0.9} />
+                      <stop offset="100%" stopColor={C.accent} stopOpacity={0.15} />
+                    </linearGradient>
                   </defs>
-                  <XAxis dataKey="curto" tick={{ fontSize: 10, fill: C.faint }} tickLine={false} axisLine={false} interval={0} />
-                  <Bar dataKey="esperado" radius={[8, 8, 0, 0]} maxBarSize={46} isAnimationActive={false}>
-                    {chartData.map((d, i) => <Cell key={i} fill={`url(#prevGrad${i % PALETA.length})`} />)}
-                    <LabelList dataKey="esperado" position="top" style={{ fontSize: 12, fontWeight: 700, fill: C.text }} formatter={(v) => fmt(v)} />
+                  <CartesianGrid vertical={false} stroke={C.hair} />
+                  <XAxis dataKey="curto" tick={{ fontSize: 9.5, fill: C.faint }} tickLine={false} axisLine={{ stroke: C.hair }} interval={0} />
+                  <Bar dataKey="esperado" fill="url(#pvBar)" radius={[3, 3, 0, 0]} maxBarSize={30} isAnimationActive={false}>
+                    <LabelList dataKey="esperado" position="top" style={{ fontSize: 11, fontWeight: 800, fill: C.text }} formatter={(v) => fmt(v)} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            {/* Legenda com faixa */}
-            <div style={{ marginTop: 6 }}>
-              {top.map((p, i) => (
-                <div key={p.key} className="prev-leg">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 3, background: PALETA[i % PALETA.length], flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</span>
-                  </span>
-                  <span style={{ flexShrink: 0, color: C.muted }}><b style={{ color: C.text }}>{fmt(p.esperado)}</b> <span style={{ fontSize: 11, color: C.faint }}>({fmt(p.low)}–{fmt(p.high)})</span></span>
-                </div>
-              ))}
-            </div>
-            {previsoes.length > top.length && <div style={{ fontSize: 11, color: C.faint, marginTop: 8 }}>+{previsoes.length - top.length} outros itens com previsão menor.</div>}
           </div>
 
-          {/* Preparo com barra de progresso */}
-          <div className="prev-sec">Preparo e compras</div>
+          {/* Watchlist: tabela densa, número tabular + mini-barra proporcional. */}
+          <div className="pv-card" style={{ marginBottom: 14, paddingTop: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 2px 2px', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: C.faint }}>
+              <span>Item</span><span>Esperado · faixa</span>
+            </div>
+            {previsoes.slice(0, 40).map((p) => (
+              <div key={p.key} className="pv-row">
+                <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</span>
+                <span className="pv-mini"><i style={{ width: Math.max(6, (p.esperado / maxEsp) * 100) + '%' }} /></span>
+                <span style={{ flexShrink: 0, textAlign: 'right', minWidth: 96 }}>
+                  <b style={{ fontSize: 15, fontWeight: 800, color: C.text, ...TAB }}>{fmt(p.esperado)}</b>
+                  <span style={{ fontSize: 11, color: C.faint, ...TAB }}> {fmt(p.low)}–{fmt(p.high)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="pv-lbl">Preparo e compras</div>
           {preparo.length === 0 ? (
             <Empty>Monte as fichas técnicas dos pratos pra ver os ingredientes necessários.</Empty>
           ) : (
@@ -193,20 +192,20 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
               const pct = x.precisa > 0 ? Math.min(100, (x.saldo / x.precisa) * 100) : 100;
               const falta = x.falta > 0.001;
               return (
-                <div key={x.id} className="prev-card" style={{ padding: '12px 14px', marginBottom: 8, borderColor: falta ? `color-mix(in srgb, ${C.red} 55%, transparent)` : C.cardBorder }}>
+                <div key={x.id} className="pv-card" style={{ padding: '12px 14px', marginBottom: 8, borderColor: falta ? `color-mix(in srgb, ${C.red} 50%, transparent)` : C.cardBorder }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.nome}</span>
-                    <span className="prev-tag" style={{ background: `color-mix(in srgb, ${falta ? C.red : C.green} 16%, transparent)`, color: falta ? C.red : C.green }}>{falta ? `falta ${fmt(x.falta)} ${x.unidade}` : 'ok ✓'}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.nome}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: falta ? C.red : C.green, flexShrink: 0, ...TAB }}>{falta ? `falta ${fmt(x.falta)} ${x.unidade}` : 'ok'}</span>
                   </div>
-                  <div className="prev-track"><div className="prev-fill" style={{ width: Math.max(3, pct) + '%', background: `linear-gradient(90deg, color-mix(in srgb, ${falta ? C.red : C.green} 45%, transparent), ${falta ? C.red : C.green})` }} /></div>
-                  <div style={{ fontSize: 11, color: C.faint, marginTop: 5 }}>precisa ~{fmt(x.precisa)} {x.unidade} · tem {fmt(x.saldo)} {x.unidade}</div>
+                  <div className="pv-track"><div className="pv-fill" style={{ width: Math.max(3, pct) + '%', background: falta ? C.red : C.green }} /></div>
+                  <div style={{ fontSize: 11, color: C.faint, marginTop: 5, ...TAB }}>precisa ~{fmt(x.precisa)} {x.unidade} · tem {fmt(x.saldo)} {x.unidade}</div>
                 </div>
               );
             })
           )}
 
-          <div style={{ fontSize: 12, color: C.faint, marginTop: 16, lineHeight: 1.5 }}>
-            A faixa mín–máx é a variação normal do seu histórico. Dias de evento, jogo ou promoção fogem disso — use a previsão como base e ajuste pelo seu faro.
+          <div style={{ fontSize: 12, color: C.faint, marginTop: 14, lineHeight: 1.5 }}>
+            A faixa mín–máx é a variação normal do seu histórico. Dias de evento, jogo ou promoção fogem disso — use como base e ajuste pelo seu faro.
           </div>
         </>
       )}
