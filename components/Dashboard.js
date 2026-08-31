@@ -32,6 +32,7 @@ import Auditoria from './Auditoria';
 import Notificacoes from './Notificacoes';
 import DespesaRapida from './DespesaRapida';
 import Widget from './Widget';
+import Previsao from './Previsao';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 
@@ -216,7 +217,7 @@ export default function Dashboard() {
         .catch(() => { /* ignora */ });
     } catch { /* ignora */ }
   }, []);
-  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario', 'backup', 'abastecimento'].includes(tab)) carregarVendas(); }, [tab]);
+  useEffect(() => { if (['hoje', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario', 'backup', 'abastecimento', 'previsao'].includes(tab)) carregarVendas(); }, [tab]);
   useEffect(() => { if (tab === 'salao' && subSalao === 'fiados') carregarVendas(); }, [subSalao]);
 
 
@@ -356,7 +357,7 @@ export default function Dashboard() {
   // sabores/combos. Sem isso, quem ia direto pro Cardápio via a lista vazia.
   useEffect(() => {
     if (tab === 'abastecimento') carregarEstoque({ sincronizar: true });
-    else if (tab === 'salao' || tab === 'financas') carregarEstoque({});
+    else if (tab === 'salao' || tab === 'financas' || tab === 'previsao') carregarEstoque({});
   }, [tab, carregarEstoque]);
 
   // Uma ação do estoque (add/mov/edit/del/fichas): chama a API e atualiza o
@@ -427,7 +428,7 @@ export default function Dashboard() {
 
   const tabs = [
     ['brain', 'Brain'], ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
-    ['abastecimento', 'Abastecimento'], ['garrafas', 'Controle'],
+    ['abastecimento', 'Abastecimento'], ['previsao', 'Previsão'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'], ['despesarapida', 'Despesa Rápida'],
     ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['backup', 'Backup'],
   ];
@@ -443,7 +444,7 @@ export default function Dashboard() {
   const grupos = [
     { titulo: 'Início', itens: [['hoje', 'Hoje'], ['brain', 'Brain']] },
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
-    { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento']] },
+    { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento'], ['previsao', 'Previsão']] },
     { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
     { titulo: 'Gestão', itens: [['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['backup', 'Backup']] },
   ];
@@ -716,6 +717,7 @@ export default function Dashboard() {
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'notificacoes' && <Notificacoes />}
         {tab === 'widget' && <Widget />}
+        {tab === 'previsao' && <Previsao vendas={vendas} cardapio={cardapio} fichas={fichas} estoque={estoque} />}
         {tab === 'despesarapida' && <DespesaRapida dados={despesas} onChange={upd.despesas} textoInicial={despesaInicial} />}
         {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, ideias, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas }} restore={(d) => {
           const dados = {
