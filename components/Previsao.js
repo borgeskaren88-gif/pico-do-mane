@@ -1,5 +1,6 @@
 'use client';
 import React, { useMemo, useState } from 'react';
+import { BarChart, Bar, XAxis, Cell, LabelList, ResponsiveContainer } from 'recharts';
 import { C, Empty, PageTitle } from './ui';
 import { num, weekday, todayISO, addDays, limparNome, DIAS } from '../lib/util';
 import { qtdNaUnidadeDoItem } from '../lib/estoque';
@@ -7,11 +8,23 @@ import { qtdNaUnidadeDoItem } from '../lib/estoque';
 const norm = (s) => limparNome(s).toLowerCase();
 const FDS = 'Fim de semana (Sex + Sáb + Dom)';
 const CURTO = { Domingo: 'Dom', 'Segunda-Feira': 'Seg', 'Terça-Feira': 'Ter', 'Quarta-Feira': 'Qua', 'Quinta-Feira': 'Qui', 'Sexta-Feira': 'Sex', 'Sábado': 'Sáb' };
-const K = 8; // usa os últimos 8 dias daquele dia da semana
+const PALETA = ['#6C8CFF', '#7BD389', '#F0A93B', '#E5799A', '#9B8CFF', '#4FC3C7', '#F2C14E', '#5AB1E0'];
+const K = 8;
 
-// Previsão de demanda: cruza o histórico de vendas (por dia da semana) com o
-// cardápio, prevê quanto de cada item, mostra uma faixa (mín–máx) honesta e
-// traduz em quanto preparar/comprar de cada ingrediente (via fichas + estoque).
+// Card de KPI (estilo painel analítico): ícone + rótulo + número grande.
+function Stat({ icon, label, valor, sub, cor }) {
+  return (
+    <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 14, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `color-mix(in srgb, ${cor} 16%, transparent)`, fontSize: 15 }}>{icon}</span>
+        <span style={{ fontSize: 10.5, fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '.05em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 26, fontWeight: 900, color: C.text, lineHeight: 1 }}>{valor}</div>
+      {sub && <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+}
+
 export default function Previsao({ vendas = [], cardapio = [], fichas = [], estoque = [] }) {
   const amanha = weekday(addDays(todayISO(), 1));
   const [alvo, setAlvo] = useState(amanha || 'Sexta-Feira');
@@ -92,9 +105,11 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
   const fmt = (x) => { const r = Math.round(x * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1).replace('.', ','); };
   const diasBase = useMemo(() => { const s = new Set(); for (const wd of wdsAlvo) for (const d of (hist.datasPorWd[wd] || [])) s.add(d); return s.size; }, [hist, alvo]); // eslint-disable-line react-hooks/exhaustive-deps
   const totalEsperado = previsoes.reduce((s, p) => s + p.esperado, 0);
-  const maxEsp = previsoes[0]?.esperado || 1;
   const faltamCompras = preparo.filter((x) => x.falta > 0.001);
   const nomeAlvo = alvo === FDS ? 'Fim de semana' : alvo.replace('-Feira', '');
+
+  const top = previsoes.slice(0, 8);
+  const chartData = top.map((p, i) => ({ nome: p.nome, curto: p.nome.length > 9 ? p.nome.slice(0, 8) + '…' : p.nome, esperado: Math.round(p.esperado * 10) / 10, cor: PALETA[i % PALETA.length] }));
 
   return (
     <div>
@@ -102,16 +117,17 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
         .prev-pills{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px;-webkit-overflow-scrolling:touch}
         .prev-pill{flex:0 0 auto;border:1px solid ${C.line};background:${C.panel};color:${C.muted};border-radius:999px;padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s}
         .prev-pill.on{background:${C.accent};color:#06101F;border-color:${C.accent}}
-        .prev-hero{border-radius:18px;padding:18px 20px;margin:12px 0 18px;background:${C.panel};background:linear-gradient(135deg,color-mix(in srgb,${C.accent} 16%,transparent),color-mix(in srgb,${C.accent} 4%,transparent));border:1px solid color-mix(in srgb,${C.accent} 45%,transparent);position:relative;overflow:hidden}
-        .prev-row{border:1px solid ${C.cardBorder};background:${C.panel};border-radius:14px;padding:12px 14px;margin-bottom:8px}
+        .prev-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+        .prev-card{background:${C.panel};border:1px solid ${C.cardBorder};border-radius:16px;padding:16px}
         .prev-track{height:7px;border-radius:999px;background:${C.panel2};overflow:hidden;margin-top:9px}
         .prev-fill{height:100%;border-radius:999px;transition:width .4s ease}
-        .prev-tag{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;display:inline-flex;align-items:center;gap:4px}
+        .prev-tag{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;flex-shrink:0}
+        .prev-leg{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid ${C.hair};font-size:13px}
+        .prev-sec{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:${C.faint};margin:0 2px 10px}
       `}</style>
 
       <PageTitle sub="Baseado no seu histórico de vendas por dia da semana">Previsão de demanda</PageTitle>
 
-      {/* Seletor de dia em pílulas (mais rápido no toque). */}
       <div className="prev-pills">
         <button className={`prev-pill${alvo === FDS ? ' on' : ''}`} onClick={() => setAlvo(FDS)}>⭐ Fim de semana</button>
         {DIAS.map((d) => <button key={d} className={`prev-pill${alvo === d ? ' on' : ''}`} onClick={() => setAlvo(d)}>{CURTO[d]}</button>)}
@@ -121,35 +137,46 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
         <Empty>Ainda não há histórico desse dia.<br />Conforme você for fechando comandas, a previsão vai ficando boa.</Empty>
       ) : (
         <>
-          {/* Destaque do total esperado. */}
-          <div className="prev-hero">
-            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: C.accent }}>{nomeAlvo}</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 40, fontWeight: 900, color: C.text, lineHeight: 1 }}>{fmt(totalEsperado)}</div>
-              <div style={{ fontSize: 13, color: C.muted, paddingBottom: 4 }}>itens esperados<br />no período</div>
-            </div>
-            <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 12, color: C.muted }}>
-              <span><b style={{ color: C.text }}>{previsoes.length}</b> produtos</span>
-              <span><b style={{ color: C.text }}>{diasBase}</b> dia(s) de base</span>
-              {faltamCompras.length > 0 && <span style={{ color: C.amber, fontWeight: 700 }}>⚠️ {faltamCompras.length} pode faltar</span>}
-            </div>
+          {/* KPIs analíticos */}
+          <div className="prev-grid" style={{ marginTop: 12 }}>
+            <Stat icon="📈" label={nomeAlvo} valor={fmt(totalEsperado)} sub="itens esperados no período" cor={C.accent} />
+            <Stat icon="🍽️" label="Produtos" valor={String(previsoes.length)} sub="com previsão" cor="#7BD389" />
+            <Stat icon="🗓️" label="Base" valor={String(diasBase)} sub="dias parecidos" cor="#9B8CFF" />
+            <Stat icon="⚠️" label="Podem faltar" valor={String(faltamCompras.length)} sub={faltamCompras.length ? 'ingredientes' : 'tudo ok'} cor={faltamCompras.length ? C.red : C.green} />
           </div>
 
-          <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: C.faint, margin: '0 2px 10px' }}>Quanto deve sair</div>
-          <div style={{ marginBottom: 20 }}>
-            {previsoes.slice(0, 40).map((p) => (
-              <div key={p.key} className="prev-row">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</span>
-                  <span style={{ flexShrink: 0 }}><b style={{ fontSize: 20, fontWeight: 800, color: C.accent }}>{fmt(p.esperado)}</b><span style={{ fontSize: 11, color: C.faint }}> un</span></span>
+          {/* Gráfico dos mais pedidos */}
+          <div className="prev-card" style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Top do {nomeAlvo.toLowerCase()}</div>
+            <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Os itens que mais devem sair (esperado)</div>
+            <div style={{ width: '100%', height: 210 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 22, right: 6, left: 6, bottom: 4 }}>
+                  <XAxis dataKey="curto" tick={{ fontSize: 10, fill: C.faint }} tickLine={false} axisLine={false} interval={0} />
+                  <Bar dataKey="esperado" radius={[8, 8, 0, 0]} maxBarSize={46} isAnimationActive={false}>
+                    {chartData.map((d, i) => <Cell key={i} fill={d.cor} />)}
+                    <LabelList dataKey="esperado" position="top" style={{ fontSize: 12, fontWeight: 700, fill: C.text }} formatter={(v) => fmt(v)} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Legenda com faixa */}
+            <div style={{ marginTop: 6 }}>
+              {top.map((p, i) => (
+                <div key={p.key} className="prev-leg">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 3, background: PALETA[i % PALETA.length], flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</span>
+                  </span>
+                  <span style={{ flexShrink: 0, color: C.muted }}><b style={{ color: C.text }}>{fmt(p.esperado)}</b> <span style={{ fontSize: 11, color: C.faint }}>({fmt(p.low)}–{fmt(p.high)})</span></span>
                 </div>
-                <div className="prev-track"><div className="prev-fill" style={{ width: Math.max(4, (p.esperado / maxEsp) * 100) + '%', background: C.accent }} /></div>
-                <div style={{ fontSize: 11, color: C.faint, marginTop: 5 }}>faixa {fmt(p.low)}–{fmt(p.high)} · {p.n} dia(s) de base</div>
-              </div>
-            ))}
+              ))}
+            </div>
+            {previsoes.length > top.length && <div style={{ fontSize: 11, color: C.faint, marginTop: 8 }}>+{previsoes.length - top.length} outros itens com previsão menor.</div>}
           </div>
 
-          <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: C.faint, margin: '0 2px 10px' }}>Preparo e compras</div>
+          {/* Preparo com barra de progresso */}
+          <div className="prev-sec">Preparo e compras</div>
           {preparo.length === 0 ? (
             <Empty>Monte as fichas técnicas dos pratos pra ver os ingredientes necessários.</Empty>
           ) : (
@@ -157,12 +184,10 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
               const pct = x.precisa > 0 ? Math.min(100, (x.saldo / x.precisa) * 100) : 100;
               const falta = x.falta > 0.001;
               return (
-                <div key={x.id} className="prev-row" style={{ borderColor: falta ? `color-mix(in srgb, ${C.red} 55%, transparent)` : C.cardBorder }}>
+                <div key={x.id} className="prev-card" style={{ padding: '12px 14px', marginBottom: 8, borderColor: falta ? `color-mix(in srgb, ${C.red} 55%, transparent)` : C.cardBorder }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 14, fontWeight: 700, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.nome}</span>
-                    <span className="prev-tag" style={{ background: `color-mix(in srgb, ${falta ? C.red : C.green} 16%, transparent)`, color: falta ? C.red : C.green, flexShrink: 0 }}>
-                      {falta ? `falta ${fmt(x.falta)} ${x.unidade}` : 'ok ✓'}
-                    </span>
+                    <span className="prev-tag" style={{ background: `color-mix(in srgb, ${falta ? C.red : C.green} 16%, transparent)`, color: falta ? C.red : C.green }}>{falta ? `falta ${fmt(x.falta)} ${x.unidade}` : 'ok ✓'}</span>
                   </div>
                   <div className="prev-track"><div className="prev-fill" style={{ width: Math.max(3, pct) + '%', background: falta ? C.red : C.green }} /></div>
                   <div style={{ fontSize: 11, color: C.faint, marginTop: 5 }}>precisa ~{fmt(x.precisa)} {x.unidade} · tem {fmt(x.saldo)} {x.unidade}</div>
