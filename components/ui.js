@@ -134,7 +134,7 @@ function useFitFonte(valor) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const MAX = 18, MIN = 11;
+    const MAX = 24, MIN = 12;
     const ajustar = () => {
       el.style.fontSize = MAX + 'px';
       const disp = el.clientWidth;
@@ -153,10 +153,10 @@ function useFitFonte(valor) {
 export function KPI({ titulo, valor, cor, sub }) {
   const ref = useFitFonte(valor);
   return (
-    <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 14, padding: '13px 15px', minWidth: 0, boxShadow: C.cardShadow }}>
-      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: C.muted, fontWeight: 600 }}>{titulo}</div>
-      <div ref={ref} style={{ fontSize: 18, fontWeight: 800, color: cor || C.text, marginTop: 4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{valor}</div>
-      {sub && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{sub}</div>}
+    <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 14, padding: '13px 15px', minWidth: 0 }}>
+      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.08em', color: C.faint, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titulo}</div>
+      <div ref={ref} style={{ fontSize: 24, fontWeight: 800, color: cor || C.text, marginTop: 8, lineHeight: 1.05, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{valor}</div>
+      {sub && <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>{sub}</div>}
     </div>
   );
 }
