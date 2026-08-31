@@ -31,6 +31,7 @@ import FichasTecnicas from './FichasTecnicas';
 import Auditoria from './Auditoria';
 import Notificacoes from './Notificacoes';
 import DespesaRapida from './DespesaRapida';
+import Widget from './Widget';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 
@@ -428,7 +429,7 @@ export default function Dashboard() {
     ['brain', 'Brain'], ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'], ['despesarapida', 'Despesa Rápida'],
-    ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['backup', 'Backup'],
+    ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['backup', 'Backup'],
   ];
 
   // Barra lateral: as áreas agrupadas por assunto (no PC fica fixa na lateral;
@@ -444,7 +445,7 @@ export default function Dashboard() {
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento']] },
     { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
-    { titulo: 'Gestão', itens: [['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['backup', 'Backup']] },
+    { titulo: 'Gestão', itens: [['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['backup', 'Backup']] },
   ];
 
   // Lembra a última área aberta (no aparelho), pra que atualizar a página caia na
@@ -714,6 +715,7 @@ export default function Dashboard() {
 
         {tab === 'marketing' && <Marketing dados={marketing} onChange={upd.marketing} receitas={receitas} />}
         {tab === 'notificacoes' && <Notificacoes />}
+        {tab === 'widget' && <Widget />}
         {tab === 'despesarapida' && <DespesaRapida dados={despesas} onChange={upd.despesas} textoInicial={despesaInicial} />}
         {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, ideias, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas }} restore={(d) => {
           const dados = {
