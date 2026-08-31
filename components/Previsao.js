@@ -11,15 +11,15 @@ const CURTO = { Domingo: 'Dom', 'Segunda-Feira': 'Seg', 'Terça-Feira': 'Ter', '
 const PALETA = ['#6C8CFF', '#7BD389', '#F0A93B', '#E5799A', '#9B8CFF', '#4FC3C7', '#F2C14E', '#5AB1E0'];
 const K = 8;
 
-// Card de KPI (estilo painel analítico): ícone + rótulo + número grande.
-function Stat({ icon, label, valor, sub, cor }) {
+// Card de KPI (estilo painel analítico): degradê translúcido na cor do dado.
+function Stat({ label, valor, sub, cor }) {
   return (
-    <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 14, minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `color-mix(in srgb, ${cor} 16%, transparent)`, fontSize: 15 }}>{icon}</span>
+    <div style={{ background: `linear-gradient(155deg, color-mix(in srgb, ${cor} 14%, transparent), color-mix(in srgb, ${cor} 2%, transparent) 62%), ${C.panel}`, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 16, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ width: 8, height: 8, borderRadius: 999, background: cor, flexShrink: 0 }} />
         <span style={{ fontSize: 10.5, fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '.05em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
       </div>
-      <div style={{ fontSize: 26, fontWeight: 900, color: C.text, lineHeight: 1 }}>{valor}</div>
+      <div style={{ fontSize: 27, fontWeight: 900, color: C.text, lineHeight: 1 }}>{valor}</div>
       {sub && <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>{sub}</div>}
     </div>
   );
@@ -119,6 +119,7 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
         .prev-pill.on{background:${C.accent};color:#06101F;border-color:${C.accent}}
         .prev-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
         .prev-card{background:${C.panel};border:1px solid ${C.cardBorder};border-radius:16px;padding:16px}
+        .prev-glass{background:linear-gradient(160deg,color-mix(in srgb,${C.accent} 9%,transparent),transparent 58%),${C.panel}}
         .prev-track{height:7px;border-radius:999px;background:${C.panel2};overflow:hidden;margin-top:9px}
         .prev-fill{height:100%;border-radius:999px;transition:width .4s ease}
         .prev-tag{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;flex-shrink:0}
@@ -129,7 +130,7 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
       <PageTitle sub="Baseado no seu histórico de vendas por dia da semana">Previsão de demanda</PageTitle>
 
       <div className="prev-pills">
-        <button className={`prev-pill${alvo === FDS ? ' on' : ''}`} onClick={() => setAlvo(FDS)}>⭐ Fim de semana</button>
+        <button className={`prev-pill${alvo === FDS ? ' on' : ''}`} onClick={() => setAlvo(FDS)}>Fim de semana</button>
         {DIAS.map((d) => <button key={d} className={`prev-pill${alvo === d ? ' on' : ''}`} onClick={() => setAlvo(d)}>{CURTO[d]}</button>)}
       </div>
 
@@ -139,22 +140,30 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
         <>
           {/* KPIs analíticos */}
           <div className="prev-grid" style={{ marginTop: 12 }}>
-            <Stat icon="📈" label={nomeAlvo} valor={fmt(totalEsperado)} sub="itens esperados no período" cor={C.accent} />
-            <Stat icon="🍽️" label="Produtos" valor={String(previsoes.length)} sub="com previsão" cor="#7BD389" />
-            <Stat icon="🗓️" label="Base" valor={String(diasBase)} sub="dias parecidos" cor="#9B8CFF" />
-            <Stat icon="⚠️" label="Podem faltar" valor={String(faltamCompras.length)} sub={faltamCompras.length ? 'ingredientes' : 'tudo ok'} cor={faltamCompras.length ? C.red : C.green} />
+            <Stat label={nomeAlvo} valor={fmt(totalEsperado)} sub="itens esperados no período" cor={C.accent} />
+            <Stat label="Produtos" valor={String(previsoes.length)} sub="com previsão" cor="#7BD389" />
+            <Stat label="Base" valor={String(diasBase)} sub="dias parecidos" cor="#9B8CFF" />
+            <Stat label="Podem faltar" valor={String(faltamCompras.length)} sub={faltamCompras.length ? 'ingredientes' : 'tudo ok'} cor={faltamCompras.length ? C.red : C.green} />
           </div>
 
           {/* Gráfico dos mais pedidos */}
-          <div className="prev-card" style={{ marginBottom: 16 }}>
+          <div className="prev-card prev-glass" style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Top do {nomeAlvo.toLowerCase()}</div>
             <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Os itens que mais devem sair (esperado)</div>
             <div style={{ width: '100%', height: 210 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 22, right: 6, left: 6, bottom: 4 }}>
+                  <defs>
+                    {PALETA.map((c, i) => (
+                      <linearGradient key={i} id={`prevGrad${i}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={c} stopOpacity={0.95} />
+                        <stop offset="100%" stopColor={c} stopOpacity={0.28} />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <XAxis dataKey="curto" tick={{ fontSize: 10, fill: C.faint }} tickLine={false} axisLine={false} interval={0} />
                   <Bar dataKey="esperado" radius={[8, 8, 0, 0]} maxBarSize={46} isAnimationActive={false}>
-                    {chartData.map((d, i) => <Cell key={i} fill={d.cor} />)}
+                    {chartData.map((d, i) => <Cell key={i} fill={`url(#prevGrad${i % PALETA.length})`} />)}
                     <LabelList dataKey="esperado" position="top" style={{ fontSize: 12, fontWeight: 700, fill: C.text }} formatter={(v) => fmt(v)} />
                   </Bar>
                 </BarChart>
@@ -189,7 +198,7 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
                     <span style={{ fontSize: 14, fontWeight: 700, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.nome}</span>
                     <span className="prev-tag" style={{ background: `color-mix(in srgb, ${falta ? C.red : C.green} 16%, transparent)`, color: falta ? C.red : C.green }}>{falta ? `falta ${fmt(x.falta)} ${x.unidade}` : 'ok ✓'}</span>
                   </div>
-                  <div className="prev-track"><div className="prev-fill" style={{ width: Math.max(3, pct) + '%', background: falta ? C.red : C.green }} /></div>
+                  <div className="prev-track"><div className="prev-fill" style={{ width: Math.max(3, pct) + '%', background: `linear-gradient(90deg, color-mix(in srgb, ${falta ? C.red : C.green} 45%, transparent), ${falta ? C.red : C.green})` }} /></div>
                   <div style={{ fontSize: 11, color: C.faint, marginTop: 5 }}>precisa ~{fmt(x.precisa)} {x.unidade} · tem {fmt(x.saldo)} {x.unidade}</div>
                 </div>
               );
