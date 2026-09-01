@@ -34,6 +34,56 @@ export async function POST(request) {
   let body;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
   const acao = txt(body?.acao, 20);
+
+  // Receber um VALOR do cliente e abater dos fiados dele (do mais antigo pro mais
+  // novo). Fiado que o valor cobre todo vira "pago"; no último, se sobrar dívida,
+  // guarda o parcial em v.abatido — assim o cliente continua na lista só com o
+  // que ainda falta. Não precisa clicar "Recebi" compra por compra.
+  if (acao === 'receberValor') {
+    const ids = Array.isArray(body?.ids) ? body.ids.map((x) => txt(x, 40)).filter(Boolean) : [];
+    const valor = Math.round((Number(body?.valor) || 0) * 100) / 100;
+    const forma = txt(body?.formaRecebida, 20) || 'Dinheiro';
+    if (!ids.length) return NextResponse.json({ ok: false, erro: 'Nenhum fiado informado.' }, { status: 400 });
+    if (!(valor > 0)) return NextResponse.json({ ok: false, erro: 'Informe um valor maior que zero.' }, { status: 400 });
+    try {
+      const sb = supabaseServer();
+      const hoje = hojeBrasil();
+      // Lê os fiados escolhidos, mantém só os ainda em aberto, mais antigo primeiro.
+      const linhas = [];
+      for (const vid of ids) {
+        const { data } = await sb.from('pdm_dados').select('valor').eq('chave', PREFIXO + vid).maybeSingle();
+        const v = data?.valor;
+        if (v && !v.pago) linhas.push(v);
+      }
+      linhas.sort((a, b) => (a.fechadaEm || a.data || '').localeCompare(b.fechadaEm || b.data || ''));
+      let resta = valor;
+      const alterados = [];
+      for (const v of linhas) {
+        if (resta <= 0.005) break;
+        const aberto = Math.round(((Number(v.fiado != null ? v.fiado : (v.pagamento === 'Fiado' ? v.total : 0)) || 0) - (Number(v.abatido) || 0)) * 100) / 100;
+        if (aberto <= 0.005) continue;
+        const paga = Math.min(aberto, resta);
+        v.abatido = Math.round(((Number(v.abatido) || 0) + paga) * 100) / 100;
+        v.recebimentos = Array.isArray(v.recebimentos) ? v.recebimentos : [];
+        v.recebimentos.push({ data: hoje, valor: paga, forma });
+        if (v.abatido >= (Number(v.fiado != null ? v.fiado : (v.pagamento === 'Fiado' ? v.total : 0)) || 0) - 0.005) {
+          v.pago = true; v.pagoEm = hoje; v.formaRecebida = forma;
+        }
+        alterados.push(v);
+        resta = Math.round((resta - paga) * 100) / 100;
+      }
+      if (!alterados.length) return NextResponse.json({ ok: false, erro: 'Esses fiados já estão quitados.' }, { status: 400 });
+      for (const v of alterados) {
+        const { error } = await sb.from('pdm_dados').upsert({ chave: PREFIXO + v.id, valor: v, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+        if (error) throw error;
+      }
+      const aplicado = Math.round((valor - Math.max(0, resta)) * 100) / 100;
+      return NextResponse.json({ ok: true, aplicado, sobra: Math.max(0, resta), quitados: alterados.filter((v) => v.pago).length });
+    } catch (e) {
+      return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao receber o fiado.' }, { status: 500 });
+    }
+  }
+
   const id = txt(body?.id, 40);
   if (!id) return NextResponse.json({ ok: false, erro: 'Venda não informada.' }, { status: 400 });
   try {

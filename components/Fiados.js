@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, KPI, Empty, SecTitle, PageTitle } from './ui';
-import { brl, num, fmtDate, fiadoDaVenda } from '../lib/util';
+import { brl, num, fmtDate, fiadoDaVenda, abertoDaVenda } from '../lib/util';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
@@ -13,6 +13,8 @@ export default function Fiados({ onMudou, clientes = [] }) {
   const [verPagos, setVerPagos] = useState(false);
   const [itensAbertos, setItensAbertos] = useState({}); // { [vendaId]: true } — mostra os itens
   const [abertoCliente, setAbertoCliente] = useState({}); // { [chave]: true } — abre o histórico do cliente
+  const [pagarAberto, setPagarAberto] = useState({}); // { [chave]: true } — abre o campo "receber valor"
+  const [valorPago, setValorPago] = useState({}); // { [chave]: 'texto do valor' }
 
   const carregar = useCallback(async () => {
     try {
@@ -40,13 +42,25 @@ export default function Fiados({ onMudou, clientes = [] }) {
   const excluir = (id) => { if (typeof window !== 'undefined' && !window.confirm('Excluir este fiado? Não vai mais aparecer nem contar em lugar nenhum.')) return; acao({ acao: 'excluir', id }); };
   const toggleItens = (id) => setItensAbertos((m) => ({ ...m, [id]: !m[id] }));
 
+  // Recebe um VALOR do cliente e abate dos fiados dele (do mais antigo pro mais
+  // novo). Se o valor cobre tudo, quita todos; senão deixa o resto em aberto.
+  const receberValor = async (g) => {
+    const valor = num(valorPago[g.chave]);
+    if (!(valor > 0)) { setErro('Digite quanto o cliente pagou.'); return; }
+    if (valor > g.total + 0.005 && typeof window !== 'undefined' &&
+        !window.confirm(`O valor (${brl(valor)}) é maior que a dívida (${brl(g.total)}). Vou quitar tudo e o resto (${brl(valor - g.total)}) fica como troco. Continuar?`)) return;
+    await acao({ acao: 'receberValor', ids: g.vendas.map((v) => v.id), valor });
+    setValorPago((m) => ({ ...m, [g.chave]: '' }));
+    setPagarAberto((m) => ({ ...m, [g.chave]: false }));
+  };
+
   const limiteDe = (nome) => { const c = clientes.find((x) => norm(x.nome) === norm(nome)); return c ? num(c.limite) : 0; };
   const rotulo = (nome, mesa) => (nome && nome.trim()) || `Mesa ${mesa}`;
 
   const fiados = vendas.filter((v) => fiadoDaVenda(v) > 0.005);
   const abertos = fiados.filter((v) => !v.pago);
   const pagos = fiados.filter((v) => v.pago).sort((a, b) => (b.pagoEm || '').localeCompare(a.pagoEm || ''));
-  const totalDevido = abertos.reduce((s, v) => s + fiadoDaVenda(v), 0);
+  const totalDevido = abertos.reduce((s, v) => s + abertoDaVenda(v), 0);
 
   // Agrupa os fiados em aberto por cliente (nome), com as compras por data.
   const grupos = useMemo(() => {
@@ -55,7 +69,7 @@ export default function Fiados({ onMudou, clientes = [] }) {
       const k = norm(v.nome) || `mesa:${v.mesa}:${v.id}`;
       let g = map.get(k);
       if (!g) { g = { chave: k, nome: rotulo(v.nome, v.mesa), total: 0, vendas: [] }; map.set(k, g); }
-      g.total += fiadoDaVenda(v);
+      g.total += abertoDaVenda(v);
       g.vendas.push(v);
     }
     for (const g of map.values()) {
@@ -107,6 +121,33 @@ export default function Fiados({ onMudou, clientes = [] }) {
                     <div style={{ fontSize: 11, color: C.faint, marginTop: 6 }}>sem limite cadastrado</div>
                   )}
 
+                  {/* Receber um valor e abater da conta do cliente (sem ir compra por compra). */}
+                  <div style={{ marginTop: 12 }}>
+                    {!pagarAberto[g.chave] ? (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <Btn kind="ok" small onClick={() => setPagarAberto((m) => ({ ...m, [g.chave]: true }))} disabled={busy}>Receber valor</Btn>
+                      </div>
+                    ) : (
+                      <div style={{ background: C.panel2, borderRadius: 10, padding: 10 }}>
+                        <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Quanto {g.nome} pagou agora? (abate do total de {brl(g.total)})</div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input
+                            type="text" inputMode="decimal" placeholder="R$ 0,00" autoFocus
+                            value={valorPago[g.chave] || ''}
+                            onChange={(e) => setValorPago((m) => ({ ...m, [g.chave]: e.target.value }))}
+                            onKeyDown={(e) => { if (e.key === 'Enter') receberValor(g); }}
+                            style={{ flex: 1, minWidth: 0, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 9, padding: '9px 12px', color: C.text, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}
+                          />
+                          <Btn kind="ok" small onClick={() => receberValor(g)} disabled={busy}>Pagar</Btn>
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                          <button onClick={() => setValorPago((m) => ({ ...m, [g.chave]: String(g.total).replace('.', ',') }))} style={{ background: 'none', border: 'none', color: C.accent, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0 }}>quitar tudo ({brl(g.total)})</button>
+                          <button onClick={() => { setPagarAberto((m) => ({ ...m, [g.chave]: false })); setValorPago((m) => ({ ...m, [g.chave]: '' })); }} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0 }}>cancelar</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Histórico (datas + consumo): fica escondido e abre ao clicar no nome. */}
                   {!abertoCliente[g.chave] ? (
                     <div style={{ fontSize: 12, color: C.faint, marginTop: 10 }}>{g.vendas.length} fiado(s) · toque no nome pra ver as datas e o que consumiu</div>
@@ -126,7 +167,10 @@ export default function Fiados({ onMudou, clientes = [] }) {
                                 </button>
                               )}
                             </div>
-                            <div style={{ fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(fiadoDaVenda(v))}</div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <div style={{ fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{brl(abertoDaVenda(v))}</div>
+                              {num(v.abatido) > 0.005 && <div style={{ fontSize: 11, color: C.green, fontVariantNumeric: 'tabular-nums' }}>já pagou {brl(num(v.abatido))}</div>}
+                            </div>
                           </div>
                           {aberto && itens.length > 0 && (
                             <div style={{ marginTop: 6, marginLeft: 2, padding: '8px 10px', background: C.panel2, borderRadius: 8 }}>

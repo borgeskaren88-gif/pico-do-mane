@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
-import { num, limparNome, fiadoDaVenda, brl } from '../../../lib/util';
+import { num, limparNome, fiadoDaVenda, abertoDaVenda, brl } from '../../../lib/util';
 import { enviarPush } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -317,7 +317,7 @@ export async function POST(request) {
         const norm = (s) => (s || '').trim().toLowerCase();
         const numBR = (s) => { const v = parseFloat(String(s).replace(/\./g, '').replace(',', '.')); return isFinite(v) ? v : 0; };
         const fmt = (n) => 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
-        const fiadoDe = (v) => (v.fiado != null ? (Number(v.fiado) || 0) : (v.pagamento === 'Fiado' ? (Number(v.total) || 0) : 0));
+        const fiadoDe = (v) => { const base = v.fiado != null ? (Number(v.fiado) || 0) : (v.pagamento === 'Fiado' ? (Number(v.total) || 0) : 0); return Math.max(0, base - (Number(v.abatido) || 0)); };
         const blob = await lerPainel(sb);
         const clientes = Array.isArray(blob.clientes) ? blob.clientes : [];
         const cli = clientes.find((x) => norm(x.nome) === norm(nomeCli) && x.bloquear && numBR(x.limite) > 0);
@@ -366,7 +366,7 @@ export async function POST(request) {
           const limite = cli ? num(cli.limite) : 0;
           if (limite > 0) {
             const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
-            const devido = (vrows || []).map((r) => r.valor).filter((v) => v && !v.pago && limparNome(v.nome).toLowerCase() === nomeNorm).reduce((s, v) => s + fiadoDaVenda(v), 0);
+            const devido = (vrows || []).map((r) => r.valor).filter((v) => v && !v.pago && limparNome(v.nome).toLowerCase() === nomeNorm).reduce((s, v) => s + abertoDaVenda(v), 0);
             if (devido >= limite - 0.005) {
               await enviarPush(sb, { titulo: 'Fiado no limite', corpo: `${limparNome(venda.nome)} está em ${brl(devido)} de ${brl(limite)}.`, url: '/', tag: 'fiado-' + nomeNorm, audiencia: 'dona' });
             }

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Empty, SecTitle, PageTitle } from './ui';
-import { brl, num, uid, limparNome, fiadoDaVenda } from '../lib/util';
+import { brl, num, uid, limparNome, fiadoDaVenda, abertoDaVenda } from '../lib/util';
 
 const vazio = () => ({ nome: '', telefone: '', limite: '', bloquear: false });
 const norm = (s) => (s || '').trim().toLowerCase();
@@ -16,7 +16,7 @@ export default function Clientes({ dados = [], onChange, vendas = [] }) {
     const m = {};
     for (const v of vendas) {
       if (v.pago) continue;
-      const f = fiadoDaVenda(v);
+      const f = abertoDaVenda(v);
       if (f <= 0.005) continue;
       const k = norm(v.nome);
       if (!k) continue;
