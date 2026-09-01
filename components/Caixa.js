@@ -129,11 +129,27 @@ export default function Caixa({ papel = 'dona' }) {
             </div>
             {(entradas.Fiado || 0) > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderTop: `1px solid ${C.line}`, fontSize: 13 }}>
-                <span style={{ color: C.amber }}>Fiado (não é caixa)</span>
+                <span style={{ color: C.amber }}>Fiado gerado hoje (não é caixa)</span>
                 <span style={{ fontWeight: 700, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{brl(entradas.Fiado)}</span>
               </div>
             )}
           </Card>
+
+          {(dados.fiadoRecebido?.total || 0) > 0 && (
+            <Card style={{ marginBottom: 14, borderColor: C.green }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: C.green }}>Fiado recebido neste caixa</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: C.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(dados.fiadoRecebido.total)}</div>
+              </div>
+              <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Dinheiro de contas fiado que entrou hoje — não é comanda de hoje (já está somado no total acima).</div>
+              {METODOS.map((m) => (dados.fiadoRecebido[m] || 0) > 0 && (
+                <div key={m} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: `1px solid ${C.line}`, marginTop: 6, fontSize: 13 }}>
+                  <span style={{ color: C.muted }}>{m}</span>
+                  <span style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(dados.fiadoRecebido[m])}</span>
+                </div>
+              ))}
+            </Card>
+          )}
 
           {papel !== 'garcom' && (dados.servico || 0) > 0 && (
             <Card style={{ marginBottom: 14, padding: '12px 14px', borderColor: C.accent2 }}>
@@ -173,7 +189,7 @@ export default function Caixa({ papel = 'dona' }) {
               {historico.map((c) => {
                 const ab = histAberto === c.id;
                 const ent = c.entradas || {};
-                const temDetalhe = METODOS.some((m) => (ent[m] || 0) > 0);
+                const temDetalhe = METODOS.some((m) => (ent[m] || 0) > 0) || (c.fiadoRecebido?.total || 0) > 0;
                 return (
                 <Card key={c.id} style={{ marginBottom: 8, padding: '12px 14px' }}>
                   <button onClick={() => { if (temDetalhe) setHistAberto(ab ? '' : c.id); }} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: temDetalhe ? 'pointer' : 'default', textAlign: 'left', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
@@ -195,8 +211,14 @@ export default function Caixa({ papel = 'dona' }) {
                       ))}
                       {(ent.Fiado || 0) > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderTop: `1px solid ${C.line}`, marginTop: 2 }}>
-                          <span style={{ color: C.amber }}>Fiado (não é caixa)</span>
+                          <span style={{ color: C.amber }}>Fiado gerado (não é caixa)</span>
                           <span style={{ fontWeight: 700, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{brl(ent.Fiado)}</span>
+                        </div>
+                      )}
+                      {(c.fiadoRecebido?.total || 0) > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderTop: `1px solid ${C.line}`, marginTop: 2 }}>
+                          <span style={{ color: C.green }}>Fiado recebido</span>
+                          <span style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(c.fiadoRecebido.total)}</span>
                         </div>
                       )}
                     </div>

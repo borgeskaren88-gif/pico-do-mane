@@ -22,10 +22,15 @@ const n2 = (n) => {
   return Math.round((Number.isFinite(v) ? v : 0) * 100) / 100;
 };
 
-// Soma as entradas das vendas ligadas a um caixa, separadas por forma.
+// Soma as entradas de um caixa, separadas por forma. Duas origens:
+//  - Comandas fechadas no turno (vendas ligadas ao caixa) — venda de hoje.
+//  - Fiado RECEBIDO no turno (recebimentos ligados ao caixa, de qualquer venda,
+//    inclusive de dívidas antigas) — dinheiro que entrou de fiado, NÃO é comanda
+//    de hoje. Fica num balde próprio (fiadoRecebido) pra dar pra separar na tela.
 async function entradasDoCaixa(sb, caixaId) {
   const { data } = await sb.from('pdm_dados').select('valor').like('chave', VD + '%');
-  const vendas = (data || []).map((r) => r.valor).filter((v) => v && v.caixaId === caixaId);
+  const todas = (data || []).map((r) => r.valor).filter(Boolean);
+  const vendas = todas.filter((v) => v.caixaId === caixaId);
   const ent = { Dinheiro: 0, Pix: 0, 'Crédito': 0, 'Débito': 0, Fiado: 0 };
   let servico = 0;
   for (const v of vendas) {
@@ -33,12 +38,27 @@ async function entradasDoCaixa(sb, caixaId) {
     const pags = Array.isArray(v.pagamentos) ? v.pagamentos : (v.pagamento ? [{ forma: v.pagamento, valor: Number(v.total) || 0 }] : []);
     for (const pg of pags) { if (ent[pg.forma] != null) ent[pg.forma] = n2(ent[pg.forma] + (Number(pg.valor) || 0)); }
   }
-  return { entradas: ent, qtdVendas: vendas.length, servico };
+  // Fiado recebido neste caixa (dinheiro que entrou de contas antigas/do mês).
+  const fiadoRecebido = { Dinheiro: 0, Pix: 0, 'Crédito': 0, 'Débito': 0, total: 0 };
+  for (const v of todas) {
+    for (const rc of (Array.isArray(v.recebimentos) ? v.recebimentos : [])) {
+      if (!rc || rc.caixaId !== caixaId) continue;
+      const val = n2(rc.valor);
+      if (!(val > 0)) continue;
+      const forma = fiadoRecebido[rc.forma] != null ? rc.forma : 'Dinheiro';
+      fiadoRecebido[forma] = n2(fiadoRecebido[forma] + val);
+      fiadoRecebido.total = n2(fiadoRecebido.total + val);
+    }
+  }
+  return { entradas: ent, qtdVendas: vendas.length, servico, fiadoRecebido };
 }
 
-function resumo(caixa, entradas) {
-  const recebido = n2(entradas.Dinheiro + entradas.Pix + entradas['Crédito'] + entradas['Débito']);
-  const dinheiroFinal = n2((Number(caixa.saldoInicial) || 0) + entradas.Dinheiro);
+function resumo(caixa, entradas, fiadoRecebido) {
+  const fr = fiadoRecebido || { Dinheiro: 0, Pix: 0, 'Crédito': 0, 'Débito': 0, total: 0 };
+  // Recebido = comandas (sem o fiado gerado) + fiado recebido de verdade.
+  const recebido = n2(entradas.Dinheiro + entradas.Pix + entradas['Crédito'] + entradas['Débito'] + fr.total);
+  // Na gaveta entra o dinheiro das comandas + o fiado recebido em dinheiro.
+  const dinheiroFinal = n2((Number(caixa.saldoInicial) || 0) + entradas.Dinheiro + fr.Dinheiro);
   return { recebido, dinheiroFinal, fiado: entradas.Fiado };
 }
 
@@ -51,13 +71,13 @@ export async function GET() {
     if (error) throw error;
     const caixas = (data || []).map((r) => r.valor).filter(Boolean);
     const aberto = caixas.find((c) => c.aberto) || null;
-    let entradas = null, extra = null, qtdVendas = 0, servico = 0;
+    let entradas = null, extra = null, qtdVendas = 0, servico = 0, fiadoRecebido = null;
     if (aberto) {
       const r = await entradasDoCaixa(sb, aberto.id);
-      entradas = r.entradas; qtdVendas = r.qtdVendas; servico = r.servico; extra = resumo(aberto, r.entradas);
+      entradas = r.entradas; qtdVendas = r.qtdVendas; servico = r.servico; fiadoRecebido = r.fiadoRecebido; extra = resumo(aberto, r.entradas, r.fiadoRecebido);
     }
     const historico = caixas.filter((c) => !c.aberto).sort((a, b) => (b.fechadoEm || '').localeCompare(a.fechadoEm || '')).slice(0, 15);
-    return NextResponse.json({ ok: true, aberto, entradas, servico, ...(extra || {}), qtdVendas, historico });
+    return NextResponse.json({ ok: true, aberto, entradas, servico, fiadoRecebido, ...(extra || {}), qtdVendas, historico });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar o caixa.' }, { status: 500 });
   }
@@ -106,12 +126,12 @@ export async function POST(request) {
       const id = String(body?.id || '').slice(0, 40);
       const caixa = caixas.find((c) => c.id === id && c.aberto);
       if (!caixa) return NextResponse.json({ ok: false, erro: 'Caixa não encontrado ou já fechado.' }, { status: 404 });
-      const { entradas, qtdVendas, servico } = await entradasDoCaixa(sb, caixa.id);
-      const r = resumo(caixa, entradas);
+      const { entradas, qtdVendas, servico, fiadoRecebido } = await entradasDoCaixa(sb, caixa.id);
+      const r = resumo(caixa, entradas, fiadoRecebido);
       const contado = body?.contado != null && body?.contado !== '' ? n2(body.contado) : null;
       const fechado = {
         ...caixa, aberto: false, fechadoEm: new Date().toISOString(), fechadoPor: p,
-        entradas, recebido: r.recebido, dinheiroFinal: r.dinheiroFinal, fiado: r.fiado, servico,
+        entradas, fiadoRecebido, recebido: r.recebido, dinheiroFinal: r.dinheiroFinal, fiado: r.fiado, servico,
         qtdVendas, contado, diferenca: contado != null ? n2(contado - r.dinheiroFinal) : null,
       };
       const { error } = await sb.from('pdm_dados').upsert({ chave: CX + caixa.id, valor: fechado, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
