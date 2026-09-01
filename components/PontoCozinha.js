@@ -1,26 +1,34 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
-import { C, Card, Btn, Field, TextInput, Empty, SecTitle } from './ui';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { C, Card, Btn, Field, TextInput, Empty, SecTitle, KPI } from './ui';
+import { mesLabel, fmtDate } from '../lib/util';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch { return ''; } };
 const hojeBR = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const horasDe = (r) => (r.entrada && r.saida ? Math.max(0, (new Date(r.saida) - new Date(r.entrada)) / 3600000) : 0);
+const fmtHoras = (h) => { const t = Math.round(Math.abs(h) * 60); const hh = Math.floor(t / 60), mm = t % 60; return `${hh}h${mm > 0 ? ` ${mm}min` : ''}`; };
+const parseHHMM = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ''); return m ? (+m[1] + (+m[2]) / 60) : null; };
+const horasJornada = (j) => { const e = parseHHMM(j?.entrada), s = parseHHMM(j?.saida); if (e == null || s == null) return 0; let d = s - e; if (d <= 0) d += 24; return d; };
 
 // Ponto da cozinha (por pessoa): escreve o nome, bate Entrada ao chegar e Saída
 // ao sair. A dona vê as horas no painel dela.
 export default function PontoCozinha() {
   const [registros, setRegistros] = useState([]);
+  const [jornadas, setJornadas] = useState({});
+  const [papel, setPapel] = useState('');
   const [nome, setNome] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [erro, setErro] = useState('');
   const [carregado, setCarregado] = useState(false);
+  const [verTurnos, setVerTurnos] = useState({});
 
   const carregar = useCallback(async () => {
     try {
       const r = await fetch('/api/ponto', { cache: 'no-store' });
       const j = await r.json();
-      if (j.ok) setRegistros(Array.isArray(j.registros) ? j.registros : []);
+      if (j.ok) { setRegistros(Array.isArray(j.registros) ? j.registros : []); setJornadas(j.jornadas && typeof j.jornadas === 'object' ? j.jornadas : {}); setPapel(j.papel || ''); }
     } catch { /* offline */ }
     finally { setCarregado(true); }
   }, []);
@@ -31,6 +39,39 @@ export default function PontoCozinha() {
   const abertoDoNome = nome.trim() ? registros.find((r) => !r.saida && norm(r.nome) === norm(nome)) : null;
   const trabalhandoAgora = registros.filter((r) => !r.saida);
   const nomesRecentes = [...new Set(registros.map((r) => r.nome).filter(Boolean))].slice(0, 6);
+
+  // Folha do mês: horas por pessoa neste mês + saldo (em haver / devendo) contra
+  // a jornada do setor. A API já manda só o ponto deste setor.
+  const ym = hoje.slice(0, 7);
+  const esperadoMes = useMemo(() => {
+    const j = jornadas[papel];
+    if (!j || !Array.isArray(j.dias) || !j.dias.length) return null;
+    const hd = horasJornada(j);
+    const [yy, mm] = hoje.split('-').map(Number);
+    const diaHoje = Number(hoje.slice(8, 10));
+    let total = 0;
+    for (let d = 1; d < diaHoje; d++) { if (j.dias.includes(new Date(yy, mm - 1, d).getDay())) total += hd; }
+    return total;
+  }, [jornadas, papel, hoje]);
+  const pessoasMes = useMemo(() => {
+    const map = new Map();
+    for (const r of registros.filter((r) => (r.data || '').slice(0, 7) === ym)) {
+      const k = norm(r.nome);
+      if (!map.has(k)) map.set(k, { nome: r.nome, horas: 0, turnos: [] });
+      const g = map.get(k); g.horas += horasDe(r); g.turnos.push(r);
+    }
+    for (const g of map.values()) g.turnos.sort((a, b) => (b.entrada || '').localeCompare(a.entrada || ''));
+    return [...map.values()].sort((a, b) => b.horas - a.horas);
+  }, [registros, ym]);
+  const totalMes = pessoasMes.reduce((s, p) => s + p.horas, 0);
+  const Saldo = ({ horas }) => {
+    if (esperadoMes == null) return null;
+    const saldo = horas - esperadoMes;
+    const emDia = Math.abs(saldo) < 0.05;
+    const cor = emDia ? C.muted : saldo > 0 ? C.green : C.red;
+    const rot = emDia ? 'em dia' : saldo > 0 ? `+${fmtHoras(saldo)} em haver` : `−${fmtHoras(saldo)} devendo`;
+    return <div style={{ fontSize: 12, fontWeight: 800, color: cor, marginTop: 2 }}>{rot} <span style={{ color: C.faint, fontWeight: 500 }}>· esperado {fmtHoras(esperadoMes)}</span></div>;
+  };
 
   const bater = async (acao) => {
     const n = nome.trim();
@@ -84,6 +125,45 @@ export default function PontoCozinha() {
             </div>
           ))}
         </Card>
+      )}
+
+      {/* Minha folha do mês: cada setor vê só a sua (a API já filtra). */}
+      {carregado && pessoasMes.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <SecTitle>Minha folha · {mesLabel(ym)}</SecTitle>
+          <div style={{ marginBottom: 10 }}>
+            <KPI titulo="Horas no mês" valor={fmtHoras(totalMes)} cor={C.accent} sub={`${pessoasMes.reduce((s, p) => s + p.turnos.length, 0)} turno(s)`} />
+          </div>
+          {pessoasMes.map((p) => {
+            const ab = !!verTurnos[norm(p.nome)];
+            return (
+              <div key={p.nome} style={{ marginBottom: 8 }}>
+                <button onClick={() => setVerTurnos((m) => ({ ...m, [norm(p.nome)]: !m[norm(p.nome)] }))} style={{ width: '100%', textAlign: 'left', background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ color: C.accent, fontSize: 12, fontWeight: 800, width: 12, flexShrink: 0 }}>{ab ? '▾' : '▸'}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 15, fontWeight: 800 }}>{p.nome}</span>
+                    <span style={{ fontSize: 12, color: C.faint, display: 'block' }}>{p.turnos.length} turno(s)</span>
+                    <Saldo horas={p.horas} />
+                  </span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: C.accent, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{fmtHoras(p.horas)}</span>
+                </button>
+                {ab && (
+                  <div style={{ marginTop: 6 }}>
+                    {p.turnos.map((r) => (
+                      <Card key={r.id} style={{ marginBottom: 6, padding: '9px 14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                          <span><b>{fmtDate(r.data)}</b> · {horaBR(r.entrada)} → {r.saida ? horaBR(r.saida) : 'em trabalho'}</span>
+                          <b style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{r.saida ? fmtHoras(horasDe(r)) : '—'}</b>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {esperadoMes == null && <div style={{ fontSize: 12, color: C.faint }}>A saldo (em haver/devendo) aparece quando a Karen configurar a jornada do setor.</div>}
+        </div>
       )}
 
       <SecTitle>Pontos de hoje ({doDia.length})</SecTitle>
