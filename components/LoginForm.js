@@ -31,6 +31,9 @@ export default function LoginForm() {
       });
       const json = await res.json();
       if (json.ok) {
+        // Marca a sessão como ativa nesta janela pra a trava de tela não pedir a
+        // senha logo depois do login (ela só trava ao fechar e reabrir).
+        try { sessionStorage.setItem('pdm_sessaoAtiva', '1'); } catch { /* ignora */ }
         router.refresh();
       } else {
         setErro(json.erro || 'Senha incorreta.');

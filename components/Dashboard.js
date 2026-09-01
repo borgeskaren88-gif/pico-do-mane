@@ -28,6 +28,7 @@ import Clientes from './Clientes';
 import Estoque from './Estoque';
 import Margem from './Margem';
 import FichasTecnicas from './FichasTecnicas';
+import ConferenciaEstoque from './ConferenciaEstoque';
 import Auditoria from './Auditoria';
 import Notificacoes from './Notificacoes';
 import DespesaRapida from './DespesaRapida';
@@ -654,7 +655,7 @@ export default function Dashboard() {
             {subAbast === 'estoque' && (
               <>
                 <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-                  {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas'], ['cortesia', 'Cortesia / Consumo']].map(([v, rot]) => (
+                  {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas'], ['conferencia', 'Conferência'], ['cortesia', 'Cortesia / Consumo']].map(([v, rot]) => (
                     <button key={v} onClick={() => setSubEstoque(v)} style={{
                       flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 10px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
                       background: subEstoque === v ? C.accent : 'transparent', color: subEstoque === v ? '#06101F' : C.muted,
@@ -663,6 +664,7 @@ export default function Dashboard() {
                 </div>
                 {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} onRepor={reporLista} />}
                 {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={estoqueAcao} />}
+                {subEstoque === 'conferencia' && <ConferenciaEstoque estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} onAcao={estoqueAcao} carregado={estCarregado} />}
                 {subEstoque === 'cortesia' && <CortesiaConsumo onFeito={() => carregarEstoque({})} />}
               </>
             )}
