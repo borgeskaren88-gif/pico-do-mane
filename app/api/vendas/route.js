@@ -16,6 +16,14 @@ function ehDona() {
   return papelDaSessao(cookies().get(nomeCookie())?.value) === 'dona';
 }
 
+// Id do caixa aberto agora (pra o fiado recebido entrar no caixa do dia). Null
+// se não houver caixa aberto — aí o recebimento fica registrado sem caixa.
+async function caixaAbertoId(sb) {
+  const { data } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
+  const c = (data || []).map((r) => r.valor).find((x) => x && x.aberto);
+  return c ? c.id : null;
+}
+
 export async function GET() {
   if (!ehDona()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
@@ -48,6 +56,7 @@ export async function POST(request) {
     try {
       const sb = supabaseServer();
       const hoje = hojeBrasil();
+      const cxId = await caixaAbertoId(sb);
       // Lê os fiados escolhidos, mantém só os ainda em aberto, mais antigo primeiro.
       const linhas = [];
       for (const vid of ids) {
@@ -65,7 +74,7 @@ export async function POST(request) {
         const paga = Math.min(aberto, resta);
         v.abatido = Math.round(((Number(v.abatido) || 0) + paga) * 100) / 100;
         v.recebimentos = Array.isArray(v.recebimentos) ? v.recebimentos : [];
-        v.recebimentos.push({ data: hoje, valor: paga, forma });
+        v.recebimentos.push({ data: hoje, valor: paga, forma, caixaId: cxId });
         if (v.abatido >= (Number(v.fiado != null ? v.fiado : (v.pagamento === 'Fiado' ? v.total : 0)) || 0) - 0.005) {
           v.pago = true; v.pagoEm = hoje; v.formaRecebida = forma;
         }
@@ -96,9 +105,19 @@ export async function POST(request) {
       const { data } = await sb.from('pdm_dados').select('valor').eq('chave', chave).maybeSingle();
       const v = data?.valor;
       if (!v) return NextResponse.json({ ok: false, erro: 'Venda não encontrada.' }, { status: 404 });
+      const hoje = hojeBrasil();
+      const forma = txt(body?.formaRecebida, 20) || 'Dinheiro';
+      // Quanto ainda faltava (fiado menos o já abatido) — é o que entra no caixa agora.
+      const base = Number(v.fiado != null ? v.fiado : (v.pagamento === 'Fiado' ? v.total : 0)) || 0;
+      const falta = Math.round((base - (Number(v.abatido) || 0)) * 100) / 100;
+      if (falta > 0.005) {
+        v.recebimentos = Array.isArray(v.recebimentos) ? v.recebimentos : [];
+        v.recebimentos.push({ data: hoje, valor: falta, forma, caixaId: await caixaAbertoId(sb) });
+        v.abatido = Math.round(((Number(v.abatido) || 0) + falta) * 100) / 100;
+      }
       v.pago = true;
-      v.pagoEm = hojeBrasil();
-      v.formaRecebida = txt(body?.formaRecebida, 20) || 'Dinheiro';
+      v.pagoEm = hoje;
+      v.formaRecebida = forma;
       const { error } = await sb.from('pdm_dados').upsert({ chave, valor: v, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
       return NextResponse.json({ ok: true, venda: v });
