@@ -25,10 +25,15 @@ export async function POST(request) {
 
   let senha = '';
   let papelPedido = '';
+  // "lembrar": o celular manda true (fica logado). No computador vem false, e aí
+  // o cookie é "de sessão" — some quando fecha o navegador, então pede a senha
+  // de novo na próxima vez. Assim o computador não fica aberto pra qualquer um.
+  let lembrar = false;
   try {
     const body = await request.json();
     senha = body?.senha ?? '';
     papelPedido = body?.papel ?? '';
+    lembrar = body?.lembrar === true;
   } catch {
     return NextResponse.json({ ok: false, erro: 'Requisição inválida.' }, { status: 400 });
   }
@@ -57,7 +62,9 @@ export async function POST(request) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 90, // 90 dias
+    // Celular: 90 dias (continua logado). Computador: sem maxAge = cookie de
+    // sessão, que o navegador apaga ao fechar → pede a senha de novo.
+    ...(lembrar ? { maxAge: 60 * 60 * 24 * 90 } : {}),
   });
 
   return NextResponse.json({ ok: true, papel });
