@@ -15,6 +15,7 @@ export default function Fiados({ onMudou, clientes = [] }) {
   const [abertoCliente, setAbertoCliente] = useState({}); // { [chave]: true } — abre o histórico do cliente
   const [pagarAberto, setPagarAberto] = useState({}); // { [chave]: true } — abre o campo "receber valor"
   const [valorPago, setValorPago] = useState({}); // { [chave]: 'texto do valor' }
+  const [caixaAberto, setCaixaAberto] = useState(null); // null=ainda não sei, true/false
 
   const carregar = useCallback(async () => {
     try {
@@ -27,6 +28,21 @@ export default function Fiados({ onMudou, clientes = [] }) {
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
+  // Saber se há caixa aberto — pra avisar antes de dar baixa (o fiado recebido só
+  // entra no caixa do dia se o caixa estiver aberto na hora).
+  const verCaixa = useCallback(async () => {
+    try { const r = await fetch('/api/caixa', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setCaixaAberto(!!j.aberto); } catch { /* ignora */ }
+  }, []);
+  useEffect(() => { verCaixa(); }, [verCaixa]);
+
+  // Se não há caixa aberto, avisa e deixa a dona escolher receber assim mesmo.
+  // Retorna true se pode seguir.
+  const confirmaSemCaixa = () => {
+    if (caixaAberto) return true;
+    if (typeof window === 'undefined') return true;
+    return window.confirm('Não há caixa aberto agora. Se receber assim, o valor NÃO vai entrar no caixa do dia.\n\nO ideal é abrir o caixa antes (aba Caixa) e depois dar baixa no fiado.\n\nReceber mesmo assim?');
+  };
+
   const acao = async (payload) => {
     setBusy(true);
     try {
@@ -34,11 +50,12 @@ export default function Fiados({ onMudou, clientes = [] }) {
       const j = await r.json();
       if (!j.ok) { setErro(j.erro || 'Erro.'); return; }
       await carregar();
+      verCaixa();
       if (onMudou) onMudou();
     } catch { setErro('Sem conexão.'); }
     finally { setBusy(false); }
   };
-  const receber = (id) => acao({ acao: 'receber', id });
+  const receber = (id) => { if (!confirmaSemCaixa()) return; acao({ acao: 'receber', id }); };
   const excluir = (id) => { if (typeof window !== 'undefined' && !window.confirm('Excluir este fiado? Não vai mais aparecer nem contar em lugar nenhum.')) return; acao({ acao: 'excluir', id }); };
   const toggleItens = (id) => setItensAbertos((m) => ({ ...m, [id]: !m[id] }));
 
@@ -49,6 +66,7 @@ export default function Fiados({ onMudou, clientes = [] }) {
     if (!(valor > 0)) { setErro('Digite quanto o cliente pagou.'); return; }
     if (valor > g.total + 0.005 && typeof window !== 'undefined' &&
         !window.confirm(`O valor (${brl(valor)}) é maior que a dívida (${brl(g.total)}). Vou quitar tudo e o resto (${brl(valor - g.total)}) fica como troco. Continuar?`)) return;
+    if (!confirmaSemCaixa()) return;
     await acao({ acao: 'receberValor', ids: g.vendas.map((v) => v.id), valor });
     setValorPago((m) => ({ ...m, [g.chave]: '' }));
     setPagarAberto((m) => ({ ...m, [g.chave]: false }));
@@ -86,6 +104,12 @@ export default function Fiados({ onMudou, clientes = [] }) {
       <PageTitle sub="Quem está devendo (contas fechadas no fiado)">Fiados</PageTitle>
 
       <KPI titulo="Total a receber" valor={brl(totalDevido)} cor={totalDevido > 0 ? C.amber : C.faint} sub={`${grupos.length} cliente(s) · ${abertos.length} fiado(s)`} />
+
+      {caixaAberto === false && grupos.length > 0 && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.amber}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text, marginTop: 12, lineHeight: 1.45 }}>
+          <b style={{ color: C.amber }}>Caixa fechado.</b> Pra o dinheiro recebido entrar no caixa do dia, abra o caixa (aba Caixa) antes de dar baixa no fiado.
+        </div>
+      )}
 
       {erro && <div style={{ fontSize: 13, color: C.red, margin: '10px 0' }}>{erro}</div>}
 
