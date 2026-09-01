@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, valorSessaoValida, valorSessaoCozinha, valorSessaoGarcom } from '../../../lib/auth';
+import { supabaseServer } from '../../../lib/supabase';
+import { conferirSenhaDona, temSenhaDona } from '../../../lib/senha';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +14,13 @@ function comparaSegura(a, b) {
 }
 
 export async function POST(request) {
-  const senhaDona = process.env.APP_PASSWORD;
   // Senha da cozinha e do garçom: padrão "1234" se não houver variável.
   const senhaCozinha = process.env.APP_PASSWORD_COZINHA || '1234';
   const senhaGarcom = process.env.APP_PASSWORD_GARCOM || '1234';
-  if (!senhaDona) {
+  const sb = supabaseServer();
+  // A senha da dona pode ter sido trocada no app (guardada no banco) ou vir da
+  // APP_PASSWORD. Se não houver nenhuma das duas, aí sim é falta de config.
+  if (!(await temSenhaDona(sb))) {
     return NextResponse.json(
       { ok: false, erro: 'Servidor sem senha configurada (APP_PASSWORD).' },
       { status: 500 }
@@ -49,7 +53,7 @@ export async function POST(request) {
   } else if (papelPedido === 'dona' || !papelPedido) {
     // 'dona' explícito, ou sem papel (compatibilidade): tenta dona e, se não for,
     // ainda aceita cozinha pela senha (não quebra quem já usava só a senha).
-    if (senha && comparaSegura(senha, senhaDona)) { valorCookie = valorSessaoValida(); papel = 'dona'; }
+    if (senha && await conferirSenhaDona(sb, senha)) { valorCookie = valorSessaoValida(); papel = 'dona'; }
     else if (!papelPedido && senha && comparaSegura(senha, senhaCozinha)) { valorCookie = valorSessaoCozinha(); papel = 'cozinha'; }
   }
 

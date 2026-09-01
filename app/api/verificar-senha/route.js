@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
+import { supabaseServer } from '../../../lib/supabase';
+import { conferirSenhaDona } from '../../../lib/senha';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,12 +24,13 @@ export async function POST(request) {
   try { const b = await request.json(); senha = b?.senha ?? ''; }
   catch { return NextResponse.json({ ok: false, erro: 'Requisição inválida.' }, { status: 400 }); }
 
-  const alvo = papel === 'dona'
-    ? (process.env.APP_PASSWORD || '')
-    : papel === 'cozinha'
-      ? (process.env.APP_PASSWORD_COZINHA || '1234')
-      : (process.env.APP_PASSWORD_GARCOM || '1234');
+  // Dona: confere pela senha trocada no app (banco) ou pela APP_PASSWORD.
+  if (papel === 'dona') {
+    const ok = senha && await conferirSenhaDona(supabaseServer(), senha);
+    return ok ? NextResponse.json({ ok: true, papel }) : NextResponse.json({ ok: false, erro: 'Senha incorreta.' }, { status: 401 });
+  }
 
+  const alvo = papel === 'cozinha' ? (process.env.APP_PASSWORD_COZINHA || '1234') : (process.env.APP_PASSWORD_GARCOM || '1234');
   if (senha && alvo && comparaSegura(senha, alvo)) return NextResponse.json({ ok: true, papel });
   return NextResponse.json({ ok: false, erro: 'Senha incorreta.' }, { status: 401 });
 }
