@@ -12,6 +12,9 @@ const PREFIXO = 'ponto:';
 const txt = (v, max) => String(v == null ? '' : v).slice(0, max).trim();
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const norm = (s) => (s || '').trim().toLowerCase();
+// Padroniza o nome pra NÃO virar "duas pessoas" por causa de maiúscula/espaço:
+// "FRANCINE", "francine", " Francine " -> "Francine". Assim as horas somam certo.
+const nomeCanonico = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase().replace(/(^|\s)([\p{L}])/gu, (m, sp, c) => sp + c.toUpperCase());
 const hojeBrasil = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
 // A cozinha e o atendimento batem o ponto; a dona também vê e pode corrigir.
@@ -60,7 +63,7 @@ export async function POST(request) {
       if (!nome) return NextResponse.json({ ok: false, erro: 'Diga o nome de quem está entrando.' }, { status: 400 });
       const abertos = (await lerRegistros(sb)).filter((v) => !v.saida && norm(v.nome) === norm(nome) && (!v.papel || v.papel === p));
       if (abertos.length) return NextResponse.json({ ok: true, jaAberto: true, registro: abertos[0] });
-      const reg = { id: uid(), nome, entrada: new Date().toISOString(), saida: null, data: hojeBrasil(), papel: p };
+      const reg = { id: uid(), nome: nomeCanonico(nome), entrada: new Date().toISOString(), saida: null, data: hojeBrasil(), papel: p };
       const { error } = await sb.from('pdm_dados').upsert({ chave: PREFIXO + reg.id, valor: reg, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
       return NextResponse.json({ ok: true, registro: reg });
@@ -114,7 +117,7 @@ export async function POST(request) {
       const dataSaida = mins(sHM) <= mins(eHM) ? proxDia(data) : data;
       const entradaISO = new Date(`${data}T${eHM}:00-03:00`).toISOString();
       const saidaISO = new Date(`${dataSaida}T${sHM}:00-03:00`).toISOString();
-      const reg = { id: uid(), nome, entrada: entradaISO, saida: saidaISO, data, papel: setor, manual: true };
+      const reg = { id: uid(), nome: nomeCanonico(nome), entrada: entradaISO, saida: saidaISO, data, papel: setor, manual: true };
       const { error } = await sb.from('pdm_dados').upsert({ chave: PREFIXO + reg.id, valor: reg, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
       return NextResponse.json({ ok: true, registro: reg });

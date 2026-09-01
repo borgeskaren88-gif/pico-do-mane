@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { C, Card, Btn, Field, TextInput, Empty, SecTitle, KPI } from './ui';
 import { mesLabel, fmtDate } from '../lib/util';
 
@@ -33,6 +33,15 @@ export default function PontoCozinha() {
     finally { setCarregado(true); }
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Se o setor já tem UM nome conhecido, preenche sozinho (uma vez) — a pessoa
+  // só toca em Entrada/Saída, sem redigitar e sem risco de escrever diferente.
+  const preencheu = useRef(false);
+  useEffect(() => {
+    if (preencheu.current || !carregado) return;
+    const nomes = [...new Set(registros.map((r) => r.nome).filter(Boolean))];
+    if (nomes.length === 1) { setNome(nomes[0]); preencheu.current = true; }
+  }, [carregado, registros]);
 
   const hoje = hojeBR();
   const doDia = registros.filter((r) => r.data === hoje);
@@ -99,11 +108,17 @@ export default function PontoCozinha() {
       <Card style={{ marginBottom: 14 }}>
         <Field label="Seu nome"><TextInput value={nome} onChange={setNome} placeholder="Ex.: Maria" /></Field>
         {nomesRecentes.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-            {nomesRecentes.map((n) => (
-              <button key={n} onClick={() => { setNome(n); setErro(''); }} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.muted, borderRadius: 999, padding: '6px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{n}</button>
-            ))}
-          </div>
+          <>
+            <div style={{ fontSize: 12, color: C.faint, marginBottom: 6 }}>Toque no seu nome (evita escrever diferente):</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {nomesRecentes.map((n) => {
+                const sel = norm(n) === norm(nome);
+                return (
+                  <button key={n} onClick={() => { setNome(n); setErro(''); }} style={{ border: `1px solid ${sel ? C.accent : C.line}`, background: sel ? C.accent : 'transparent', color: sel ? '#06101F' : C.muted, borderRadius: 999, padding: '7px 14px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>{n}</button>
+                );
+              })}
+            </div>
+          </>
         )}
         {abertoDoNome ? (
           <>
