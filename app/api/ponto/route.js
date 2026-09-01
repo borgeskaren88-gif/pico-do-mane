@@ -90,10 +90,14 @@ export async function POST(request) {
       for (const key of ['cozinha', 'garcom', 'dona']) {
         const j = entra[key];
         if (!j || typeof j !== 'object') continue;
+        const nome = nomeCanonico(txt(j.nome, 60));
         const dias = Array.isArray(j.dias) ? [...new Set(j.dias.map(Number).filter((d) => d >= 0 && d <= 6))].sort((a, b) => a - b) : [];
         const entrada = hhmm(j.entrada), saida = hhmm(j.saida);
-        if (!dias.length || !entrada || !saida) continue;
-        limpo[key] = { dias, entrada, saida };
+        const temJornada = dias.length && entrada && saida;
+        if (!nome && !temJornada) continue;
+        limpo[key] = {};
+        if (nome) limpo[key].nome = nome;
+        if (temJornada) { limpo[key].dias = dias; limpo[key].entrada = entrada; limpo[key].saida = saida; }
       }
       const { error } = await sb.from('pdm_dados').upsert({ chave: 'jornadas', valor: limpo, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;

@@ -45,7 +45,10 @@ export default function PontoCozinha() {
 
   const hoje = hojeBR();
   const doDia = registros.filter((r) => r.data === hoje);
-  const abertoDoNome = nome.trim() ? registros.find((r) => !r.saida && norm(r.nome) === norm(nome)) : null;
+  // Nome fixo do setor (a dona cadastra) — quando existe, a pessoa não digita nada.
+  const nomeFixo = (jornadas[papel] && jornadas[papel].nome) ? jornadas[papel].nome : '';
+  const nomeAtivo = nomeFixo || nome.trim();
+  const abertoDoNome = nomeAtivo ? registros.find((r) => !r.saida && norm(r.nome) === norm(nomeAtivo)) : null;
   const trabalhandoAgora = registros.filter((r) => !r.saida);
   const nomesRecentes = [...new Set(registros.map((r) => r.nome).filter(Boolean))].slice(0, 6);
 
@@ -83,7 +86,7 @@ export default function PontoCozinha() {
   };
 
   const bater = async (acao) => {
-    const n = nome.trim();
+    const n = nomeFixo || nome.trim();
     if (!n) { setErro('Escreva seu nome primeiro.'); return; }
     setBusy(true); setErro(''); setMsg('');
     try {
@@ -106,7 +109,10 @@ export default function PontoCozinha() {
       {erro && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{erro}</div>}
 
       <Card style={{ marginBottom: 14 }}>
-        <Field label="Seu nome"><TextInput value={nome} onChange={setNome} placeholder="Ex.: Maria" /></Field>
+        {nomeFixo ? (
+          <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 12 }}>Olá, {nomeFixo} 👋</div>
+        ) : (
+        <><Field label="Seu nome"><TextInput value={nome} onChange={setNome} placeholder="Ex.: Maria" /></Field>
         {nomesRecentes.length > 0 && (
           <>
             <div style={{ fontSize: 12, color: C.faint, marginBottom: 6 }}>Toque no seu nome (evita escrever diferente):</div>
@@ -119,6 +125,8 @@ export default function PontoCozinha() {
               })}
             </div>
           </>
+        )}
+        </>
         )}
         {abertoDoNome ? (
           <>
