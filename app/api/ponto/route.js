@@ -40,7 +40,7 @@ export async function GET() {
     // Jornada esperada por setor (dona configura): { cozinha:{dias,entrada,saida}, garcom:{...} }.
     const { data: jr } = await sb.from('pdm_dados').select('valor').eq('chave', 'jornadas').maybeSingle();
     const jornadas = (jr?.valor && typeof jr.valor === 'object') ? jr.valor : {};
-    return NextResponse.json({ ok: true, registros, jornadas });
+    return NextResponse.json({ ok: true, registros, jornadas, papel: p });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar o ponto.' }, { status: 500 });
   }
