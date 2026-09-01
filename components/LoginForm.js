@@ -18,15 +18,12 @@ export default function LoginForm() {
     setErro('');
     setCarregando(true);
     try {
-      // Celular (ou app instalado na tela inicial) => continua logado.
-      // Computador no navegador => cookie de sessão: ao fechar, pede a senha
-      // de novo. Detecta pelo aparelho e pelo modo "app instalado".
+      // Só o celular/tablet continua logado. Notebook/PC pede a senha ao fechar
+      // — MESMO com o app instalado (o app no notebook também é "standalone",
+      // então a diferença tem que ser pelo aparelho, não pelo modo instalado).
       const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-      const ehCelular = /Android|iPhone|iPad|iPod/i.test(ua)
+      const lembrar = /Android|iPhone|iPad|iPod/i.test(ua)
         || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      const instalado = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
-        || (typeof navigator !== 'undefined' && navigator.standalone === true);
-      const lembrar = ehCelular || instalado;
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
