@@ -123,6 +123,12 @@ export default function Caixa({ papel = 'dona' }) {
                 <span style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(entradas[m] || 0)}</span>
               </div>
             ))}
+            {(dados.fiadoRecebido?.total || 0) > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderTop: `1px solid ${C.line}`, fontSize: 14 }}>
+                <span style={{ color: C.muted }}>Entrada · Fiado recebido</span>
+                <span style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(dados.fiadoRecebido.total)}</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderTop: `2px solid ${C.line}`, marginTop: 4 }}>
               <span style={{ fontWeight: 800, color: C.text }}>Dinheiro na gaveta (saldo final)</span>
               <span style={{ fontWeight: 800, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(dados.dinheiroFinal)}</span>
@@ -134,22 +140,6 @@ export default function Caixa({ papel = 'dona' }) {
               </div>
             )}
           </Card>
-
-          {(dados.fiadoRecebido?.total || 0) > 0 && (
-            <Card style={{ marginBottom: 14, borderColor: C.green }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: C.green }}>Fiado recebido neste caixa</div>
-                <div style={{ fontSize: 16, fontWeight: 900, color: C.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(dados.fiadoRecebido.total)}</div>
-              </div>
-              <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Dinheiro de contas fiado que entrou hoje — não é comanda de hoje (já está somado no total acima).</div>
-              {METODOS.map((m) => (dados.fiadoRecebido[m] || 0) > 0 && (
-                <div key={m} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: `1px solid ${C.line}`, marginTop: 6, fontSize: 13 }}>
-                  <span style={{ color: C.muted }}>{m}</span>
-                  <span style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(dados.fiadoRecebido[m])}</span>
-                </div>
-              ))}
-            </Card>
-          )}
 
           {papel !== 'garcom' && (dados.servico || 0) > 0 && (
             <Card style={{ marginBottom: 14, padding: '12px 14px', borderColor: C.accent2 }}>
