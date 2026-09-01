@@ -15,11 +15,11 @@
   --c-text: #E9F0FB;
   --c-muted: #94A8C7;
   --c-faint: #5E7391;
-  --c-green: #4FC79B;
-  --c-red: #E9765C;
+  --c-green: #26C767;
+  --c-red: #F0524D;
   /* Dourado quente pra atencao (boletos a pagar, avisos nao-criticos). */
   --c-amber: #ECB24A;
-  --c-red-soft: rgba(233, 118, 92, 0.33);
+  --c-red-soft: rgba(240, 82, 77, 0.33);
   --c-bar-bg: rgba(8, 13, 24, 0.55);
   --c-glow-a: rgba(59, 134, 245, 0.30);
   --c-glow-b: rgba(59, 134, 245, 0);
@@ -43,10 +43,10 @@
   --c-text: #14233B;
   --c-muted: #5B6B82;
   --c-faint: #8A99AD;
-  --c-green: #1DA97C;
-  --c-red: #E05640;
+  --c-green: #16A34A;
+  --c-red: #DC2626;
   --c-amber: #B5820F;
-  --c-red-soft: rgba(224, 86, 64, 0.35);
+  --c-red-soft: rgba(220, 38, 38, 0.32);
   --c-bar-bg: rgba(247, 250, 255, 0.72);
   --c-glow-a: rgba(59, 111, 240, 0.07);
   --c-glow-b: rgba(59, 111, 240, 0);
