@@ -51,7 +51,7 @@ export default function PontoDona() {
   // ---- Config da jornada ----
   const abrirConfig = () => {
     const base = {};
-    for (const [k] of SETORES) base[k] = jornadas[k] ? { dias: [...(jornadas[k].dias || [])], entrada: jornadas[k].entrada || '16:00', saida: jornadas[k].saida || '00:00' } : { dias: [], entrada: '16:00', saida: '00:00' };
+    for (const [k] of SETORES) base[k] = jornadas[k] ? { nome: jornadas[k].nome || '', dias: [...(jornadas[k].dias || [])], entrada: jornadas[k].entrada || '16:00', saida: jornadas[k].saida || '00:00' } : { nome: '', dias: [], entrada: '16:00', saida: '00:00' };
     setForm(base); setMsg(''); setConfigAberto(true);
   };
   const toggleDia = (setor, d) => setForm((f) => {
@@ -161,6 +161,11 @@ export default function PontoDona() {
               return (
                 <div key={k} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 12, marginTop: 12 }}>
                   <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>{rot}</div>
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 4 }}>Nome do funcionário</div>
+                    <input value={j.nome || ''} onChange={(e) => setForm((f) => ({ ...f, [k]: { ...(f[k] || { dias: [], entrada: '16:00', saida: '00:00' }), nome: e.target.value } }))} placeholder="Ex.: Francine" style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 8, padding: '9px 10px', fontSize: 14, width: '100%', boxSizing: 'border-box' }} />
+                    <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>A tela de Ponto dela já vem com esse nome — ela só toca em Entrada/Saída.</div>
+                  </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                     {DIAS.map(([d, dr]) => {
                       const on = j.dias.includes(d);
