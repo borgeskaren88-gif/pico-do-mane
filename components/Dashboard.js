@@ -109,7 +109,7 @@ function normalizarNomes(dados) {
 
 export default function Dashboard() {
   const router = useRouter();
-  const [tab, setTab] = useState('brain');
+  const [tab, setTab] = useState('hoje');
   const [loaded, setLoaded] = useState(false);
   const [erroLoad, setErroLoad] = useState(false);
   const [salvarFalhou, setSalvarFalhou] = useState(false);
@@ -357,7 +357,7 @@ export default function Dashboard() {
   // sabores/combos. Sem isso, quem ia direto pro Cardápio via a lista vazia.
   useEffect(() => {
     if (tab === 'abastecimento') carregarEstoque({ sincronizar: true });
-    else if (tab === 'salao' || tab === 'financas' || tab === 'previsao') carregarEstoque({});
+    else if (tab === 'salao' || tab === 'financas' || tab === 'previsao' || tab === 'hoje') carregarEstoque({});
   }, [tab, carregarEstoque]);
 
   // Uma ação do estoque (add/mov/edit/del/fichas): chama a API e atualiza o
@@ -427,7 +427,7 @@ export default function Dashboard() {
   };
 
   const tabs = [
-    ['brain', 'Brain'], ['hoje', 'Hoje'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
+    ['brain', 'Brain'], ['hoje', 'Dashboard'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['previsao', 'Previsão'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'], ['despesarapida', 'Despesa Rápida'],
     ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['backup', 'Backup'],
@@ -442,7 +442,7 @@ export default function Dashboard() {
   useEffect(() => { try { if (localStorage.getItem('picoos-lateral') === 'recolhida') setLateralRecolhida(true); } catch { /* ignora */ } }, []);
   const recolherLateral = (v) => setLateralRecolhida((cur) => { const nv = v == null ? !cur : v; try { localStorage.setItem('picoos-lateral', nv ? 'recolhida' : 'aberta'); } catch { /* ignora */ } return nv; });
   const grupos = [
-    { titulo: 'Início', itens: [['hoje', 'Hoje'], ['brain', 'Brain']] },
+    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ['brain', 'Brain']] },
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento'], ['previsao', 'Previsão']] },
     { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
@@ -618,7 +618,7 @@ export default function Dashboard() {
 
       <div style={{ maxWidth: tab === 'brain' ? 1180 : 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
-        {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} setTab={irParaTab} />}
+        {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
         {tab === 'financas' && (
           <>
