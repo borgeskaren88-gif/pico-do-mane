@@ -100,13 +100,16 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
   }, [previsoes, fichaPorCardapio, estoquePorId]);
 
   const fmt = (x) => { const r = Math.round(x * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1).replace('.', ','); };
+  // Produtos vendidos são unidades inteiras (cerveja, prato): mostra sem vírgula,
+  // que "meia cerveja" confunde. Ingredientes do preparo seguem com vírgula (fmt).
+  const fmtInt = (x) => String(Math.max(0, Math.round(num(x))));
   const diasBase = useMemo(() => { const s = new Set(); for (const wd of wdsAlvo) for (const d of (hist.datasPorWd[wd] || [])) s.add(d); return s.size; }, [hist, alvo]); // eslint-disable-line react-hooks/exhaustive-deps
   const totalEsperado = previsoes.reduce((s, p) => s + p.esperado, 0);
   const maxEsp = previsoes[0]?.esperado || 1;
   const faltamCompras = preparo.filter((x) => x.falta > 0.001);
   const nomeAlvo = alvo === FDS ? 'Fim de semana' : alvo.replace('-Feira', '');
   const top = previsoes.slice(0, 8);
-  const chartData = top.map((p) => ({ curto: p.nome.length > 8 ? p.nome.slice(0, 7) + '…' : p.nome, esperado: Math.round(p.esperado * 10) / 10 }));
+  const chartData = top.map((p) => ({ curto: p.nome.length > 8 ? p.nome.slice(0, 7) + '…' : p.nome, esperado: Math.round(p.esperado) }));
 
   return (
     <div>
@@ -136,7 +139,7 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
       ) : (
         <>
           <div className="pv-grid" style={{ marginTop: 12 }}>
-            <Stat label={nomeAlvo} valor={fmt(totalEsperado)} sub="itens esperados" forte={C.accent} />
+            <Stat label={nomeAlvo} valor={fmtInt(totalEsperado)} sub="itens esperados" forte={C.accent} />
             <Stat label="Produtos" valor={String(previsoes.length)} sub="com previsão" />
             <Stat label="Dias de base" valor={String(diasBase)} sub="no histórico" />
             <Stat label="Podem faltar" valor={String(faltamCompras.length)} sub={faltamCompras.length ? 'ingredientes' : 'nada'} forte={faltamCompras.length ? C.red : C.green} />
@@ -160,7 +163,7 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
                   <CartesianGrid vertical={false} stroke={C.hair} />
                   <XAxis dataKey="curto" tick={{ fontSize: 9.5, fill: C.faint }} tickLine={false} axisLine={{ stroke: C.hair }} interval={0} />
                   <Bar dataKey="esperado" fill="url(#pvBar)" radius={[3, 3, 0, 0]} maxBarSize={30} isAnimationActive={false}>
-                    <LabelList dataKey="esperado" position="top" style={{ fontSize: 11, fontWeight: 800, fill: C.text }} formatter={(v) => fmt(v)} />
+                    <LabelList dataKey="esperado" position="top" style={{ fontSize: 11, fontWeight: 800, fill: C.text }} formatter={(v) => fmtInt(v)} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -177,8 +180,8 @@ export default function Previsao({ vendas = [], cardapio = [], fichas = [], esto
                 <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</span>
                 <span className="pv-mini"><i style={{ width: Math.max(6, (p.esperado / maxEsp) * 100) + '%' }} /></span>
                 <span style={{ flexShrink: 0, textAlign: 'right', minWidth: 96 }}>
-                  <b style={{ fontSize: 15, fontWeight: 800, color: C.text, ...TAB }}>{fmt(p.esperado)}</b>
-                  <span style={{ fontSize: 11, color: C.faint, ...TAB }}> {fmt(p.low)}–{fmt(p.high)}</span>
+                  <b style={{ fontSize: 15, fontWeight: 800, color: C.text, ...TAB }}>{fmtInt(p.esperado)}</b>
+                  <span style={{ fontSize: 11, color: C.faint, ...TAB }}> {fmtInt(p.low)}–{fmtInt(p.high)}</span>
                 </span>
               </div>
             ))}
