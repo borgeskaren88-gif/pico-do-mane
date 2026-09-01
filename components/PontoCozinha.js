@@ -50,7 +50,16 @@ export default function PontoCozinha() {
   const nomeAtivo = nomeFixo || nome.trim();
   const abertoDoNome = nomeAtivo ? registros.find((r) => !r.saida && norm(r.nome) === norm(nomeAtivo)) : null;
   const trabalhandoAgora = registros.filter((r) => !r.saida);
-  const nomesRecentes = [...new Set(registros.map((r) => r.nome).filter(Boolean))].slice(0, 6);
+  // Junta grafias diferentes do mesmo nome (FRANCINE/Francine) num botão só.
+  const nomesRecentes = useMemo(() => {
+    const vis = new Map();
+    for (const r of registros) {
+      const n = (r.nome || '').trim(); if (!n) continue;
+      const k = norm(n);
+      if (!vis.has(k)) vis.set(k, n.replace(/\s+/g, ' ').replace(/(^|\s)([\p{L}])/gu, (m, sp, c) => sp + c.toUpperCase()));
+    }
+    return [...vis.values()].slice(0, 6);
+  }, [registros]);
 
   // Folha do mês: horas por pessoa neste mês + saldo (em haver / devendo) contra
   // a jornada do setor. A API já manda só o ponto deste setor.
