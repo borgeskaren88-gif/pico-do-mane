@@ -62,7 +62,7 @@ export default function Fiados({ onMudou, clientes = [] }) {
       g.vendas.sort((a, b) => (b.fechadaEm || b.data || '').localeCompare(a.fechadaEm || a.data || ''));
       g.limite = limiteDe(g.nome);
     }
-    return [...map.values()].sort((a, b) => b.total - a.total);
+    return [...map.values()].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' }));
   }, [vendas, clientes]);
 
   const itensDe = (v) => (Array.isArray(v.itens) ? v.itens : []);
