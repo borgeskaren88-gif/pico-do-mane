@@ -24,12 +24,14 @@ if (!r || !r.ok) {
   const o = r.ontem || {};
   const cx = w.addText(o.caixaBRL || "R$ 0,00");
   cx.font = Font.boldSystemFont(22); cx.textColor = Color.white();
-  const sub = w.addText("caixa de ontem");
+  const sub = w.addText("entrou no caixa ontem");
   sub.font = Font.systemFont(9); sub.textColor = new Color("#9AA7BD");
-  w.addSpacer(6);
-  const aReceber = (r.aReceber && r.aReceber.totalBRL) || o.fiadoBRL || "R$ 0,00";
-  const fi = w.addText("A receber (fiado): " + aReceber);
+  w.addSpacer(5);
+  const fi = w.addText("Fiado de ontem: " + (o.fiadoBRL || "R$ 0,00"));
   fi.font = Font.systemFont(10); fi.textColor = new Color("#ECB24A");
+  w.addSpacer(3);
+  const tt = w.addText("Total do dia: " + (o.totalBRL || o.caixaBRL || "R$ 0,00"));
+  tt.font = Font.boldSystemFont(11); tt.textColor = new Color("#5BBF8A");
   w.addSpacer(8);
   const eb = r.estoqueBaixo || { quantidade: 0, itens: [] };
   if (eb.quantidade > 0) {
@@ -89,8 +91,9 @@ export default function Widget() {
           <div style={{ marginTop: 8, background: '#0A1220', borderRadius: 16, padding: 16, maxWidth: 200 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#7AA2FF', letterSpacing: '.08em' }}>PICO DO MANÉ</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginTop: 6, lineHeight: 1 }}>{dados.ontem?.caixaBRL || 'R$ 0,00'}</div>
-            <div style={{ fontSize: 10, color: '#9AA7BD' }}>caixa de ontem</div>
-            <div style={{ fontSize: 10, color: '#ECB24A', marginTop: 4 }}>A receber (fiado): {dados.aReceber?.totalBRL || dados.ontem?.fiadoBRL || 'R$ 0,00'}</div>
+            <div style={{ fontSize: 10, color: '#9AA7BD' }}>entrou no caixa ontem</div>
+            <div style={{ fontSize: 10, color: '#ECB24A', marginTop: 4 }}>Fiado de ontem: {dados.ontem?.fiadoBRL || 'R$ 0,00'}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#5BBF8A', marginTop: 2 }}>Total do dia: {dados.ontem?.totalBRL || dados.ontem?.caixaBRL || 'R$ 0,00'}</div>
             <div style={{ marginTop: 10 }}>
               {dados.estoqueBaixo.quantidade > 0 ? (
                 <>

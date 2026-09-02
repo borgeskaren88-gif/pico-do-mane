@@ -26,10 +26,9 @@ export async function GET(request) {
     const vendasHoje = vendas.filter((v) => (v.data || '') === hoje);
     const vendasOntem = vendas.filter((v) => (v.data || '') === ontem);
 
-    // Fiado gerado ontem (só do dia).
+    // Fiado gerado ontem (só do dia) — foi registrado na conta de alguém ontem.
     const fiadoOntem = Math.round(vendasOntem.reduce((s, v) => s + fiadoDaVenda(v), 0) * 100) / 100;
-    // Total A RECEBER: todos os fiados ainda em aberto (Jessica + todo mundo),
-    // já descontando os pagamentos parciais. É o número que importa de manhã.
+    // Total A RECEBER: todos os fiados ainda em aberto (pra referência).
     const fiadoAberto = Math.round(vendas.reduce((s, v) => s + abertoDaVenda(v), 0) * 100) / 100;
 
     // Saldo do caixa de ontem: soma o "recebido" dos caixas fechados ontem. Se
@@ -56,7 +55,10 @@ export async function GET(request) {
     return NextResponse.json({
       ok: true,
       atualizado: new Date().toISOString(),
-      ontem: { data: ontem, caixa: caixaOntem, caixaBRL: brl(caixaOntem), fiado: fiadoOntem, fiadoBRL: brl(fiadoOntem) },
+      ontem: (() => {
+        const totalDia = Math.round((caixaOntem + fiadoOntem) * 100) / 100;
+        return { data: ontem, caixa: caixaOntem, caixaBRL: brl(caixaOntem), fiado: fiadoOntem, fiadoBRL: brl(fiadoOntem), total: totalDia, totalBRL: brl(totalDia) };
+      })(),
       aReceber: { total: fiadoAberto, totalBRL: brl(fiadoAberto) },
       faturamento: { total: totalHoje, recebido: recebidoHoje, fiado: fiadoHoje, vendas: vendasHoje.length, totalBRL: brl(totalHoje), recebidoBRL: brl(recebidoHoje), fiadoBRL: brl(fiadoHoje) },
       estoqueBaixo: { quantidade: baixos.length, itens: baixos.slice(0, 6).map((it) => it.nome) },
