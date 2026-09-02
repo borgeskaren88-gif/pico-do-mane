@@ -12,18 +12,18 @@
   --c-raised: #543E33;
   --c-line: #5C4638;
   --c-hair: #3E2E26;
-  --c-accent: #B08968;
-  --c-accent2: #D6BFA6;
-  /* Cor do texto/ícone em cima do botão de destaque (caramelo -> texto espresso). */
-  --c-on-accent: #2A1D16;
-  --c-text: #F3E9D7;
-  --c-muted: #C9B49E;
-  --c-faint: #9A8571;
-  --c-green: #79BE93;
-  --c-red: #D08462;
+  --c-accent: #88937B;
+  --c-accent2: #AAB49C;
+  /* Cor do texto/ícone em cima do botão de destaque (sage -> texto oliva escuro). */
+  --c-on-accent: #23271D;
+  --c-text: #E8E1D5;
+  --c-muted: #BEB8A8;
+  --c-faint: #8C8676;
+  --c-green: #8FAE86;
+  --c-red: #A46447;
   /* Dourado quente pra atencao (boletos a pagar, avisos nao-criticos). */
-  --c-amber: #DDA85E;
-  --c-red-soft: rgba(208, 132, 98, 0.33);
+  --c-amber: #D3A45C;
+  --c-red-soft: rgba(164, 100, 71, 0.35);
   --c-bar-bg: rgba(30, 20, 14, 0.45);
   --c-glow-a: rgba(214, 165, 112, 0.42);
   --c-glow-b: rgba(214, 165, 112, 0);
@@ -45,26 +45,26 @@
   --c-raised: #FFFDF8;
   --c-line: #E1CFB4;
   --c-hair: #EDE1CB;
-  --c-accent: #7A553A;
-  --c-accent2: #B08968;
-  /* Cor do texto/ícone em cima do botão de destaque (mocha -> texto creme). */
-  --c-on-accent: #F6EEDF;
-  --c-text: #3B2A22;
-  --c-muted: #6E5646;
-  --c-faint: #9B8672;
-  --c-green: #2E8F63;
-  --c-red: #C15A3C;
-  --c-amber: #9C6F16;
-  --c-red-soft: rgba(193, 90, 60, 0.33);
+  --c-accent: #7C8A6C;
+  --c-accent2: #9BAA8B;
+  /* Cor do texto/ícone em cima do botão de destaque (sage -> texto claro linho). */
+  --c-on-accent: #F5F0E6;
+  --c-text: #2E3327;
+  --c-muted: #5E6653;
+  --c-faint: #8E9484;
+  --c-green: #5E8A54;
+  --c-red: #A65B3E;
+  --c-amber: #8F6A1F;
+  --c-red-soft: rgba(166, 91, 62, 0.33);
   --c-bar-bg: rgba(249, 240, 226, 0.6);
   --c-glow-a: rgba(176, 137, 104, 0.22);
   --c-glow-b: rgba(176, 137, 104, 0);
-  --c-bg-top: #F6E8D2;
-  --c-bg-bottom: #E7D4B7;
+  --c-bg-top: #F4EFE4;
+  --c-bg-bottom: #E4DED0;
   /* Vidro (glassmorphism): cartões translúcidos claros com desfoque. */
-  --c-glass-bg: rgba(255, 253, 248, 0.55);
-  --c-glass-border: rgba(120, 85, 58, 0.16);
-  --c-glass-shadow: 0 10px 30px rgba(93, 64, 33, 0.10);
+  --c-glass-bg: rgba(255, 255, 252, 0.55);
+  --c-glass-border: rgba(70, 78, 60, 0.16);
+  --c-glass-shadow: 0 10px 30px rgba(60, 66, 48, 0.10);
   --c-card-border: #EDE1CB;
   --c-card-shadow: 0 1px 2px rgba(59, 42, 34, 0.05), 0 8px 24px rgba(59, 42, 34, 0.08);
 }

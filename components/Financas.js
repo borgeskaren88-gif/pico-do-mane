@@ -120,7 +120,7 @@ export default function Financas({ usuario, tema = 'escuro' }) {
         </div>
 
         {/* KPIs */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
           <KPI titulo="Gastos" valor={brl(resumo.despesas)} cor={C.red} />
           <KPI titulo="Entradas" valor={brl(resumo.receitas)} cor={C.green} />
           <KPI titulo="Saldo" valor={brl(resumo.saldo)} cor={resumo.saldo >= 0 ? C.green : C.red} />
@@ -135,7 +135,7 @@ export default function Financas({ usuario, tema = 'escuro' }) {
               <TipoBtn ativo={tipo === 'receita'} cor={C.green} onClick={() => { setTipo('receita'); setCategoria(''); }}>Entrada</TipoBtn>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
               <Field label="Valor (R$)">
                 <input inputMode="decimal" value={valor} placeholder="0,00" autoFocus
                   onChange={(e) => setValor(e.target.value)}
@@ -143,7 +143,7 @@ export default function Financas({ usuario, tema = 'escuro' }) {
               </Field>
               <Field label="Data">
                 <input type="date" value={data} onChange={(e) => setData(e.target.value)}
-                  style={{ ...inputStyle, colorScheme: tema === 'escuro' ? 'dark' : 'light' }} />
+                  style={{ ...inputStyle, minWidth: 0, WebkitAppearance: 'none', appearance: 'none', colorScheme: tema === 'escuro' ? 'dark' : 'light' }} />
               </Field>
             </div>
 
