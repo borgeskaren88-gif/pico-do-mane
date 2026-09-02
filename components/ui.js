@@ -35,8 +35,8 @@ export function LogoMark({ size = 42, radius = 12 }) {
           <stop offset="1" stopColor="#E3BA85" />
         </linearGradient>
         <linearGradient id="lm-glass" x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.55" />
-          <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0.12" />
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.62" />
+          <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0.14" />
           <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
         </linearGradient>
         <filter id="lm-glow" x="-45%" y="-45%" width="190%" height="190%">
@@ -48,10 +48,11 @@ export function LogoMark({ size = 42, radius = 12 }) {
       <g transform="translate(9.6,12) scale(3.36)">
         <path d={CORACAO} fill="#C79A69" opacity="0.4" filter="url(#lm-glow)" />
       </g>
-      {/* coração principal, translúcido, com reflexo de vidro */}
+      {/* coração principal em vidro: translúcido, reflexo e bordinha de luz */}
       <g transform="translate(14,16) scale(3)">
-        <path d={CORACAO} fill="url(#lm-heart)" opacity="0.94" />
+        <path d={CORACAO} fill="url(#lm-heart)" opacity="0.5" />
         <path d={CORACAO} fill="url(#lm-glass)" />
+        <path d={CORACAO} fill="none" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="0.5" strokeLinejoin="round" />
       </g>
     </svg>
   );
