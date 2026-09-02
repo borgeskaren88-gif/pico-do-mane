@@ -25,9 +25,9 @@ export function LogoMark({ size = 42, radius = 12 }) {
     <svg width={size} height={size} viewBox="0 0 100 100" style={{ flexShrink: 0, display: 'block' }} aria-hidden="true">
       <defs>
         <linearGradient id="lm-bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#7A4A24" />
-          <stop offset="0.55" stopColor="#A66A34" />
-          <stop offset="1" stopColor="#D19A5E" />
+          <stop offset="0" stopColor="#5E4230" />
+          <stop offset="0.55" stopColor="#7A553A" />
+          <stop offset="1" stopColor="#B08968" />
         </linearGradient>
         <radialGradient id="lm-gloss" cx="0.28" cy="0.2" r="0.9">
           <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.2" />
@@ -38,8 +38,8 @@ export function LogoMark({ size = 42, radius = 12 }) {
       <rect width="100" height="100" rx={rx} fill="url(#lm-gloss)" />
       <text x="50" y="51" textAnchor="middle" dominantBaseline="central"
         fontFamily="Georgia, 'Times New Roman', serif" fontWeight="700"
-        fontSize="46" fill="#FFF7EE" textLength="66" lengthAdjust="spacingAndGlyphs">
-        K<tspan fill="#F0D6B8" fontSize="30">&amp;</tspan>M
+        fontSize="46" fill="#F3E9D7" textLength="66" lengthAdjust="spacingAndGlyphs">
+        K<tspan fill="#D6BFA6" fontSize="30">&amp;</tspan>M
       </text>
     </svg>
   );
