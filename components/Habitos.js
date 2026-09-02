@@ -81,7 +81,7 @@ export default function Habitos({ usuario }) {
               style={{ ...inputStyle, width: 54, textAlign: 'center', flexShrink: 0, fontSize: 18 }} />
             <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Beber 2L de água, Academia, Ler 10min" style={inputStyle} />
           </div>
-          <button type="submit" disabled={salvando} style={{ marginTop: 10, width: '100%', background: C.accent, color: '#06101F', border: 'none', borderRadius: 10, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: salvando ? 'default' : 'pointer', opacity: salvando ? 0.7 : 1 }}>
+          <button type="submit" disabled={salvando} style={{ marginTop: 10, width: '100%', background: C.accent, color: C.onAccent, border: 'none', borderRadius: 10, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: salvando ? 'default' : 'pointer', opacity: salvando ? 0.7 : 1 }}>
             {salvando ? 'Adicionando…' : '+ Adicionar hábito'}
           </button>
         </form>

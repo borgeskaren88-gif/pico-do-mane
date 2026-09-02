@@ -163,7 +163,7 @@ export default function Financas({ usuario, tema = 'escuro' }) {
 
             <button type="submit" disabled={salvando} style={{
               width: '100%', background: tipo === 'receita' ? C.green : C.accent,
-              color: tipo === 'receita' ? '#052014' : '#06101F', border: 'none', borderRadius: 10,
+              color: tipo === 'receita' ? '#052014' : C.onAccent, border: 'none', borderRadius: 10,
               padding: '12px 18px', fontSize: 15, fontWeight: 700, cursor: salvando ? 'default' : 'pointer', opacity: salvando ? 0.7 : 1,
             }}>
               {salvando ? 'Salvando…' : tipo === 'receita' ? '+ Adicionar entrada' : '+ Adicionar gasto'}
@@ -261,7 +261,7 @@ function TipoBtn({ ativo, cor, onClick, children }) {
       flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer',
       border: `1.5px solid ${ativo ? cor : C.line}`,
       background: ativo ? cor : 'transparent',
-      color: ativo ? '#06101F' : C.muted,
+      color: ativo ? C.onAccent : C.muted,
     }}>{children}</button>
   );
 }

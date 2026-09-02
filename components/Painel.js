@@ -72,7 +72,7 @@ export default function Painel({ usuario }) {
             const ativo = aba === id;
             return (
               <button key={id} onClick={() => { setAba(id); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }}
-                style={{ flex: 1, border: 'none', cursor: 'pointer', borderRadius: 12, padding: '8px 6px', background: ativo ? C.accent : 'transparent', color: ativo ? '#06101F' : C.muted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                style={{ flex: 1, border: 'none', cursor: 'pointer', borderRadius: 12, padding: '8px 6px', background: ativo ? C.accent : 'transparent', color: ativo ? C.onAccent : C.muted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                 <span style={{ fontSize: 19, lineHeight: 1 }}>{ico}</span>
                 <span style={{ fontSize: 12, fontWeight: 700 }}>{rot}</span>
               </button>

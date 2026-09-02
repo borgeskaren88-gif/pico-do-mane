@@ -74,7 +74,7 @@ export default function ListaCompras({ usuario }) {
             <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Arroz, Detergente, Pão" style={inputStyle} />
             <input value={quantidade} onChange={(e) => setQuantidade(e.target.value)} placeholder="qtd" style={{ ...inputStyle, width: 76, flexShrink: 0 }} />
           </div>
-          <button type="submit" disabled={salvando} style={{ marginTop: 10, width: '100%', background: C.accent, color: '#06101F', border: 'none', borderRadius: 10, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: salvando ? 'default' : 'pointer', opacity: salvando ? 0.7 : 1 }}>
+          <button type="submit" disabled={salvando} style={{ marginTop: 10, width: '100%', background: C.accent, color: C.onAccent, border: 'none', borderRadius: 10, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: salvando ? 'default' : 'pointer', opacity: salvando ? 0.7 : 1 }}>
             {salvando ? 'Adicionando…' : '+ Adicionar'}
           </button>
         </form>

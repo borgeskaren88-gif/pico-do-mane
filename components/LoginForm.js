@@ -65,7 +65,7 @@ export default function LoginForm() {
               </div>
             </Field>
             {erro && <div style={{ color: C.red, fontSize: 13, marginBottom: 14, marginTop: -6 }}>{erro}</div>}
-            <button type="submit" disabled={carregando} style={{ width: '100%', background: C.accent, color: '#06101F', border: 'none', borderRadius: 10, padding: '12px 18px', fontSize: 15, fontWeight: 700, cursor: carregando ? 'default' : 'pointer', opacity: carregando ? 0.7 : 1 }}>
+            <button type="submit" disabled={carregando} style={{ width: '100%', background: C.accent, color: C.onAccent, border: 'none', borderRadius: 10, padding: '12px 18px', fontSize: 15, fontWeight: 700, cursor: carregando ? 'default' : 'pointer', opacity: carregando ? 0.7 : 1 }}>
               {carregando ? 'Entrando…' : 'Entrar'}
             </button>
           </form>

@@ -4,6 +4,7 @@
 export const C = {
   ink: 'var(--c-ink)', panel: 'var(--c-panel)', panel2: 'var(--c-panel2)', raised: 'var(--c-raised)',
   line: 'var(--c-line)', hair: 'var(--c-hair)', accent: 'var(--c-accent)', accent2: 'var(--c-accent2)',
+  onAccent: 'var(--c-on-accent)',
   text: 'var(--c-text)', muted: 'var(--c-muted)', faint: 'var(--c-faint)',
   green: 'var(--c-green)', red: 'var(--c-red)', amber: 'var(--c-amber)',
   redSoft: 'var(--c-red-soft)', barBg: 'var(--c-bar-bg)',
@@ -15,17 +16,18 @@ export const C = {
 // variáveis do tema, então o degradê muda junto no claro/escuro.
 export const pageBg = 'radial-gradient(1000px 560px at 50% -4%, var(--c-glow-a), var(--c-glow-b) 58%), linear-gradient(180deg, var(--c-bg-top) 0%, var(--c-bg-bottom) 55%)';
 
-// Marca do app: mesma seta de crescimento em degradê azul do ícone da tela
-// inicial. `size` em px; `radius` é o arredondamento em px do quadrado.
+// Marca do app: monograma "K & M" em creme sobre um quadrado marrom degradê
+// (café -> caramelo), o mesmo do ícone da tela inicial. `size` em px; `radius`
+// é o arredondamento em px do quadrado.
 export function LogoMark({ size = 42, radius = 12 }) {
   const rx = (radius * 100) / size; // converte px -> unidades do viewBox 0..100
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" style={{ flexShrink: 0, display: 'block' }} aria-hidden="true">
       <defs>
         <linearGradient id="lm-bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#1652E8" />
-          <stop offset="0.55" stopColor="#2C86F5" />
-          <stop offset="1" stopColor="#38D2F0" />
+          <stop offset="0" stopColor="#7A4A24" />
+          <stop offset="0.55" stopColor="#A66A34" />
+          <stop offset="1" stopColor="#D19A5E" />
         </linearGradient>
         <radialGradient id="lm-gloss" cx="0.28" cy="0.2" r="0.9">
           <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.2" />
@@ -34,10 +36,11 @@ export function LogoMark({ size = 42, radius = 12 }) {
       </defs>
       <rect width="100" height="100" rx={rx} fill="url(#lm-bg)" />
       <rect width="100" height="100" rx={rx} fill="url(#lm-gloss)" />
-      <g fill="none" stroke="#FFFFFF" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M26 70 L74 30" />
-        <path d="M58 30 L74 30 L74 46" />
-      </g>
+      <text x="50" y="51" textAnchor="middle" dominantBaseline="central"
+        fontFamily="Georgia, 'Times New Roman', serif" fontWeight="700"
+        fontSize="46" fill="#FFF7EE" textLength="66" lengthAdjust="spacingAndGlyphs">
+        K<tspan fill="#F0D6B8" fontSize="30">&amp;</tspan>M
+      </text>
     </svg>
   );
 }
@@ -87,7 +90,7 @@ export function Area({ value, onChange, placeholder, rows = 2 }) {
 
 export function Btn({ children, onClick, kind = 'primary', small, type = 'button' }) {
   const styles = {
-    primary: { background: C.accent, color: '#06101F', border: 'none' },
+    primary: { background: C.accent, color: C.onAccent, border: 'none' },
     ghost: { background: 'transparent', color: C.text, border: `1px solid ${C.line}` },
     danger: { background: 'transparent', color: C.red, border: `1px solid ${C.redSoft}` },
     ok: { background: C.green, color: '#052014', border: 'none' },
