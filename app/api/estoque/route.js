@@ -4,6 +4,7 @@ import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, igualNome } from '../../../lib/estoque';
 import { limparNome, num } from '../../../lib/util';
+import { notificarEstoqueCritico } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +76,8 @@ export async function POST(request) {
       itens = itens.map((it) => { if (it.id !== id) return it; achou = true; return aplicarMovimentoItem(it, tipo, body?.qtd, (body?.motivo || '') + quem); });
       if (!achou) return NextResponse.json({ ok: false, erro: 'Item não encontrado.' }, { status: 404 });
       const novo = await gravarEstoque(sb, blob, { estoque: itens });
+      // Saída/contagem podem zerar um item: avisa na hora se cruzou pro mínimo/zero.
+      if (tipo === 'saida' || tipo === 'contagem') { try { await notificarEstoqueCritico(sb, arr(blob.estoque), itens); } catch (e) { /* push nunca quebra o movimento */ } }
       return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
     }
 
@@ -231,6 +234,7 @@ export async function POST(request) {
       const r = aplicarBaixasVendas(itens, arr(blob.fichas), vendas, arr(blob.estoqueBaixas));
       if (r.mudou || r.baixadas !== arr(blob.estoqueBaixas)) {
         const novo = await gravarEstoque(sb, blob, { estoque: r.estoque, estoqueBaixas: r.baixadas });
+        if (r.mudou) { try { await notificarEstoqueCritico(sb, itens, r.estoque); } catch (e) { /* push nunca quebra a sincronização */ } }
         return NextResponse.json({ ok: true, itens: arr(novo.estoque), fichas: arr(novo.fichas), resumo: r.resumo });
       }
       return NextResponse.json({ ok: true, itens, fichas: arr(blob.fichas), resumo: r.resumo });
