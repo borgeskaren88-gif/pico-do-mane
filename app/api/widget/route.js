@@ -5,6 +5,8 @@ import { num, brl, addDays, fiadoDaVenda, abertoDaVenda, diaOperacional } from '
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const fetchCache = 'force-no-store'; // nunca cachear a leitura do banco
+export const revalidate = 0;
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 
