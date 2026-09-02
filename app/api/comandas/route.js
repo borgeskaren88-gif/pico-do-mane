@@ -4,7 +4,7 @@ import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
 import { num, limparNome, fiadoDaVenda, abertoDaVenda, brl } from '../../../lib/util';
-import { enviarPush } from '../../../lib/push';
+import { enviarPush, notificarEstoqueCritico } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -161,6 +161,7 @@ export async function POST(request) {
       const novos = estoque.map((it) => { if (it.id !== itemId) return it; achou = true; return aplicarMovimentoItem(it, 'saida', qtd, motivo + ' (atendimento)'); });
       if (!achou) return NextResponse.json({ ok: false, erro: 'Item não encontrado no estoque.' }, { status: 404 });
       await gravarPainelParcial(sb, { estoque: novos });
+      try { await notificarEstoqueCritico(sb, estoque, novos); } catch (e) { /* push nunca quebra a baixa */ }
       return NextResponse.json({ ok: true });
     }
 
@@ -196,6 +197,7 @@ export async function POST(request) {
       }
       if (!mudou) return NextResponse.json({ ok: false, erro: 'Não achei ingredientes pra baixar (confira a ficha).' }, { status: 400 });
       await gravarPainelParcial(sb, { estoque: novoEstoque });
+      try { await notificarEstoqueCritico(sb, estoque, novoEstoque); } catch (e) { /* push nunca quebra a baixa */ }
       return NextResponse.json({ ok: true, prato });
     }
 
@@ -355,6 +357,8 @@ export async function POST(request) {
         const rb = aplicarBaixasVendas(arr(blobAtual.estoque), arr(blobAtual.fichas), [venda], arr(blobAtual.estoqueBaixas), false);
         if (rb.mudou) {
           await gravarPainelParcial(sb, { estoque: rb.estoque, estoqueBaixas: rb.baixadas });
+          // Avisa na hora se algum item acabou/chegou no mínimo com essa venda.
+          try { await notificarEstoqueCritico(sb, blobAtual.estoque, rb.estoque); } catch (e) { /* push nunca quebra a venda */ }
         }
       } catch (e) { /* estoque nunca quebra a venda */ }
       // Aviso na hora: se essa venda no fiado levou o cliente a bater o limite,
