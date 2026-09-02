@@ -56,7 +56,7 @@ export async function GET(request) {
       ontem: { data: ontem, caixa: caixaOntem, caixaBRL: brl(caixaOntem), fiado: fiadoOntem, fiadoBRL: brl(fiadoOntem) },
       faturamento: { total: totalHoje, recebido: recebidoHoje, fiado: fiadoHoje, vendas: vendasHoje.length, totalBRL: brl(totalHoje), recebidoBRL: brl(recebidoHoje), fiadoBRL: brl(fiadoHoje) },
       estoqueBaixo: { quantidade: baixos.length, itens: baixos.slice(0, 6).map((it) => it.nome) },
-    });
+    }, { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro no widget.' }, { status: 500 });
   }
