@@ -16,10 +16,12 @@ export const C = {
 // variáveis do tema, então o degradê muda junto no claro/escuro.
 export const pageBg = 'radial-gradient(1000px 560px at 50% -4%, var(--c-glow-a), var(--c-glow-b) 58%), linear-gradient(180deg, var(--c-bg-top) 0%, var(--c-bg-bottom) 55%)';
 
-// Marca do app: um coração em degradê café/caramelo sobre um quadrado creme,
-// o mesmo do ícone da tela inicial. `size` em px; `radius` é o arredondamento
-// em px do quadrado.
-const CORACAO = 'M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z';
+// Marca do app: coração "dobrado" (dois planos com vinco no meio, dando um ar
+// 3D moderno) em degradê café/caramelo, com um coração-eco desfocado atrás,
+// sobre um quadrado creme. `size` em px; `radius` é o arredondamento em px.
+const H_FULL = 'M50 82 C 42 72, 22 60, 16 43 C 12 31, 21 22, 32 24 C 40 25.5, 46 31, 50 38 C 54 31, 60 25.5, 68 24 C 79 22, 88 31, 84 43 C 78 60, 58 72, 50 82 Z';
+const H_LEFT = 'M50 38 C 46 31, 40 25.5, 32 24 C 21 22, 12 31, 16 43 C 22 60, 42 72, 50 82 Z';
+const H_RIGHT = 'M50 38 C 54 31, 60 25.5, 68 24 C 79 22, 88 31, 84 43 C 78 60, 58 72, 50 82 Z';
 export function LogoMark({ size = 42, radius = 12 }) {
   const rx = (radius * 100) / size; // converte px -> unidades do viewBox 0..100
   return (
@@ -29,31 +31,32 @@ export function LogoMark({ size = 42, radius = 12 }) {
           <stop offset="0" stopColor="#FDF8F0" />
           <stop offset="1" stopColor="#EADFCC" />
         </linearGradient>
-        <linearGradient id="lm-heart" x1="0.12" y1="0.05" x2="0.9" y2="1">
-          <stop offset="0" stopColor="#6E4A2C" />
-          <stop offset="0.5" stopColor="#A9794B" />
-          <stop offset="1" stopColor="#E3BA85" />
+        <linearGradient id="lm-left" x1="0.1" y1="0" x2="0.6" y2="1">
+          <stop offset="0" stopColor="#D9B481" />
+          <stop offset="1" stopColor="#EBD1A2" />
         </linearGradient>
-        <linearGradient id="lm-glass" x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.62" />
-          <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0.14" />
+        <linearGradient id="lm-right" x1="0.4" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#7E5433" />
+          <stop offset="1" stopColor="#B0855A" />
+        </linearGradient>
+        <linearGradient id="lm-sheen" x1="0" y1="0" x2="0.35" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.42" />
+          <stop offset="0.55" stopColor="#FFFFFF" stopOpacity="0.05" />
           <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
         </linearGradient>
-        <filter id="lm-glow" x="-45%" y="-45%" width="190%" height="190%">
-          <feGaussianBlur stdDeviation="4.6" />
+        <filter id="lm-glow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="3" />
         </filter>
       </defs>
       <rect width="100" height="100" rx={rx} fill="url(#lm-tile)" />
-      {/* coração-eco desfocado atrás, dando um glow moderno */}
-      <g transform="translate(9.6,12) scale(3.36)">
-        <path d={CORACAO} fill="#C79A69" opacity="0.4" filter="url(#lm-glow)" />
+      {/* coração-eco desfocado atrás (glow moderno) */}
+      <g transform="translate(50,50) scale(1.14) translate(-50,-52)">
+        <path d={H_FULL} fill="#CBA476" opacity="0.32" filter="url(#lm-glow)" />
       </g>
-      {/* coração principal em vidro: translúcido, reflexo e bordinha de luz */}
-      <g transform="translate(14,16) scale(3)">
-        <path d={CORACAO} fill="url(#lm-heart)" opacity="0.5" />
-        <path d={CORACAO} fill="url(#lm-glass)" />
-        <path d={CORACAO} fill="none" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="0.5" strokeLinejoin="round" />
-      </g>
+      {/* coração dobrado: plano claro à esquerda, escuro à direita, brilho por cima */}
+      <path d={H_LEFT} fill="url(#lm-left)" />
+      <path d={H_RIGHT} fill="url(#lm-right)" />
+      <path d={H_FULL} fill="url(#lm-sheen)" />
     </svg>
   );
 }
