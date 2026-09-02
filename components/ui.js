@@ -26,23 +26,32 @@ export function LogoMark({ size = 42, radius = 12 }) {
     <svg width={size} height={size} viewBox="0 0 100 100" style={{ flexShrink: 0, display: 'block' }} aria-hidden="true">
       <defs>
         <linearGradient id="lm-tile" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#FCF6EC" />
-          <stop offset="1" stopColor="#EFE0C9" />
+          <stop offset="0" stopColor="#FDF8F0" />
+          <stop offset="1" stopColor="#EADFCC" />
         </linearGradient>
-        <linearGradient id="lm-heart" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#754F30" />
-          <stop offset="0.5" stopColor="#A6764A" />
-          <stop offset="1" stopColor="#CBA06D" />
+        <linearGradient id="lm-heart" x1="0.12" y1="0.05" x2="0.9" y2="1">
+          <stop offset="0" stopColor="#6E4A2C" />
+          <stop offset="0.5" stopColor="#A9794B" />
+          <stop offset="1" stopColor="#E3BA85" />
         </linearGradient>
-        <radialGradient id="lm-heart-gloss" cx="0.32" cy="0.24" r="0.75">
-          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.4" />
-          <stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0" />
-        </radialGradient>
+        <linearGradient id="lm-glass" x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.55" />
+          <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0.12" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
+        <filter id="lm-glow" x="-45%" y="-45%" width="190%" height="190%">
+          <feGaussianBlur stdDeviation="4.6" />
+        </filter>
       </defs>
       <rect width="100" height="100" rx={rx} fill="url(#lm-tile)" />
+      {/* coração-eco desfocado atrás, dando um glow moderno */}
+      <g transform="translate(9.6,12) scale(3.36)">
+        <path d={CORACAO} fill="#C79A69" opacity="0.4" filter="url(#lm-glow)" />
+      </g>
+      {/* coração principal, translúcido, com reflexo de vidro */}
       <g transform="translate(14,16) scale(3)">
-        <path d={CORACAO} fill="url(#lm-heart)" />
-        <path d={CORACAO} fill="url(#lm-heart-gloss)" />
+        <path d={CORACAO} fill="url(#lm-heart)" opacity="0.94" />
+        <path d={CORACAO} fill="url(#lm-glass)" />
       </g>
     </svg>
   );
