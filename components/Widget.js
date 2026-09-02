@@ -105,6 +105,11 @@ export default function Widget() {
               ) : <div style={{ fontSize: 10, color: '#5BBF8A' }}>estoque ok ✓</div>}
             </div>
           </div>
+          {dados.atualizado && (
+            <div style={{ fontSize: 11, color: C.faint, marginTop: 10 }}>
+              Lido do servidor às <b style={{ color: C.muted }}>{(() => { try { return new Date(dados.atualizado).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }); } catch { return '—'; } })()}</b> — toque no ⟳ e veja se essa hora muda.
+            </div>
+          )}
         </Card>
       )}
 
