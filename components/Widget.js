@@ -27,7 +27,8 @@ if (!r || !r.ok) {
   const sub = w.addText("caixa de ontem");
   sub.font = Font.systemFont(9); sub.textColor = new Color("#9AA7BD");
   w.addSpacer(6);
-  const fi = w.addText("Fiado ontem: " + (o.fiadoBRL || "R$ 0,00"));
+  const aReceber = (r.aReceber && r.aReceber.totalBRL) || o.fiadoBRL || "R$ 0,00";
+  const fi = w.addText("A receber (fiado): " + aReceber);
   fi.font = Font.systemFont(10); fi.textColor = new Color("#ECB24A");
   w.addSpacer(8);
   const eb = r.estoqueBaixo || { quantidade: 0, itens: [] };
@@ -89,7 +90,7 @@ export default function Widget() {
             <div style={{ fontSize: 10, fontWeight: 700, color: '#7AA2FF', letterSpacing: '.08em' }}>PICO DO MANÉ</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginTop: 6, lineHeight: 1 }}>{dados.ontem?.caixaBRL || 'R$ 0,00'}</div>
             <div style={{ fontSize: 10, color: '#9AA7BD' }}>caixa de ontem</div>
-            <div style={{ fontSize: 10, color: '#ECB24A', marginTop: 4 }}>Fiado ontem: {dados.ontem?.fiadoBRL || 'R$ 0,00'}</div>
+            <div style={{ fontSize: 10, color: '#ECB24A', marginTop: 4 }}>A receber (fiado): {dados.aReceber?.totalBRL || dados.ontem?.fiadoBRL || 'R$ 0,00'}</div>
             <div style={{ marginTop: 10 }}>
               {dados.estoqueBaixo.quantidade > 0 ? (
                 <>
