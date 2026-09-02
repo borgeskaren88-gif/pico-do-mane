@@ -4,7 +4,7 @@ import { C, Card, Btn, PageTitle, SecTitle, inputStyle } from './ui';
 
 // Monta o script do Scriptable com o link já embutido, pra dona só copiar e colar.
 function montarScript(url) {
-  return `// PicoOS — Faturamento de hoje + Estoque
+  return `// PicoOS — Caixa de ontem + Fiado + Estoque
 const URL = "${url}";
 let r;
 try { r = await new Request(URL).loadJSON(); } catch (e) { r = null; }
@@ -17,15 +17,20 @@ w.addSpacer(6);
 if (!r || !r.ok) {
   const e = w.addText("Sem dados agora"); e.font = Font.systemFont(12); e.textColor = new Color("#9AA7BD");
 } else {
-  const fat = w.addText(r.faturamento.recebidoBRL);
-  fat.font = Font.boldSystemFont(22); fat.textColor = Color.white();
-  const sub = w.addText("recebido hoje" + (r.faturamento.fiado > 0 ? " · fiado " + r.faturamento.fiadoBRL : ""));
+  const o = r.ontem || {};
+  const cx = w.addText(o.caixaBRL || "R$ 0,00");
+  cx.font = Font.boldSystemFont(22); cx.textColor = Color.white();
+  const sub = w.addText("caixa de ontem");
   sub.font = Font.systemFont(9); sub.textColor = new Color("#9AA7BD");
+  w.addSpacer(6);
+  const fi = w.addText("Fiado ontem: " + (o.fiadoBRL || "R$ 0,00"));
+  fi.font = Font.systemFont(10); fi.textColor = new Color("#ECB24A");
   w.addSpacer(8);
-  if (r.estoqueBaixo.quantidade > 0) {
-    const e = w.addText("⚠️ " + r.estoqueBaixo.quantidade + " no mínimo");
+  const eb = r.estoqueBaixo || { quantidade: 0, itens: [] };
+  if (eb.quantidade > 0) {
+    const e = w.addText("⚠️ " + eb.quantidade + " acabando");
     e.font = Font.mediumSystemFont(11); e.textColor = new Color("#F0A93B");
-    const n = w.addText(r.estoqueBaixo.itens.join(", "));
+    const n = w.addText(eb.itens.join(", "));
     n.font = Font.systemFont(9); n.textColor = new Color("#9AA7BD"); n.lineLimit = 2;
   } else {
     const e = w.addText("estoque ok ✓"); e.font = Font.systemFont(10); e.textColor = new Color("#5BBF8A");
@@ -64,7 +69,7 @@ export default function Widget() {
 
   return (
     <div>
-      <PageTitle sub="Um quadrinho na tela inicial com o faturamento de hoje e o estoque">Widget na tela inicial</PageTitle>
+      <PageTitle sub="Um quadrinho na tela inicial com o caixa de ontem, o fiado e o estoque">Widget na tela inicial</PageTitle>
 
       <Card style={{ marginBottom: 14, background: C.panel2 }}>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}>
@@ -78,12 +83,13 @@ export default function Widget() {
           <SecTitle>Prévia (dados de agora)</SecTitle>
           <div style={{ marginTop: 8, background: '#0A1220', borderRadius: 16, padding: 16, maxWidth: 200 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#7AA2FF', letterSpacing: '.08em' }}>PICO DO MANÉ</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginTop: 6, lineHeight: 1 }}>{dados.faturamento.recebidoBRL}</div>
-            <div style={{ fontSize: 10, color: '#9AA7BD' }}>recebido hoje{dados.faturamento.fiado > 0 ? ` · fiado ${dados.faturamento.fiadoBRL}` : ''}</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginTop: 6, lineHeight: 1 }}>{dados.ontem?.caixaBRL || 'R$ 0,00'}</div>
+            <div style={{ fontSize: 10, color: '#9AA7BD' }}>caixa de ontem</div>
+            <div style={{ fontSize: 10, color: '#ECB24A', marginTop: 4 }}>Fiado ontem: {dados.ontem?.fiadoBRL || 'R$ 0,00'}</div>
             <div style={{ marginTop: 10 }}>
               {dados.estoqueBaixo.quantidade > 0 ? (
                 <>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#F0A93B' }}>⚠️ {dados.estoqueBaixo.quantidade} no mínimo</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#F0A93B' }}>⚠️ {dados.estoqueBaixo.quantidade} acabando</div>
                   <div style={{ fontSize: 9, color: '#9AA7BD' }}>{dados.estoqueBaixo.itens.join(', ')}</div>
                 </>
               ) : <div style={{ fontSize: 10, color: '#5BBF8A' }}>estoque ok ✓</div>}

@@ -55,7 +55,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const totalVencidas = vencidas.reduce((s, g) => s + g.total, 0);
   const tarefasHoje = tarefas.filter((t) => !t.feito && t.data === hoje);
   const tarefasAtrasadas = tarefas.filter((t) => !t.feito && t.data && t.data < hoje);
-  const estoqueBaixo = (estoque || []).filter((it) => { const min = num(it.estoqueMin); return min > 0 && num(it.saldo) <= min; });
+  const estoqueBaixo = (estoque || []).filter((it) => { const min = num(it.minimo); return min > 0 && num(it.saldo) <= min; });
   const temAviso = boletosHoje.length || vencidas.length || tarefasHoje.length || tarefasAtrasadas.length || estoqueBaixo.length;
   const avisoUrgente = boletosHoje.length || vencidas.length;
 
