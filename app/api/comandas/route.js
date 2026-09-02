@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
-import { num, limparNome, fiadoDaVenda, abertoDaVenda, brl } from '../../../lib/util';
+import { num, limparNome, fiadoDaVenda, abertoDaVenda, brl, diaOperacional } from '../../../lib/util';
 import { enviarPush, notificarEstoqueCritico } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -336,7 +336,7 @@ export async function POST(request) {
       const { data: caixaRows } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
       const caixaAberto = (caixaRows || []).map((r) => r.valor).find((x) => x && x.aberto);
       const venda = {
-        id: uid(), data: hojeBrasil(), mesa: c.mesa, total, subtotal, servico, desconto, descontoPct, pessoas,
+        id: uid(), data: diaOperacional(), mesa: c.mesa, total, subtotal, servico, desconto, descontoPct, pessoas,
         pagamentos: pags, pagamento: pags.length === 1 ? pags[0].forma : 'Dividido', fiado,
         nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens, caixaId: caixaAberto ? caixaAberto.id : null,
         // Só fica "não pago" (na lista de fiados) o que ficou no fiado.
