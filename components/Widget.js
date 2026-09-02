@@ -7,7 +7,11 @@ function montarScript(url) {
   return `// PicoOS — Caixa de ontem + Fiado + Estoque
 const URL = "${url}";
 let r;
-try { r = await new Request(URL).loadJSON(); } catch (e) { r = null; }
+try {
+  const req = new Request(URL + (URL.includes("?") ? "&" : "?") + "_=" + Date.now());
+  req.headers = { "Cache-Control": "no-store" };
+  r = await req.loadJSON();
+} catch (e) { r = null; }
 const w = new ListWidget();
 w.backgroundColor = new Color("#0A1220");
 w.setPadding(14, 14, 14, 14);
