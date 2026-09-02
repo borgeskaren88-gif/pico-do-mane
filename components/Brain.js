@@ -31,6 +31,9 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
   const [editId, setEditId] = useState(null);
   const [editTexto, setEditTexto] = useState('');
   const [editNota, setEditNota] = useState('');
+  // Privacidade: a nota fica ESCONDIDA; só aparece quando a dona toca no card.
+  // Assim, com a tela aberta no bar, ninguém lê o conteúdo — só o título.
+  const [notaAberta, setNotaAberta] = useState({});
   const abrirEdit = (i) => { setEditId(i.id); setEditTexto(i.texto || ''); setEditNota(i.nota || ''); };
   const salvarEdit = () => { onIdeias(ideias.map((x) => (x.id === editId ? { ...x, texto: editTexto.trim() || x.texto, nota: editNota.trim() } : x))); setEditId(null); };
   const cancelarEdit = () => setEditId(null);
@@ -171,15 +174,21 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
                           </>
                         ) : (
                           <>
-                            <button onClick={() => abrirEdit(i)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginBottom: 9 }}>
-                              <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.4, fontWeight: 600, textDecoration: status === 'feito' ? 'line-through' : 'none', opacity: status === 'feito' ? 0.7 : 1 }}>{i.texto}</div>
-                              {i.nota
-                                ? <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.4, marginTop: 4, whiteSpace: 'pre-wrap' }}>{i.nota}</div>
-                                : <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>+ adicionar nota</div>}
+                            <button onClick={() => setNotaAberta((m) => ({ ...m, [i.id]: !m[i.id] }))} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginBottom: 9 }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                                <span style={{ color: C.faint, fontSize: 12, fontWeight: 800, lineHeight: 1.5, flexShrink: 0 }}>{notaAberta[i.id] ? '▾' : '▸'}</span>
+                                <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.4, fontWeight: 600, minWidth: 0, textDecoration: status === 'feito' ? 'line-through' : 'none', opacity: status === 'feito' ? 0.7 : 1 }}>{i.texto}</div>
+                              </div>
+                              {notaAberta[i.id] && (
+                                i.nota
+                                  ? <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.4, marginTop: 6, marginLeft: 19, whiteSpace: 'pre-wrap' }}>{i.nota}</div>
+                                  : <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6, marginLeft: 19 }}>Sem nota. Toque em “editar” pra escrever.</div>
+                              )}
                             </button>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <button onClick={() => mover(i, -1)} disabled={idx === 0} aria-label="Voltar" style={setaBtn(idx > 0)}>‹</button>
                               <button onClick={() => mover(i, 1)} disabled={idx === ORDEM.length - 1} aria-label="Avançar" style={setaBtn(idx < ORDEM.length - 1)}>›</button>
+                              <button onClick={() => abrirEdit(i)} aria-label="Editar" style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 700, lineHeight: 1, padding: '7px 11px', borderRadius: 8 }}>editar</button>
                               <button onClick={() => excluirIdeia(i.id)} aria-label="Excluir" style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${C.line}`, color: C.faint, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '6px 10px', borderRadius: 8 }}>×</button>
                             </div>
                           </>
