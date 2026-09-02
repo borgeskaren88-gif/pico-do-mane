@@ -64,6 +64,7 @@
 }
 
 html, body {
+  font-family: 'Urbanist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   background: var(--c-bg-bottom);
   /* Puxar-para-atualizar próprio: desliga o refresh nativo do navegador no topo
      pra não brigar com o gesto do PicoOS (e funcionar também no app instalado). */

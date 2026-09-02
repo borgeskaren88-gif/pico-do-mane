@@ -220,7 +220,7 @@ export default function Financas({ usuario, tema = 'escuro' }) {
           {carregando ? (
             <Empty>Carregando…</Empty>
           ) : grupos.length === 0 ? (
-            <Empty>Nenhum lançamento neste mês.<br />Adicione o primeiro gasto ali em cima. 👆</Empty>
+            <Empty>Nenhum lançamento neste mês.<br />Adicione o primeiro gasto ali em cima.</Empty>
           ) : (
             grupos.map(([dia, itens]) => (
               <div key={dia} style={{ marginBottom: 14 }}>

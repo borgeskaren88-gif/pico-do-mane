@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { C, Card, Btn, Label, inputStyle, Empty } from './ui';
+import { C, Card, Btn, Label, inputStyle, Empty, Icone } from './ui';
 
 export default function ListaCompras({ usuario }) {
   const [lista, setLista] = useState([]);
@@ -52,8 +52,8 @@ export default function ListaCompras({ usuario }) {
   const linha = (it) => (
     <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderTop: `1px solid ${C.hair}` }}>
       <button onClick={() => alternar(it.id)} aria-label={it.comprado ? 'Desmarcar' : 'Marcar como comprado'}
-        style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, cursor: 'pointer', padding: 0, border: `2px solid ${it.comprado ? C.green : C.line}`, background: it.comprado ? C.green : 'transparent', color: '#052014', fontSize: 15, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {it.comprado ? '✓' : ''}
+        style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, cursor: 'pointer', padding: 0, border: `2px solid ${it.comprado ? C.green : C.line}`, background: it.comprado ? C.green : 'transparent', color: '#052014', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {it.comprado ? <Icone name="check" size={16} /> : ''}
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: it.comprado ? C.faint : C.text, textDecoration: it.comprado ? 'line-through' : 'none' }}>
@@ -83,12 +83,12 @@ export default function ListaCompras({ usuario }) {
       {erro && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{erro}</div>}
 
       {carregando ? <Empty>Carregando…</Empty> : lista.length === 0 ? (
-        <Empty>Lista vazia.<br />Anote o que está faltando em casa. 🛒</Empty>
+        <Empty>Lista vazia.<br />Anote o que está faltando em casa.</Empty>
       ) : (
         <>
           <Label>A comprar ({abertos.length})</Label>
           <Card style={{ marginTop: 8, marginBottom: 16, padding: 0, overflow: 'hidden' }}>
-            {abertos.length === 0 ? <Empty>Tudo comprado! 🎉</Empty> : abertos.map(linha)}
+            {abertos.length === 0 ? <Empty>Tudo comprado!</Empty> : abertos.map(linha)}
           </Card>
 
           {comprados.length > 0 && (

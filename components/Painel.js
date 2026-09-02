@@ -1,15 +1,15 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { C, LogoMark, pageBg } from './ui';
+import { C, Icone, LogoMark, pageBg } from './ui';
 import Financas from './Financas';
 import Habitos from './Habitos';
 import ListaCompras from './ListaCompras';
 
 const ABAS = [
-  ['financas', 'Finanças', '💰'],
-  ['habitos', 'Hábitos', '🔥'],
-  ['lista', 'Lista', '🛒'],
+  ['financas', 'Finanças', 'wallet'],
+  ['habitos', 'Hábitos', 'flame'],
+  ['lista', 'Lista', 'cart'],
 ];
 
 export default function Painel({ usuario }) {
@@ -44,7 +44,7 @@ export default function Painel({ usuario }) {
   const tituloAba = ABAS.find(([id]) => id === aba)?.[1] || '';
 
   return (
-    <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: "'Urbanist', system-ui, -apple-system, sans-serif" }}>
       {/* Barra do topo */}
       <div style={{ position: 'sticky', top: 0, zIndex: 10, background: C.barBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${C.hair}`, padding: 'calc(10px + env(safe-area-inset-top)) 16px 10px' }}>
         <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -53,7 +53,7 @@ export default function Painel({ usuario }) {
             <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.1 }}>Nossa Casa</div>
             <div style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Olá, {usuario.nome} · {tituloAba}</div>
           </div>
-          <button onClick={trocarTema} title="Trocar tema" style={iconBtn}>{tema === 'escuro' ? '☀️' : '🌙'}</button>
+          <button onClick={trocarTema} title="Trocar tema" style={iconBtn}><Icone name={tema === 'escuro' ? 'sun' : 'moon'} size={18} /></button>
           <button onClick={sair} style={{ ...iconBtn, width: 'auto', padding: '0 12px', fontSize: 13, fontWeight: 600 }}>Sair</button>
         </div>
       </div>
@@ -73,7 +73,7 @@ export default function Painel({ usuario }) {
             return (
               <button key={id} onClick={() => { setAba(id); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }}
                 style={{ flex: 1, border: 'none', cursor: 'pointer', borderRadius: 12, padding: '8px 6px', background: ativo ? C.accent : 'transparent', color: ativo ? C.onAccent : C.muted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                <span style={{ fontSize: 19, lineHeight: 1 }}>{ico}</span>
+                <Icone name={ico} size={21} />
                 <span style={{ fontSize: 12, fontWeight: 700 }}>{rot}</span>
               </button>
             );

@@ -45,6 +45,32 @@ export function LogoMark({ size = 42, radius = 12 }) {
   );
 }
 
+// Ícones desenhados (linha), sem emoji. Herdam a cor via currentColor, então
+// acompanham o texto do lugar onde são usados (aba ativa, tema, etc.).
+export function Icone({ name, size = 20, stroke = 2 }) {
+  const props = {
+    width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+    strokeWidth: stroke, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+    style: { display: 'block', flexShrink: 0 },
+  };
+  switch (name) {
+    case 'wallet':
+      return (<svg {...props}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>);
+    case 'flame':
+      return (<svg {...props}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>);
+    case 'cart':
+      return (<svg {...props}><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.5 3h2l2.6 12.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L22 8H5.1" /></svg>);
+    case 'check':
+      return (<svg {...props}><path d="M20 6 9 17l-5-5" /></svg>);
+    case 'sun':
+      return (<svg {...props}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>);
+    case 'moon':
+      return (<svg {...props}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" /></svg>);
+    default:
+      return null;
+  }
+}
+
 export const inputStyle = {
   width: '100%', background: C.panel2, border: `1px solid ${C.line}`, color: C.text,
   borderRadius: 10, padding: '11px 12px', fontSize: 15, outline: 'none', boxSizing: 'border-box',
