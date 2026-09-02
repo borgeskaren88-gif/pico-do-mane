@@ -24,12 +24,15 @@
   /* Dourado quente pra atencao (boletos a pagar, avisos nao-criticos). */
   --c-amber: #DDA85E;
   --c-red-soft: rgba(208, 132, 98, 0.33);
-  --c-bar-bg: rgba(36, 25, 19, 0.55);
-  --c-glow-a: rgba(176, 137, 104, 0.24);
-  --c-glow-b: rgba(176, 137, 104, 0);
-  --c-bg-top: #43312A;
-  --c-bg-bottom: #241913;
-  /* Cartões: no escuro, borda visível e sem sombra (fundo chapado). */
+  --c-bar-bg: rgba(30, 20, 14, 0.45);
+  --c-glow-a: rgba(214, 165, 112, 0.42);
+  --c-glow-b: rgba(214, 165, 112, 0);
+  --c-bg-top: #4C3626;
+  --c-bg-bottom: #1C130D;
+  /* Vidro (glassmorphism): cartões translúcidos com desfoque por trás. */
+  --c-glass-bg: rgba(255, 247, 238, 0.08);
+  --c-glass-border: rgba(255, 246, 235, 0.18);
+  --c-glass-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
   --c-card-border: var(--c-line);
   --c-card-shadow: none;
 }
@@ -53,12 +56,15 @@
   --c-red: #C15A3C;
   --c-amber: #9C6F16;
   --c-red-soft: rgba(193, 90, 60, 0.33);
-  --c-bar-bg: rgba(251, 244, 232, 0.75);
-  --c-glow-a: rgba(122, 85, 58, 0.06);
-  --c-glow-b: rgba(122, 85, 58, 0);
-  --c-bg-top: #FBF4E8;
-  --c-bg-bottom: #F3E9D7;
-  /* Cartões: no claro, borda quente clara + sombra suave e arejada. */
+  --c-bar-bg: rgba(249, 240, 226, 0.6);
+  --c-glow-a: rgba(176, 137, 104, 0.22);
+  --c-glow-b: rgba(176, 137, 104, 0);
+  --c-bg-top: #F6E8D2;
+  --c-bg-bottom: #E7D4B7;
+  /* Vidro (glassmorphism): cartões translúcidos claros com desfoque. */
+  --c-glass-bg: rgba(255, 253, 248, 0.55);
+  --c-glass-border: rgba(120, 85, 58, 0.16);
+  --c-glass-shadow: 0 10px 30px rgba(93, 64, 33, 0.10);
   --c-card-border: #EDE1CB;
   --c-card-shadow: 0 1px 2px rgba(59, 42, 34, 0.05), 0 8px 24px rgba(59, 42, 34, 0.08);
 }

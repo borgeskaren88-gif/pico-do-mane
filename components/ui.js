@@ -9,12 +9,13 @@ export const C = {
   green: 'var(--c-green)', red: 'var(--c-red)', amber: 'var(--c-amber)',
   redSoft: 'var(--c-red-soft)', barBg: 'var(--c-bar-bg)',
   cardBorder: 'var(--c-card-border)', cardShadow: 'var(--c-card-shadow)',
+  glassBg: 'var(--c-glass-bg)', glassBorder: 'var(--c-glass-border)', glassShadow: 'var(--c-glass-shadow)',
 };
 
 // Fundo da página com profundidade: um brilho azul no topo por cima de um
 // leve degradê, dando cara mais moderna que o fundo chapado. As cores vêm das
 // variáveis do tema, então o degradê muda junto no claro/escuro.
-export const pageBg = 'radial-gradient(1000px 560px at 50% -4%, var(--c-glow-a), var(--c-glow-b) 58%), linear-gradient(180deg, var(--c-bg-top) 0%, var(--c-bg-bottom) 55%)';
+export const pageBg = 'radial-gradient(135% 115% at 12% 6%, var(--c-glow-a), var(--c-glow-b) 55%), linear-gradient(152deg, var(--c-bg-top) 0%, var(--c-bg-bottom) 100%)';
 
 // Marca do app: coração "dobrado" (dois planos com vinco no meio, dando um ar
 // 3D moderno) em degradê café/caramelo, com um coração-eco desfocado atrás,
@@ -88,7 +89,8 @@ export function Icone({ name, size = 20, stroke = 2 }) {
 }
 
 export const inputStyle = {
-  width: '100%', background: C.panel2, border: `1px solid ${C.line}`, color: C.text,
+  width: '100%', background: C.glassBg, backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+  border: `1px solid ${C.glassBorder}`, color: C.text,
   borderRadius: 10, padding: '11px 12px', fontSize: 15, outline: 'none', boxSizing: 'border-box',
 };
 
@@ -146,7 +148,7 @@ export function Btn({ children, onClick, kind = 'primary', small, type = 'button
 }
 
 export function Card({ children, style }) {
-  return <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 18, boxShadow: C.cardShadow, ...style }}>{children}</div>;
+  return <div style={{ background: C.glassBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${C.glassBorder}`, borderRadius: 16, padding: 18, boxShadow: C.glassShadow, ...style }}>{children}</div>;
 }
 
 export function Field({ label, children }) {
@@ -159,7 +161,7 @@ export function Empty({ children }) {
 
 export function KPI({ titulo, valor, cor, sub }) {
   return (
-    <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 14, padding: '13px 15px', minWidth: 0, boxShadow: C.cardShadow }}>
+    <div style={{ background: C.glassBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${C.glassBorder}`, borderRadius: 14, padding: '13px 15px', minWidth: 0, boxShadow: C.glassShadow }}>
       <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: C.muted, fontWeight: 600 }}>{titulo}</div>
       <div style={{ fontSize: 20, fontWeight: 800, color: cor || C.text, marginTop: 4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{valor}</div>
       {sub && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{sub}</div>}
