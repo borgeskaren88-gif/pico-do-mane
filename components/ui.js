@@ -16,31 +16,34 @@ export const C = {
 // variáveis do tema, então o degradê muda junto no claro/escuro.
 export const pageBg = 'radial-gradient(1000px 560px at 50% -4%, var(--c-glow-a), var(--c-glow-b) 58%), linear-gradient(180deg, var(--c-bg-top) 0%, var(--c-bg-bottom) 55%)';
 
-// Marca do app: monograma "K & M" em creme sobre um quadrado marrom degradê
-// (café -> caramelo), o mesmo do ícone da tela inicial. `size` em px; `radius`
-// é o arredondamento em px do quadrado.
+// Marca do app: um coração em degradê café/caramelo sobre um quadrado creme,
+// o mesmo do ícone da tela inicial. `size` em px; `radius` é o arredondamento
+// em px do quadrado.
+const CORACAO = 'M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z';
 export function LogoMark({ size = 42, radius = 12 }) {
   const rx = (radius * 100) / size; // converte px -> unidades do viewBox 0..100
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" style={{ flexShrink: 0, display: 'block' }} aria-hidden="true">
       <defs>
-        <linearGradient id="lm-bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#5E4230" />
-          <stop offset="0.55" stopColor="#7A553A" />
-          <stop offset="1" stopColor="#B08968" />
+        <linearGradient id="lm-tile" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FCF6EC" />
+          <stop offset="1" stopColor="#EFE0C9" />
         </linearGradient>
-        <radialGradient id="lm-gloss" cx="0.28" cy="0.2" r="0.9">
-          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.2" />
-          <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0" />
+        <linearGradient id="lm-heart" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#754F30" />
+          <stop offset="0.5" stopColor="#A6764A" />
+          <stop offset="1" stopColor="#CBA06D" />
+        </linearGradient>
+        <radialGradient id="lm-heart-gloss" cx="0.32" cy="0.24" r="0.75">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.4" />
+          <stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0" />
         </radialGradient>
       </defs>
-      <rect width="100" height="100" rx={rx} fill="url(#lm-bg)" />
-      <rect width="100" height="100" rx={rx} fill="url(#lm-gloss)" />
-      <text x="50" y="51" textAnchor="middle" dominantBaseline="central"
-        fontFamily="Georgia, 'Times New Roman', serif" fontWeight="700"
-        fontSize="46" fill="#F3E9D7" textLength="66" lengthAdjust="spacingAndGlyphs">
-        K<tspan fill="#D6BFA6" fontSize="30">&amp;</tspan>M
-      </text>
+      <rect width="100" height="100" rx={rx} fill="url(#lm-tile)" />
+      <g transform="translate(14,16) scale(3)">
+        <path d={CORACAO} fill="url(#lm-heart)" />
+        <path d={CORACAO} fill="url(#lm-heart-gloss)" />
+      </g>
     </svg>
   );
 }
