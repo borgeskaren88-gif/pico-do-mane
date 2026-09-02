@@ -61,7 +61,9 @@ export default function Widget() {
       const j = await r.json();
       if (j.ok && j.url) {
         setUrl(j.url);
-        try { const rd = await fetch(j.url, { cache: 'no-store' }); const jd = await rd.json(); if (jd.ok) setDados(jd); } catch { /* ignora */ }
+        // Busca a prévia com "anti-cache" (_=agora) pra nunca pegar uma cópia
+        // velha — senão o número do estoque/caixa fica preso num valor antigo.
+        try { const busta = j.url + (j.url.includes('?') ? '&' : '?') + '_=' + Date.now(); const rd = await fetch(busta, { cache: 'no-store' }); const jd = await rd.json(); if (jd.ok) setDados(jd); } catch { /* ignora */ }
       } else setErro('Não consegui gerar o link.');
     } catch { setErro('Sem conexão.'); }
   }, []);
