@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { tokenWidgetValido } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { num, brl, todayISO, addDays, fiadoDaVenda } from '../../../lib/util';
+import { num, brl, todayISO, addDays, fiadoDaVenda, abertoDaVenda } from '../../../lib/util';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -26,8 +26,11 @@ export async function GET(request) {
     const vendasHoje = vendas.filter((v) => (v.data || '') === hoje);
     const vendasOntem = vendas.filter((v) => (v.data || '') === ontem);
 
-    // Fiado gerado ontem.
+    // Fiado gerado ontem (só do dia).
     const fiadoOntem = Math.round(vendasOntem.reduce((s, v) => s + fiadoDaVenda(v), 0) * 100) / 100;
+    // Total A RECEBER: todos os fiados ainda em aberto (Jessica + todo mundo),
+    // já descontando os pagamentos parciais. É o número que importa de manhã.
+    const fiadoAberto = Math.round(vendas.reduce((s, v) => s + abertoDaVenda(v), 0) * 100) / 100;
 
     // Saldo do caixa de ontem: soma o "recebido" dos caixas fechados ontem. Se
     // não fechou caixa ontem, usa as vendas de ontem (total menos o fiado) como
@@ -54,6 +57,7 @@ export async function GET(request) {
       ok: true,
       atualizado: new Date().toISOString(),
       ontem: { data: ontem, caixa: caixaOntem, caixaBRL: brl(caixaOntem), fiado: fiadoOntem, fiadoBRL: brl(fiadoOntem) },
+      aReceber: { total: fiadoAberto, totalBRL: brl(fiadoAberto) },
       faturamento: { total: totalHoje, recebido: recebidoHoje, fiado: fiadoHoje, vendas: vendasHoje.length, totalBRL: brl(totalHoje), recebidoBRL: brl(recebidoHoje), fiadoBRL: brl(fiadoHoje) },
       estoqueBaixo: { quantidade: baixos.length, itens: baixos.slice(0, 6).map((it) => it.nome) },
     }, { headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' } });
