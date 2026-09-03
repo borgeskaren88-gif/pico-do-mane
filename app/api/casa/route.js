@@ -107,7 +107,7 @@ export async function POST(request) {
       const nome = txt(body?.nome, 40);
       if (!nome) return NextResponse.json({ ok: false, erro: 'Dê um nome ao cartão.' }, { status: 400 });
       const cor = CORES_HABITO.includes(body?.cor) ? body.cor : CORES_HABITO[casa.cartoes.length % CORES_HABITO.length];
-      casa.cartoes = [...casa.cartoes, { id: uid(), usuario: usuario.nome, nome, cor, limite: Math.max(0, num(body?.limite)), fatura: Math.max(0, num(body?.fatura)), vencimento: txt(body?.vencimento, 2), criadoEm: Date.now() }];
+      casa.cartoes = [...casa.cartoes, { id: uid(), usuario: usuario.nome, nome, cor, limite: Math.max(0, num(body?.limite)), fatura: Math.max(0, num(body?.fatura)), vencimento: txt(body?.vencimento, 2), pagamento: txt(body?.pagamento, 2), criadoEm: Date.now() }];
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }
@@ -116,6 +116,15 @@ export async function POST(request) {
       const c = casa.cartoes.find((x) => x.id === id);
       if (c && c.usuario !== usuario.nome) return NextResponse.json({ ok: false, erro: 'Só o dono pode apagar o cartão.' }, { status: 403 });
       casa.cartoes = casa.cartoes.filter((x) => x.id !== id);
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'cartaoDatas') {
+      const id = txt(body?.id, 40);
+      const c = casa.cartoes.find((x) => x.id === id);
+      if (!c) return NextResponse.json({ ok: false, erro: 'Cartão não encontrado.' }, { status: 404 });
+      if (c.usuario !== usuario.nome) return NextResponse.json({ ok: false, erro: 'Você só mexe nos seus cartões.' }, { status: 403 });
+      casa.cartoes = casa.cartoes.map((x) => x.id === id ? { ...x, vencimento: txt(body?.vencimento, 2), pagamento: txt(body?.pagamento, 2) } : x);
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }
