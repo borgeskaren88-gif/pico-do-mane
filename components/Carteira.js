@@ -1,19 +1,9 @@
 'use client';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { C, Card, Label, inputStyle } from './ui';
-import { CORES_HABITO, brl, num, todayISO, MESES } from '../lib/util';
+import { CORES_HABITO, brl, num, todayISO, MESES, CATEGORIAS_DESPESA, categoriaAuto, parcelaDaCompra } from '../lib/util';
 
-function parcelaNoMes(compra, mes) {
-  const [y1, m1] = String(compra.data || '').slice(0, 7).split('-').map(Number);
-  const [y2, m2] = mes.split('-').map(Number);
-  const diff = (y2 - y1) * 12 + (m2 - m1);
-  if (compra.recorrente) {
-    return { diff, recorrente: true, parcelas: 0, valorParcela: Number(compra.valor) || 0, ativa: diff >= 0, indice: diff + 1 };
-  }
-  const parcelas = Math.max(1, Number(compra.parcelas) || 1);
-  const valorParcela = (Number(compra.valor) || 0) / parcelas;
-  return { diff, parcelas, valorParcela, ativa: diff >= 0 && diff < parcelas, indice: diff + 1 };
-}
+const parcelaNoMes = parcelaDaCompra;
 const mesCurto = (mes) => `${MESES[Number(mes.slice(5)) - 1]}/${mes.slice(2, 4)}`;
 const inputBranco = { background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', marginTop: 0 };
 
@@ -36,6 +26,7 @@ export default function Carteira({ usuario, mes }) {
   const [cValor, setCValor] = useState('');
   const [cParc, setCParc] = useState('1');
   const [cRec, setCRec] = useState(false);
+  const [cCat, setCCat] = useState('');
   const [cData, setCData] = useState(todayISO());
   const [salvando, setSalvando] = useState(false);
 
@@ -72,8 +63,8 @@ export default function Carteira({ usuario, mes }) {
   const addCompra = async (cartaoId) => {
     if (!(num(cValor) > 0) || salvando) return;
     setSalvando(true);
-    await acao({ acao: 'compraAdd', cartaoId, descricao: cDesc.trim(), valor: cValor, parcelas: cParc, recorrente: cRec, data: cData });
-    setCDesc(''); setCValor(''); setCParc('1'); setCRec(false); setCData(todayISO()); setSalvando(false);
+    await acao({ acao: 'compraAdd', cartaoId, descricao: cDesc.trim(), valor: cValor, parcelas: cParc, recorrente: cRec, categoria: cCat || categoriaAuto(cDesc), data: cData });
+    setCDesc(''); setCValor(''); setCParc('1'); setCRec(false); setCCat(''); setCData(todayISO()); setSalvando(false);
   };
   const apagarCompra = (id) => acao({ acao: 'compraDel', id });
 
@@ -171,6 +162,10 @@ export default function Carteira({ usuario, mes }) {
                         <input inputMode="decimal" value={cValor} onChange={(e) => setCValor(e.target.value)} placeholder={cRec ? 'Valor por mês (R$)' : 'Valor total (R$)'} style={{ ...inputStyle, ...inputBranco }} />
                         {!cRec && <input inputMode="numeric" value={cParc} onChange={(e) => setCParc(e.target.value)} placeholder="parcelas" style={{ ...inputStyle, ...inputBranco, width: 92, flexShrink: 0, textAlign: 'center' }} />}
                       </div>
+                      <select value={cCat || categoriaAuto(cDesc)} onChange={(e) => setCCat(e.target.value)} style={{ ...inputStyle, ...inputBranco, appearance: 'none', marginTop: 8 }}>
+                        <option value="">Categoria (automática)…</option>
+                        {CATEGORIAS_DESPESA.map((cat) => <option key={cat} value={cat} style={{ color: '#2A1D16' }}>{cat}</option>)}
+                      </select>
                       <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
                         <input type="date" value={cData} onChange={(e) => setCData(e.target.value)} style={{ ...inputStyle, ...inputBranco, minWidth: 0, WebkitAppearance: 'none', appearance: 'none', colorScheme: 'dark' }} />
                         <button onClick={() => addCompra(c.id)} disabled={salvando} style={{ background: 'rgba(255,255,255,0.92)', color: '#2A1D16', border: 'none', borderRadius: 10, padding: '0 16px', height: 42, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>lançar</button>

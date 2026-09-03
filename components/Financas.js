@@ -4,12 +4,13 @@ import { C, Card, Field, Label, inputStyle, Empty, KPI } from './ui';
 import Carteira from './Carteira';
 import {
   brl, num, todayISO, ymHoje, mesLabel, passoMes, fmtDate,
-  CATEGORIAS_DESPESA, CATEGORIAS_RECEITA,
+  CATEGORIAS_DESPESA, CATEGORIAS_RECEITA, parcelaDaCompra, categoriaAuto,
 } from '../lib/util';
 
 export default function Financas({ usuario, tema = 'escuro' }) {
   const [mes, setMes] = useState(ymHoje());
   const [lancamentos, setLancamentos] = useState([]);
+  const [comprasCartao, setComprasCartao] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
 
@@ -37,6 +38,16 @@ export default function Financas({ usuario, tema = 'escuro' }) {
   }, []);
 
   useEffect(() => { carregar(mes); }, [mes, carregar]);
+
+  // Compras dos cartões (da carteira) pra somar nas despesas do mês.
+  useEffect(() => {
+    let vivo = true;
+    fetch('/api/casa', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => { if (vivo && j.ok) setComprasCartao(j.compras || []); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [lancamentos]);
 
   const categorias = tipo === 'receita' ? CATEGORIAS_RECEITA : CATEGORIAS_DESPESA;
 
@@ -91,10 +102,20 @@ export default function Financas({ usuario, tema = 'escuro' }) {
         porCategoria[l.categoria || 'Outros'] = (porCategoria[l.categoria || 'Outros'] || 0) + v;
       }
     }
+    // Soma as compras do cartão (parcela do mês) nas despesas/categorias/pessoa.
+    for (const cp of comprasCartao) {
+      const p = parcelaDaCompra(cp, mes);
+      if (!p.ativa) continue;
+      const v = p.valorParcela;
+      despesas += v;
+      porPessoa[cp.usuario] = (porPessoa[cp.usuario] || 0) + v;
+      const cat = cp.categoria || categoriaAuto(cp.descricao) || 'Outros';
+      porCategoria[cat] = (porCategoria[cat] || 0) + v;
+    }
     const catList = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
     const pessoaList = Object.entries(porPessoa).sort((a, b) => b[1] - a[1]);
     return { despesas, receitas, saldo: receitas - despesas, catList, pessoaList };
-  }, [lancamentos]);
+  }, [lancamentos, comprasCartao, mes]);
 
   // Agrupa lançamentos por data (para a lista)
   const grupos = useMemo(() => {
