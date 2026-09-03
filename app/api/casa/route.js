@@ -106,7 +106,8 @@ export async function POST(request) {
     if (acao === 'listaAdd') {
       const nome = txt(body?.nome, 80);
       if (!nome) return NextResponse.json({ ok: false, erro: 'Escreva o item.' }, { status: 400 });
-      casa.lista = [{ id: uid(), nome, quantidade: txt(body?.quantidade, 40), comprado: false, criadoPor: usuario.nome, criadoEm: Date.now() }, ...casa.lista];
+      const secao = body?.secao === 'grande' ? 'grande' : 'dia';
+      casa.lista = [{ id: uid(), nome, quantidade: txt(body?.quantidade, 40), secao, comprado: false, criadoPor: usuario.nome, criadoEm: Date.now() }, ...casa.lista];
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }
@@ -123,7 +124,8 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, ...casa });
     }
     if (acao === 'listaLimparComprados') {
-      casa.lista = casa.lista.filter((it) => !it.comprado);
+      const sec = txt(body?.secao, 10);
+      casa.lista = casa.lista.filter((it) => !it.comprado || (sec && (it.secao || 'dia') !== sec));
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }
