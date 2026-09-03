@@ -24,7 +24,11 @@ export async function GET(request) {
     const sb = supabaseServer();
     let q = sb.from(TABELA).select('*').order('data', { ascending: false }).order('criado_em', { ascending: false });
     if (mes && /^\d{4}-\d{2}$/.test(mes)) {
-      q = q.gte('data', `${mes}-01`).lte('data', `${mes}-31`);
+      // Limite superior = primeiro dia do mês seguinte (evita datas inválidas
+      // como 2026-09-31 em meses de 30 dias ou fevereiro).
+      const [y, m] = mes.split('-').map(Number);
+      const proxMes = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+      q = q.gte('data', `${mes}-01`).lt('data', proxMes);
     }
     const { data, error } = await q;
     if (error) throw error;
