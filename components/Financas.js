@@ -128,7 +128,7 @@ export default function Financas({ usuario, tema = 'escuro' }) {
         </div>
 
         {/* Carteira: cartões de cada pessoa */}
-        <Carteira usuario={usuario} />
+        <Carteira usuario={usuario} mes={mes} />
 
         {/* Formulário de novo lançamento */}
         <Card style={{ marginBottom: 16 }}>
