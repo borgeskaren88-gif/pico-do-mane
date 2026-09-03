@@ -119,6 +119,9 @@ export default function Habitos({ usuario }) {
           {/* ===== Esta semana ===== */}
           {meus.length > 0 && <EstaSemana meus={meus} feitosNo={feitosNo} hoje={hoje} />}
 
+          {/* ===== Progresso por hábito (cápsulas) ===== */}
+          {meus.length > 0 && <ProgressoPorHabito meus={meus} checkins={checkins} mes={mes} corDe={corDe} hoje={hoje} />}
+
           {/* ===== Sequência + contadores ===== */}
           {meus.length > 0 && <Sequencia meus={meus} checkins={checkins} feitosNo={feitosNo} hoje={hoje} />}
 
@@ -276,6 +279,41 @@ function Sequencia({ meus, checkins, feitosNo, hoje }) {
         {cont(stats.checks, 'Checks')}
       </div>
     </div>
+  );
+}
+
+// Progresso de cada hábito no mês, em barras-cápsula (estilo "insights").
+// % = dias marcados / dias já decorridos no mês.
+function ProgressoPorHabito({ meus, checkins, mes, corDe, hoje }) {
+  const dados = useMemo(() => {
+    const [y, m] = mes.split('-').map(Number);
+    const totalDias = new Date(y, m, 0).getDate();
+    const ymAtual = hoje.slice(0, 7);
+    const elapsed = mes === ymAtual ? Number(hoje.slice(8)) : (mes < ymAtual ? totalDias : 0);
+    return meus.map((h) => {
+      let num = 0;
+      for (let d = 1; d <= elapsed; d++) if (checkins[`${h.id}|${mes}-${String(d).padStart(2, '0')}`]) num += 1;
+      return { h, pct: elapsed > 0 ? Math.round((num / elapsed) * 100) : 0 };
+    });
+  }, [meus, checkins, mes, hoje]);
+  const rolar = dados.length > 4;
+  return (
+    <Card style={{ marginBottom: 12 }}>
+      <Label>Progresso por hábito (mês)</Label>
+      <div style={{ display: 'flex', gap: 12, marginTop: 16, justifyContent: rolar ? 'flex-start' : 'space-around', overflowX: rolar ? 'auto' : 'visible', paddingBottom: rolar ? 4 : 0 }}>
+        {dados.map(({ h, pct }) => (
+          <div key={h.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 52 }}>
+            <div style={{ position: 'relative', width: 52, height: 180, borderRadius: 999, background: 'rgba(160,150,130,0.14)', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.06) 0 5px, transparent 5px 11px)' }} />
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.max(16, pct)}%`, background: corDe[h.id], borderRadius: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#FFFFFF' }}>{pct}%</span>
+              </div>
+            </div>
+            <span style={{ fontSize: 11, color: C.muted, maxWidth: 60, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.nome}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
