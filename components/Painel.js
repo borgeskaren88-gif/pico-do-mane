@@ -22,6 +22,10 @@ export default function Painel({ usuario }) {
       const t = localStorage.getItem('financas-tema');
       if (t === 'claro' || t === 'escuro') setTema(t);
     } catch {}
+    try {
+      const a = new URLSearchParams(window.location.search).get('aba');
+      if (['financas', 'habitos', 'lista'].includes(a)) setAba(a);
+    } catch {}
   }, []);
   const trocarTema = () => {
     const novo = tema === 'escuro' ? 'claro' : 'escuro';

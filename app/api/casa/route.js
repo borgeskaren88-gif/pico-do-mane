@@ -2,6 +2,15 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, usuarioDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
+import { CORES_HABITO } from '../../../lib/util';
+
+// Escolhe uma cor válida: usa a pedida se estiver na paleta; senão, a primeira
+// cor ainda não usada pela pessoa (pra hábitos saírem com cores diferentes).
+function corHabito(pedida, habitos, usuarioNome) {
+  if (CORES_HABITO.includes(pedida)) return pedida;
+  const usadas = habitos.filter((h) => h.usuario === usuarioNome).map((h) => h.cor);
+  return CORES_HABITO.find((c) => !usadas.includes(c)) || CORES_HABITO[habitos.length % CORES_HABITO.length];
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +63,19 @@ export async function POST(request) {
     if (acao === 'habitoAdd') {
       const nome = txt(body?.nome, 60);
       if (!nome) return NextResponse.json({ ok: false, erro: 'Dê um nome ao hábito.' }, { status: 400 });
-      casa.habitos = [{ id: uid(), usuario: usuario.nome, nome, emoji: txt(body?.emoji, 8), criadoEm: Date.now() }, ...casa.habitos];
+      const cor = corHabito(txt(body?.cor, 9), casa.habitos, usuario.nome);
+      casa.habitos = [{ id: uid(), usuario: usuario.nome, nome, cor, criadoEm: Date.now() }, ...casa.habitos];
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'habitoCor') {
+      const id = txt(body?.id, 40);
+      const cor = txt(body?.cor, 9);
+      if (!CORES_HABITO.includes(cor)) return NextResponse.json({ ok: false, erro: 'Cor inválida.' }, { status: 400 });
+      const h = casa.habitos.find((x) => x.id === id);
+      if (!h) return NextResponse.json({ ok: false, erro: 'Hábito não encontrado.' }, { status: 404 });
+      if (h.usuario !== usuario.nome) return NextResponse.json({ ok: false, erro: 'Só quem criou pode mudar a cor.' }, { status: 403 });
+      casa.habitos = casa.habitos.map((x) => x.id === id ? { ...x, cor } : x);
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }
