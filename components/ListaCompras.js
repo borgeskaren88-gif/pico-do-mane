@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { C, Card, Label, inputStyle, Empty, Icone } from './ui';
 
-const SECOES = [['grande', 'Compra grande'], ['dia', 'Dia a dia']];
+const SECOES = [['grande', 'Rancho'], ['dia', 'Dia a dia']];
 
 export default function ListaCompras({ usuario }) {
   const [lista, setLista] = useState([]);
@@ -101,7 +101,7 @@ export default function ListaCompras({ usuario }) {
             <input value={quantidade} onChange={(e) => setQuantidade(e.target.value)} placeholder="qtd" style={{ ...inputStyle, width: 76, flexShrink: 0 }} />
           </div>
           <button type="submit" disabled={salvando} style={{ marginTop: 10, width: '100%', background: C.accent, color: C.onAccent, border: 'none', borderRadius: 10, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: salvando ? 'default' : 'pointer', opacity: salvando ? 0.7 : 1 }}>
-            {salvando ? 'Adicionando…' : `+ Adicionar em ${secaoSel === 'grande' ? 'Compra grande' : 'Dia a dia'}`}
+            {salvando ? 'Adicionando…' : `+ Adicionar em ${secaoSel === 'grande' ? 'Rancho' : 'Dia a dia'}`}
           </button>
         </form>
       </Card>
@@ -112,7 +112,7 @@ export default function ListaCompras({ usuario }) {
         <Empty>Lista vazia.<br />Escolha a seção e anote o que está faltando.</Empty>
       ) : (
         <>
-          {renderSecao('grande', 'Compra grande')}
+          {renderSecao('grande', 'Rancho')}
           {renderSecao('dia', 'Dia a dia')}
         </>
       )}
