@@ -7,6 +7,9 @@ function parcelaNoMes(compra, mes) {
   const [y1, m1] = String(compra.data || '').slice(0, 7).split('-').map(Number);
   const [y2, m2] = mes.split('-').map(Number);
   const diff = (y2 - y1) * 12 + (m2 - m1);
+  if (compra.recorrente) {
+    return { diff, recorrente: true, parcelas: 0, valorParcela: Number(compra.valor) || 0, ativa: diff >= 0, indice: diff + 1 };
+  }
   const parcelas = Math.max(1, Number(compra.parcelas) || 1);
   const valorParcela = (Number(compra.valor) || 0) / parcelas;
   return { diff, parcelas, valorParcela, ativa: diff >= 0 && diff < parcelas, indice: diff + 1 };
@@ -32,6 +35,7 @@ export default function Carteira({ usuario, mes }) {
   const [cDesc, setCDesc] = useState('');
   const [cValor, setCValor] = useState('');
   const [cParc, setCParc] = useState('1');
+  const [cRec, setCRec] = useState(false);
   const [cData, setCData] = useState(todayISO());
   const [salvando, setSalvando] = useState(false);
 
@@ -68,8 +72,8 @@ export default function Carteira({ usuario, mes }) {
   const addCompra = async (cartaoId) => {
     if (!(num(cValor) > 0) || salvando) return;
     setSalvando(true);
-    await acao({ acao: 'compraAdd', cartaoId, descricao: cDesc.trim(), valor: cValor, parcelas: cParc, data: cData });
-    setCDesc(''); setCValor(''); setCParc('1'); setCData(todayISO()); setSalvando(false);
+    await acao({ acao: 'compraAdd', cartaoId, descricao: cDesc.trim(), valor: cValor, parcelas: cParc, recorrente: cRec, data: cData });
+    setCDesc(''); setCValor(''); setCParc('1'); setCRec(false); setCData(todayISO()); setSalvando(false);
   };
   const apagarCompra = (id) => acao({ acao: 'compraDel', id });
 
@@ -158,26 +162,32 @@ export default function Carteira({ usuario, mes }) {
 
                     {/* Fatura: lançar compra + lista */}
                     <div style={{ marginTop: 12, background: 'rgba(0,0,0,0.18)', borderRadius: 12, padding: 12 }}>
-                      <input value={cDesc} onChange={(e) => setCDesc(e.target.value)} placeholder="O que comprou? (ex.: Geladeira)" style={{ ...inputStyle, ...inputBranco }} />
+                      <input value={cDesc} onChange={(e) => setCDesc(e.target.value)} placeholder="O que comprou? (ex.: Academia)" style={{ ...inputStyle, ...inputBranco }} />
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                        <button type="button" onClick={() => setCRec(false)} style={{ flex: 1, minWidth: 120, padding: '9px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: `1.5px solid ${!cRec ? '#fff' : 'rgba(255,255,255,0.3)'}`, background: !cRec ? 'rgba(255,255,255,0.9)' : 'transparent', color: !cRec ? '#2A1D16' : '#fff' }}>Uma vez / parcelado</button>
+                        <button type="button" onClick={() => setCRec(true)} style={{ flex: 1, minWidth: 120, padding: '9px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: `1.5px solid ${cRec ? '#fff' : 'rgba(255,255,255,0.3)'}`, background: cRec ? 'rgba(255,255,255,0.9)' : 'transparent', color: cRec ? '#2A1D16' : '#fff' }}>Recorrente (todo mês)</button>
+                      </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                        <input inputMode="decimal" value={cValor} onChange={(e) => setCValor(e.target.value)} placeholder="Valor total (R$)" style={{ ...inputStyle, ...inputBranco }} />
-                        <input inputMode="numeric" value={cParc} onChange={(e) => setCParc(e.target.value)} placeholder="parcelas" style={{ ...inputStyle, ...inputBranco, width: 92, flexShrink: 0, textAlign: 'center' }} />
+                        <input inputMode="decimal" value={cValor} onChange={(e) => setCValor(e.target.value)} placeholder={cRec ? 'Valor por mês (R$)' : 'Valor total (R$)'} style={{ ...inputStyle, ...inputBranco }} />
+                        {!cRec && <input inputMode="numeric" value={cParc} onChange={(e) => setCParc(e.target.value)} placeholder="parcelas" style={{ ...inputStyle, ...inputBranco, width: 92, flexShrink: 0, textAlign: 'center' }} />}
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
                         <input type="date" value={cData} onChange={(e) => setCData(e.target.value)} style={{ ...inputStyle, ...inputBranco, minWidth: 0, WebkitAppearance: 'none', appearance: 'none', colorScheme: 'dark' }} />
                         <button onClick={() => addCompra(c.id)} disabled={salvando} style={{ background: 'rgba(255,255,255,0.92)', color: '#2A1D16', border: 'none', borderRadius: 10, padding: '0 16px', height: 42, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>lançar</button>
                       </div>
-                      {num(cValor) > 0 && Number(cParc) > 1 && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 6 }}>{cParc}x de {brl(num(cValor) / Math.max(1, Number(cParc)))}</div>}
+                      {num(cValor) > 0 && (cRec ? <div style={{ fontSize: 11, opacity: 0.85, marginTop: 6 }}>Cobra {brl(num(cValor))} todo mês (a partir da data)</div> : Number(cParc) > 1 && <div style={{ fontSize: 11, opacity: 0.85, marginTop: 6 }}>{cParc}x de {brl(num(cValor) / Math.max(1, Number(cParc)))}</div>)}
 
                       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {lista.length === 0 ? <div style={{ fontSize: 12, opacity: 0.7 }}>Nenhuma compra ainda.</div> : lista.map((cp) => {
                           const p = parcelaNoMes(cp, mes);
-                          const status = p.parcelas === 1 ? (p.ativa ? 'à vista neste mês' : (p.diff < 0 ? 'lançada' : 'paga'))
+                          const status = p.recorrente ? (p.ativa ? 'mensal (recorrente)' : 'começa depois')
+                            : p.parcelas === 1 ? (p.ativa ? 'à vista neste mês' : (p.diff < 0 ? 'lançada' : 'paga'))
                             : p.ativa ? `parcela ${p.indice}/${p.parcelas} neste mês` : p.diff < 0 ? `começa depois (${p.parcelas}x)` : `quitada (${p.parcelas}x)`;
+                          const total = p.recorrente ? `${brl(Number(cp.valor))}/mês` : brl(Number(cp.valor));
                           return (
                             <div key={cp.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cp.descricao || 'Compra'} · {brl(Number(cp.valor))}</div>
+                                <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cp.descricao || 'Compra'} · {total}</div>
                                 <div style={{ fontSize: 11, opacity: 0.85 }}>{status}{p.parcelas > 1 ? ` · ${brl(p.valorParcela)}/mês` : ''}</div>
                               </div>
                               <button onClick={() => apagarCompra(cp.id)} style={{ background: 'none', border: 'none', color: '#fff', opacity: 0.7, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>

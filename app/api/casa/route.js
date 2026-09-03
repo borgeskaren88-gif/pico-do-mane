@@ -135,9 +135,10 @@ export async function POST(request) {
       if (cartao.usuario !== usuario.nome) return NextResponse.json({ ok: false, erro: 'Você só lança nos seus cartões.' }, { status: 403 });
       const valor = num(body?.valor);
       if (!(valor > 0)) return NextResponse.json({ ok: false, erro: 'Informe o valor da compra.' }, { status: 400 });
-      const parcelas = Math.min(60, Math.max(1, Math.round(num(body?.parcelas) || 1)));
+      const recorrente = !!body?.recorrente;
+      const parcelas = recorrente ? 1 : Math.min(60, Math.max(1, Math.round(num(body?.parcelas) || 1)));
       const data = /^\d{4}-\d{2}-\d{2}$/.test(body?.data) ? body.data : new Date().toISOString().slice(0, 10);
-      casa.compras = [{ id: uid(), usuario: usuario.nome, cartaoId, descricao: txt(body?.descricao, 60), categoria: txt(body?.categoria, 40), valor, parcelas, data, criadoEm: Date.now() }, ...casa.compras];
+      casa.compras = [{ id: uid(), usuario: usuario.nome, cartaoId, descricao: txt(body?.descricao, 60), categoria: txt(body?.categoria, 40), valor, parcelas, recorrente, data, criadoEm: Date.now() }, ...casa.compras];
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }
