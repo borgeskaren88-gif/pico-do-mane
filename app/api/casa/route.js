@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, usuarioDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { CORES_HABITO } from '../../../lib/util';
+import { CORES_HABITO, num } from '../../../lib/util';
 
 // Escolhe uma cor válida: usa a pedida se estiver na paleta; senão, a primeira
 // cor ainda não usada pela pessoa (pra hábitos saírem com cores diferentes).
@@ -27,7 +27,7 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 async function lerCasa(sb) {
   const { data } = await sb.from('casa_dados').select('valor').eq('chave', CHAVE).maybeSingle();
   const v = data?.valor || {};
-  return { habitos: arr(v.habitos), checkins: (v.checkins && typeof v.checkins === 'object') ? v.checkins : {}, lista: arr(v.lista) };
+  return { habitos: arr(v.habitos), checkins: (v.checkins && typeof v.checkins === 'object') ? v.checkins : {}, lista: arr(v.lista), cartoes: arr(v.cartoes) };
 }
 
 async function gravarCasa(sb, casa) {
@@ -98,6 +98,33 @@ export async function POST(request) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return NextResponse.json({ ok: false, erro: 'Data inválida.' }, { status: 400 });
       const chave = `${id}|${dia}`;
       if (body?.feito) casa.checkins[chave] = true; else delete casa.checkins[chave];
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+
+    // ---- Carteira (cada um tem os seus cartões; os dois podem ver) ----
+    if (acao === 'cartaoAdd') {
+      const nome = txt(body?.nome, 40);
+      if (!nome) return NextResponse.json({ ok: false, erro: 'Dê um nome ao cartão.' }, { status: 400 });
+      const cor = CORES_HABITO.includes(body?.cor) ? body.cor : CORES_HABITO[casa.cartoes.length % CORES_HABITO.length];
+      casa.cartoes = [...casa.cartoes, { id: uid(), usuario: usuario.nome, nome, cor, limite: Math.max(0, num(body?.limite)), fatura: Math.max(0, num(body?.fatura)), vencimento: txt(body?.vencimento, 2), criadoEm: Date.now() }];
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'cartaoDel') {
+      const id = txt(body?.id, 40);
+      const c = casa.cartoes.find((x) => x.id === id);
+      if (c && c.usuario !== usuario.nome) return NextResponse.json({ ok: false, erro: 'Só o dono pode apagar o cartão.' }, { status: 403 });
+      casa.cartoes = casa.cartoes.filter((x) => x.id !== id);
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'cartaoFatura') {
+      const id = txt(body?.id, 40);
+      const c = casa.cartoes.find((x) => x.id === id);
+      if (!c) return NextResponse.json({ ok: false, erro: 'Cartão não encontrado.' }, { status: 404 });
+      if (c.usuario !== usuario.nome) return NextResponse.json({ ok: false, erro: 'Você só mexe nos seus cartões.' }, { status: 403 });
+      casa.cartoes = casa.cartoes.map((x) => x.id === id ? { ...x, fatura: Math.max(0, num(body?.fatura)) } : x);
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }

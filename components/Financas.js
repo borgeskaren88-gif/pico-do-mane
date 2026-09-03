@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { C, Card, Field, Label, inputStyle, Empty, KPI } from './ui';
+import Carteira from './Carteira';
 import {
   brl, num, todayISO, ymHoje, mesLabel, passoMes, fmtDate,
   CATEGORIAS_DESPESA, CATEGORIAS_RECEITA,
@@ -125,6 +126,9 @@ export default function Financas({ usuario, tema = 'escuro' }) {
           <KPI titulo="Entradas" valor={brl(resumo.receitas)} cor={C.green} />
           <KPI titulo="Saldo" valor={brl(resumo.saldo)} cor={resumo.saldo >= 0 ? C.green : C.red} />
         </div>
+
+        {/* Carteira: cartões de cada pessoa */}
+        <Carteira usuario={usuario} />
 
         {/* Formulário de novo lançamento */}
         <Card style={{ marginBottom: 16 }}>
