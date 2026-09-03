@@ -52,6 +52,14 @@ export async function GET(request) {
     const estoque = arr(painelRow?.valor?.estoque);
     const baixos = estoque.filter((it) => { const min = num(it.minimo); return min > 0 && num(it.saldo) <= min; });
 
+    // Caixa de ontem PELO QUE A DONA LANÇA NA FINANÇAS (o "caixa do dia" que ela
+    // confere), pra bater com a tela de Finanças/Log. É a soma das receitas do
+    // dia SEM os "Recebimento Atrasado" (esses ficam à parte). Se ela ainda não
+    // lançou, cai no caixa fechado / comandas como aproximação.
+    const receitas = arr(painelRow?.valor?.receitas);
+    const receitaOntem = Math.round(receitas.filter((r) => r && (r.data || '') === ontem && (r.categoria || '') !== 'Recebimento Atrasado').reduce((s, r) => s + num(r.valor), 0) * 100) / 100;
+    if (receitaOntem > 0) caixaOntem = receitaOntem;
+
     return NextResponse.json({
       ok: true,
       atualizado: new Date().toISOString(),
