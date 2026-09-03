@@ -133,6 +133,9 @@ export default function Habitos({ usuario }) {
             <Grade mes={mes} habitos={meus} feitosNo={feitosNo} corDe={corDe} diaSel={diaSel} onDia={setDiaSel} hoje={hoje} />
           </Card>
 
+          {/* ===== Melhores dias da semana (do mês) ===== */}
+          {meus.length > 0 && <PorDiaSemana meus={meus} feitosNo={feitosNo} mes={mes} hoje={hoje} />}
+
           {/* ===== Adicionar hábito ===== */}
           <Card style={{ marginBottom: 18 }}>
             <Label>Novo hábito seu</Label>
@@ -273,6 +276,45 @@ function Sequencia({ meus, checkins, feitosNo, hoje }) {
         {cont(stats.checks, 'Checks')}
       </div>
     </div>
+  );
+}
+
+// Gráfico do mês: média de conclusão por dia da semana (mostra em que dias
+// a pessoa cumpre mais). Ignora dias futuros pra não puxar a média pra baixo.
+function PorDiaSemana({ meus, feitosNo, mes, hoje }) {
+  const WNOMES = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const WFULL = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  const { pcts, melhor } = useMemo(() => {
+    const soma = [0, 0, 0, 0, 0, 0, 0], cont = [0, 0, 0, 0, 0, 0, 0];
+    for (const d of diasDoMes(mes).filter(Boolean)) {
+      if (d > hoje) continue;
+      const wd = new Date(d + 'T12:00:00').getDay();
+      soma[wd] += meus.length ? (feitosNo(d, meus) / meus.length) * 100 : 0;
+      cont[wd] += 1;
+    }
+    const pcts = soma.map((s, i) => (cont[i] ? Math.round(s / cont[i]) : 0));
+    let melhor = -1, mx = 0;
+    pcts.forEach((p, i) => { if (cont[i] && p > mx) { mx = p; melhor = i; } });
+    return { pcts, melhor };
+  }, [meus, feitosNo, mes, hoje]);
+  const cor = (p) => (p >= 60 ? C.green : p >= 40 ? C.amber : C.faint);
+  return (
+    <Card style={{ marginBottom: 12 }}>
+      <Label>Melhores dias da semana</Label>
+      <div style={{ display: 'flex', gap: 8, height: 92, marginTop: 12 }}>
+        {pcts.map((p, i) => (
+          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+              <div style={{ width: '100%', height: `${Math.max(6, p)}%`, background: cor(p), borderRadius: 6, opacity: p === 0 ? 0.35 : 1 }} />
+            </div>
+            <span style={{ fontSize: 10, color: i === melhor ? C.accent : C.faint, fontWeight: i === melhor ? 800 : 500 }}>{WNOMES[i]}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 12, color: C.muted, textAlign: 'center', marginTop: 10 }}>
+        {melhor >= 0 ? <>Seu melhor dia costuma ser <b style={{ color: C.text }}>{WFULL[melhor]}</b>.</> : 'Marque hábitos pra ver seus melhores dias.'}
+      </div>
+    </Card>
   );
 }
 
