@@ -168,14 +168,11 @@ export default function DarciFlutuante({ onAbrir, cheio = false, ...dados }) {
   return (
     <>
       <style>{`
-        @keyframes darci-halo { 0%,100% { box-shadow: 0 6px 18px rgba(0,0,0,.26), 0 0 0 0 color-mix(in srgb, ${C.accent} 34%, transparent) }
-                                 50%     { box-shadow: 0 6px 18px rgba(0,0,0,.26), 0 0 0 7px color-mix(in srgb, ${C.accent} 0%, transparent) } }
         @keyframes darci-sobe { from { transform: translateY(10px); opacity: 0 } to { transform: none; opacity: 1 } }
         @keyframes darci-blink { 0%,100%{opacity:.25} 50%{opacity:1} }
         /* O botão mora na barra onde foi colocado (cabeçalho ou lateral), em
            linha com os outros — nada de flutuar solto por cima da tela. */
-        .darci-canto { display: flex; flex-shrink: 0; }
-        .darci-fab { animation: darci-halo 3.6s ease-out infinite; }
+        .darci-canto { display: flex; flex-shrink: 0; align-items: center; }
         .darci-balao { animation: darci-sobe .2s ease both; }
         .darci-pt { display:inline-block; width:5px; height:5px; border-radius:999px; background:${C.accent}; margin-right:4px; animation: darci-blink 1s infinite; }
         .darci-pt:nth-child(2){ animation-delay:.15s } .darci-pt:nth-child(3){ animation-delay:.3s }
@@ -265,17 +262,20 @@ export default function DarciFlutuante({ onAbrir, cheio = false, ...dados }) {
             altura e não briga com os botões que já moram lá. */}
         <button
           ref={botaoRef}
-          className="darci-fab darci-bola"
+          className="darci-bola"
           onClick={() => { if (!aberto) return abrir(); if (falando || pensando) return esconder(); return ouvirOk ? ouvir() : esconder(); }}
           aria-label="Falar com o Darci"
           title="Falar com o Darci"
           style={{
-            height: 34, width: cheio ? '100%' : undefined, borderRadius: 999, padding: '0 10px', overflow: 'hidden',
-            border: `1px solid ${ativa ? C.accent : C.line}`, background: C.panel, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            height: cheio ? 40 : 36, width: cheio ? '100%' : undefined,
+            borderRadius: cheio ? 12 : 10, padding: cheio ? '0 12px' : '0 8px', overflow: 'hidden',
+            border: `1px solid ${ativa ? C.accent : C.line}`, cursor: 'pointer',
+            // Fundo escuro sempre: a onda é de luz, e no claro ela sumiria.
+            background: 'linear-gradient(180deg, #101733 0%, #0a0e1c 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}
         >
-          <OndaDarci ativo={ativa} largura={cheio ? undefined : 56} altura={24} />
+          <OndaDarci ativo={ativa} largura={cheio ? undefined : 46} altura={cheio ? 26 : 20} />
         </button>
       </div>
     </>
