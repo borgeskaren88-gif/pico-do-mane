@@ -41,7 +41,7 @@ export default function Darci(dados) {
     carregarVozes();
     window.speechSynthesis.addEventListener?.('voiceschanged', carregarVozes);
     return () => {
-      pararFala();
+      // Sai da tela mas continua falando: ela pode ir mexer no PicoOS ouvindo.
       window.speechSynthesis.removeEventListener?.('voiceschanged', carregarVozes);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
