@@ -13,6 +13,11 @@ import { num, brl, addDays, ymOf, limparNome, fiadoDaVenda, abertoDaVenda, diaOp
 
 const ATRASADO = 'Recebimento Atrasado';
 const CHAVE_VOZ = 'picoos-voz-darci';
+const CHAVE_TOM = 'picoos-tom-darci';
+// O iPhone não libera pra apps/sites as vozes baixadas em Acessibilidade (nem as
+// da Siri) — só um conjunto fixo, que em pt-BR costuma ser só feminino. Por isso
+// o tom é regulável: abaixando, a voz soa masculina.
+const TOM_PADRAO = 0.7;
 // Tira acento e caixa, pra casar a pergunta sem depender de como ela escreveu.
 const norm = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const tem = (t, ...palavras) => palavras.some((p) => t.includes(p));
@@ -29,10 +34,17 @@ export default function Darci({ receitas = [], despesas = [], compras = [], vend
   const [vozOk, setVozOk] = useState(false);
   const [vozes, setVozes] = useState([]);   // vozes pt-BR do aparelho
   const [vozId, setVozId] = useState('');   // voiceURI escolhido
+  const [tom, setTom] = useState(TOM_PADRAO); // grave (0,5) ↔ agudo (1,2)
   const fimRef = useRef(null);
   const timerRef = useRef(null);
   const vozIdRef = useRef('');
+  const tomRef = useRef(TOM_PADRAO);
   useEffect(() => { vozIdRef.current = vozId; }, [vozId]);
+  useEffect(() => { tomRef.current = tom; }, [tom]);
+  useEffect(() => {
+    try { const s = parseFloat(localStorage.getItem(CHAVE_TOM)); if (s >= 0.5 && s <= 1.2) setTom(s); } catch { /* ignora */ }
+  }, []);
+  const trocarTom = (v) => { setTom(v); try { localStorage.setItem(CHAVE_TOM, String(v)); } catch { /* ignora */ } };
 
   // Lê TODAS as vozes do aparelho (português primeiro) e escolhe uma masculina
   // de pt-BR quando houver. O iPhone às vezes só entrega a lista completa depois
@@ -89,15 +101,15 @@ export default function Darci({ receitas = [], despesas = [], compras = [], vend
       const u = new SpeechSynthesisUtterance(String(texto).replace(/R\$\s?/g, 'reais ').replace(/\s+/g, ' '));
       u.lang = 'pt-BR';
       u.rate = 1.0;
-      // Se a voz escolhida JÁ é masculina (ex.: Felipe), fala no tom natural dela.
-      // Só abaixa o tom quando a única opção é uma voz feminina/neutra.
       let ehMasculina = false;
       try {
         const todas = window.speechSynthesis.getVoices() || [];
         const v = todas.find((x) => x.voiceURI === vozIdRef.current);
         if (v) { u.voice = v; ehMasculina = MASC.test(v.name || ''); }
       } catch { /* usa a padrão */ }
-      u.pitch = ehMasculina ? 1.0 : 0.82;
+      // Voz já masculina fala no tom natural; nas outras vale o tom que a dona
+      // regulou (o padrão já vem grave, pra soar masculino).
+      u.pitch = ehMasculina ? 1.0 : tomRef.current;
       u.onstart = () => setFalando(true);
       // Depois de falar uma vez, o iPhone costuma liberar a lista completa.
       u.onend = () => { setFalando(false); carregarVozes(); };
@@ -299,6 +311,13 @@ export default function Darci({ receitas = [], despesas = [], compras = [], vend
     }, 520);
   };
 
+  // Nomes repetidos (o iPhone lista a mesma voz em versao simples e melhorada):
+  // numera pra dona conseguir diferenciar e testar cada uma.
+  const rotuloVoz = (v) => {
+    const iguais = vozes.filter((x) => x.name === v.name);
+    if (iguais.length < 2) return v.name;
+    return `${v.name} ${iguais.indexOf(v) + 1}`;
+  };
   const vozesPt = vozes.filter((v) => /^pt/i.test(v.lang || ''));
   const vozesOutras = vozes.filter((v) => !/^pt/i.test(v.lang || ''));
   const ativa = falando || pensando;
@@ -331,12 +350,12 @@ export default function Darci({ receitas = [], despesas = [], compras = [], vend
                 {!vozes.length && <option value="">(nenhuma encontrada)</option>}
                 {vozesPt.length > 0 && (
                   <optgroup label="Português">
-                    {vozesPt.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>)}
+                    {vozesPt.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{rotuloVoz(v)}</option>)}
                   </optgroup>
                 )}
                 {vozesOutras.length > 0 && (
                   <optgroup label="Outros idiomas">
-                    {vozesOutras.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>)}
+                    {vozesOutras.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{rotuloVoz(v)} ({v.lang})</option>)}
                   </optgroup>
                 )}
               </select>
@@ -345,8 +364,26 @@ export default function Darci({ receitas = [], despesas = [], compras = [], vend
               <button onClick={carregarVozes}
                 style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>atualizar</button>
             </div>
-            <div style={{ fontSize: 11, color: C.faint, marginTop: 6 }}>
-              {vozes.length ? `${vozes.length} voz(es) neste aparelho · ${vozesPt.length} em português` : 'Nenhuma voz encontrada ainda — toque em "atualizar".'}
+
+            {/* Tom da voz: o iPhone não libera voz masculina pra apps, então
+                abaixar o tom é o que deixa o Darci com voz de homem. */}
+            <div style={{ maxWidth: 320, margin: '12px auto 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.faint, fontWeight: 700, marginBottom: 4 }}>
+                <span>Tom da voz</span><span>{tom <= 0.72 ? 'grave' : tom >= 0.95 ? 'agudo' : 'médio'}</span>
+              </div>
+              <input type="range" min="0.5" max="1.2" step="0.02" value={tom}
+                onChange={(e) => trocarTom(parseFloat(e.target.value))}
+                onMouseUp={() => falar('Ó, Karen. Assim tá bom?')}
+                onTouchEnd={() => falar('Ó, Karen. Assim tá bom?')}
+                style={{ width: '100%', accentColor: C.accent }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: C.faint }}>
+                <span>mais grave</span><span>mais fino</span>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 11, color: C.faint, marginTop: 8, lineHeight: 1.45 }}>
+              {vozes.length ? `${vozes.length} voz(es) neste aparelho · ${vozesPt.length} em português.` : 'Nenhuma voz encontrada ainda — toque em "atualizar".'}
+              {' '}O iPhone não libera pra apps as vozes baixadas em Acessibilidade (nem as da Siri) — por isso o tom é regulável aqui.
             </div>
           </div>
         )}
