@@ -38,6 +38,7 @@ import DespesaRapida from './DespesaRapida';
 import Widget from './Widget';
 import Previsao from './Previsao';
 import BotaoAtualizar from './BotaoAtualizar';
+import AtualizacaoAuto from './AtualizacaoAuto';
 import PullToRefresh from './PullToRefresh';
 
 const arr = (v) => (Array.isArray(v) ? v : []);
@@ -543,6 +544,7 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <PullToRefresh />
+      <AtualizacaoAuto />
       {salvarFalhou && (
         <div style={{ position: 'fixed', zIndex: 200, left: 0, right: 0, top: 0, background: C.red, color: '#fff', padding: 'calc(8px + env(safe-area-inset-top)) 14px 8px', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', textAlign: 'center', lineHeight: 1.35 }}>
           <span>⚠️ Não consegui salvar sua última alteração (internet). Refaça quando a conexão voltar.</span>
