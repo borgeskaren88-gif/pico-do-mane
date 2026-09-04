@@ -27,7 +27,7 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 async function lerCasa(sb) {
   const { data } = await sb.from('casa_dados').select('valor').eq('chave', CHAVE).maybeSingle();
   const v = data?.valor || {};
-  return { habitos: arr(v.habitos), checkins: (v.checkins && typeof v.checkins === 'object') ? v.checkins : {}, lista: arr(v.lista), cartoes: arr(v.cartoes), compras: arr(v.compras) };
+  return { habitos: arr(v.habitos), checkins: (v.checkins && typeof v.checkins === 'object') ? v.checkins : {}, lista: arr(v.lista), cartoes: arr(v.cartoes), compras: arr(v.compras), pagamentos: (v.pagamentos && typeof v.pagamentos === 'object') ? v.pagamentos : {} };
 }
 
 async function gravarCasa(sb, casa) {
@@ -107,7 +107,7 @@ export async function POST(request) {
       const nome = txt(body?.nome, 40);
       if (!nome) return NextResponse.json({ ok: false, erro: 'Dê um nome ao cartão.' }, { status: 400 });
       const cor = CORES_HABITO.includes(body?.cor) ? body.cor : CORES_HABITO[casa.cartoes.length % CORES_HABITO.length];
-      casa.cartoes = [...casa.cartoes, { id: uid(), usuario: usuario.nome, nome, cor, limite: Math.max(0, num(body?.limite)), fatura: Math.max(0, num(body?.fatura)), vencimento: txt(body?.vencimento, 2), pagamento: txt(body?.pagamento, 2), criadoEm: Date.now() }];
+      casa.cartoes = [...casa.cartoes, { id: uid(), usuario: usuario.nome, nome, cor, limite: Math.max(0, num(body?.limite)), fatura: Math.max(0, num(body?.fatura)), fechamento: txt(body?.fechamento, 2), vencimento: txt(body?.vencimento, 2), pagamento: txt(body?.pagamento, 2), criadoEm: Date.now() }];
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }
@@ -124,7 +124,19 @@ export async function POST(request) {
       const c = casa.cartoes.find((x) => x.id === id);
       if (!c) return NextResponse.json({ ok: false, erro: 'Cartão não encontrado.' }, { status: 404 });
       if (c.usuario !== usuario.nome) return NextResponse.json({ ok: false, erro: 'Você só mexe nos seus cartões.' }, { status: 403 });
-      casa.cartoes = casa.cartoes.map((x) => x.id === id ? { ...x, vencimento: txt(body?.vencimento, 2), pagamento: txt(body?.pagamento, 2) } : x);
+      casa.cartoes = casa.cartoes.map((x) => x.id === id ? { ...x, fechamento: txt(body?.fechamento, 2), vencimento: txt(body?.vencimento, 2) } : x);
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'faturaPagar' || acao === 'faturaReabrir') {
+      const cartaoId = txt(body?.cartaoId, 40);
+      const m = txt(body?.mes, 7);
+      const c = casa.cartoes.find((x) => x.id === cartaoId);
+      if (!c) return NextResponse.json({ ok: false, erro: 'Cartão não encontrado.' }, { status: 404 });
+      if (c.usuario !== usuario.nome) return NextResponse.json({ ok: false, erro: 'Você só mexe nos seus cartões.' }, { status: 403 });
+      if (!/^\d{4}-\d{2}$/.test(m)) return NextResponse.json({ ok: false, erro: 'Mês inválido.' }, { status: 400 });
+      const chave = `${cartaoId}|${m}`;
+      if (acao === 'faturaPagar') casa.pagamentos[chave] = true; else delete casa.pagamentos[chave];
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }
