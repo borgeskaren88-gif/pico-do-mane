@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OrbDarci from './OrbDarci';
@@ -34,35 +34,45 @@ export default function Darci({ receitas = [], despesas = [], compras = [], vend
   const vozIdRef = useRef('');
   useEffect(() => { vozIdRef.current = vozId; }, [vozId]);
 
-  // Descobre as vozes do aparelho e escolhe uma masculina de pt-BR quando houver.
+  // Lê TODAS as vozes do aparelho (português primeiro) e escolhe uma masculina
+  // de pt-BR quando houver. O iPhone às vezes só entrega a lista completa depois
+  // de falar uma vez — por isso dá pra recarregar no botão "atualizar".
+  const carregarVozes = useCallback(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    let todas = [];
+    try { todas = window.speechSynthesis.getVoices() || []; } catch { todas = []; }
+    if (!todas.length) return;
+    const ehPt = (v) => /^pt/i.test(v.lang || '');
+    const ordenadas = [...todas].sort((a, b) => {
+      const pa = ehPt(a) ? 0 : 1, pb = ehPt(b) ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+    setVozes(ordenadas);
+    setVozId((atual) => {
+      if (atual && ordenadas.some((v) => v.voiceURI === atual)) return atual;
+      let salva = '';
+      try { salva = localStorage.getItem(CHAVE_VOZ) || ''; } catch { /* ignora */ }
+      if (salva && ordenadas.some((v) => v.voiceURI === salva)) return salva;
+      const pt = ordenadas.filter(ehPt);
+      const br = pt.filter((v) => /pt[-_]BR/i.test(v.lang || ''));
+      const escolha = br.find((v) => MASC.test(v.name || '')) || pt.find((v) => MASC.test(v.name || '')) || br[0] || pt[0] || ordenadas[0];
+      return escolha ? escolha.voiceURI : '';
+    });
+  }, []);
+
   useEffect(() => {
     const ok = typeof window !== 'undefined' && !!window.speechSynthesis;
     setVozOk(ok);
     if (!ok) return;
-    const carregar = () => {
-      let todas = [];
-      try { todas = window.speechSynthesis.getVoices() || []; } catch { todas = []; }
-      const pt = todas.filter((v) => /^pt/i.test(v.lang || ''));
-      if (!pt.length) return;
-      setVozes(pt);
-      setVozId((atual) => {
-        if (atual && pt.some((v) => v.voiceURI === atual)) return atual;
-        let salva = '';
-        try { salva = localStorage.getItem(CHAVE_VOZ) || ''; } catch { /* ignora */ }
-        if (salva && pt.some((v) => v.voiceURI === salva)) return salva;
-        const br = pt.filter((v) => /pt[-_]BR/i.test(v.lang));
-        const escolha = (br.find((v) => MASC.test(v.name || '')) || pt.find((v) => MASC.test(v.name || '')) || br[0] || pt[0]);
-        return escolha ? escolha.voiceURI : '';
-      });
-    };
-    carregar();
-    window.speechSynthesis.addEventListener?.('voiceschanged', carregar);
+    carregarVozes();
+    window.speechSynthesis.addEventListener?.('voiceschanged', carregarVozes);
     return () => {
       try { window.speechSynthesis.cancel(); } catch { /* ignora */ }
-      window.speechSynthesis.removeEventListener?.('voiceschanged', carregar);
+      window.speechSynthesis.removeEventListener?.('voiceschanged', carregarVozes);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, []);
+  }, [carregarVozes]);
 
   useEffect(() => { try { fimRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch { /* ignora */ } }, [conversa]);
 
@@ -89,7 +99,8 @@ export default function Darci({ receitas = [], despesas = [], compras = [], vend
       } catch { /* usa a padrão */ }
       u.pitch = ehMasculina ? 1.0 : 0.82;
       u.onstart = () => setFalando(true);
-      u.onend = () => setFalando(false);
+      // Depois de falar uma vez, o iPhone costuma liberar a lista completa.
+      u.onend = () => { setFalando(false); carregarVozes(); };
       u.onerror = () => setFalando(false);
       window.speechSynthesis.speak(u);
     } catch { setFalando(false); }
@@ -288,6 +299,8 @@ export default function Darci({ receitas = [], despesas = [], compras = [], vend
     }, 520);
   };
 
+  const vozesPt = vozes.filter((v) => /^pt/i.test(v.lang || ''));
+  const vozesOutras = vozes.filter((v) => !/^pt/i.test(v.lang || ''));
   const ativa = falando || pensando;
   const ATALHOS = ['Briefing do dia', 'Como foi ontem?', 'Quanto tenho a receber?', 'O que está acabando?', 'Como está o mês?', 'O que eu faço hoje?', 'O que mais vende?', 'Tenho conta pra pagar?'];
 
@@ -309,15 +322,32 @@ export default function Darci({ receitas = [], despesas = [], compras = [], vend
           {pensando ? 'processando…' : falando ? 'falando' : 'sócio · manezinho da ilha'}
         </div>
         {!vozOk && <div style={{ fontSize: 12, color: C.amber, marginTop: 8 }}>Neste aparelho a voz não funciona — ele responde escrito.</div>}
-        {vozOk && vozes.length > 1 && (
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11.5, color: C.faint, fontWeight: 700 }}>Voz</span>
-            <select value={vozId} onChange={(e) => trocarVoz(e.target.value)}
-              style={{ ...inputStyle, width: 'auto', maxWidth: 210, padding: '7px 10px', fontSize: 12.5 }}>
-              {vozes.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>)}
-            </select>
-            <button onClick={() => falar('Ó, Karen. Sou o Darci, teu sócio aqui do Pico.')}
-              style={{ background: 'none', border: `1px solid ${C.line}`, color: C.accent, borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>testar</button>
+        {vozOk && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11.5, color: C.faint, fontWeight: 700 }}>Voz</span>
+              <select value={vozId} onChange={(e) => trocarVoz(e.target.value)}
+                style={{ ...inputStyle, width: 'auto', maxWidth: 220, padding: '7px 10px', fontSize: 12.5 }}>
+                {!vozes.length && <option value="">(nenhuma encontrada)</option>}
+                {vozesPt.length > 0 && (
+                  <optgroup label="Português">
+                    {vozesPt.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>)}
+                  </optgroup>
+                )}
+                {vozesOutras.length > 0 && (
+                  <optgroup label="Outros idiomas">
+                    {vozesOutras.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>)}
+                  </optgroup>
+                )}
+              </select>
+              <button onClick={() => falar('Ó, Karen. Sou o Darci, teu sócio aqui do Pico.')}
+                style={{ background: 'none', border: `1px solid ${C.line}`, color: C.accent, borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>testar</button>
+              <button onClick={carregarVozes}
+                style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>atualizar</button>
+            </div>
+            <div style={{ fontSize: 11, color: C.faint, marginTop: 6 }}>
+              {vozes.length ? `${vozes.length} voz(es) neste aparelho · ${vozesPt.length} em português` : 'Nenhuma voz encontrada ainda — toque em "atualizar".'}
+            </div>
           </div>
         )}
       </div>
