@@ -7,7 +7,7 @@ import React, { useRef, useEffect, useState } from 'react';
 //
 // Sem a prop `largura` ela ocupa toda a largura de onde estiver (e se ajusta
 // sozinha quando a tela muda de tamanho).
-export default function OndaDarci({ ativo = false, largura, altura = 34 }) {
+export default function OndaDarci({ ativo = false, largura, altura = 34, neon = true, cor = 'var(--c-accent)' }) {
   const caixaRef = useRef(null);
   const ref = useRef(null);
   const ativoRef = useRef(ativo);
@@ -44,6 +44,19 @@ export default function OndaDarci({ ativo = false, largura, altura = 34 }) {
     let raf = 0;
     let t = 0;
     let energia = 0; // 0 parado, 1 no auge — sobe e desce suave
+    let quadro = 0;
+    // A cor pode vir como var(--c-accent); o canvas não entende — resolve aqui,
+    // e de vez em quando de novo, pra acompanhar a troca de tema.
+    let corReal = cor;
+    const resolverCor = () => {
+      if (!/^var\(/.test(cor)) { corReal = cor; return; }
+      try {
+        const nome = cor.slice(4, -1).trim();
+        const v = getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+        corReal = v || '#3B86F5';
+      } catch { corReal = '#3B86F5'; }
+    };
+    resolverCor();
 
     // Desenha o caminho da onda uma vez; as camadas por cima é que dão o neon.
     const caminho = (fase, amp) => {
@@ -78,6 +91,17 @@ export default function OndaDarci({ ativo = false, largura, altura = 34 }) {
       t += 0.026 + energia * 0.055;
 
       ctx.clearRect(0, 0, w, altura);
+
+      // Modo simples: um traço só, na cor do app — pra viver dentro das barras
+      // claras do PicoOS sem parecer um pedaço de outro programa.
+      if (!neon) {
+        if (quadro++ % 30 === 0) resolverCor();
+        const ampS = altura * (0.16 + 0.24 * energia);
+        passa(t, ampS, corReal, Math.max(1.6, altura * 0.10), 1, 0);
+        raf = requestAnimationFrame(desenha);
+        return;
+      }
+
       const g = ctx.createLinearGradient(0, 0, w, 0);
       g.addColorStop(0, 'rgba(50,110,255,0)');
       g.addColorStop(0.16, 'rgba(70,150,255,1)');
@@ -99,7 +123,7 @@ export default function OndaDarci({ ativo = false, largura, altura = 34 }) {
     };
     desenha();
     return () => cancelAnimationFrame(raf);
-  }, [medida, altura]);
+  }, [medida, altura, neon, cor]);
 
   return (
     <div ref={caixaRef} style={{ width: largura || '100%', height: altura, lineHeight: 0 }}>
