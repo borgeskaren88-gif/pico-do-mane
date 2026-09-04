@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { C, inputStyle } from './ui';
-import OrbDarci from './OrbDarci';
+import OndaDarci from './OndaDarci';
 import { analisarBar, responder, ATALHOS } from '../lib/darci';
 import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque } from '../lib/darciVoz';
 
@@ -138,8 +138,8 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
   return (
     <>
       <style>{`
-        @keyframes darci-halo { 0%,100% { box-shadow: 0 8px 26px rgba(0,0,0,.30), 0 0 0 0 color-mix(in srgb, ${C.accent} 40%, transparent) }
-                                 50%     { box-shadow: 0 8px 26px rgba(0,0,0,.30), 0 0 0 9px color-mix(in srgb, ${C.accent} 0%, transparent) } }
+        @keyframes darci-halo { 0%,100% { box-shadow: 0 6px 18px rgba(0,0,0,.26), 0 0 0 0 color-mix(in srgb, ${C.accent} 34%, transparent) }
+                                 50%     { box-shadow: 0 6px 18px rgba(0,0,0,.26), 0 0 0 7px color-mix(in srgb, ${C.accent} 0%, transparent) } }
         @keyframes darci-sobe { from { transform: translateY(10px); opacity: 0 } to { transform: none; opacity: 1 } }
         @keyframes darci-blink { 0%,100%{opacity:.25} 50%{opacity:1} }
         /* A bola mora em cima, na faixa do cabeçalho. O recuo à direita deixa
@@ -149,7 +149,8 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
           right: calc(14px + env(safe-area-inset-right));
           display: flex; flex-direction: column-reverse; align-items: flex-end; }
         .darci-bola { margin-right: 94px; }
-        .darci-fab { animation: darci-halo 3.2s ease-out infinite; }
+        @media (max-width: 400px) { .darci-bola { margin-right: 90px; } }
+        .darci-fab { animation: darci-halo 3.6s ease-out infinite; }
         .darci-balao { animation: darci-sobe .2s ease both; }
         .darci-pt { display:inline-block; width:5px; height:5px; border-radius:999px; background:${C.accent}; margin-right:4px; animation: darci-blink 1s infinite; }
         .darci-pt:nth-child(2){ animation-delay:.15s } .darci-pt:nth-child(3){ animation-delay:.3s }
@@ -233,18 +234,20 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
           </div>
         )}
 
+        {/* A onda de voz do Darci, deitada na faixa do cabeçalho: ocupa pouca
+            altura e não briga com os botões que já moram lá. */}
         <button
           className="darci-fab darci-bola"
           onClick={() => { if (!aberto) return abrir(); if (falando || pensando) return esconder(); return ouvirOk ? ouvir() : esconder(); }}
-          aria-label="Falar com a Darci"
-          title="Falar com a Darci"
+          aria-label="Falar com o Darci"
+          title="Falar com o Darci"
           style={{
-            width: 54, height: 54, borderRadius: 999, padding: 0, overflow: 'hidden',
+            height: 30, borderRadius: 999, padding: '0 9px', overflow: 'hidden',
             border: `1px solid ${ativa ? C.accent : C.line}`, background: C.panel, cursor: 'pointer',
-            display: 'grid', placeItems: 'center',
+            display: 'flex', alignItems: 'center', gap: 2,
           }}
         >
-          <OrbDarci ativo={ativa} tamanho={52} />
+          <OndaDarci ativo={ativa} largura={54} altura={22} />
         </button>
       </div>
     </>
