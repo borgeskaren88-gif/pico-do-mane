@@ -12,7 +12,7 @@ import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala } from '../lib/dar
 //
 // No iPhone o Safari não tem reconhecimento de fala; nesse caso o balão abre
 // com o campo pronto e os atalhos — a resposta vem em voz alta do mesmo jeito.
-export default function DarciFlutuante({ onAbrir, lateralRecolhida, ...dados }) {
+export default function DarciFlutuante({ onAbrir, ...dados }) {
   const [aberto, setAberto] = useState(false);
   const [ouvindo, setOuvindo] = useState(false);
   const [pensando, setPensando] = useState(false);
@@ -28,6 +28,7 @@ export default function DarciFlutuante({ onAbrir, lateralRecolhida, ...dados }) 
   dadosRef.current = dados;
   const recRef = useRef(null);
   const campoRef = useRef(null);
+  const caixaRef = useRef(null);
   const timerRef = useRef(null);
 
   const pararTudo = useCallback(() => {
@@ -86,25 +87,49 @@ export default function DarciFlutuante({ onAbrir, lateralRecolhida, ...dados }) 
   }, [responderAgora]);
 
   // Toque na bola: abre o balão e já sai ouvindo (o toque é o gesto que o
-  // navegador exige pra liberar microfone e voz).
+  // navegador exige pra liberar microfone e voz). Se ele já estiver falando,
+  // só mostra o balão de novo — não corta a resposta no meio.
   const abrir = () => {
     setAberto(true);
-    setOuviu(''); setResposta('');
     try { onAbrir && onAbrir(); } catch { /* ignora */ }
+    if (falando || pensando) return;
+    setOuviu(''); setResposta('');
     if (ouvirOk) ouvir();
     else setTimeout(() => { try { campoRef.current?.focus(); } catch { /* ignora */ } }, 60);
   };
 
-  const fechar = useCallback(() => { pararTudo(); setAberto(false); }, [pararTudo]);
+  // Fechar o balão NÃO cala o Darci: ela pode guardar o balão e sair mexendo
+  // no PicoOS enquanto ouve a resposta. Só para o microfone, que não faz
+  // sentido continuar ligado com o balão fechado.
+  const esconder = useCallback(() => {
+    try { recRef.current && recRef.current.abort(); } catch { /* ignora */ }
+    recRef.current = null;
+    setOuvindo(false);
+    setAberto(false);
+  }, []);
 
   useEffect(() => {
     if (!aberto) return;
-    const esc = (e) => { if (e.key === 'Escape') fechar(); };
+    const esc = (e) => { if (e.key === 'Escape') esconder(); };
+    // Toque fora guarda o balão e SEGUE para o que ela tocou (não tem camada
+    // por cima bloqueando o app).
+    const fora = (e) => { if (caixaRef.current && !caixaRef.current.contains(e.target)) esconder(); };
     document.addEventListener('keydown', esc);
-    return () => document.removeEventListener('keydown', esc);
-  }, [aberto, fechar]);
+    document.addEventListener('pointerdown', fora);
+    return () => { document.removeEventListener('keydown', esc); document.removeEventListener('pointerdown', fora); };
+  }, [aberto, esconder]);
 
-  useEffect(() => () => { pararTudo(); }, [pararTudo]);
+  // Ao sair da tela o microfone para, mas a fala continua — ela pode trocar de
+  // aba ouvindo. E este relógio mantém o botão "parar de falar" certo mesmo
+  // quando a resposta começou na tela cheia do Darci.
+  useEffect(() => {
+    const t = setInterval(() => { try { setFalando(!!(window.speechSynthesis && window.speechSynthesis.speaking)); } catch { /* ignora */ } }, 500);
+    return () => {
+      clearInterval(t);
+      try { recRef.current && recRef.current.abort(); } catch { /* ignora */ }
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const ativa = ouvindo || pensando || falando;
   const estado = ouvindo ? 'te ouvindo…' : pensando ? 'pensando…' : falando ? 'falando' : 'toca na bola e pergunta';
@@ -116,30 +141,30 @@ export default function DarciFlutuante({ onAbrir, lateralRecolhida, ...dados }) 
                                  50%     { box-shadow: 0 8px 26px rgba(0,0,0,.30), 0 0 0 9px color-mix(in srgb, ${C.accent} 0%, transparent) } }
         @keyframes darci-sobe { from { transform: translateY(10px); opacity: 0 } to { transform: none; opacity: 1 } }
         @keyframes darci-blink { 0%,100%{opacity:.25} 50%{opacity:1} }
+        /* A bola mora em cima, na faixa do cabeçalho. O recuo à direita deixa
+           livres os botões que já ficam lá (o + , o atualizar, o Ocultar). */
         .darci-canto { position: fixed; z-index: 60;
-          left: calc(16px + env(safe-area-inset-left));
-          bottom: calc(20px + env(safe-area-inset-bottom)); }
-        /* Com a lateral aberta no computador, a bola encosta logo ao lado dela. */
-        @media (min-width: 820px) { .darci-canto.darci-com-lateral { left: calc(252px + env(safe-area-inset-left)); } }
+          top: calc(8px + env(safe-area-inset-top));
+          right: calc(14px + env(safe-area-inset-right));
+          display: flex; flex-direction: column-reverse; align-items: flex-end; }
+        .darci-bola { margin-right: 94px; }
         .darci-fab { animation: darci-halo 3.2s ease-out infinite; }
         .darci-balao { animation: darci-sobe .2s ease both; }
         .darci-pt { display:inline-block; width:5px; height:5px; border-radius:999px; background:${C.accent}; margin-right:4px; animation: darci-blink 1s infinite; }
         .darci-pt:nth-child(2){ animation-delay:.15s } .darci-pt:nth-child(3){ animation-delay:.3s }
       `}</style>
 
-      {aberto && <div onClick={fechar} style={{ position: 'fixed', inset: 0, zIndex: 59, background: 'transparent' }} />}
-
-      <div className={`darci-canto${lateralRecolhida ? '' : ' darci-com-lateral'}`}>
+      <div className="darci-canto" ref={caixaRef}>
         {aberto && (
           <div className="darci-balao" role="dialog" aria-label="Darci" style={{
-            width: 'min(320px, calc(100vw - 32px))', marginBottom: 10,
+            width: 'min(320px, calc(100vw - 28px))', marginTop: 10,
             background: C.ink, border: `1px solid ${C.line}`, borderRadius: 18,
             boxShadow: '0 18px 44px rgba(0,0,0,.45)', padding: '12px 13px 13px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '.10em', color: C.text }}>DARCI</span>
               <span style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>{estado}</span>
-              <button onClick={fechar} aria-label="Fechar" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.muted, fontSize: 20, lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}>×</button>
+              <button onClick={esconder} aria-label="Fechar" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.muted, fontSize: 20, lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}>×</button>
             </div>
 
             {ouviu && (
@@ -198,24 +223,27 @@ export default function DarciFlutuante({ onAbrir, lateralRecolhida, ...dados }) 
             </div>
 
             {falando && (
-              <button onClick={() => { pararFala(); setFalando(false); }}
-                style={{ marginTop: 9, background: 'none', border: 'none', color: C.red, fontSize: 12, fontWeight: 700, padding: 0, cursor: 'pointer' }}>parar de falar</button>
+              <div style={{ marginTop: 9, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <button onClick={() => { pararFala(); setFalando(false); }}
+                  style={{ background: 'none', border: 'none', color: C.red, fontSize: 12, fontWeight: 700, padding: 0, cursor: 'pointer' }}>parar de falar</button>
+                <span style={{ fontSize: 11, color: C.faint }}>Pode fechar e mexer no PicoOS — eu continuo falando.</span>
+              </div>
             )}
           </div>
         )}
 
         <button
-          className="darci-fab"
-          onClick={() => (aberto ? (ouvirOk ? ouvir() : fechar()) : abrir())}
+          className="darci-fab darci-bola"
+          onClick={() => { if (!aberto) return abrir(); if (falando || pensando) return esconder(); return ouvirOk ? ouvir() : esconder(); }}
           aria-label="Falar com a Darci"
           title="Falar com a Darci"
           style={{
-            width: 64, height: 64, borderRadius: 999, padding: 0, overflow: 'hidden',
+            width: 54, height: 54, borderRadius: 999, padding: 0, overflow: 'hidden',
             border: `1px solid ${ativa ? C.accent : C.line}`, background: C.panel, cursor: 'pointer',
             display: 'grid', placeItems: 'center',
           }}
         >
-          <OrbDarci ativo={ativa} tamanho={62} />
+          <OrbDarci ativo={ativa} tamanho={52} />
         </button>
       </div>
     </>
