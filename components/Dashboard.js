@@ -7,6 +7,7 @@ import SEED_DATA from '../data/seed.json';
 
 import Brain from './Brain';
 import Darci from './Darci';
+import DarciFlutuante from './DarciFlutuante';
 import Hoje from './Hoje';
 import Diario from './Diario';
 import Marketing from './Marketing';
@@ -742,6 +743,11 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* A Darci fica a um toque de qualquer tela (na aba dela o botão some). */}
+      {tab !== 'darci' && (
+        <DarciFlutuante receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} estoque={estoque} tarefas={tarefas} clientes={clientes}
+          onAbrir={() => { carregarVendas(); carregarEstoque({}); }} />
+      )}
     </div>
   );
 }
