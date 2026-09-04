@@ -1,82 +1,223 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { C } from './ui';
-import Darci from './Darci';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { C, inputStyle } from './ui';
 import OrbDarci from './OrbDarci';
+import { analisarBar, responder, ATALHOS } from '../lib/darci';
+import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala } from '../lib/darciVoz';
 
-// Botão flutuante da Darci: fica sempre no canto, em qualquer tela do PicoOS.
-// Ao tocar, ela sobe numa gaveta por cima da tela — a dona pergunta e volta pro
-// que estava fazendo, sem perder de vista. A aba "Darci" continua existindo pra
-// quem quiser a tela inteira.
-export default function DarciFlutuante({ onAbrir, ...props }) {
+// Bola da Darci: fica num canto, em qualquer tela do PicoOS.
+// Ao tocar ela NÃO abre a tela dela — ela já começa a ouvir e responde ali
+// mesmo, num balãozinho em cima da bola. A aba "Darci" continua existindo pra
+// quando a dona quiser a tela inteira (voz, tom, conversa longa).
+//
+// No iPhone o Safari não tem reconhecimento de fala; nesse caso o balão abre
+// com o campo pronto e os atalhos — a resposta vem em voz alta do mesmo jeito.
+export default function DarciFlutuante({ onAbrir, lateralRecolhida, ...dados }) {
   const [aberto, setAberto] = useState(false);
-  // Ao abrir, pede pro Dashboard atualizar vendas/estoque — assim ela responde
-  // com o número de agora mesmo vindo de uma tela que não carrega esses dados.
-  const abrir = () => { setAberto(true); try { onAbrir && onAbrir(); } catch { /* ignora */ } };
+  const [ouvindo, setOuvindo] = useState(false);
+  const [pensando, setPensando] = useState(false);
+  const [falando, setFalando] = useState(false);
+  const [pergunta, setPergunta] = useState('');
+  const [ouviu, setOuviu] = useState('');      // o que ela falou
+  const [resposta, setResposta] = useState(''); // o que a Darci respondeu
+  const [ouvirOk, setOuvirOk] = useState(false); // este aparelho entende voz?
+
+  useEffect(() => { setOuvirOk(podeOuvir()); }, []);
+
+  const dadosRef = useRef(dados);
+  dadosRef.current = dados;
+  const recRef = useRef(null);
+  const campoRef = useRef(null);
+  const timerRef = useRef(null);
+
+  const pararTudo = useCallback(() => {
+    try { recRef.current && recRef.current.abort(); } catch { /* ignora */ }
+    recRef.current = null;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    pararFala();
+    setOuvindo(false); setPensando(false); setFalando(false);
+  }, []);
+
+  const responderAgora = useCallback((texto) => {
+    const q = String(texto || '').trim();
+    if (!q) return;
+    setOuviu(q);
+    setPergunta('');
+    setResposta('');
+    setPensando(true);
+    timerRef.current = setTimeout(() => {
+      const resp = responder(q, analisarBar(dadosRef.current));
+      setPensando(false);
+      setResposta(resp);
+      falarTexto(resp, { aoIniciar: () => setFalando(true), aoTerminar: () => setFalando(false) });
+    }, 380);
+  }, []);
+
+  // Começa a ouvir. Só funciona onde o navegador tem reconhecimento de fala.
+  const ouvir = useCallback(() => {
+    const Rec = ReconhecimentoFala();
+    if (!Rec) { try { campoRef.current?.focus(); } catch { /* ignora */ } return; }
+    pararFala();
+    setFalando(false);
+    try { recRef.current && recRef.current.abort(); } catch { /* ignora */ }
+    const rec = new Rec();
+    rec.lang = 'pt-BR';
+    rec.continuous = false;
+    rec.interimResults = true;
+    let fala = '';
+    rec.onresult = (e) => {
+      let parcial = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) fala += t + ' '; else parcial += t;
+      }
+      setOuviu((fala + parcial).trim());
+    };
+    rec.onerror = () => { setOuvindo(false); recRef.current = null; };
+    rec.onend = () => {
+      setOuvindo(false);
+      recRef.current = null;
+      const dito = fala.trim();
+      if (dito) responderAgora(dito);
+    };
+    recRef.current = rec;
+    try { rec.start(); setOuvindo(true); setOuviu(''); setResposta(''); }
+    catch { setOuvindo(false); }
+  }, [responderAgora]);
+
+  // Toque na bola: abre o balão e já sai ouvindo (o toque é o gesto que o
+  // navegador exige pra liberar microfone e voz).
+  const abrir = () => {
+    setAberto(true);
+    setOuviu(''); setResposta('');
+    try { onAbrir && onAbrir(); } catch { /* ignora */ }
+    if (ouvirOk) ouvir();
+    else setTimeout(() => { try { campoRef.current?.focus(); } catch { /* ignora */ } }, 60);
+  };
+
+  const fechar = useCallback(() => { pararTudo(); setAberto(false); }, [pararTudo]);
 
   useEffect(() => {
     if (!aberto) return;
-    const esc = (e) => { if (e.key === 'Escape') setAberto(false); };
+    const esc = (e) => { if (e.key === 'Escape') fechar(); };
     document.addEventListener('keydown', esc);
-    const antes = document.body.style.overflow;
-    document.body.style.overflow = 'hidden'; // trava o fundo enquanto a gaveta está aberta
-    return () => { document.removeEventListener('keydown', esc); document.body.style.overflow = antes; };
-  }, [aberto]);
+    return () => document.removeEventListener('keydown', esc);
+  }, [aberto, fechar]);
+
+  useEffect(() => () => { pararTudo(); }, [pararTudo]);
+
+  const ativa = ouvindo || pensando || falando;
+  const estado = ouvindo ? 'te ouvindo…' : pensando ? 'pensando…' : falando ? 'falando' : 'toca na bola e pergunta';
 
   return (
     <>
       <style>{`
-        @keyframes darci-sobe { from { transform: translateY(18px); opacity: 0 } to { transform: none; opacity: 1 } }
         @keyframes darci-halo { 0%,100% { box-shadow: 0 8px 26px rgba(0,0,0,.30), 0 0 0 0 color-mix(in srgb, ${C.accent} 40%, transparent) }
                                  50%     { box-shadow: 0 8px 26px rgba(0,0,0,.30), 0 0 0 9px color-mix(in srgb, ${C.accent} 0%, transparent) } }
+        @keyframes darci-sobe { from { transform: translateY(10px); opacity: 0 } to { transform: none; opacity: 1 } }
+        @keyframes darci-blink { 0%,100%{opacity:.25} 50%{opacity:1} }
+        .darci-canto { position: fixed; z-index: 60;
+          left: calc(16px + env(safe-area-inset-left));
+          bottom: calc(20px + env(safe-area-inset-bottom)); }
+        /* Com a lateral aberta no computador, a bola encosta logo ao lado dela. */
+        @media (min-width: 820px) { .darci-canto.darci-com-lateral { left: calc(252px + env(safe-area-inset-left)); } }
         .darci-fab { animation: darci-halo 3.2s ease-out infinite; }
-        .darci-gaveta { animation: darci-sobe .22s ease both; }
+        .darci-balao { animation: darci-sobe .2s ease both; }
+        .darci-pt { display:inline-block; width:5px; height:5px; border-radius:999px; background:${C.accent}; margin-right:4px; animation: darci-blink 1s infinite; }
+        .darci-pt:nth-child(2){ animation-delay:.15s } .darci-pt:nth-child(3){ animation-delay:.3s }
       `}</style>
 
-      {!aberto && (
+      {aberto && <div onClick={fechar} style={{ position: 'fixed', inset: 0, zIndex: 59, background: 'transparent' }} />}
+
+      <div className={`darci-canto${lateralRecolhida ? '' : ' darci-com-lateral'}`}>
+        {aberto && (
+          <div className="darci-balao" role="dialog" aria-label="Darci" style={{
+            width: 'min(320px, calc(100vw - 32px))', marginBottom: 10,
+            background: C.ink, border: `1px solid ${C.line}`, borderRadius: 18,
+            boxShadow: '0 18px 44px rgba(0,0,0,.45)', padding: '12px 13px 13px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '.10em', color: C.text }}>DARCI</span>
+              <span style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>{estado}</span>
+              <button onClick={fechar} aria-label="Fechar" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.muted, fontSize: 20, lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}>×</button>
+            </div>
+
+            {ouviu && (
+              <div style={{ fontSize: 12.5, color: C.muted, fontStyle: 'italic', marginBottom: 8 }}>“{ouviu}”</div>
+            )}
+
+            {pensando && (
+              <div style={{ padding: '6px 0 10px' }}>
+                <span className="darci-pt" /><span className="darci-pt" /><span className="darci-pt" />
+              </div>
+            )}
+
+            {resposta && (
+              <div style={{
+                fontSize: 13.5, lineHeight: 1.5, color: C.text, background: C.panel,
+                border: `1px solid ${C.cardBorder}`, borderRadius: 14, padding: '10px 12px',
+                maxHeight: '38vh', overflowY: 'auto', marginBottom: 10,
+              }}>{resposta}</div>
+            )}
+
+            {/* Campo escrito: é o caminho do iPhone (sem reconhecimento de fala)
+                e a saída pra quando o microfone não entender. */}
+            <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+              <input
+                ref={campoRef}
+                value={pergunta}
+                onChange={(e) => setPergunta(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') responderAgora(pergunta); }}
+                placeholder="Pergunta pra Darci…"
+                style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '9px 11px', fontSize: 13 }}
+              />
+              {ouvirOk ? (
+                <button onClick={() => (ouvindo ? pararTudo() : ouvir())}
+                  aria-label={ouvindo ? 'Parar de ouvir' : 'Falar com a Darci'}
+                  style={{
+                    width: 40, height: 40, flexShrink: 0, borderRadius: 12, cursor: 'pointer',
+                    display: 'grid', placeItems: 'center',
+                    background: ouvindo ? C.red : 'transparent', color: ouvindo ? '#fff' : C.accent,
+                    border: `1px solid ${ouvindo ? C.red : C.line}`,
+                  }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><line x1="12" y1="19" x2="12" y2="22" /></svg>
+                </button>
+              ) : (
+                <button onClick={() => responderAgora(pergunta)}
+                  style={{ flexShrink: 0, borderRadius: 12, cursor: 'pointer', padding: '10px 13px', fontSize: 13, fontWeight: 800, background: C.accent, color: '#06101F', border: 'none' }}>Ir</button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 6, marginTop: 9, overflowX: 'auto', paddingBottom: 2 }}>
+              {ATALHOS.slice(0, 4).map((a) => (
+                <button key={a} onClick={() => responderAgora(a)} style={{
+                  border: `1px solid ${C.line}`, background: 'transparent', color: C.muted, borderRadius: 999,
+                  padding: '6px 11px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                }}>{a}</button>
+              ))}
+            </div>
+
+            {falando && (
+              <button onClick={() => { pararFala(); setFalando(false); }}
+                style={{ marginTop: 9, background: 'none', border: 'none', color: C.red, fontSize: 12, fontWeight: 700, padding: 0, cursor: 'pointer' }}>parar de falar</button>
+            )}
+          </div>
+        )}
+
         <button
           className="darci-fab"
-          onClick={abrir}
+          onClick={() => (aberto ? (ouvirOk ? ouvir() : fechar()) : abrir())}
           aria-label="Falar com a Darci"
           title="Falar com a Darci"
           style={{
-            position: 'fixed', zIndex: 60,
-            right: 'calc(16px + env(safe-area-inset-right))',
-            bottom: 'calc(20px + env(safe-area-inset-bottom))',
             width: 64, height: 64, borderRadius: 999, padding: 0, overflow: 'hidden',
-            border: `1px solid ${C.line}`, background: C.panel, cursor: 'pointer',
+            border: `1px solid ${ativa ? C.accent : C.line}`, background: C.panel, cursor: 'pointer',
             display: 'grid', placeItems: 'center',
           }}
         >
-          <OrbDarci ativo={false} tamanho={62} />
+          <OrbDarci ativo={ativa} tamanho={62} />
         </button>
-      )}
-
-      {aberto && (
-        <div
-          onClick={(e) => { if (e.target === e.currentTarget) setAberto(false); }}
-          role="dialog" aria-modal="true" aria-label="Darci"
-          style={{
-            position: 'fixed', inset: 0, zIndex: 70,
-            background: 'rgba(3, 8, 18, 0.55)', backdropFilter: 'blur(3px)',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          }}
-        >
-          <div className="darci-gaveta" style={{
-            position: 'relative', width: '100%', maxWidth: 720, maxHeight: '92vh', overflowY: 'auto',
-            background: C.ink, border: `1px solid ${C.line}`, borderBottom: 'none',
-            borderTopLeftRadius: 22, borderTopRightRadius: 22,
-            padding: '8px 16px calc(20px + env(safe-area-inset-bottom))',
-          }}>
-            <div style={{ position: 'sticky', top: 0, zIndex: 3, background: C.ink, paddingTop: 4, paddingBottom: 6 }}>
-              <div style={{ width: 42, height: 4, borderRadius: 999, background: C.line, margin: '0 auto' }} />
-              <button onClick={() => setAberto(false)} aria-label="Fechar"
-                style={{ position: 'absolute', right: 0, top: 0, background: 'none', border: 'none', color: C.muted, fontSize: 22, lineHeight: 1, padding: '2px 6px', cursor: 'pointer' }}>×</button>
-            </div>
-            <Darci {...props} />
-          </div>
-        </div>
-      )}
+      </div>
     </>
   );
 }

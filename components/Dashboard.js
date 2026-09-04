@@ -746,6 +746,7 @@ export default function Dashboard() {
       {/* A Darci fica a um toque de qualquer tela (na aba dela o botão some). */}
       {tab !== 'darci' && (
         <DarciFlutuante receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} estoque={estoque} tarefas={tarefas} clientes={clientes}
+          lateralRecolhida={lateralRecolhida}
           onAbrir={() => { carregarVendas(); carregarEstoque({}); }} />
       )}
     </div>
