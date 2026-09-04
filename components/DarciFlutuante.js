@@ -258,29 +258,31 @@ export default function DarciFlutuante({ onAbrir, cheio = false, ...dados }) {
           </div>
         )}
 
-        {/* A onda de voz do Darci, deitada na faixa do cabeçalho: ocupa pouca
-            altura e não briga com os botões que já moram lá. */}
+        {/* Na lateral ele é mais um item do menu (mesma classe dos outros, então
+            alinha sozinho); na barra de cima é mais um ícone da fileira. O
+            traço é simples e na cor do app — a onda de neon só na tela dele. */}
         <button
           ref={botaoRef}
-          className="darci-bola"
+          className={cheio ? 'pos-navitem' : undefined}
           onClick={() => { if (!aberto) return abrir(); if (falando || pensando) return esconder(); return ouvirOk ? ouvir() : esconder(); }}
           aria-label="Falar com o Darci"
           title="Falar com o Darci"
-          style={{
-            height: cheio ? 40 : 36, width: cheio ? '100%' : undefined,
-            borderRadius: cheio ? 12 : 10, padding: cheio ? '0 12px' : '0 8px', overflow: 'hidden',
+          style={cheio ? { color: ativa ? C.accent : C.muted } : {
+            height: 36, borderRadius: 10, padding: '0 8px', overflow: 'hidden',
             border: `1px solid ${ativa ? C.accent : C.line}`, background: 'transparent',
             color: C.accent, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: cheio ? 'flex-start' : 'center', gap: 9, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}
         >
-          {/* Traço simples, na cor do app: dentro das barras claras do PicoOS a
-              onda de neon parecia pedaço de outro programa. */}
-          <OndaDarci ativo={ativa} neon={false} largura={cheio ? 54 : 30} altura={cheio ? 22 : 18} />
-          {cheio && (
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: ativa ? C.accent : C.muted, letterSpacing: '.01em' }}>
-              {ativa ? estado : 'Falar com o Darci'}
+          {cheio ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <OndaDarci ativo={ativa} neon={false} largura={26} altura={16} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {ativa ? estado : 'Falar com o Darci'}
+              </span>
             </span>
+          ) : (
+            <OndaDarci ativo={ativa} neon={false} largura={30} altura={18} />
           )}
         </button>
       </div>

@@ -598,12 +598,12 @@ export default function Dashboard() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
             </button>
           </div>
-          {tab !== 'darci' && darciNaLateral && (
-            <div style={{ padding: '12px 14px 2px' }}>
-              <DarciFlutuante cheio {...propsDarci} />
-            </div>
-          )}
           <nav className="pos-nav">
+            {/* O Darci abre o menu: é um item como os outros, só que em vez de
+                trocar de tela ele já começa a ouvir. */}
+            {tab !== 'darci' && darciNaLateral && (
+              <div className="pos-group"><DarciFlutuante cheio {...propsDarci} /></div>
+            )}
             {grupos.map((g) => (
               <div key={g.titulo} className="pos-group">
                 <div className="pos-group-title">{g.titulo}</div>
