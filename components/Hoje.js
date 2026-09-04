@@ -6,7 +6,7 @@ import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparC
 
 const TAB = { fontVariantNumeric: 'tabular-nums' };
 
-export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], estoque = [], vendas = [], setTab }) {
+export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], estoque = [], vendas = [], setTab, darci = null }) {
   const [mostrarValores, setMostrarValores] = useState(true);
   const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
   const [caixaAberto, setCaixaAberto] = useState(null);
@@ -89,10 +89,14 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           <div style={{ fontSize: 26, fontWeight: 900, marginTop: 2 }}>Dashboard</div>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{saudacao}, Karen · resumo de {mesLabel(mes)}</div>
         </div>
-        <button onClick={() => setMostrarValores((v) => !v)} title={mostrarValores ? 'Ocultar valores' : 'Mostrar valores'}
-          style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-          {mostrarValores ? 'Ocultar' : 'Mostrar'}
-        </button>
+        {/* O Darci fica aqui, do lado do Ocultar: os dois no mesmo formato. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {darci}
+          <button onClick={() => setMostrarValores((v) => !v)} title={mostrarValores ? 'Ocultar valores' : 'Mostrar valores'}
+            style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            {mostrarValores ? 'Ocultar' : 'Mostrar'}
+          </button>
+        </div>
       </div>
 
       {caixaAlerta && (

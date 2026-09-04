@@ -13,7 +13,7 @@ import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque } from
 //
 // No iPhone o Safari não tem reconhecimento de fala; nesse caso o balão abre
 // com o campo pronto e os atalhos — a resposta vem em voz alta do mesmo jeito.
-export default function DarciFlutuante({ onAbrir, cheio = false, ...dados }) {
+export default function DarciFlutuante({ onAbrir, ...dados }) {
   const [aberto, setAberto] = useState(false);
   const [ouvindo, setOuvindo] = useState(false);
   const [pensando, setPensando] = useState(false);
@@ -178,7 +178,7 @@ export default function DarciFlutuante({ onAbrir, cheio = false, ...dados }) {
         .darci-pt:nth-child(2){ animation-delay:.15s } .darci-pt:nth-child(3){ animation-delay:.3s }
       `}</style>
 
-      <div className="darci-canto" ref={caixaRef} style={cheio ? { width: '100%' } : undefined}>
+      <div className="darci-canto" ref={caixaRef}>
         {aberto && pos && (
           <div className="darci-balao" role="dialog" aria-label="Darci" style={{
             position: 'fixed', zIndex: 70,
@@ -258,32 +258,20 @@ export default function DarciFlutuante({ onAbrir, cheio = false, ...dados }) {
           </div>
         )}
 
-        {/* Na lateral ele é mais um item do menu (mesma classe dos outros, então
-            alinha sozinho); na barra de cima é mais um ícone da fileira. O
-            traço é simples e na cor do app — a onda de neon só na tela dele. */}
+        {/* Mesmo formato do botão Ocultar, que fica coladinho nele: mesma borda,
+            mesmo canto, mesmo recuo. O traço é simples e na cor do app. */}
         <button
           ref={botaoRef}
-          className={cheio ? 'pos-navitem' : undefined}
           onClick={() => { if (!aberto) return abrir(); if (falando || pensando) return esconder(); return ouvirOk ? ouvir() : esconder(); }}
           aria-label="Falar com o Darci"
           title="Falar com o Darci"
-          style={cheio ? { color: ativa ? C.accent : C.muted } : {
-            height: 36, borderRadius: 10, padding: '0 8px', overflow: 'hidden',
-            border: `1px solid ${ativa ? C.accent : C.line}`, background: 'transparent',
-            color: C.accent, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          style={{
+            flexShrink: 0, background: 'transparent', borderRadius: 10, padding: '7px 12px',
+            border: `1px solid ${ativa ? C.accent : C.line}`, color: C.accent, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 0,
           }}
         >
-          {cheio ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              <OndaDarci ativo={ativa} neon={false} largura={26} altura={16} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {ativa ? estado : 'Falar com o Darci'}
-              </span>
-            </span>
-          ) : (
-            <OndaDarci ativo={ativa} neon={false} largura={30} altura={18} />
-          )}
+          <OndaDarci ativo={ativa} neon={false} largura={30} altura={18} />
         </button>
       </div>
     </>
