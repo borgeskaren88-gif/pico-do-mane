@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { C, inputStyle } from './ui';
 import OrbDarci from './OrbDarci';
 import { analisarBar, responder, ATALHOS } from '../lib/darci';
-import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala } from '../lib/darciVoz';
+import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque } from '../lib/darciVoz';
 
 // Bola da Darci: fica num canto, em qualquer tela do PicoOS.
 // Ao tocar ela NÃO abre a tela dela — ela já começa a ouvir e responde ali
@@ -21,8 +21,9 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
   const [ouviu, setOuviu] = useState('');      // o que ela falou
   const [resposta, setResposta] = useState(''); // o que a Darci respondeu
   const [ouvirOk, setOuvirOk] = useState(false); // este aparelho entende voz?
+  const sotaqueRef = useRef('manezinho');
 
-  useEffect(() => { setOuvirOk(podeOuvir()); }, []);
+  useEffect(() => { setOuvirOk(podeOuvir()); sotaqueRef.current = lerSotaque(); }, []);
 
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
@@ -47,10 +48,10 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
     setResposta('');
     setPensando(true);
     timerRef.current = setTimeout(() => {
-      const resp = responder(q, analisarBar(dadosRef.current));
+      const resp = responder(q, analisarBar(dadosRef.current), sotaqueRef.current);
       setPensando(false);
       setResposta(resp);
-      falarTexto(resp, { aoIniciar: () => setFalando(true), aoTerminar: () => setFalando(false) });
+      falarTexto(resp, { sotaque: sotaqueRef.current, aoIniciar: () => setFalando(true), aoTerminar: () => setFalando(false) });
     }, 380);
   }, []);
 
