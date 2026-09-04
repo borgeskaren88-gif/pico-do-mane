@@ -5,14 +5,15 @@ import OndaDarci from './OndaDarci';
 import { analisarBar, responder, ATALHOS } from '../lib/darci';
 import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque } from '../lib/darciVoz';
 
-// Bola da Darci: fica num canto, em qualquer tela do PicoOS.
-// Ao tocar ela NÃO abre a tela dela — ela já começa a ouvir e responde ali
-// mesmo, num balãozinho em cima da bola. A aba "Darci" continua existindo pra
-// quando a dona quiser a tela inteira (voz, tom, conversa longa).
+// A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
+// a barra de cima no celular), em linha com os outros botões. Ao tocar ela NÃO
+// abre a tela dele — ele já começa a ouvir e responde ali mesmo, num balão
+// grudado no botão. A aba "Darci" continua existindo pra quando a dona quiser a
+// tela inteira (voz, tom, jeito de falar, conversa longa).
 //
 // No iPhone o Safari não tem reconhecimento de fala; nesse caso o balão abre
 // com o campo pronto e os atalhos — a resposta vem em voz alta do mesmo jeito.
-export default function DarciFlutuante({ onAbrir, ...dados }) {
+export default function DarciFlutuante({ onAbrir, cheio = false, ...dados }) {
   const [aberto, setAberto] = useState(false);
   const [ouvindo, setOuvindo] = useState(false);
   const [pensando, setPensando] = useState(false);
@@ -21,6 +22,7 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
   const [ouviu, setOuviu] = useState('');      // o que ela falou
   const [resposta, setResposta] = useState(''); // o que a Darci respondeu
   const [ouvirOk, setOuvirOk] = useState(false); // este aparelho entende voz?
+  const [pos, setPos] = useState(null); // onde o balão abre, medido no botão
   const sotaqueRef = useRef('manezinho');
 
   useEffect(() => { setOuvirOk(podeOuvir()); sotaqueRef.current = lerSotaque(); }, []);
@@ -30,6 +32,7 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
   const recRef = useRef(null);
   const campoRef = useRef(null);
   const caixaRef = useRef(null);
+  const botaoRef = useRef(null);
   const timerRef = useRef(null);
 
   const pararTudo = useCallback(() => {
@@ -91,6 +94,7 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
   // navegador exige pra liberar microfone e voz). Se ele já estiver falando,
   // só mostra o balão de novo — não corta a resposta no meio.
   const abrir = () => {
+    posicionar();
     setAberto(true);
     try { onAbrir && onAbrir(); } catch { /* ignora */ }
     if (falando || pensando) return;
@@ -109,16 +113,42 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
     setAberto(false);
   }, []);
 
+  // O balão abre grudado no botão, medido de verdade — assim ele nunca fica
+  // solto no meio da tela nem por cima de outra coisa, esteja o botão no
+  // cabeçalho do celular ou na lateral do computador.
+  const posicionar = useCallback(() => {
+    const b = botaoRef.current;
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    const larg = Math.min(320, window.innerWidth - 24);
+    const esquerda = Math.min(Math.max(12, r.right - larg), window.innerWidth - larg - 12);
+    const paraBaixo = r.top < window.innerHeight / 2;
+    setPos({
+      largura: larg,
+      left: Math.round(esquerda),
+      top: paraBaixo ? Math.round(r.bottom + 8) : null,
+      bottom: paraBaixo ? null : Math.round(window.innerHeight - r.top + 8),
+    });
+  }, []);
+
   useEffect(() => {
     if (!aberto) return;
+    posicionar();
+    window.addEventListener('resize', posicionar);
+    window.addEventListener('scroll', posicionar, true);
     const esc = (e) => { if (e.key === 'Escape') esconder(); };
     // Toque fora guarda o balão e SEGUE para o que ela tocou (não tem camada
     // por cima bloqueando o app).
     const fora = (e) => { if (caixaRef.current && !caixaRef.current.contains(e.target)) esconder(); };
     document.addEventListener('keydown', esc);
     document.addEventListener('pointerdown', fora);
-    return () => { document.removeEventListener('keydown', esc); document.removeEventListener('pointerdown', fora); };
-  }, [aberto, esconder]);
+    return () => {
+      window.removeEventListener('resize', posicionar);
+      window.removeEventListener('scroll', posicionar, true);
+      document.removeEventListener('keydown', esc);
+      document.removeEventListener('pointerdown', fora);
+    };
+  }, [aberto, esconder, posicionar]);
 
   // Ao sair da tela o microfone para, mas a fala continua — ela pode trocar de
   // aba ouvindo. E este relógio mantém o botão "parar de falar" certo mesmo
@@ -133,7 +163,7 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
   }, []);
 
   const ativa = ouvindo || pensando || falando;
-  const estado = ouvindo ? 'te ouvindo…' : pensando ? 'pensando…' : falando ? 'falando' : 'toca na bola e pergunta';
+  const estado = ouvindo ? 'te ouvindo…' : pensando ? 'pensando…' : falando ? 'falando' : 'toca e pergunta';
 
   return (
     <>
@@ -142,24 +172,21 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
                                  50%     { box-shadow: 0 6px 18px rgba(0,0,0,.26), 0 0 0 7px color-mix(in srgb, ${C.accent} 0%, transparent) } }
         @keyframes darci-sobe { from { transform: translateY(10px); opacity: 0 } to { transform: none; opacity: 1 } }
         @keyframes darci-blink { 0%,100%{opacity:.25} 50%{opacity:1} }
-        /* A bola mora em cima, na faixa do cabeçalho. O recuo à direita deixa
-           livres os botões que já ficam lá (o + , o atualizar, o Ocultar). */
-        .darci-canto { position: fixed; z-index: 60;
-          top: calc(8px + env(safe-area-inset-top));
-          right: calc(14px + env(safe-area-inset-right));
-          display: flex; flex-direction: column-reverse; align-items: flex-end; }
-        .darci-bola { margin-right: 94px; }
-        @media (max-width: 400px) { .darci-bola { margin-right: 90px; } }
+        /* O botão mora na barra onde foi colocado (cabeçalho ou lateral), em
+           linha com os outros — nada de flutuar solto por cima da tela. */
+        .darci-canto { display: flex; flex-shrink: 0; }
         .darci-fab { animation: darci-halo 3.6s ease-out infinite; }
         .darci-balao { animation: darci-sobe .2s ease both; }
         .darci-pt { display:inline-block; width:5px; height:5px; border-radius:999px; background:${C.accent}; margin-right:4px; animation: darci-blink 1s infinite; }
         .darci-pt:nth-child(2){ animation-delay:.15s } .darci-pt:nth-child(3){ animation-delay:.3s }
       `}</style>
 
-      <div className="darci-canto" ref={caixaRef}>
-        {aberto && (
+      <div className="darci-canto" ref={caixaRef} style={cheio ? { width: '100%' } : undefined}>
+        {aberto && pos && (
           <div className="darci-balao" role="dialog" aria-label="Darci" style={{
-            width: 'min(320px, calc(100vw - 28px))', marginTop: 10,
+            position: 'fixed', zIndex: 70,
+            left: pos.left, top: pos.top == null ? undefined : pos.top, bottom: pos.bottom == null ? undefined : pos.bottom,
+            width: pos.largura,
             background: C.ink, border: `1px solid ${C.line}`, borderRadius: 18,
             boxShadow: '0 18px 44px rgba(0,0,0,.45)', padding: '12px 13px 13px',
           }}>
@@ -237,17 +264,18 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
         {/* A onda de voz do Darci, deitada na faixa do cabeçalho: ocupa pouca
             altura e não briga com os botões que já moram lá. */}
         <button
+          ref={botaoRef}
           className="darci-fab darci-bola"
           onClick={() => { if (!aberto) return abrir(); if (falando || pensando) return esconder(); return ouvirOk ? ouvir() : esconder(); }}
           aria-label="Falar com o Darci"
           title="Falar com o Darci"
           style={{
-            height: 30, borderRadius: 999, padding: '0 9px', overflow: 'hidden',
+            height: 34, width: cheio ? '100%' : undefined, borderRadius: 999, padding: '0 10px', overflow: 'hidden',
             border: `1px solid ${ativa ? C.accent : C.line}`, background: C.panel, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 2,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <OndaDarci ativo={ativa} largura={54} altura={22} />
+          <OndaDarci ativo={ativa} largura={cheio ? undefined : 56} altura={24} />
         </button>
       </div>
     </>
