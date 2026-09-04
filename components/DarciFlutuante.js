@@ -269,13 +269,19 @@ export default function DarciFlutuante({ onAbrir, cheio = false, ...dados }) {
           style={{
             height: cheio ? 40 : 36, width: cheio ? '100%' : undefined,
             borderRadius: cheio ? 12 : 10, padding: cheio ? '0 12px' : '0 8px', overflow: 'hidden',
-            border: `1px solid ${ativa ? C.accent : C.line}`, cursor: 'pointer',
-            // Fundo escuro sempre: a onda é de luz, e no claro ela sumiria.
-            background: 'linear-gradient(180deg, #101733 0%, #0a0e1c 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            border: `1px solid ${ativa ? C.accent : C.line}`, background: 'transparent',
+            color: C.accent, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: cheio ? 'flex-start' : 'center', gap: 9, flexShrink: 0,
           }}
         >
-          <OndaDarci ativo={ativa} largura={cheio ? undefined : 46} altura={cheio ? 26 : 20} />
+          {/* Traço simples, na cor do app: dentro das barras claras do PicoOS a
+              onda de neon parecia pedaço de outro programa. */}
+          <OndaDarci ativo={ativa} neon={false} largura={cheio ? 54 : 30} altura={cheio ? 22 : 18} />
+          {cheio && (
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: ativa ? C.accent : C.muted, letterSpacing: '.01em' }}>
+              {ativa ? estado : 'Falar com o Darci'}
+            </span>
+          )}
         </button>
       </div>
     </>
