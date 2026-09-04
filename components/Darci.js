@@ -79,12 +79,15 @@ export default function Darci({ receitas = [], despesas = [], compras = [], vend
       const u = new SpeechSynthesisUtterance(String(texto).replace(/R\$\s?/g, 'reais ').replace(/\s+/g, ' '));
       u.lang = 'pt-BR';
       u.rate = 1.0;
-      u.pitch = 0.82; // tom mais grave, pra soar masculino mesmo em voz neutra
+      // Se a voz escolhida JÁ é masculina (ex.: Felipe), fala no tom natural dela.
+      // Só abaixa o tom quando a única opção é uma voz feminina/neutra.
+      let ehMasculina = false;
       try {
         const todas = window.speechSynthesis.getVoices() || [];
         const v = todas.find((x) => x.voiceURI === vozIdRef.current);
-        if (v) u.voice = v;
+        if (v) { u.voice = v; ehMasculina = MASC.test(v.name || ''); }
       } catch { /* usa a padrão */ }
+      u.pitch = ehMasculina ? 1.0 : 0.82;
       u.onstart = () => setFalando(true);
       u.onend = () => setFalando(false);
       u.onerror = () => setFalando(false);
