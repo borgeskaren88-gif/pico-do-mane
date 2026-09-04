@@ -2,11 +2,11 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
-import OrbDarci from './OrbDarci';
+import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, ATALHOS } from '../lib/darci';
 import { temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala } from '../lib/darciVoz';
 
-// Tela cheia do Darci: a esfera grande, a conversa e os ajustes de voz.
+// Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
 // lib/darciVoz.js — os mesmos que o balão flutuante usa.
 export default function Darci(dados) {
@@ -104,10 +104,18 @@ export default function Darci(dados) {
       `}</style>
 
       <div style={{ textAlign: 'center', paddingTop: 6, marginBottom: 6 }}>
-        <OrbDarci ativo={ativa} tamanho={200} />
-        <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '.06em', color: C.text, marginTop: -6 }}>DARCI</div>
-        <div style={{ fontSize: 11.5, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 700, marginTop: 3 }}>
-          {pensando ? 'processando…' : falando ? 'falando' : 'sócio · manezinho da ilha'}
+        {/* O painel do Darci: a onda de voz dele, viva. */}
+        <div style={{
+          textAlign: 'left', borderRadius: 20, padding: '16px 18px 12px', marginBottom: 4,
+          background: 'radial-gradient(130% 110% at 85% 0%, #33203a 0%, #131832 46%, #070a15 100%)',
+          border: '1px solid rgba(255,255,255,.09)', overflow: 'hidden',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.18em', color: 'rgba(255,255,255,.55)' }}>DARCI</div>
+          <div style={{ fontSize: 25, fontWeight: 800, color: '#7fd2ff', marginTop: 3, lineHeight: 1.1 }}>
+            {pensando ? 'Pensando…' : falando ? 'Falando' : 'Pronto'}
+          </div>
+          <div style={{ margin: '10px -6px 0' }}><OndaDarci ativo={ativa} altura={132} /></div>
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.45)', letterSpacing: '.06em' }}>teu sócio · manezinho da ilha</div>
         </div>
         {!vozOk && <div style={{ fontSize: 12, color: C.amber, marginTop: 8 }}>Neste aparelho a voz não funciona — ele responde escrito.</div>}
 
