@@ -4,7 +4,7 @@ import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OrbDarci from './OrbDarci';
 import { analisarBar, responder, ATALHOS } from '../lib/darci';
-import { temVoz, ehPt, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, falarTexto, pararFala } from '../lib/darciVoz';
+import { temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, falarTexto, pararFala } from '../lib/darciVoz';
 
 // Tela cheia do Darci: a esfera grande, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -18,6 +18,7 @@ export default function Darci(dados) {
   const [vozes, setVozes] = useState([]);
   const [vozId, setVozId] = useState('');
   const [tom, setTom] = useState(0.7);
+  const [nome, setNome] = useState(NOME_PADRAO); // como ele fala o nome dela
   const [verTodas, setVerTodas] = useState(false); // vozes de outros idiomas
   const fimRef = useRef(null);
   const timerRef = useRef(null);
@@ -35,6 +36,7 @@ export default function Darci(dados) {
     const ok = temVoz();
     setVozOk(ok);
     setTom(lerTom());
+    setNome(lerNome());
     if (!ok) return;
     carregarVozes();
     window.speechSynthesis.addEventListener?.('voiceschanged', carregarVozes);
@@ -49,14 +51,15 @@ export default function Darci(dados) {
 
   const falar = useCallback((texto) => {
     falarTexto(texto, {
-      vozId, tom,
+      vozId, tom, nome,
       aoIniciar: () => setFalando(true),
       aoTerminar: () => { setFalando(false); carregarVozes(); },
     });
-  }, [vozId, tom, carregarVozes]);
+  }, [vozId, tom, nome, carregarVozes]);
 
   const trocarVoz = (id) => { setVozId(id); salvarVoz(id); };
   const trocarTom = (v) => { setTom(v); salvarTom(v); };
+  const trocarNome = (v) => { setNome(v); salvarNome(v); };
 
   const enviar = (texto) => {
     const q = String(texto || '').trim();
@@ -80,7 +83,8 @@ export default function Darci(dados) {
   // numera pra dar pra testar cada uma.
   const rotuloVoz = (v) => {
     const iguais = vozes.filter((x) => x.name === v.name);
-    return iguais.length < 2 ? v.name : `${v.name} ${iguais.indexOf(v) + 1}`;
+    const base = iguais.length < 2 ? v.name : `${v.name} ${iguais.indexOf(v) + 1}`;
+    return ehMelhor(v) ? `${base} (melhorada)` : base;
   };
 
   return (
@@ -139,8 +143,25 @@ export default function Darci(dados) {
               </div>
             </div>
 
+            {/* A voz brasileira lê "Karen" como "Kerên". Escrevendo com acento
+                ela acerta — e aqui a dona ajusta até ficar do jeito dela. */}
+            <div style={{ maxWidth: 320, margin: '14px auto 0', textAlign: 'left' }}>
+              <div style={{ fontSize: 11, color: C.faint, fontWeight: 700, marginBottom: 4 }}>Como ele fala teu nome</div>
+              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                <input value={nome} onChange={(e) => trocarNome(e.target.value)}
+                  placeholder={NOME_PADRAO}
+                  style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '9px 11px', fontSize: 13.5 }} />
+                <button onClick={() => falar('Ó, Karen. Falei teu nome certo agora?')}
+                  style={{ background: 'none', border: `1px solid ${C.line}`, color: C.accent, borderRadius: 999, padding: '8px 13px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>ouvir</button>
+              </div>
+              <div style={{ fontSize: 10.5, color: C.faint, marginTop: 5, lineHeight: 1.45 }}>
+                Escreve do jeito que soa: <b>Káren</b>, <b>Kárem</b>, <b>Cáren</b>… toca em “ouvir” até acertar.
+              </div>
+            </div>
+
             <div style={{ fontSize: 11, color: C.faint, marginTop: 8, lineHeight: 1.45, maxWidth: 380, margin: '8px auto 0' }}>
               O iPhone não libera pra apps as vozes que você baixa em Acessibilidade (nem as da Siri) — só estas. Por isso o tom é regulável aqui.
+              {' '}<b>Quer voz melhor?</b> No notebook, abre o PicoOS no <b>Microsoft Edge</b>: lá aparecem as vozes “Natural” da Microsoft (a masculina é a <b>Antônio</b>), que falam português bem mais claro. Aqui na lista elas vêm marcadas como <i>melhorada</i>.
               {vozesOutras.length > 0 && !semPt && (
                 <>{' '}<button onClick={() => setVerTodas((v) => !v)}
                   style={{ background: 'none', border: 'none', color: C.accent, cursor: 'pointer', fontSize: 11, fontWeight: 700, padding: 0 }}>
