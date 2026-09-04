@@ -48,8 +48,8 @@ export default function ListaCompras({ usuario }) {
   const linha = (it) => (
     <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderTop: `1px solid ${C.hair}` }}>
       <button onClick={() => alternar(it.id)} aria-label={it.comprado ? 'Desmarcar' : 'Marcar como comprado'}
-        style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, cursor: 'pointer', padding: 0, border: `2px solid ${it.comprado ? C.green : C.line}`, background: it.comprado ? C.green : 'transparent', color: '#052014', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {it.comprado ? <Icone name="check" size={16} /> : ''}
+        style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, cursor: 'pointer', padding: 0, border: `2px solid ${it.comprado ? C.green : C.muted}`, background: it.comprado ? C.green : 'rgba(255,255,255,0.04)', color: '#052014', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {it.comprado ? <Icone name="check" size={17} /> : ''}
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: it.comprado ? C.faint : C.text, textDecoration: it.comprado ? 'line-through' : 'none' }}>

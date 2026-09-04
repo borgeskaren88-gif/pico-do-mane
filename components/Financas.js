@@ -218,6 +218,16 @@ export default function Financas({ usuario, tema = 'escuro' }) {
           </Card>
         )}
 
+        {/* Gráfico pizza: onde o gasto é maior */}
+        {resumo.catList.length > 0 && resumo.despesas > 0 && (
+          <Card style={{ marginBottom: 16 }}>
+            <Label>Onde o gasto é maior</Label>
+            <div style={{ marginTop: 12 }}>
+              <GraficoPizza dados={resumo.catList} total={resumo.despesas} />
+            </div>
+          </Card>
+        )}
+
         {/* Por categoria */}
         {resumo.catList.length > 0 && (
           <Card style={{ marginBottom: 16 }}>
@@ -295,6 +305,49 @@ function Barra({ pct, cor }) {
   return (
     <div style={{ height: 8, background: C.panel2, borderRadius: 999, overflow: 'hidden' }}>
       <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: cor, borderRadius: 999 }} />
+    </div>
+  );
+}
+
+// Paleta terrosa pra fatiar o gráfico pizza (uma cor por categoria).
+const CORES_PIZZA = ['#A46447', '#88937B', '#D3A45C', '#6E8CA0', '#9A7BA0', '#5E9C8F', '#C58BA0', '#8C7A5C', '#B07A55', '#7A8A6E'];
+
+// Gráfico pizza (rosca) de gastos por categoria: mostra onde o gasto é maior.
+function GraficoPizza({ dados, total }) {
+  const R = 52, W = 26, C0 = 2 * Math.PI * R; // raio, espessura, circunferência
+  let acc = 0;
+  const fatias = dados.map(([cat, v], i) => {
+    const frac = total > 0 ? v / total : 0;
+    const s = { cat, v, cor: CORES_PIZZA[i % CORES_PIZZA.length], frac, offset: acc };
+    acc += frac;
+    return s;
+  });
+  const maior = fatias[0];
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+      <div style={{ position: 'relative', width: 140, height: 140, flexShrink: 0 }}>
+        <svg width="140" height="140" viewBox="0 0 140 140" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="70" cy="70" r={R} fill="none" stroke="rgba(160,150,130,0.18)" strokeWidth={W} />
+          {fatias.map((s) => (
+            <circle key={s.cat} cx="70" cy="70" r={R} fill="none" stroke={s.cor} strokeWidth={W}
+              strokeDasharray={`${s.frac * C0} ${C0}`} strokeDashoffset={-s.offset * C0} />
+          ))}
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <span style={{ fontSize: 10, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Maior</span>
+          <span style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.1, maxWidth: 88 }}>{maior ? maior.cat : '—'}</span>
+          {maior && <span style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{Math.round(maior.frac * 100)}%</span>}
+        </div>
+      </div>
+      <div style={{ flex: 1, minWidth: 140, display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {fatias.map((s) => (
+          <div key={s.cat} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <span style={{ width: 11, height: 11, borderRadius: 3, background: s.cor, flexShrink: 0 }} />
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.cat}</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums', color: C.muted }}>{Math.round(s.frac * 100)}%</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
