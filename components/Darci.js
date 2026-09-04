@@ -3,8 +3,8 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OrbDarci from './OrbDarci';
-import { analisarBar, responder, ATALHOS } from '../lib/darci';
-import { temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, falarTexto, pararFala } from '../lib/darciVoz';
+import { analisarBar, responder, temperar, ATALHOS } from '../lib/darci';
+import { temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala } from '../lib/darciVoz';
 
 // Tela cheia do Darci: a esfera grande, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -19,6 +19,7 @@ export default function Darci(dados) {
   const [vozId, setVozId] = useState('');
   const [tom, setTom] = useState(0.7);
   const [nome, setNome] = useState(NOME_PADRAO); // como ele fala o nome dela
+  const [sotaque, setSotaque] = useState('manezinho'); // jeito de falar
   const [verTodas, setVerTodas] = useState(false); // vozes de outros idiomas
   const fimRef = useRef(null);
   const timerRef = useRef(null);
@@ -37,6 +38,7 @@ export default function Darci(dados) {
     setVozOk(ok);
     setTom(lerTom());
     setNome(lerNome());
+    setSotaque(lerSotaque());
     if (!ok) return;
     carregarVozes();
     window.speechSynthesis.addEventListener?.('voiceschanged', carregarVozes);
@@ -51,15 +53,19 @@ export default function Darci(dados) {
 
   const falar = useCallback((texto) => {
     falarTexto(texto, {
-      vozId, tom, nome,
+      vozId, tom, nome, sotaque,
       aoIniciar: () => setFalando(true),
       aoTerminar: () => { setFalando(false); carregarVozes(); },
     });
-  }, [vozId, tom, nome, carregarVozes]);
+  }, [vozId, tom, nome, sotaque, carregarVozes]);
 
   const trocarVoz = (id) => { setVozId(id); salvarVoz(id); };
   const trocarTom = (v) => { setTom(v); salvarTom(v); };
   const trocarNome = (v) => { setNome(v); salvarNome(v); };
+  const trocarSotaque = (v) => {
+    setSotaque(v); salvarSotaque(v);
+    falarTexto(temperar('Ó, Karen. Assim tá bom pra ti?', v), { vozId, tom, nome, sotaque: v, aoIniciar: () => setFalando(true), aoTerminar: () => setFalando(false) });
+  };
 
   const enviar = (texto) => {
     const q = String(texto || '').trim();
@@ -68,7 +74,7 @@ export default function Darci(dados) {
     setPergunta('');
     setPensando(true);
     timerRef.current = setTimeout(() => {
-      const resp = responder(q, n);
+      const resp = responder(q, n, sotaque);
       setPensando(false);
       setConversa((c) => [...c, { de: 'darci', texto: resp }]);
       falar(resp);
@@ -156,6 +162,24 @@ export default function Darci(dados) {
               </div>
               <div style={{ fontSize: 10.5, color: C.faint, marginTop: 5, lineHeight: 1.45 }}>
                 Escreve do jeito que soa: <b>Káren</b>, <b>Kárem</b>, <b>Cáren</b>… toca em “ouvir” até acertar.
+              </div>
+            </div>
+
+            {/* Quanto de ilha ele põe na fala. O conteúdo é o mesmo — muda o jeito. */}
+            <div style={{ maxWidth: 320, margin: '14px auto 0', textAlign: 'left' }}>
+              <div style={{ fontSize: 11, color: C.faint, fontWeight: 700, marginBottom: 5 }}>Jeito de falar</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[['leve', 'Leve'], ['manezinho', 'Manezinho'], ['carregado', 'Carregado']].map(([v, rot]) => (
+                  <button key={v} onClick={() => trocarSotaque(v)} style={{
+                    flex: 1, borderRadius: 999, padding: '8px 6px', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                    border: `1px solid ${sotaque === v ? C.accent : C.line}`,
+                    background: sotaque === v ? C.accent : 'transparent',
+                    color: sotaque === v ? '#06101F' : C.muted,
+                  }}>{rot}</button>
+                ))}
+              </div>
+              <div style={{ fontSize: 10.5, color: C.faint, marginTop: 5, lineHeight: 1.45 }}>
+                <b>Leve</b>: português certinho. <b>Manezinho</b>: o jeito da ilha, com “tá”, “pra”, “ó”. <b>Carregado</b>: mais o chiado do manezinho na voz — só na fala, na tela continua escrito certo.
               </div>
             </div>
 
