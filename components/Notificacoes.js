@@ -71,7 +71,7 @@ export default function Notificacoes() {
 
       <Card style={{ marginBottom: 14, background: C.panel2 }}>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}>
-          Ative num aparelho e o PicoOS te avisa: <b style={{ color: C.text }}>estoque acabando</b>, <b style={{ color: C.text }}>fiado no limite</b>, <b style={{ color: C.text }}>conta vencendo</b> e o <b style={{ color: C.text }}>resumo do dia</b>. Dá pra ativar em vários aparelhos (celular, iPad, computador).
+          Ative num aparelho e o PicoOS te avisa: <b style={{ color: C.text }}>estoque acabando</b>, <b style={{ color: C.text }}>fiado no limite</b>, <b style={{ color: C.text }}>conta vencendo</b>, <b style={{ color: C.text }}>quem bateu o ponto</b> e o <b style={{ color: C.text }}>resumo do dia</b>. Dá pra ativar em vários aparelhos (celular, iPad, computador).
         </div>
       </Card>
 
@@ -134,7 +134,7 @@ export default function Notificacoes() {
         <Card style={{ marginBottom: 14, background: C.panel2 }}>
           <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 8 }}>O que você recebe</div>
           <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>
-            Todo dia de manhã (a partir das <b style={{ color: C.text }}>7h</b>) chega um <b style={{ color: C.text }}>resumo</b> com o que precisa de atenção: quanto vendeu ontem, <b style={{ color: C.text }}>agenda do dia</b>, contas vencendo hoje, estoque no mínimo e fiados no limite. E <b style={{ color: C.text }}>na hora</b>, quando um fiado bate o limite de alguém. Cada <b style={{ color: C.text }}>compromisso da agenda</b> também te avisa no <b style={{ color: C.text }}>horário marcado</b> (pelo Calendário do celular). Toque em <b style={{ color: C.text }}>“Ver resumo agora”</b> pra ver como fica.
+            Todo dia de manhã (a partir das <b style={{ color: C.text }}>7h</b>) chega um <b style={{ color: C.text }}>resumo</b> com o que precisa de atenção: quanto vendeu ontem, <b style={{ color: C.text }}>agenda do dia</b>, contas vencendo hoje, estoque no mínimo e fiados no limite. E <b style={{ color: C.text }}>na hora</b>: quando um fiado bate o limite de alguém e quando alguém da equipe <b style={{ color: C.text }}>bate o ponto</b> — entrada e saída, com o tempo do turno. Cada <b style={{ color: C.text }}>compromisso da agenda</b> também te avisa no <b style={{ color: C.text }}>horário marcado</b> (pelo Calendário do celular). Toque em <b style={{ color: C.text }}>“Ver resumo agora”</b> pra ver como fica.
           </div>
         </Card>
       )}

@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
+import { notificarPonto } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +67,9 @@ export async function POST(request) {
       const reg = { id: uid(), nome: nomeCanonico(nome), entrada: new Date().toISOString(), saida: null, data: hojeBrasil(), papel: p };
       const { error } = await sb.from('pdm_dados').upsert({ chave: PREFIXO + reg.id, valor: reg, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
+      // A dona recebe na hora quem bateu o ponto. Quando é ela mesma batendo,
+      // não faz sentido avisar.
+      if (p !== 'dona') await notificarPonto(sb, reg, 'entrada');
       return NextResponse.json({ ok: true, registro: reg });
     }
 
@@ -77,6 +81,7 @@ export async function POST(request) {
       const reg = { ...abertos[0], saida: new Date().toISOString() };
       const { error } = await sb.from('pdm_dados').upsert({ chave: PREFIXO + reg.id, valor: reg, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
+      if (p !== 'dona') await notificarPonto(sb, reg, 'saida');
       return NextResponse.json({ ok: true, registro: reg });
     }
 
