@@ -39,6 +39,7 @@ import Widget from './Widget';
 import Previsao from './Previsao';
 import BotaoAtualizar from './BotaoAtualizar';
 import AtualizacaoAuto from './AtualizacaoAuto';
+import VersaoApp from './VersaoApp';
 import PullToRefresh from './PullToRefresh';
 
 const arr = (v) => (Array.isArray(v) ? v : []);
@@ -627,6 +628,7 @@ export default function Dashboard() {
             </button>
             <button onClick={sair} style={{ flex: 1, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Sair</button>
           </div>
+          <VersaoApp />
         </aside>
         <div className="pos-content">
           <div className="pos-topbar">
