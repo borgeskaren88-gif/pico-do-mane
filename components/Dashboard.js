@@ -444,6 +444,17 @@ export default function Dashboard() {
   // preferência no aparelho.
   const [lateralRecolhida, setLateralRecolhida] = useState(false);
   useEffect(() => { try { if (localStorage.getItem('picoos-lateral') === 'recolhida') setLateralRecolhida(true); } catch { /* ignora */ } }, []);
+  // Tela larga = a lateral cabe. Serve pra saber onde encaixar o Darci: na
+  // lateral (computador) ou na barra de cima (celular).
+  const [telaLarga, setTelaLarga] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(min-width: 820px)');
+    const ver = () => setTelaLarga(mq.matches);
+    ver();
+    mq.addEventListener ? mq.addEventListener('change', ver) : mq.addListener(ver);
+    return () => { mq.removeEventListener ? mq.removeEventListener('change', ver) : mq.removeListener(ver); };
+  }, []);
   const recolherLateral = (v) => setLateralRecolhida((cur) => { const nv = v == null ? !cur : v; try { localStorage.setItem('picoos-lateral', nv ? 'recolhida' : 'aberta'); } catch { /* ignora */ } return nv; });
   const grupos = [
     { titulo: 'Início', itens: [['hoje', 'Dashboard'], ['darci', 'Darci'], ['brain', 'Brain']] },
@@ -521,6 +532,14 @@ export default function Dashboard() {
     <div style={{ minHeight: '100vh', background: C.ink, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>Carregando seus dados…</div>
   );
 
+  // O Darci fica encaixado numa barra que já existe: na lateral, no computador;
+  // na barra de cima, no celular. Assim ele fica sempre alinhado com o resto.
+  const propsDarci = {
+    receitas, despesas, compras, vendas, estoque, tarefas, clientes,
+    onAbrir: () => { carregarVendas(); carregarEstoque({}); },
+  };
+  const darciNaLateral = telaLarga && !lateralRecolhida;
+
   return (
     <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <PullToRefresh />
@@ -589,6 +608,11 @@ export default function Dashboard() {
               </div>
             ))}
           </nav>
+          {tab !== 'darci' && darciNaLateral && (
+            <div style={{ padding: '0 12px 10px' }}>
+              <DarciFlutuante cheio {...propsDarci} />
+            </div>
+          )}
           <div className="pos-side-foot">
             <BotaoAtualizar />
             <button onClick={trocarTema} title={tema === 'claro' ? 'Mudar para escuro' : 'Mudar para claro'} aria-label="Trocar tema"
@@ -611,6 +635,7 @@ export default function Dashboard() {
               <LogoMark size={28} radius={9} />
               <div style={{ fontSize: 16, fontWeight: 900 }}>PicoOS</div>
             </div>
+            {tab !== 'darci' && !darciNaLateral && <DarciFlutuante {...propsDarci} />}
             {tab !== 'despesarapida' && (
               <button onClick={() => setTab('despesarapida')} aria-label="Despesa rápida" title="Despesa rápida"
                 style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.accent, borderRadius: 10, padding: '7px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -743,11 +768,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* A Darci fica a um toque de qualquer tela (na aba dela o botão some). */}
-      {tab !== 'darci' && (
-        <DarciFlutuante receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} estoque={estoque} tarefas={tarefas} clientes={clientes}
-          onAbrir={() => { carregarVendas(); carregarEstoque({}); }} />
-      )}
     </div>
   );
 }
