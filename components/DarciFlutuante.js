@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { C, inputStyle } from './ui';
 import OndaDarci from './OndaDarci';
-import { analisarBar, responder, listaNovidades, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
+import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
 import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque } from '../lib/darciVoz';
 
 // A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
@@ -13,7 +13,7 @@ import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque } from
 //
 // No iPhone o Safari não tem reconhecimento de fala; nesse caso o balão abre
 // com o campo pronto e os atalhos — a resposta vem em voz alta do mesmo jeito.
-export default function DarciFlutuante({ onAbrir, ...dados }) {
+export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const [aberto, setAberto] = useState(false);
   const [ouvindo, setOuvindo] = useState(false);
   const [pensando, setPensando] = useState(false);
@@ -21,6 +21,7 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
   const [pergunta, setPergunta] = useState('');
   const [ouviu, setOuviu] = useState('');      // o que ela falou
   const [resposta, setResposta] = useState(''); // o que a Darci respondeu
+  const [pedido, setPedido] = useState(null);   // ordem entendida, esperando confirmação
   const [ouvirOk, setOuvirOk] = useState(false); // este aparelho entende voz?
   const [pos, setPos] = useState(null); // onde o balão abre, medido no botão
   const [desdeMs, setDesdeMs] = useState(0); // até onde ela já foi informada
@@ -64,6 +65,14 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
     setOuviu(q);
     setPergunta('');
     setResposta('');
+    setPedido(null);
+    // Antes de responder, vê se é uma ORDEM (lançar despesa, baixar estoque,
+    // anotar tarefa). Se for, mostra o que entendeu e espera o "confirmar" —
+    // nada é gravado sem ela mandar.
+    if (onAnotar) {
+      const cmd = interpretarComando(q, dadosRef.current);
+      if (cmd) { setPedido(cmd); setResposta(''); return; }
+    }
     setPensando(true);
     timerRef.current = setTimeout(() => {
       const resp = responder(q, analisarBar({ ...dadosRef.current, desdeMs: desdeRef.current }), sotaqueRef.current);
@@ -71,7 +80,7 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
       setResposta(resp);
       falarTexto(resp, { sotaque: sotaqueRef.current, aoIniciar: () => setFalando(true), aoTerminar: () => setFalando(false) });
     }, 380);
-  }, []);
+  }, [onAnotar]);
 
   // Começa a ouvir. Só funciona onde o navegador tem reconhecimento de fala.
   const ouvir = useCallback(() => {
@@ -231,6 +240,21 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
             {pensando && (
               <div style={{ padding: '6px 0 10px' }}>
                 <span className="darci-pt" /><span className="darci-pt" /><span className="darci-pt" />
+              </div>
+            )}
+
+            {pedido && (
+              <div style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 14, padding: '11px 12px', marginBottom: 10 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, marginBottom: 4 }}>CONFIRMA?</div>
+                <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.45 }}>{pedido.resumo}</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button onClick={async () => {
+                    const feito = await onAnotar(pedido);
+                    setPedido(null);
+                    setResposta(feito && feito.ok ? (feito.msg || 'Feito, anotado.') : (feito && feito.erro) || 'Não consegui gravar.');
+                  }} style={{ border: 'none', background: C.accent, color: '#06101F', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>Confirmar</button>
+                  <button onClick={() => setPedido(null)} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.muted, borderRadius: 10, padding: '9px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
+                </div>
               </div>
             )}
 

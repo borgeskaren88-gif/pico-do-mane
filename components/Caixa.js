@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, KPI, Field, NumInput, Empty, SecTitle, PageTitle } from './ui';
-import { brl, num, fmtDate } from '../lib/util';
+import { brl, num, uid, fmtDate } from '../lib/util';
 
 const METODOS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
 const hora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
@@ -11,7 +11,7 @@ const diaBR = (iso) => { if (!iso) return ''; try { return new Intl.DateTimeForm
 const dataHora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
 const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? 'Karen' : '');
 
-export default function Caixa({ papel = 'dona' }) {
+export default function Caixa({ papel = 'dona', receitas = null, onReceitas = null }) {
   const [dados, setDados] = useState(null);
   const [carregado, setCarregado] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -211,15 +211,31 @@ export default function Caixa({ papel = 'dona' }) {
                           <span style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(c.fiadoRecebido.total)}</span>
                         </div>
                       )}
-                      {/* Quanto lançar em Receitas: a venda do dia, SEM o fiado
-                          recebido — esse já entra sozinho quando se dá a baixa. */}
-                      {papel !== 'garcom' && (
-                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.line}`, fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
-                          Lançar em <b style={{ color: C.text }}>Receitas</b> (venda do dia):{' '}
-                          <b style={{ color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(Math.max(0, num(c.recebido) - num(c.fiadoRecebido?.total)))}</b>
-                          {(c.fiadoRecebido?.total || 0) > 0 ? ' — o fiado recebido já foi lançado sozinho como Recebimento Atrasado.' : ''}
-                        </div>
-                      )}
+                      {/* Fechamento guiado: a venda do dia (recebido MENOS o fiado
+                          recebido, que já entrou sozinho) vira receita num toque. */}
+                      {papel !== 'garcom' && (() => {
+                        const aLancar = Math.round(Math.max(0, num(c.recebido) - num(c.fiadoRecebido?.total)) * 100) / 100;
+                        const lancado = Array.isArray(receitas) && receitas.find((r) => r && r.refCaixa === c.id);
+                        return (
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
+                            <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
+                              Venda do dia pra lançar em <b style={{ color: C.text }}>Receitas</b>:{' '}
+                              <b style={{ color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(aLancar)}</b>
+                              {(c.fiadoRecebido?.total || 0) > 0 ? ' — o fiado recebido já entrou sozinho como Recebimento Atrasado.' : ''}
+                            </div>
+                            {lancado ? (
+                              <div style={{ fontSize: 12.5, color: C.green, fontWeight: 700, marginTop: 7 }}>✓ Já lançado em Receitas.</div>
+                            ) : onReceitas && aLancar > 0.005 ? (
+                              <div style={{ marginTop: 9 }}>
+                                <Btn kind="ok" small onClick={() => onReceitas([{
+                                  id: uid(), data: diaBR(c.abertoEm || c.fechadoEm), categoria: 'Caixa',
+                                  descricao: 'Fechamento do caixa', valor: aLancar, obs: '', refCaixa: c.id,
+                                }, ...receitas])}>Lançar {brl(aLancar)} em Receitas</Btn>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </Card>

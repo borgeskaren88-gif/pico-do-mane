@@ -5,6 +5,19 @@ import { brl, num, fmtDate, uid, diaOperacional, fiadoDaVenda, abertoDaVenda } f
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
+// Link do WhatsApp com a mensagem pronta. Telefone brasileiro sem o 55 ganha o
+// 55 na frente; sem telefone cadastrado não dá link (aí a gente copia o texto).
+const zapLink = (telefone, msg) => {
+  const d = String(telefone || '').replace(/\D/g, '');
+  const numero = d.length >= 12 ? d : (d.length >= 10 ? '55' + d : '');
+  return numero ? `https://wa.me/${numero}?text=${encodeURIComponent(msg)}` : '';
+};
+const msgCobranca = (nome, total) => (
+  `Oi ${nome}, tudo bem? Aqui é do Pico do Mané.\n\n`
+  + `Passando pra lembrar do teu consumo, que está em ${brl(total)}. `
+  + `Dá pra acertar até o dia 10?\n\nQualquer coisa é só me chamar por aqui. Obrigada!`
+);
+
 const FONTE_ATRASADO = 'Recebimento Atrasado';
 
 export default function Fiados({ onMudou, clientes = [], receitas = null, onReceitas = null }) {
@@ -120,6 +133,21 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
   };
 
   const limiteDe = (nome) => { const c = clientes.find((x) => norm(x.nome) === norm(nome)); return c ? num(c.limite) : 0; };
+  const telefoneDe = (nome) => { const c = clientes.find((x) => norm(x.nome) === norm(nome)); return (c && c.telefone) || ''; };
+
+  // Cobrar no WhatsApp: abre a conversa da pessoa com o texto pronto. Sem
+  // telefone cadastrado, copia a mensagem pra ela colar onde quiser.
+  const cobrar = async (g) => {
+    const msg = msgCobranca(g.nome, g.total);
+    const link = zapLink(telefoneDe(g.nome), msg);
+    if (link) { try { window.open(link, '_blank', 'noopener'); } catch { /* ignora */ } return; }
+    try {
+      await navigator.clipboard.writeText(msg);
+      setErro(`${g.nome} não tem telefone cadastrado (aba Clientes). Copiei a mensagem pra você colar no WhatsApp.`);
+    } catch {
+      setErro(`${g.nome} não tem telefone cadastrado. A mensagem seria: ${msg}`);
+    }
+  };
   const rotulo = (nome, mesa) => (nome && nome.trim()) || `Mesa ${mesa}`;
 
   const fiados = vendas.filter((v) => fiadoDaVenda(v) > 0.005);
@@ -205,8 +233,10 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                   {/* Receber um valor e abater da conta do cliente (sem ir compra por compra). */}
                   <div style={{ marginTop: 12 }}>
                     {!pagarAberto[g.chave] ? (
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <Btn kind="ok" small onClick={() => setPagarAberto((m) => ({ ...m, [g.chave]: true }))} disabled={busy}>Receber valor</Btn>
+                        {/* Cobrança pronta: abre a conversa da pessoa no WhatsApp com o texto escrito. */}
+                        <Btn kind="ghost" small onClick={() => cobrar(g)}>Cobrar no WhatsApp</Btn>
                       </div>
                     ) : (
                       <div style={{ background: C.panel2, borderRadius: 10, padding: 10 }}>
