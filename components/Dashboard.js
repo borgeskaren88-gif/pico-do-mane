@@ -538,6 +538,23 @@ export default function Dashboard() {
         upd.tarefas([{ id: uid(), texto: d.texto || '', data: '', feito: false, criadoEm: Date.now() }, ...tarefas]);
         return { ok: true, msg: `Anotei: ${d.texto}. Está no Brain.` };
       }
+      if (pedido.tipo === 'agenda') {
+        // Vai pra agenda do Google (a mesma que já avisa no horário marcado).
+        // Sem Google conectado, não perde o compromisso: vira tarefa com data.
+        try {
+          const r = await fetch('/api/google/criar-evento', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ titulo: d.titulo, data: d.data, hora: d.hora, diaTodo: !d.hora }),
+          });
+          const j = await r.json();
+          if (j && j.ok) {
+            const quando = `${d.data.slice(8, 10)}/${d.data.slice(5, 7)}${d.hora ? ` às ${d.hora}` : ''}`;
+            return { ok: true, msg: `Marquei na agenda: ${d.titulo}, ${quando}. O celular te avisa na hora.` };
+          }
+        } catch { /* cai no plano B */ }
+        upd.tarefas([{ id: uid(), texto: d.titulo, data: d.data, feito: false, criadoEm: Date.now() }, ...tarefas]);
+        return { ok: true, msg: `A agenda do Google não está conectada, então anotei no TO DO com a data: ${d.titulo}, dia ${d.data.slice(8, 10)}/${d.data.slice(5, 7)}.` };
+      }
       if (pedido.tipo === 'perda') {
         const j = await estoqueAcao({ acao: 'mov', id: d.itemId, tipo: 'saida', qtd: d.qtd, motivo: d.motivo });
         if (!j || !j.ok) return { ok: false, erro: (j && j.erro) || 'Não consegui baixar do estoque.' };
