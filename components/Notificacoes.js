@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
-import { C, Card, Btn, PageTitle, SecTitle } from './ui';
+import { C, Card, Btn, Field, NumInput, PageTitle, SecTitle } from './ui';
 import { pushSuportado, ehIOS, estaInstalado, statusPush, ativarPush, desativarPush, testarPush } from '../lib/pushClient';
 
 export default function Notificacoes() {
@@ -11,6 +11,7 @@ export default function Notificacoes() {
   const [inscrito, setInscrito] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [avisos, setAvisos] = useState(null); // o que ela quer receber na hora
 
   const conferir = useCallback(async () => {
     setIos(ehIOS());
@@ -19,6 +20,12 @@ export default function Notificacoes() {
     setSuporta(s.suporta);
     setPermissao(s.permissao);
     setInscrito(s.inscrito);
+    // Traz também as preferências de aviso (o que chega na hora).
+    try {
+      const r = await fetch('/api/push', { cache: 'no-store' });
+      const j = await r.json();
+      if (j && j.ok && j.avisos) setAvisos(j.avisos);
+    } catch { /* sem conexão: mostra sem os interruptores */ }
   }, []);
   useEffect(() => { conferir(); }, [conferir]);
 
@@ -60,6 +67,15 @@ export default function Notificacoes() {
       else setMsg(j.erro || 'Não consegui enviar o resumo.');
     } catch { setMsg('Sem conexão pra enviar o resumo.'); }
     finally { setBusy(false); }
+  };
+
+  // Liga/desliga um aviso. Salva na hora, sem botão de confirmar.
+  const mudarAviso = async (patch) => {
+    const novo = { ...avisos, ...patch };
+    setAvisos(novo);
+    try {
+      await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'avisos', avisos: novo }) });
+    } catch { setMsg('Não consegui salvar essa preferência (sem conexão).'); }
   };
 
   // iPhone/iPad sem estar instalado na tela inicial: o iOS não deixa ativar push.
@@ -130,11 +146,43 @@ export default function Notificacoes() {
         </Card>
       )}
 
+      {/* Interruptores: o que chega na hora que acontece. */}
+      {avisos && suporta && !precisaInstalar && (
+        <Card style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 4 }}>Avisos na hora</div>
+          <div style={{ fontSize: 12.5, color: C.faint, lineHeight: 1.5, marginBottom: 6 }}>Escolha o que vale te interromper. O resumo da manhã continua vindo de qualquer jeito.</div>
+          {[
+            ['comandaFiado', 'Comanda no fiado', 'Toda vez que uma conta sair fiada, com o nome de quem ficou devendo'],
+            ['caixa', 'Caixa aberto e fechado', 'No fechamento vem recebido, gaveta e a diferença da conferência'],
+            ['perda', 'Perda, quebra e cortesia', 'Saída sem venda, com o valor do que se perdeu'],
+            ['ponto', 'Ponto da equipe', 'Entrada e saída, com o tempo do turno'],
+            ['estoque', 'Item acabando', 'Quando algo zera ou bate o mínimo'],
+          ].map(([chave, titulo, desc]) => (
+            <label key={chave} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 0', borderTop: `1px solid ${C.hair}`, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!avisos[chave]} onChange={(e) => mudarAviso({ [chave]: e.target.checked })}
+                style={{ width: 20, height: 20, marginTop: 1, accentColor: C.accent, flexShrink: 0 }} />
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.text }}>{titulo}</span>
+                <span style={{ display: 'block', fontSize: 12, color: C.faint, lineHeight: 1.45, marginTop: 2 }}>{desc}</span>
+              </span>
+            </label>
+          ))}
+          <div style={{ borderTop: `1px solid ${C.hair}`, paddingTop: 12, marginTop: 4 }}>
+            <Field label="Avisar também comandas a partir de (R$) — 0 desliga">
+              <NumInput value={String(avisos.comandaValor ?? '')} onChange={(v) => mudarAviso({ comandaValor: Number(String(v).replace(',', '.')) || 0 })} />
+            </Field>
+            <div style={{ fontSize: 12, color: C.faint, lineHeight: 1.45, marginTop: -6 }}>
+              Numa noite cheia, avisar toda comanda vira chuva de notificação. Assim só chegam as grandes.
+            </div>
+          </div>
+        </Card>
+      )}
+
       {suporta && !precisaInstalar && inscrito && (
         <Card style={{ marginBottom: 14, background: C.panel2 }}>
           <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 8 }}>O que você recebe</div>
           <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>
-            Todo dia de manhã (a partir das <b style={{ color: C.text }}>7h</b>) chega um <b style={{ color: C.text }}>resumo</b> com o que precisa de atenção: quanto vendeu ontem, <b style={{ color: C.text }}>agenda do dia</b>, contas vencendo hoje, estoque no mínimo e fiados no limite. E <b style={{ color: C.text }}>na hora</b>: quando um fiado bate o limite de alguém e quando alguém da equipe <b style={{ color: C.text }}>bate o ponto</b> — entrada e saída, com o tempo do turno. Cada <b style={{ color: C.text }}>compromisso da agenda</b> também te avisa no <b style={{ color: C.text }}>horário marcado</b> (pelo Calendário do celular). Toque em <b style={{ color: C.text }}>“Ver resumo agora”</b> pra ver como fica.
+            Todo dia de manhã (a partir das <b style={{ color: C.text }}>7h</b>) chega um <b style={{ color: C.text }}>resumo</b> com o que precisa de atenção: quanto vendeu ontem, <b style={{ color: C.text }}>agenda do dia</b>, contas vencendo hoje, estoque no mínimo e fiados no limite. E <b style={{ color: C.text }}>na hora</b>, o que estiver ligado aí em cima: comanda no fiado, caixa aberto e fechado, perda e cortesia, ponto da equipe, item acabando — mais o aviso de quando um fiado <b style={{ color: C.text }}>bate o limite</b> de alguém. Cada <b style={{ color: C.text }}>compromisso da agenda</b> também te avisa no <b style={{ color: C.text }}>horário marcado</b> (pelo Calendário do celular). Toque em <b style={{ color: C.text }}>“Ver resumo agora”</b> pra ver como fica.
           </div>
         </Card>
       )}

@@ -4,7 +4,7 @@ import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
 import { num, limparNome, fiadoDaVenda, abertoDaVenda, brl, diaOperacional } from '../../../lib/util';
-import { enviarPush, notificarEstoqueCritico } from '../../../lib/push';
+import { enviarPush, notificarEstoqueCritico, notificarComandaFechada, notificarSaidaSemVenda } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -162,6 +162,14 @@ export async function POST(request) {
       if (!achou) return NextResponse.json({ ok: false, erro: 'Item não encontrado no estoque.' }, { status: 404 });
       await gravarPainelParcial(sb, { estoque: novos });
       try { await notificarEstoqueCritico(sb, estoque, novos); } catch (e) { /* push nunca quebra a baixa */ }
+      try {
+        const it = novos.find((x) => x.id === itemId);
+        await notificarSaidaSemVenda(sb, {
+          titulo: `${motivo}: ${limparNome(it?.nome)}`,
+          descricao: `${qtd} ${it?.unidade || 'un'} · lançado pelo atendimento`,
+          valor: qtd * num(it?.custo),
+        });
+      } catch (e) { /* push nunca quebra a baixa */ }
       return NextResponse.json({ ok: true });
     }
 
@@ -198,6 +206,7 @@ export async function POST(request) {
       if (!mudou) return NextResponse.json({ ok: false, erro: 'Não achei ingredientes pra baixar (confira a ficha).' }, { status: 400 });
       await gravarPainelParcial(sb, { estoque: novoEstoque });
       try { await notificarEstoqueCritico(sb, estoque, novoEstoque); } catch (e) { /* push nunca quebra a baixa */ }
+      try { await notificarSaidaSemVenda(sb, { titulo: `${motivoBase}: ${prato}`, descricao: `${qtd} ${qtd === 1 ? 'unidade' : 'unidades'} · lançado pelo atendimento` }); } catch (e) { /* push nunca quebra a baixa */ }
       return NextResponse.json({ ok: true, prato });
     }
 
@@ -385,6 +394,9 @@ export async function POST(request) {
           try { await notificarEstoqueCritico(sb, blobAtual.estoque, rb.estoque); } catch (e) { /* push nunca quebra a venda */ }
         }
       } catch (e) { /* estoque nunca quebra a venda */ }
+      // Aviso na hora da comanda fechada (fiado ou valor alto, conforme a dona
+      // configurou em Notificações).
+      try { await notificarComandaFechada(sb, venda); } catch (e) { /* push nunca quebra a venda */ }
       // Aviso na hora: se essa venda no fiado levou o cliente a bater o limite,
       // manda um push. Best-effort — nunca quebra a venda.
       if (fiado > 0.005 && venda.nome) {

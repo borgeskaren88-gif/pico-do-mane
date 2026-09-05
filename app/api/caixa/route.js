@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
+import { notificarCaixa } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,6 +109,7 @@ export async function POST(request) {
       const caixa = { id: uid(), aberto: true, saldoInicial, abertoEm: new Date().toISOString(), abertoPor: p };
       const { error } = await sb.from('pdm_dados').upsert({ chave: CX + caixa.id, valor: caixa, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
+      try { await notificarCaixa(sb, caixa, 'abrir'); } catch (e) { /* push nunca quebra a abertura */ }
       return NextResponse.json({ ok: true, caixa });
     }
 
@@ -136,6 +138,7 @@ export async function POST(request) {
       };
       const { error } = await sb.from('pdm_dados').upsert({ chave: CX + caixa.id, valor: fechado, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
+      try { await notificarCaixa(sb, fechado, 'fechar'); } catch (e) { /* push nunca quebra o fechamento */ }
       return NextResponse.json({ ok: true, caixa: fechado });
     }
 

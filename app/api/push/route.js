@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { obterConfigPush, salvarInscricao, removerInscricao, enviarPush, montarResumoDiario } from '../../../lib/push';
+import { obterConfigPush, salvarInscricao, removerInscricao, enviarPush, montarResumoDiario, lerAvisos, salvarAvisos } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs'; // web-push precisa do Node (crypto), não do Edge.
@@ -18,7 +18,10 @@ export async function GET() {
   try {
     const sb = supabaseServer();
     const cfg = await obterConfigPush(sb);
-    return NextResponse.json({ ok: true, publicKey: cfg.publicKey });
+    // Junto vão as preferências de aviso, pra a tela de Notificações já abrir
+    // com os interruptores no estado certo.
+    const avisos = p === 'dona' ? await lerAvisos(sb) : undefined;
+    return NextResponse.json({ ok: true, publicKey: cfg.publicKey, ...(avisos ? { avisos } : {}) });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao preparar notificações.' }, { status: 500 });
   }
@@ -54,6 +57,12 @@ export async function POST(request) {
       if (!resumo) return NextResponse.json({ ok: true, enviados: 0, vazio: true });
       const r = await enviarPush(sb, { ...resumo, tag: 'resumo-diario', audiencia: 'dona' });
       return NextResponse.json({ ok: true, ...r });
+    }
+    // Ligar/desligar cada aviso na hora (só a dona).
+    if (acao === 'avisos') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona.' }, { status: 403 });
+      const avisos = await salvarAvisos(sb, body?.avisos);
+      return NextResponse.json({ ok: true, avisos });
     }
     return NextResponse.json({ ok: false, erro: 'Ação inválida.' }, { status: 400 });
   } catch (e) {
