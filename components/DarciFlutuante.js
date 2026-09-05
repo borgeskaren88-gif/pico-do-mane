@@ -28,7 +28,8 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const podeGravar = !pedido ? false
     : pedido.tipo === 'despesa' ? (Number(edit.valor) > 0 && String(edit.descricao || '').trim().length > 1)
       : pedido.tipo === 'tarefa' ? String(edit.texto || '').trim().length > 1
-        : Number(edit.qtd) > 0;
+        : pedido.tipo === 'agenda' ? (String(edit.titulo || '').trim().length > 2 && /^\d{4}-\d{2}-\d{2}$/.test(edit.data || ''))
+          : Number(edit.qtd) > 0;
   const [ouvirOk, setOuvirOk] = useState(false); // este aparelho entende voz?
   const [pos, setPos] = useState(null); // onde o balão abre, medido no botão
   const [desdeMs, setDesdeMs] = useState(0); // até onde ela já foi informada
@@ -300,6 +301,18 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
                 {pedido.tipo === 'tarefa' && (
                   <input value={edit.texto ?? ''} onChange={(e) => setEdit((m) => ({ ...m, texto: e.target.value }))}
                     style={{ ...inputStyle, width: '100%', padding: '9px 10px', fontSize: 13 }} />
+                )}
+                {pedido.tipo === 'agenda' && (
+                  <>
+                    <input value={edit.titulo ?? ''} onChange={(e) => setEdit((m) => ({ ...m, titulo: e.target.value }))}
+                      placeholder="O que é?" style={{ ...inputStyle, width: '100%', padding: '9px 10px', fontSize: 13, marginBottom: 7 }} />
+                    <div style={{ display: 'flex', gap: 7 }}>
+                      <input type="date" value={edit.data ?? ''} onChange={(e) => setEdit((m) => ({ ...m, data: e.target.value }))}
+                        style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '9px 10px', fontSize: 13 }} />
+                      <input type="time" value={edit.hora ?? ''} onChange={(e) => setEdit((m) => ({ ...m, hora: e.target.value, diaTodo: !e.target.value }))}
+                        style={{ ...inputStyle, width: 110, padding: '9px 10px', fontSize: 13 }} />
+                    </div>
+                  </>
                 )}
                 {pedido.tipo === 'perda' && (
                   <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>

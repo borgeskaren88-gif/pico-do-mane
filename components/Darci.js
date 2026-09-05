@@ -29,7 +29,8 @@ export default function Darci({ onAnotar, ...dados }) {
   const podeGravar = !pedido ? false
     : pedido.tipo === 'despesa' ? (Number(edit.valor) > 0 && String(edit.descricao || '').trim().length > 1)
       : pedido.tipo === 'tarefa' ? String(edit.texto || '').trim().length > 1
-        : Number(edit.qtd) > 0;
+        : pedido.tipo === 'agenda' ? (String(edit.titulo || '').trim().length > 2 && /^\d{4}-\d{2}-\d{2}$/.test(edit.data || ''))
+          : Number(edit.qtd) > 0;
   const fimRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -309,6 +310,18 @@ export default function Darci({ onAnotar, ...dados }) {
           {pedido.tipo === 'tarefa' && (
             <input value={edit.texto ?? ''} onChange={(e) => setEdit((m) => ({ ...m, texto: e.target.value }))}
               style={{ ...inputStyle, width: '100%', marginBottom: 12 }} />
+          )}
+          {pedido.tipo === 'agenda' && (
+            <>
+              <input value={edit.titulo ?? ''} onChange={(e) => setEdit((m) => ({ ...m, titulo: e.target.value }))}
+                placeholder="O que é?" style={{ ...inputStyle, width: '100%', marginBottom: 8 }} />
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input type="date" value={edit.data ?? ''} onChange={(e) => setEdit((m) => ({ ...m, data: e.target.value }))}
+                  style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
+                <input type="time" value={edit.hora ?? ''} onChange={(e) => setEdit((m) => ({ ...m, hora: e.target.value, diaTodo: !e.target.value }))}
+                  style={{ ...inputStyle, width: 130 }} />
+              </div>
+            </>
           )}
           {pedido.tipo === 'perda' && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
