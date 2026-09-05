@@ -23,6 +23,12 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const [resposta, setResposta] = useState(''); // o que a Darci respondeu
   const [pedido, setPedido] = useState(null);   // ordem entendida, esperando confirmação
   const [aviso, setAviso] = useState('');       // por que ele não conseguiu ouvir
+  const [edit, setEdit] = useState({});         // campos da ordem, editáveis antes de gravar
+  useEffect(() => { setEdit(pedido ? { ...pedido.dados } : {}); }, [pedido]);
+  const podeGravar = !pedido ? false
+    : pedido.tipo === 'despesa' ? (Number(edit.valor) > 0 && String(edit.descricao || '').trim().length > 1)
+      : pedido.tipo === 'tarefa' ? String(edit.texto || '').trim().length > 1
+        : Number(edit.qtd) > 0;
   const [ouvirOk, setOuvirOk] = useState(false); // este aparelho entende voz?
   const [pos, setPos] = useState(null); // onde o balão abre, medido no botão
   const [desdeMs, setDesdeMs] = useState(0); // até onde ela já foi informada
@@ -273,16 +279,42 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
               </div>
             )}
 
+            {/* Ele mostra o que entendeu em campos que dá pra corrigir. Se pescou
+                só o valor, ela completa "do que foi" e confirma. */}
             {pedido && (
               <div style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 14, padding: '11px 12px', marginBottom: 10 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, marginBottom: 4 }}>CONFIRMA?</div>
-                <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.45 }}>{pedido.resumo}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, marginBottom: 6 }}>{(pedido.titulo || 'Confirma?').toUpperCase()}</div>
+                {pedido.tipo === 'despesa' && (
+                  <>
+                    <div style={{ display: 'flex', gap: 7, marginBottom: 7 }}>
+                      <input value={edit.valor ?? ''} onChange={(e) => setEdit((m) => ({ ...m, valor: e.target.value.replace(',', '.') }))}
+                        inputMode="decimal" placeholder="Valor"
+                        style={{ ...inputStyle, width: 92, padding: '9px 10px', fontSize: 13 }} />
+                      <input value={edit.descricao ?? ''} onChange={(e) => setEdit((m) => ({ ...m, descricao: e.target.value }))}
+                        placeholder="Do que foi?" autoFocus={!String(pedido.dados.descricao || '').trim()}
+                        style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '9px 10px', fontSize: 13 }} />
+                    </div>
+                    <div style={{ fontSize: 11.5, color: C.faint }}>Categoria: {edit.categoria || 'A classificar'} · hoje</div>
+                  </>
+                )}
+                {pedido.tipo === 'tarefa' && (
+                  <input value={edit.texto ?? ''} onChange={(e) => setEdit((m) => ({ ...m, texto: e.target.value }))}
+                    style={{ ...inputStyle, width: '100%', padding: '9px 10px', fontSize: 13 }} />
+                )}
+                {pedido.tipo === 'perda' && (
+                  <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                    <input value={edit.qtd ?? ''} onChange={(e) => setEdit((m) => ({ ...m, qtd: e.target.value.replace(',', '.') }))}
+                      inputMode="decimal" style={{ ...inputStyle, width: 92, padding: '9px 10px', fontSize: 13 }} />
+                    <span style={{ fontSize: 13, color: C.text }}>{edit.unidade} de <b>{edit.nome}</b> · {String(edit.motivo || '').toLowerCase()}</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button onClick={async () => {
-                    const feito = await onAnotar(pedido);
+                  <button disabled={!podeGravar} onClick={async () => {
+                    if (!podeGravar) return;
+                    const feito = await onAnotar({ ...pedido, dados: { ...pedido.dados, ...edit } });
                     setPedido(null);
                     setResposta(feito && feito.ok ? (feito.msg || 'Feito, anotado.') : (feito && feito.erro) || 'Não consegui gravar.');
-                  }} style={{ border: 'none', background: C.accent, color: '#06101F', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>Confirmar</button>
+                  }} style={{ border: 'none', background: podeGravar ? C.accent : C.line, color: podeGravar ? '#06101F' : C.faint, borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 800, cursor: podeGravar ? 'pointer' : 'default' }}>Confirmar</button>
                   <button onClick={() => setPedido(null)} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.muted, borderRadius: 10, padding: '9px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
                 </div>
               </div>

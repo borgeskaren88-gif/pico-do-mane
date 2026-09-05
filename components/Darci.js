@@ -22,8 +22,14 @@ export default function Darci({ onAnotar, ...dados }) {
   const [sotaque, setSotaque] = useState('manezinho'); // jeito de falar
   const [verTodas, setVerTodas] = useState(false); // vozes de outros idiomas
   const [pedido, setPedido] = useState(null); // ordem entendida, esperando confirmação
+  const [edit, setEdit] = useState({}); // campos da ordem, editáveis antes de gravar
   const [escutaOk, setEscutaOk] = useState(true); // este aparelho deixa escutar?
   useEffect(() => { setEscutaOk(podeOuvir()); }, []);
+  useEffect(() => { setEdit(pedido ? { ...pedido.dados } : {}); }, [pedido]);
+  const podeGravar = !pedido ? false
+    : pedido.tipo === 'despesa' ? (Number(edit.valor) > 0 && String(edit.descricao || '').trim().length > 1)
+      : pedido.tipo === 'tarefa' ? String(edit.texto || '').trim().length > 1
+        : Number(edit.qtd) > 0;
   const fimRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -284,13 +290,37 @@ export default function Darci({ onAnotar, ...dados }) {
         </div>
       )}
 
+      {/* O que ele entendeu, em campos que dá pra corrigir antes de gravar. */}
       {pedido && (
         <Card style={{ marginBottom: 14, borderColor: C.accent }}>
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, letterSpacing: '.06em', marginBottom: 5 }}>CONFIRMA?</div>
-          <div style={{ fontSize: 14.5, color: C.text, lineHeight: 1.5, marginBottom: 12 }}>{pedido.resumo}</div>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, letterSpacing: '.06em', marginBottom: 8 }}>{(pedido.titulo || 'Confirma?').toUpperCase()}</div>
+          {pedido.tipo === 'despesa' && (
+            <>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input value={edit.valor ?? ''} onChange={(e) => setEdit((m) => ({ ...m, valor: e.target.value.replace(',', '.') }))}
+                  inputMode="decimal" placeholder="Valor" style={{ ...inputStyle, width: 110 }} />
+                <input value={edit.descricao ?? ''} onChange={(e) => setEdit((m) => ({ ...m, descricao: e.target.value }))}
+                  placeholder="Do que foi?" autoFocus={!String(pedido.dados.descricao || '').trim()}
+                  style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
+              </div>
+              <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Categoria: {edit.categoria || 'A classificar'} · hoje</div>
+            </>
+          )}
+          {pedido.tipo === 'tarefa' && (
+            <input value={edit.texto ?? ''} onChange={(e) => setEdit((m) => ({ ...m, texto: e.target.value }))}
+              style={{ ...inputStyle, width: '100%', marginBottom: 12 }} />
+          )}
+          {pedido.tipo === 'perda' && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+              <input value={edit.qtd ?? ''} onChange={(e) => setEdit((m) => ({ ...m, qtd: e.target.value.replace(',', '.') }))}
+                inputMode="decimal" style={{ ...inputStyle, width: 110 }} />
+              <span style={{ fontSize: 14, color: C.text }}>{edit.unidade} de <b>{edit.nome}</b> · {String(edit.motivo || '').toLowerCase()}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <Btn onClick={async () => {
-              const feito = await onAnotar(pedido);
+              if (!podeGravar) return;
+              const feito = await onAnotar({ ...pedido, dados: { ...pedido.dados, ...edit } });
               setPedido(null);
               const msg = feito && feito.ok ? (feito.msg || 'Feito.') : (feito && feito.erro) || 'Não consegui gravar.';
               setConversa((c) => [...c, { de: 'darci', texto: msg }]);
@@ -298,6 +328,7 @@ export default function Darci({ onAnotar, ...dados }) {
             }}>Confirmar</Btn>
             <Btn kind="ghost" onClick={() => setPedido(null)}>Cancelar</Btn>
           </div>
+          {!podeGravar && <div style={{ fontSize: 12, color: C.amber, marginTop: 9 }}>Falta completar aí em cima pra eu poder gravar.</div>}
         </Card>
       )}
 
