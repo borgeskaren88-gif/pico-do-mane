@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
-import { analisarBar, responder, temperar, ATALHOS } from '../lib/darci';
+import { analisarBar, responder, temperar, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
 import { temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala } from '../lib/darciVoz';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
@@ -24,7 +24,13 @@ export default function Darci(dados) {
   const fimRef = useRef(null);
   const timerRef = useRef(null);
 
-  const n = useMemo(() => analisarBar(dados), [dados]);
+  // Até onde ela já foi informada. Fica fixo enquanto a tela está aberta (pra o
+  // cartão não sumir no meio da leitura) e é marcado como visto poucos segundos
+  // depois — assim, da próxima vez, ele conta só o que for novo mesmo.
+  const [desdeMs] = useState(() => lerVisto());
+  useEffect(() => { const t = setTimeout(() => marcarVisto(Date.now()), 4000); return () => clearTimeout(t); }, []);
+
+  const n = useMemo(() => analisarBar({ ...dados, desdeMs }), [dados, desdeMs]);
 
   const carregarVozes = useCallback(() => {
     const lista = listarVozes();
@@ -204,6 +210,25 @@ export default function Darci(dados) {
           </div>
         )}
       </div>
+
+      {/* O que mudou desde a última visita — é isso que mantém ela atualizada
+          sem precisar perguntar nada. */}
+      {n.novidades.length > 0 && (
+        <Card style={{ margin: '16px 0 0', borderColor: C.accent }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+            <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>O que mudou</span>
+            <span style={{ fontSize: 11.5, color: C.faint }}>desde {faz(desdeMs)}</span>
+          </div>
+          {n.novidades.map((linha, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, fontSize: 13.5, color: C.muted, lineHeight: 1.5, marginBottom: 5 }}>
+              <span style={{ color: C.accent, fontWeight: 800 }}>·</span><span>{linha}</span>
+            </div>
+          ))}
+          <div style={{ marginTop: 10 }}>
+            <Btn small onClick={() => enviar('O que mudou?')}>Me conta em voz alta</Btn>
+          </div>
+        </Card>
+      )}
 
       {conversa.length === 0 ? (
         <Card style={{ margin: '16px 0 14px', borderColor: C.accent }}>

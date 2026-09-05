@@ -1,8 +1,8 @@
 'use client';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { C, inputStyle } from './ui';
 import OndaDarci from './OndaDarci';
-import { analisarBar, responder, ATALHOS } from '../lib/darci';
+import { analisarBar, responder, listaNovidades, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
 import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque } from '../lib/darciVoz';
 
 // A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
@@ -23,12 +23,27 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
   const [resposta, setResposta] = useState(''); // o que a Darci respondeu
   const [ouvirOk, setOuvirOk] = useState(false); // este aparelho entende voz?
   const [pos, setPos] = useState(null); // onde o balão abre, medido no botão
+  const [desdeMs, setDesdeMs] = useState(0); // até onde ela já foi informada
+
+  useEffect(() => { setDesdeMs(lerVisto()); }, []);
+
+  // O que mudou desde a última conversa. É o que faz a onda piscar chamando.
+  // As dependências são as listas em si (e não o objeto de props, que nasce novo
+  // a cada render) — senão isso recalcularia à toa o tempo todo.
+  const novas = useMemo(
+    () => (desdeMs ? listaNovidades(dados, desdeMs) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [desdeMs, dados.vendas, dados.estoque, dados.receitas, dados.despesas, dados.compras, dados.tarefas],
+  );
+  const jaVi = () => { const agora = Date.now(); marcarVisto(agora); setDesdeMs(agora); };
   const sotaqueRef = useRef('manezinho');
 
   useEffect(() => { setOuvirOk(podeOuvir()); sotaqueRef.current = lerSotaque(); }, []);
 
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
+  const desdeRef = useRef(0);
+  desdeRef.current = desdeMs;
   const recRef = useRef(null);
   const campoRef = useRef(null);
   const caixaRef = useRef(null);
@@ -51,7 +66,7 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
     setResposta('');
     setPensando(true);
     timerRef.current = setTimeout(() => {
-      const resp = responder(q, analisarBar(dadosRef.current), sotaqueRef.current);
+      const resp = responder(q, analisarBar({ ...dadosRef.current, desdeMs: desdeRef.current }), sotaqueRef.current);
       setPensando(false);
       setResposta(resp);
       falarTexto(resp, { sotaque: sotaqueRef.current, aoIniciar: () => setFalando(true), aoTerminar: () => setFalando(false) });
@@ -193,6 +208,22 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
               <button onClick={esconder} aria-label="Fechar" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.muted, fontSize: 20, lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}>×</button>
             </div>
 
+            {novas.length > 0 && (
+              <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 14, padding: '10px 12px', marginBottom: 9 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 5 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, letterSpacing: '.04em' }}>O QUE MUDOU</span>
+                  <span style={{ fontSize: 10.5, color: C.faint }}>desde {faz(desdeMs)}</span>
+                </div>
+                {novas.slice(0, 4).map((linha, i) => (
+                  <div key={i} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45, marginBottom: 3 }}>· {linha}</div>
+                ))}
+                <div style={{ display: 'flex', gap: 12, marginTop: 7 }}>
+                  <button onClick={() => responderAgora('O que mudou?')} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12, fontWeight: 700, padding: 0, cursor: 'pointer' }}>ouvir</button>
+                  <button onClick={jaVi} style={{ background: 'none', border: 'none', color: C.faint, fontSize: 12, fontWeight: 700, padding: 0, cursor: 'pointer' }}>já vi</button>
+                </div>
+              </div>
+            )}
+
             {ouviu && (
               <div style={{ fontSize: 12.5, color: C.muted, fontStyle: 'italic', marginBottom: 8 }}>“{ouviu}”</div>
             )}
@@ -272,6 +303,10 @@ export default function DarciFlutuante({ onAbrir, ...dados }) {
           }}
         >
           <OndaDarci ativo={ativa} neon={false} largura={30} altura={18} />
+          {/* Pontinho: tem coisa nova pra ela saber. */}
+          {novas.length > 0 && !aberto && (
+            <span style={{ width: 7, height: 7, borderRadius: 999, background: C.amber, marginLeft: 6, flexShrink: 0 }} />
+          )}
         </button>
       </div>
     </>
