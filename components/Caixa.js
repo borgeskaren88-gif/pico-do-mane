@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, KPI, Field, NumInput, Empty, SecTitle, PageTitle } from './ui';
-import { brl, fmtDate } from '../lib/util';
+import { brl, num, fmtDate } from '../lib/util';
 
 const METODOS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
 const hora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
@@ -209,6 +209,15 @@ export default function Caixa({ papel = 'dona' }) {
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, borderTop: `1px solid ${C.line}`, marginTop: 2 }}>
                           <span style={{ color: C.green }}>Fiado recebido</span>
                           <span style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(c.fiadoRecebido.total)}</span>
+                        </div>
+                      )}
+                      {/* Quanto lançar em Receitas: a venda do dia, SEM o fiado
+                          recebido — esse já entra sozinho quando se dá a baixa. */}
+                      {papel !== 'garcom' && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.line}`, fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
+                          Lançar em <b style={{ color: C.text }}>Receitas</b> (venda do dia):{' '}
+                          <b style={{ color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(Math.max(0, num(c.recebido) - num(c.fiadoRecebido?.total)))}</b>
+                          {(c.fiadoRecebido?.total || 0) > 0 ? ' — o fiado recebido já foi lançado sozinho como Recebimento Atrasado.' : ''}
                         </div>
                       )}
                     </div>

@@ -724,7 +724,7 @@ export default function Dashboard() {
             {subSalao === 'comandas' && <Comandas papel="dona" />}
             {subSalao === 'caixa' && <Caixa />}
             {subSalao === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} estoque={estoque} />}
-            {subSalao === 'fiados' && <Fiados onMudou={carregarVendas} clientes={clientes} />}
+            {subSalao === 'fiados' && <Fiados onMudou={carregarVendas} clientes={clientes} receitas={receitas} onReceitas={upd.receitas} />}
             {subSalao === 'clientes' && <Clientes dados={clientes} onChange={upd.clientes} vendas={vendas} />}
           </>
         )}
