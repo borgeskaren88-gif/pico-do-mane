@@ -27,6 +27,9 @@ export default function Comandas({ papel = 'dona' }) {
   const [saborDe, setSaborDe] = useState(null); // item cujo seletor de sabor está aberto
   const [comboQtds, setComboQtds] = useState({}); // distribuição de sabores do combo (nome -> qtd)
   useEffect(() => { setComboQtds({}); }, [saborDe]);
+  const [addDe, setAddDe] = useState(null);   // item cujo seletor de adicionais está aberto
+  const [addQtds, setAddQtds] = useState({}); // adicionais escolhidos (nome -> qtd)
+  useEffect(() => { setAddQtds({}); }, [addDe]);
   const [dividirPor, setDividirPor] = useState(2); // divisor da conta (quantas pessoas rachando)
   const [info, setInfo] = useState({ nome: '', pessoas: '', obs: '' });
   const infoDe = useRef(null); // id da comanda cujo info está carregado
@@ -97,7 +100,7 @@ export default function Comandas({ papel = 'dona' }) {
     const j = await acao({ acao: 'config', mesasQtd: n }, { manterSel: true });
     if (j?.ok) { setMesasQtd(n); setConfigAberto(false); }
   };
-  const addItem = (cardapioId, sabor) => acao({ acao: 'add', comandaId: selId, cardapioId, ...(sabor ? { sabor } : {}) });
+  const addItem = (cardapioId, sabor, adicionais) => acao({ acao: 'add', comandaId: selId, cardapioId, ...(sabor ? { sabor } : {}), ...(adicionais ? { adicionais } : {}) });
   // Combo: distribui N unidades entre os sabores (ex.: 3 Tropical + 2 Melancia).
   const addCombo = (cardapioId, saboresQtd) => acao({ acao: 'add', comandaId: selId, cardapioId, saboresQtd });
   const setQtd = (itemId, qtd) => acao({ acao: 'setQtd', comandaId: selId, itemId, qtd });
@@ -212,12 +215,14 @@ export default function Comandas({ papel = 'dona' }) {
       const q = qtdNaComanda(it.id);
       const d = it.disp; // null = sem ficha; 0 = em falta; baixo = acabando
       const temSabores = Array.isArray(it.sabores) && it.sabores.length > 0;
+      const temAdicionais = !temSabores && Array.isArray(it.adicionais) && it.adicionais.length > 0;
       return (
-        <button key={it.id} onClick={() => (temSabores ? setSaborDe(it) : addItem(it.id))} disabled={busy}
+        <button key={it.id} onClick={() => (temSabores ? setSaborDe(it) : temAdicionais ? setAddDe(it) : addItem(it.id))} disabled={busy}
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
           <span style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: C.accent, color: '#fff', fontSize: 20, fontWeight: 800, lineHeight: '26px', textAlign: 'center' }}>+</span>
           <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{it.nome}</span>
           {temSabores && <span style={{ fontSize: 10, fontWeight: 800, color: C.accent, border: `1px solid ${C.accent}`, borderRadius: 999, padding: '1px 7px', flexShrink: 0 }}>sabores</span>}
+          {temAdicionais && <span style={{ fontSize: 10, fontWeight: 800, color: C.accent, border: `1px solid ${C.accent}`, borderRadius: 999, padding: '1px 7px', flexShrink: 0 }}>adicionais</span>}
           {d === 0 && <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: C.red, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>em falta</span>}
           {d != null && d > 0 && d <= 3 && <span style={{ fontSize: 11, fontWeight: 800, color: '#06101F', background: C.amber, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>só {d}</span>}
           {q > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: '#06101F', background: C.green, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>{q} na mesa</span>}
@@ -285,6 +290,42 @@ export default function Comandas({ papel = 'dona' }) {
             </div>
           </div>
         )}
+
+        {addDe && (() => {
+          const base = num(addDe.preco);
+          const escolhidos = (addDe.adicionais || []).map((a) => ({ a, n: Number(addQtds[a.nome]) || 0 })).filter((x) => x.n > 0);
+          const somaAdd = escolhidos.reduce((t, x) => t + num(x.a.preco) * x.n, 0);
+          return (
+            <div onClick={() => setAddDe(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 1000 }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 16, padding: 18, width: '100%', maxWidth: 360, maxHeight: '86vh', overflowY: 'auto', boxShadow: '0 12px 44px rgba(0,0,0,.4)' }}>
+                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>{addDe.nome}</div>
+                <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>Quer acrescentar alguma coisa? (pode pular)</div>
+                {(addDe.adicionais || []).map((a) => {
+                  const n = Number(addQtds[a.nome]) || 0;
+                  return (
+                    <div key={a.nome} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.line}` }}>
+                      <span style={{ minWidth: 0, fontSize: 15, fontWeight: 600 }}>
+                        {a.nome}
+                        <span style={{ fontSize: 12, color: C.green, fontWeight: 700, marginLeft: 6 }}>+{brl(num(a.preco))}</span>
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        <button onClick={() => setAddQtds((m) => ({ ...m, [a.nome]: Math.max(0, n - 1) }))} style={estBtn}>–</button>
+                        <span style={{ minWidth: 22, textAlign: 'center', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+                        <button onClick={() => setAddQtds((m) => ({ ...m, [a.nome]: n + 1 }))} style={estBtn}>+</button>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 800, marginTop: 12, marginBottom: 12, borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+                  <span>Total do item</span>
+                  <span style={{ color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(base + somaAdd)}</span>
+                </div>
+                <Btn kind="ok" onClick={() => { addItem(addDe.id, null, addQtds); setAddDe(null); }} disabled={busy}>Adicionar</Btn>
+                <button onClick={() => setAddDe(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '14px 0 0' }}>Cancelar</button>
+              </div>
+            </div>
+          );
+        })()}
 
         {cardapio.length > 0 && (
           <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar produto…" /></div>

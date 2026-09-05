@@ -6,7 +6,7 @@ import { UNIDADES } from '../lib/estoque';
 
 export const CATEGORIAS_CARDAPIO = ['Chopp / Cerveja', 'Drinks / Doses', 'Carta de Vinhos', 'Porções', 'Café & Tapiocas', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Combos', 'Outros'];
 
-const itemVazio = () => ({ nome: '', preco: '', categoria: '', sabores: [], saboresTotal: '' });
+const itemVazio = () => ({ nome: '', preco: '', categoria: '', sabores: [], saboresTotal: '', adicionais: [] });
 
 export default function Cardapio({ dados = [], onChange, estoque = [] }) {
   const [novo, setNovo] = useState(itemVazio());
@@ -20,6 +20,12 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
   const addSabor = () => setNovo((f) => ({ ...f, sabores: [...(f.sabores || []), { nome: '', estoqueId: '', qtd: '', unidade: '' }] }));
   const setSabor = (i, patch) => setNovo((f) => ({ ...f, sabores: (f.sabores || []).map((s, j) => (j === i ? { ...s, ...patch } : s)) }));
   const removerSabor = (i) => setNovo((f) => ({ ...f, sabores: (f.sabores || []).filter((_, j) => j !== i) }));
+
+  // Adicionais pagos (ex.: açaí + granola, leite condensado…). Cada um tem o
+  // seu preço e, se quiser, o item do estoque que baixa junto.
+  const addAdicional = () => setNovo((f) => ({ ...f, adicionais: [...(f.adicionais || []), { nome: '', preco: '3', estoqueId: '', qtd: '', unidade: '' }] }));
+  const setAdicional = (i, patch) => setNovo((f) => ({ ...f, adicionais: (f.adicionais || []).map((a, j) => (j === i ? { ...a, ...patch } : a)) }));
+  const removerAdicional = (i) => setNovo((f) => ({ ...f, adicionais: (f.adicionais || []).filter((_, j) => j !== i) }));
 
   // Agrupa por categoria, na ordem do cardápio; "sem categoria" por último.
   const grupos = useMemo(() => {
@@ -49,12 +55,15 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
     // entre os sabores (ex.: 5 energéticos = 3 Tropical + 2 Melancia). Vazio/0 =
     // escolhe 1 sabor só (ex.: caipirinha).
     const total = Math.max(0, Math.floor(num(novo.saboresTotal)));
-    const limpo = { nome: nomeLimpo, preco: novo.preco || '0', categoria: novo.categoria, sabores: saboresLimpos, saboresTotal: saboresLimpos.length ? total : 0 };
+    const adicionaisLimpos = (novo.adicionais || [])
+      .map((a) => ({ nome: limparNome(a.nome), preco: String(a.preco || '0'), estoqueId: String(a.estoqueId || ''), qtd: String(a.qtd || ''), unidade: String(a.unidade || '') }))
+      .filter((a) => a.nome);
+    const limpo = { nome: nomeLimpo, preco: novo.preco || '0', categoria: novo.categoria, sabores: saboresLimpos, saboresTotal: saboresLimpos.length ? total : 0, adicionais: adicionaisLimpos };
     if (editId) onChange(dados.map((i) => (i.id === editId ? { ...i, ...limpo } : i)));
     else onChange([{ id: uid(), ...limpo, ativo: true }, ...dados]);
     setNovo(itemVazio()); setEditId(null);
   };
-  const editar = (it) => { setNovo({ nome: it.nome || '', preco: it.preco || '', categoria: it.categoria || '', sabores: Array.isArray(it.sabores) ? it.sabores.map((s) => ({ ...s })) : [], saboresTotal: it.saboresTotal ? String(it.saboresTotal) : '' }); setEditId(it.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const editar = (it) => { setNovo({ nome: it.nome || '', preco: it.preco || '', categoria: it.categoria || '', sabores: Array.isArray(it.sabores) ? it.sabores.map((s) => ({ ...s })) : [], saboresTotal: it.saboresTotal ? String(it.saboresTotal) : '', adicionais: Array.isArray(it.adicionais) ? it.adicionais.map((a) => ({ ...a })) : [] }); setEditId(it.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const cancelar = () => { setNovo(itemVazio()); setEditId(null); };
   const excluir = (id) => { if (id === editId) cancelar(); onChange(dados.filter((i) => i.id !== id)); };
   const alternarAtivo = (it) => onChange(dados.map((i) => (i.id === it.id ? { ...i, ativo: i.ativo === false ? true : false } : i)));
@@ -102,6 +111,36 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
             </div>
           ))}
           <Btn kind="ghost" small onClick={addSabor}>+ Adicionar sabor</Btn>
+        </div>
+
+        {/* Adicionais pagos (opcional) */}
+        <div style={{ marginTop: 4, marginBottom: 12, borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4 }}>Adicionais pagos (opcional)</div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>
+            Pra item que a pessoa incrementa (açaí + granola, leite condensado, morango…). Na venda o garçom marca os que ela quis e o <b style={{ color: C.text }}>preço soma sozinho</b>. Se ligar o adicional a um item do estoque, ele também <b style={{ color: C.text }}>baixa junto</b>.
+          </div>
+          {(novo.adicionais || []).map((a, i) => (
+            <div key={i} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, marginBottom: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 10 }}>
+                <Field label="Nome do adicional"><TextInput value={a.nome} onChange={(v) => setAdicional(i, { nome: v })} placeholder="Ex.: Granola" /></Field>
+                <Field label="Preço (R$)"><NumInput value={a.preco} onChange={(v) => setAdicional(i, { preco: v })} /></Field>
+              </div>
+              <Field label="Baixa do estoque (opcional)">
+                <select value={a.estoqueId} onChange={(e) => setAdicional(i, { estoqueId: e.target.value })} style={{ ...inputStyle, appearance: 'none' }}>
+                  <option value="">Não baixa do estoque</option>
+                  {estoqueOrdenado.map((it) => <option key={it.id} value={it.id}>{it.nome} ({it.unidade})</option>)}
+                </select>
+              </Field>
+              {a.estoqueId && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <Field label="Quantidade"><NumInput value={a.qtd} onChange={(v) => setAdicional(i, { qtd: v })} /></Field>
+                  <Field label="Unidade"><Select value={a.unidade} onChange={(v) => setAdicional(i, { unidade: v })} options={UNIDADES} /></Field>
+                </div>
+              )}
+              <button onClick={() => removerAdicional(i)} style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '4px 0' }}>Remover adicional</button>
+            </div>
+          ))}
+          <Btn kind="ghost" small onClick={addAdicional}>+ Adicionar adicional</Btn>
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
