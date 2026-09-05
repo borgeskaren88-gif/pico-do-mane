@@ -4,7 +4,7 @@ import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, igualNome } from '../../../lib/estoque';
 import { limparNome, num } from '../../../lib/util';
-import { notificarEstoqueCritico } from '../../../lib/push';
+import { notificarEstoqueCritico, notificarSaidaSemVenda } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +78,18 @@ export async function POST(request) {
       const novo = await gravarEstoque(sb, blob, { estoque: itens });
       // Saída/contagem podem zerar um item: avisa na hora se cruzou pro mínimo/zero.
       if (tipo === 'saida' || tipo === 'contagem') { try { await notificarEstoqueCritico(sb, arr(blob.estoque), itens); } catch (e) { /* push nunca quebra o movimento */ } }
+      // Perda, quebra e vencido também avisam na hora — saída sem venda é a que
+      // mais come margem calada.
+      if (tipo === 'saida' && /(desperd|vencid|quebr|perda)/i.test(String(body?.motivo || ''))) {
+        try {
+          const it = itens.find((x) => x.id === id);
+          await notificarSaidaSemVenda(sb, {
+            titulo: `${String(body?.motivo || 'Perda')}: ${limparNome(it?.nome)}`,
+            descricao: `${num(body?.qtd)} ${it?.unidade || 'un'}${quem ? ' ·' + quem : ''}`,
+            valor: num(body?.qtd) * num(it?.custo),
+          });
+        } catch (e) { /* push nunca quebra o movimento */ }
+      }
       return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
     }
 
