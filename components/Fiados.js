@@ -1,11 +1,13 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, KPI, Empty, SecTitle, PageTitle } from './ui';
-import { brl, num, fmtDate, fiadoDaVenda, abertoDaVenda } from '../lib/util';
+import { brl, num, fmtDate, uid, diaOperacional, fiadoDaVenda, abertoDaVenda } from '../lib/util';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
-export default function Fiados({ onMudou, clientes = [] }) {
+const FONTE_ATRASADO = 'Recebimento Atrasado';
+
+export default function Fiados({ onMudou, clientes = [], receitas = null, onReceitas = null }) {
   const [vendas, setVendas] = useState([]);
   const [carregado, setCarregado] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -16,6 +18,7 @@ export default function Fiados({ onMudou, clientes = [] }) {
   const [pagarAberto, setPagarAberto] = useState({}); // { [chave]: true } — abre o campo "receber valor"
   const [valorPago, setValorPago] = useState({}); // { [chave]: 'texto do valor' }
   const [caixaAberto, setCaixaAberto] = useState(null); // null=ainda não sei, true/false
+  const [ultima, setUltima] = useState(null); // última baixa: { ref, nome, valor } — pra desfazer
 
   const carregar = useCallback(async () => {
     try {
@@ -48,14 +51,52 @@ export default function Fiados({ onMudou, clientes = [] }) {
     try {
       const r = await fetch('/api/vendas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const j = await r.json();
-      if (!j.ok) { setErro(j.erro || 'Erro.'); return; }
+      if (!j.ok) { setErro(j.erro || 'Erro.'); return j; }
+      await carregar();
+      verCaixa();
+      if (onMudou) onMudou();
+      return j;
+    } catch { setErro('Sem conexão.'); return null; }
+    finally { setBusy(false); }
+  };
+  // Toda baixa de fiado já entra em Receitas como "Recebimento Atrasado", na
+  // data de hoje (dia operacional: madrugada conta como a noite anterior). A
+  // etiqueta (ref) liga o lançamento à baixa, pra o Desfazer levar os dois.
+  const lancarReceita = (ref, nome, valor) => {
+    if (!onReceitas || !Array.isArray(receitas) || !(valor > 0.005)) return;
+    onReceitas([{
+      id: uid(), data: diaOperacional(), categoria: FONTE_ATRASADO,
+      descricao: `Fiado recebido — ${nome}`, valor: Math.round(valor * 100) / 100, obs: '', refFiado: ref,
+    }, ...receitas]);
+  };
+
+  const desfazerUltima = async () => {
+    if (!ultima) return;
+    const alvo = ultima;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/vendas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'desfazer', ref: alvo.ref }) });
+      const j = await r.json();
+      if (!j.ok) { setErro(j.erro || 'Não consegui desfazer.'); return; }
+      // Tira também o lançamento que essa baixa criou em Receitas.
+      if (onReceitas && Array.isArray(receitas)) onReceitas(receitas.filter((x) => x && x.refFiado !== alvo.ref));
+      setUltima(null);
       await carregar();
       verCaixa();
       if (onMudou) onMudou();
     } catch { setErro('Sem conexão.'); }
     finally { setBusy(false); }
   };
-  const receber = (id) => { if (!confirmaSemCaixa()) return; acao({ acao: 'receber', id }); };
+
+  const receber = async (id) => {
+    if (!confirmaSemCaixa()) return;
+    const v = vendas.find((x) => x.id === id);
+    const nome = v ? rotulo(v.nome, v.mesa) : 'cliente';
+    const valor = v ? abertoDaVenda(v) : 0;
+    const ref = uid();
+    const j = await acao({ acao: 'receber', id, ref });
+    if (j && j.ok) { lancarReceita(ref, nome, num(j.aplicado) || valor); setUltima({ ref, nome, valor: num(j.aplicado) || valor }); }
+  };
   const excluir = (id) => { if (typeof window !== 'undefined' && !window.confirm('Excluir este fiado? Não vai mais aparecer nem contar em lugar nenhum.')) return; acao({ acao: 'excluir', id }); };
   const toggleItens = (id) => setItensAbertos((m) => ({ ...m, [id]: !m[id] }));
 
@@ -67,7 +108,13 @@ export default function Fiados({ onMudou, clientes = [] }) {
     if (valor > g.total + 0.005 && typeof window !== 'undefined' &&
         !window.confirm(`O valor (${brl(valor)}) é maior que a dívida (${brl(g.total)}). Vou quitar tudo e o resto (${brl(valor - g.total)}) fica como troco. Continuar?`)) return;
     if (!confirmaSemCaixa()) return;
-    await acao({ acao: 'receberValor', ids: g.vendas.map((v) => v.id), valor });
+    const ref = uid();
+    const j = await acao({ acao: 'receberValor', ids: g.vendas.map((v) => v.id), valor, ref });
+    if (j && j.ok) {
+      const entrou = num(j.aplicado) || valor;
+      lancarReceita(ref, g.nome, entrou);
+      setUltima({ ref, nome: g.nome, valor: entrou });
+    }
     setValorPago((m) => ({ ...m, [g.chave]: '' }));
     setPagarAberto((m) => ({ ...m, [g.chave]: false }));
   };
@@ -104,6 +151,16 @@ export default function Fiados({ onMudou, clientes = [] }) {
       <PageTitle sub="Quem está devendo (contas fechadas no fiado)">Fiados</PageTitle>
 
       <KPI titulo="Total a receber" valor={brl(totalDevido)} cor={totalDevido > 0 ? C.amber : C.faint} sub={`${grupos.length} cliente(s) · ${abertos.length} fiado(s)`} />
+
+      {ultima && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.green}`, borderRadius: 10, padding: '11px 14px', marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: C.text, lineHeight: 1.45, flex: 1, minWidth: 180 }}>
+            Recebi <b>{brl(ultima.valor)}</b> de <b>{ultima.nome}</b> — já lancei em Receitas como <b>Recebimento Atrasado</b>.
+          </span>
+          <Btn kind="ghost" small onClick={desfazerUltima} disabled={busy}>Desfazer</Btn>
+          <button onClick={() => setUltima(null)} aria-label="Fechar aviso" style={{ background: 'none', border: 'none', color: C.faint, fontSize: 18, lineHeight: 1, cursor: 'pointer', padding: '0 2px' }}>×</button>
+        </div>
+      )}
 
       {caixaAberto === false && grupos.length > 0 && (
         <div style={{ background: C.panel2, border: `1px solid ${C.amber}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text, marginTop: 12, lineHeight: 1.45 }}>

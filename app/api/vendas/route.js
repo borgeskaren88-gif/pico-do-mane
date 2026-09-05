@@ -51,6 +51,7 @@ export async function POST(request) {
     const ids = Array.isArray(body?.ids) ? body.ids.map((x) => txt(x, 40)).filter(Boolean) : [];
     const valor = Math.round((Number(body?.valor) || 0) * 100) / 100;
     const forma = txt(body?.formaRecebida, 20) || 'Dinheiro';
+    const ref = txt(body?.ref, 40); // etiqueta pra poder desfazer depois
     if (!ids.length) return NextResponse.json({ ok: false, erro: 'Nenhum fiado informado.' }, { status: 400 });
     if (!(valor > 0)) return NextResponse.json({ ok: false, erro: 'Informe um valor maior que zero.' }, { status: 400 });
     try {
@@ -74,9 +75,10 @@ export async function POST(request) {
         const paga = Math.min(aberto, resta);
         v.abatido = Math.round(((Number(v.abatido) || 0) + paga) * 100) / 100;
         v.recebimentos = Array.isArray(v.recebimentos) ? v.recebimentos : [];
-        v.recebimentos.push({ data: hoje, valor: paga, forma, caixaId: cxId });
+        v.recebimentos.push({ data: hoje, valor: paga, forma, caixaId: cxId, ref: ref || undefined });
         if (v.abatido >= (Number(v.fiado != null ? v.fiado : (v.pagamento === 'Fiado' ? v.total : 0)) || 0) - 0.005) {
           v.pago = true; v.pagoEm = hoje; v.formaRecebida = forma;
+          if (ref) v.quitadoPor = ref; // foi ESTA baixa que quitou — o desfazer precisa saber
         }
         alterados.push(v);
         resta = Math.round((resta - paga) * 100) / 100;
@@ -87,9 +89,48 @@ export async function POST(request) {
         if (error) throw error;
       }
       const aplicado = Math.round((valor - Math.max(0, resta)) * 100) / 100;
-      return NextResponse.json({ ok: true, aplicado, sobra: Math.max(0, resta), quitados: alterados.filter((v) => v.pago).length });
+      return NextResponse.json({ ok: true, aplicado, sobra: Math.max(0, resta), quitados: alterados.filter((v) => v.pago).length, ref: ref || null });
     } catch (e) {
       return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao receber o fiado.' }, { status: 500 });
+    }
+  }
+
+  // Desfazer uma baixa de fiado inteira, pela etiqueta que ela recebeu. Tira o
+  // recebimento de cada venda que ele tocou, devolve o valor pra dívida e, se a
+  // venda tinha sido quitada por essa baixa, ela volta a ficar em aberto.
+  if (acao === 'desfazer') {
+    const ref = txt(body?.ref, 40);
+    if (!ref) return NextResponse.json({ ok: false, erro: 'Baixa não informada.' }, { status: 400 });
+    try {
+      const sb = supabaseServer();
+      const { data, error } = await sb.from('pdm_dados').select('chave, valor').like('chave', PREFIXO + '%');
+      if (error) throw error;
+      let devolvido = 0;
+      const alterados = [];
+      for (const linha of (data || [])) {
+        const v = linha?.valor;
+        if (!v || !Array.isArray(v.recebimentos)) continue;
+        const ficam = [];
+        let tirado = 0;
+        for (const r of v.recebimentos) {
+          if (r && r.ref === ref) tirado += Number(r.valor) || 0;
+          else ficam.push(r);
+        }
+        if (!(tirado > 0.005)) continue;
+        v.recebimentos = ficam;
+        v.abatido = Math.round(Math.max(0, (Number(v.abatido) || 0) - tirado) * 100) / 100;
+        if (v.quitadoPor === ref) { v.pago = false; v.pagoEm = null; v.formaRecebida = null; v.quitadoPor = null; }
+        devolvido = Math.round((devolvido + tirado) * 100) / 100;
+        alterados.push([linha.chave, v]);
+      }
+      if (!alterados.length) return NextResponse.json({ ok: false, erro: 'Essa baixa já foi desfeita.' }, { status: 400 });
+      for (const [chave, v] of alterados) {
+        const { error: e2 } = await sb.from('pdm_dados').upsert({ chave, valor: v, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+        if (e2) throw e2;
+      }
+      return NextResponse.json({ ok: true, devolvido, vendas: alterados.length });
+    } catch (e) {
+      return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao desfazer a baixa.' }, { status: 500 });
     }
   }
 
@@ -107,20 +148,22 @@ export async function POST(request) {
       if (!v) return NextResponse.json({ ok: false, erro: 'Venda não encontrada.' }, { status: 404 });
       const hoje = hojeBrasil();
       const forma = txt(body?.formaRecebida, 20) || 'Dinheiro';
+      const ref = txt(body?.ref, 40);
       // Quanto ainda faltava (fiado menos o já abatido) — é o que entra no caixa agora.
       const base = Number(v.fiado != null ? v.fiado : (v.pagamento === 'Fiado' ? v.total : 0)) || 0;
       const falta = Math.round((base - (Number(v.abatido) || 0)) * 100) / 100;
       if (falta > 0.005) {
         v.recebimentos = Array.isArray(v.recebimentos) ? v.recebimentos : [];
-        v.recebimentos.push({ data: hoje, valor: falta, forma, caixaId: await caixaAbertoId(sb) });
+        v.recebimentos.push({ data: hoje, valor: falta, forma, caixaId: await caixaAbertoId(sb), ref: ref || undefined });
         v.abatido = Math.round(((Number(v.abatido) || 0) + falta) * 100) / 100;
       }
       v.pago = true;
       v.pagoEm = hoje;
       v.formaRecebida = forma;
+      if (ref) v.quitadoPor = ref; // pra saber que foi ESSA baixa que quitou
       const { error } = await sb.from('pdm_dados').upsert({ chave, valor: v, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
-      return NextResponse.json({ ok: true, venda: v });
+      return NextResponse.json({ ok: true, venda: v, aplicado: falta > 0.005 ? falta : 0, ref: ref || null });
     }
 
     // Excluir uma venda (ex.: lançada por engano).
