@@ -3,13 +3,13 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
-import { analisarBar, responder, temperar, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
+import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
 import { temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala } from '../lib/darciVoz';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
 // lib/darciVoz.js — os mesmos que o balão flutuante usa.
-export default function Darci(dados) {
+export default function Darci({ onAnotar, ...dados }) {
   const [pergunta, setPergunta] = useState('');
   const [conversa, setConversa] = useState([]); // { de:'karen'|'darci', texto }
   const [falando, setFalando] = useState(false);
@@ -21,6 +21,7 @@ export default function Darci(dados) {
   const [nome, setNome] = useState(NOME_PADRAO); // como ele fala o nome dela
   const [sotaque, setSotaque] = useState('manezinho'); // jeito de falar
   const [verTodas, setVerTodas] = useState(false); // vozes de outros idiomas
+  const [pedido, setPedido] = useState(null); // ordem entendida, esperando confirmação
   const fimRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -78,6 +79,13 @@ export default function Darci(dados) {
     if (!q || pensando) return;
     setConversa((c) => [...c, { de: 'karen', texto: q }]);
     setPergunta('');
+    setPedido(null);
+    // Ordem (lançar despesa, baixar estoque, anotar tarefa) espera confirmação;
+    // pergunta segue direto pra resposta.
+    if (onAnotar) {
+      const cmd = interpretarComando(q, dados);
+      if (cmd) { setPedido(cmd); return; }
+    }
     setPensando(true);
     timerRef.current = setTimeout(() => {
       const resp = responder(q, n, sotaque);
@@ -274,13 +282,30 @@ export default function Darci(dados) {
         </div>
       )}
 
+      {pedido && (
+        <Card style={{ marginBottom: 14, borderColor: C.accent }}>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, letterSpacing: '.06em', marginBottom: 5 }}>CONFIRMA?</div>
+          <div style={{ fontSize: 14.5, color: C.text, lineHeight: 1.5, marginBottom: 12 }}>{pedido.resumo}</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Btn onClick={async () => {
+              const feito = await onAnotar(pedido);
+              setPedido(null);
+              const msg = feito && feito.ok ? (feito.msg || 'Feito.') : (feito && feito.erro) || 'Não consegui gravar.';
+              setConversa((c) => [...c, { de: 'darci', texto: msg }]);
+              falar(msg);
+            }}>Confirmar</Btn>
+            <Btn kind="ghost" onClick={() => setPedido(null)}>Cancelar</Btn>
+          </div>
+        </Card>
+      )}
+
       <Card style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input
             value={pergunta}
             onChange={(e) => setPergunta(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') enviar(pergunta); }}
-            placeholder="Pergunta pro Darci… (ou usa o microfone do teclado)"
+            placeholder="Pergunta ou manda anotar… (ex.: lança 50 de gelo)"
             style={{ ...inputStyle, flex: 1, minWidth: 0 }}
           />
           <MicBtn value={pergunta} onChange={setPergunta} />

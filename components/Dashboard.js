@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, LogoMark, pageBg } from './ui';
-import { ymOf, todayISO, limparNome, fiadoDaVenda } from '../lib/util';
+import { ymOf, todayISO, limparNome, fiadoDaVenda, uid, num, brl } from '../lib/util';
 import SEED_DATA from '../data/seed.json';
 
 import Brain from './Brain';
@@ -524,8 +524,32 @@ export default function Dashboard() {
   );
 
   // O Darci fica no cabeçalho do Dashboard, ao lado do botão Ocultar.
+  // O Darci anota por ordem falada: ele entende, a dona confirma na tela e só
+  // então grava. Cada tipo vai pro lugar certo do PicoOS.
+  const anotarPeloDarci = async (pedido) => {
+    try {
+      const d = (pedido && pedido.dados) || {};
+      if (pedido.tipo === 'despesa') {
+        const nova = { id: uid(), data: todayISO(), categoria: d.categoria || 'A classificar', descricao: d.descricao || '', valor: num(d.valor), obs: 'Anotado pelo Darci' };
+        upd.despesas([nova, ...despesas]);
+        return { ok: true, msg: `Lancei ${brl(num(d.valor))} — ${d.descricao}. Está em Finanças, Despesas.` };
+      }
+      if (pedido.tipo === 'tarefa') {
+        upd.tarefas([{ id: uid(), texto: d.texto || '', data: '', feito: false, criadoEm: Date.now() }, ...tarefas]);
+        return { ok: true, msg: `Anotei: ${d.texto}. Está no Brain.` };
+      }
+      if (pedido.tipo === 'perda') {
+        const j = await estoqueAcao({ acao: 'mov', id: d.itemId, tipo: 'saida', qtd: d.qtd, motivo: d.motivo });
+        if (!j || !j.ok) return { ok: false, erro: (j && j.erro) || 'Não consegui baixar do estoque.' };
+        return { ok: true, msg: `Baixei ${d.qtd} ${d.unidade} de ${d.nome} como ${String(d.motivo).toLowerCase()}.` };
+      }
+      return { ok: false, erro: 'Não entendi o que era pra fazer.' };
+    } catch { return { ok: false, erro: 'Sem conexão pra gravar agora.' }; }
+  };
+
   const propsDarci = {
-    receitas, despesas, compras, vendas, estoque, tarefas, clientes,
+    receitas, despesas, compras, vendas, estoque, tarefas, clientes, cardapio, fichas,
+    onAnotar: anotarPeloDarci,
     onAbrir: () => { carregarVendas(); carregarEstoque({}); },
   };
 
@@ -631,7 +655,7 @@ export default function Dashboard() {
           </div>
 
       <div style={{ maxWidth: tab === 'brain' ? 1180 : 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
-        {tab === 'darci' && <Darci receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} estoque={estoque} tarefas={tarefas} clientes={clientes} />}
+        {tab === 'darci' && <Darci {...propsDarci} />}
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={<DarciFlutuante {...propsDarci} />} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
@@ -722,7 +746,7 @@ export default function Dashboard() {
               ))}
             </div>
             {subSalao === 'comandas' && <Comandas papel="dona" />}
-            {subSalao === 'caixa' && <Caixa />}
+            {subSalao === 'caixa' && <Caixa receitas={receitas} onReceitas={upd.receitas} />}
             {subSalao === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} estoque={estoque} />}
             {subSalao === 'fiados' && <Fiados onMudou={carregarVendas} clientes={clientes} receitas={receitas} onReceitas={upd.receitas} />}
             {subSalao === 'clientes' && <Clientes dados={clientes} onChange={upd.clientes} vendas={vendas} />}
