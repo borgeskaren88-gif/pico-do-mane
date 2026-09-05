@@ -4,7 +4,7 @@ import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
-import { temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala } from '../lib/darciVoz';
+import { podeOuvir, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala } from '../lib/darciVoz';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -22,6 +22,8 @@ export default function Darci({ onAnotar, ...dados }) {
   const [sotaque, setSotaque] = useState('manezinho'); // jeito de falar
   const [verTodas, setVerTodas] = useState(false); // vozes de outros idiomas
   const [pedido, setPedido] = useState(null); // ordem entendida, esperando confirmação
+  const [escutaOk, setEscutaOk] = useState(true); // este aparelho deixa escutar?
+  useEffect(() => { setEscutaOk(podeOuvir()); }, []);
   const fimRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -311,6 +313,13 @@ export default function Darci({ onAnotar, ...dados }) {
           <MicBtn value={pergunta} onChange={setPergunta} />
           <Btn onClick={() => enviar(pergunta)}>Perguntar</Btn>
         </div>
+        {/* iPhone não deixa o site escutar. O microfone do teclado resolve — e é
+            melhor dizer isso do que deixar ela falando com a tela. */}
+        {!escutaOk && (
+          <div style={{ fontSize: 12, color: C.faint, lineHeight: 1.45, marginTop: 8 }}>
+            Neste aparelho eu não escuto direto. Toca no campo acima e usa o <b style={{ color: C.text }}>microfone do teclado</b> — dá no mesmo, e eu respondo em voz alta.
+          </div>
+        )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
           {ATALHOS.map((a) => (
             <button key={a} onClick={() => enviar(a)} style={{
