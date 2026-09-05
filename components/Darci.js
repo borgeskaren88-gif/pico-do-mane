@@ -4,7 +4,7 @@ import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
-import { podeOuvir, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala } from '../lib/darciVoz';
+import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala } from '../lib/darciVoz';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -24,7 +24,8 @@ export default function Darci({ onAnotar, ...dados }) {
   const [pedido, setPedido] = useState(null); // ordem entendida, esperando confirmação
   const [edit, setEdit] = useState({}); // campos da ordem, editáveis antes de gravar
   const [escutaOk, setEscutaOk] = useState(true); // este aparelho deixa escutar?
-  useEffect(() => { setEscutaOk(podeOuvir()); }, []);
+  const [escuta, setEscuta] = useState(false); // atender quando chamam pelo nome
+  useEffect(() => { setEscutaOk(podeOuvir()); setEscuta(lerEscuta()); }, []);
   useEffect(() => { setEdit(pedido ? { ...pedido.dados } : {}); }, [pedido]);
   const podeGravar = !pedido ? false
     : pedido.tipo === 'despesa' ? (Number(edit.valor) > 0 && String(edit.descricao || '').trim().length > 1)
@@ -195,6 +196,23 @@ export default function Darci({ onAnotar, ...dados }) {
                 Escreve do jeito que soa: <b>Káren</b>, <b>Kárem</b>, <b>Cáren</b>… toca em “ouvir” até acertar.
               </div>
             </div>
+
+            {/* Me chama pelo nome: o balão fica de ouvido em pé e acorda no
+                "Darci". Só onde o navegador deixa escutar (não vale no iPhone). */}
+            {escutaOk && (
+              <div style={{ maxWidth: 320, margin: '14px auto 0', textAlign: 'left' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={escuta} onChange={(e) => { setEscuta(e.target.checked); salvarEscuta(e.target.checked); }}
+                    style={{ width: 19, height: 19, marginTop: 1, accentColor: C.accent, flexShrink: 0 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: C.text }}>Atender quando eu chamar “Darci”</span>
+                    <span style={{ display: 'block', fontSize: 11.5, color: C.faint, lineHeight: 1.45, marginTop: 2 }}>
+                      O microfone fica aberto esperando o nome. Dá pra emendar a pergunta (“Darci, quanto entrou hoje?”) ou só chamar e falar depois. Gasta mais bateria — no notebook do balcão vale a pena.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
 
             {/* Quanto de ilha ele põe na fala. O conteúdo é o mesmo — muda o jeito. */}
             <div style={{ maxWidth: 320, margin: '14px auto 0', textAlign: 'left' }}>

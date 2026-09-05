@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { C, inputStyle } from './ui';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
-import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque } from '../lib/darciVoz';
+import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome } from '../lib/darciVoz';
 
 // A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
 // a barra de cima no celular), em linha com os outros botões. Ao tocar ela NÃO
@@ -47,7 +47,8 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const jaVi = () => { const agora = Date.now(); marcarVisto(agora); setDesdeMs(agora); };
   const sotaqueRef = useRef('manezinho');
 
-  useEffect(() => { setOuvirOk(podeOuvir()); sotaqueRef.current = lerSotaque(); }, []);
+  const [escuta, setEscuta] = useState(false); // atender quando chamam pelo nome
+  useEffect(() => { setOuvirOk(podeOuvir()); sotaqueRef.current = lerSotaque(); setEscuta(lerEscuta()); }, []);
 
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
@@ -205,6 +206,59 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
     };
   }, [aberto, esconder, posicionar]);
 
+  // Modo "me chama pelo nome": um segundo ouvido, contínuo, que só reage quando
+  // escuta "Darci". Fica calado enquanto ele mesmo fala (senão ouviria a própria
+  // voz) e enquanto o balão está ouvindo a pergunta, pra não brigarem pelo
+  // microfone. Só existe onde o navegador tem reconhecimento de fala.
+  const vigiaRef = useRef(null);
+  useEffect(() => {
+    const Rec = ReconhecimentoFala();
+    const podeVigiar = escuta && ouvirOk && Rec && !ouvindo && !falando && !pensando;
+    const parar = () => { try { vigiaRef.current && vigiaRef.current.abort(); } catch { /* ignora */ } vigiaRef.current = null; };
+    if (!podeVigiar) { parar(); return undefined; }
+
+    let vivo = true;
+    let reinicio = null;
+    const ligar = () => {
+      if (!vivo || vigiaRef.current) return;
+      const rec = new Rec();
+      rec.lang = 'pt-BR';
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.onresult = (e) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (!e.results[i].isFinal) continue;
+          const dito = e.results[i][0].transcript || '';
+          const depois = chamadoPeloNome(dito);
+          if (depois == null) continue;
+          parar();
+          setAberto(true);
+          posicionar();
+          try { onAbrir && onAbrir(); } catch { /* ignora */ }
+          // Chamou e já perguntou? Responde. Só chamou? Fica ouvindo a pergunta.
+          if (depois.length > 2) responderAgora(depois);
+          else { setAviso(''); setOuviu(''); setResposta(''); ouvir(); }
+          return;
+        }
+      };
+      rec.onerror = (ev) => {
+        const c = (ev && ev.error) || '';
+        vigiaRef.current = null;
+        if (c === 'not-allowed' || c === 'service-not-allowed') {
+          // Sem permissão não adianta insistir: desliga e explica.
+          setEscuta(false); salvarEscuta(false);
+          setAviso('Pra eu atender pelo nome, o navegador precisa liberar o microfone. Desliguei por enquanto.');
+        }
+      };
+      rec.onend = () => { vigiaRef.current = null; if (vivo) reinicio = setTimeout(ligar, 600); };
+      vigiaRef.current = rec;
+      try { rec.start(); } catch { vigiaRef.current = null; }
+    };
+    ligar();
+    return () => { vivo = false; if (reinicio) clearTimeout(reinicio); parar(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [escuta, ouvirOk, ouvindo, falando, pensando]);
+
   // Ao sair da tela o microfone para, mas a fala continua — ela pode trocar de
   // aba ouvindo. E este relógio mantém o botão "parar de falar" certo mesmo
   // quando a resposta começou na tela cheia do Darci.
@@ -272,6 +326,16 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
               <div style={{ padding: '6px 0 10px' }}>
                 <span className="darci-pt" /><span className="darci-pt" /><span className="darci-pt" />
               </div>
+            )}
+
+            {ouvirOk && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, cursor: 'pointer' }}>
+                <input type="checkbox" checked={escuta} onChange={(e) => { setEscuta(e.target.checked); salvarEscuta(e.target.checked); }}
+                  style={{ width: 17, height: 17, accentColor: C.accent, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: escuta ? C.text : C.muted, lineHeight: 1.35 }}>
+                  Atender quando eu chamar <b>“Darci”</b>{escuta ? ' · microfone ligado' : ''}
+                </span>
+              </label>
             )}
 
             {aviso && (
@@ -405,6 +469,9 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
           {/* Pontinho: tem coisa nova pra ela saber. */}
           {novas.length > 0 && !aberto && (
             <span style={{ width: 7, height: 7, borderRadius: 999, background: C.amber, marginLeft: 6, flexShrink: 0 }} />
+          )}
+          {escuta && !aberto && novas.length === 0 && (
+            <span title="Ouvindo pelo nome" style={{ width: 7, height: 7, borderRadius: 999, background: C.green, marginLeft: 6, flexShrink: 0 }} />
           )}
         </button>
       </div>
