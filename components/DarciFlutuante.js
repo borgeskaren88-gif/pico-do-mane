@@ -22,6 +22,7 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const [ouviu, setOuviu] = useState('');      // o que ela falou
   const [resposta, setResposta] = useState(''); // o que a Darci respondeu
   const [pedido, setPedido] = useState(null);   // ordem entendida, esperando confirmação
+  const [aviso, setAviso] = useState('');       // por que ele não conseguiu ouvir
   const [ouvirOk, setOuvirOk] = useState(false); // este aparelho entende voz?
   const [pos, setPos] = useState(null); // onde o balão abre, medido no botão
   const [desdeMs, setDesdeMs] = useState(0); // até onde ela já foi informada
@@ -85,8 +86,15 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   // Começa a ouvir. Só funciona onde o navegador tem reconhecimento de fala.
   const ouvir = useCallback(() => {
     const Rec = ReconhecimentoFala();
-    if (!Rec) { try { campoRef.current?.focus(); } catch { /* ignora */ } return; }
+    if (!Rec) {
+      // iPhone: o Safari não deixa o site escutar. O microfone do teclado faz o
+      // mesmo serviço — melhor dizer isso do que ficar em silêncio.
+      setAviso('Neste aparelho eu não consigo escutar direto. Toca no campo aqui embaixo e usa o microfone do teclado — funciona igualzinho.');
+      try { campoRef.current?.focus(); } catch { /* ignora */ }
+      return;
+    }
     pararFala();
+    setAviso('');
     setFalando(false);
     try { recRef.current && recRef.current.abort(); } catch { /* ignora */ }
     const rec = new Rec();
@@ -102,7 +110,22 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
       }
       setOuviu((fala + parcial).trim());
     };
-    rec.onerror = () => { setOuvindo(false); recRef.current = null; };
+    // Sem isso, quando o microfone é bloqueado ou não entende, ele só ficava
+    // quieto — e parecia que não estava ouvindo. Agora ele DIZ o que houve.
+    rec.onerror = (e) => {
+      setOuvindo(false);
+      recRef.current = null;
+      const c = (e && e.error) || '';
+      setAviso(
+        (c === 'not-allowed' || c === 'service-not-allowed')
+          ? 'O navegador bloqueou o microfone. Libera o microfone pro PicoOS (no cadeado ao lado do endereço) e tenta de novo. Enquanto isso, escreve aqui embaixo.'
+          : c === 'audio-capture' ? 'Não achei microfone neste aparelho. Escreve aqui embaixo que eu respondo igual.'
+            : c === 'no-speech' ? 'Não ouvi nada. Fala mais perto do aparelho, ou escreve aqui embaixo.'
+              : c === 'network' ? 'Sem internet pra entender a fala agora. Escreve aqui embaixo.'
+                : 'Não consegui ouvir agora. Escreve aqui embaixo ou usa o microfone do teclado.',
+      );
+    };
+    rec.onstart = () => setAviso('');
     rec.onend = () => {
       setOuvindo(false);
       recRef.current = null;
@@ -110,8 +133,8 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
       if (dito) responderAgora(dito);
     };
     recRef.current = rec;
-    try { rec.start(); setOuvindo(true); setOuviu(''); setResposta(''); }
-    catch { setOuvindo(false); }
+    try { rec.start(); setOuvindo(true); setOuviu(''); setResposta(''); setAviso(''); }
+    catch { setOuvindo(false); setAviso('Não consegui ligar o microfone. Escreve aqui embaixo que dá no mesmo.'); }
   }, [responderAgora]);
 
   // Toque na bola: abre o balão e já sai ouvindo (o toque é o gesto que o
@@ -120,6 +143,7 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const abrir = () => {
     posicionar();
     setAberto(true);
+    setAviso('');
     try { onAbrir && onAbrir(); } catch { /* ignora */ }
     if (falando || pensando) return;
     setOuviu(''); setResposta('');
@@ -240,6 +264,12 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
             {pensando && (
               <div style={{ padding: '6px 0 10px' }}>
                 <span className="darci-pt" /><span className="darci-pt" /><span className="darci-pt" />
+              </div>
+            )}
+
+            {aviso && (
+              <div style={{ background: 'color-mix(in srgb, ' + C.amber + ' 12%, transparent)', border: `1px solid ${C.amber}`, borderRadius: 12, padding: '9px 11px', marginBottom: 9, fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>
+                {aviso}
               </div>
             )}
 
