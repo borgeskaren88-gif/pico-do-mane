@@ -246,10 +246,34 @@ export async function POST(request) {
         extras = [{ estoqueId: String(s.estoqueId), qtd: String(s.qtd), unidade: String(s.unidade || '') }];
         mergeKey = sabor;
       }
-      const nomeItem = txt(prod.nome, 200) + (sabor ? ` (${sabor})` : '');
-      const existe = mergeKey != null ? c.itens.find((it) => it.cardapioId === cardapioId && (it.sabor || '') === mergeKey) : null;
+      // Adicionais pagos (ex.: açaí + granola + leite condensado). Cada um soma
+      // o preço dele no item e, se estiver ligado a um item do estoque, baixa
+      // junto no fechamento.
+      const pedidos = (body && typeof body.adicionais === 'object' && body.adicionais) ? body.adicionais : {};
+      const listaAdd = Array.isArray(prod.adicionais) ? prod.adicionais : [];
+      const nomesAdd = [];
+      let precoAdd = 0;
+      const extrasAdd = [];
+      for (const a of listaAdd) {
+        if (!a || !a.nome) continue;
+        const n = Math.max(0, Math.floor(Number(pedidos[a.nome]) || 0));
+        if (!n) continue;
+        const pu = Number(String(a.preco == null ? 0 : a.preco).replace(/\./g, '').replace(',', '.')) || 0;
+        precoAdd += pu * n;
+        nomesAdd.push(n > 1 ? `${n}x ${a.nome}` : a.nome);
+        if (a.estoqueId && num(a.qtd) > 0) extrasAdd.push({ estoqueId: String(a.estoqueId), qtd: qStr(num(a.qtd) * n), unidade: String(a.unidade || '') });
+      }
+      const addKey = nomesAdd.join(', ');
+      const precoFinal = Math.round((preco + precoAdd) * 100) / 100;
+      const nomeItem = txt(prod.nome, 200) + (sabor ? ` (${sabor})` : '') + (addKey ? ` + ${addKey}` : '');
+      const todosExtras = [...(Array.isArray(extras) ? extras : []), ...extrasAdd];
+      const existe = mergeKey != null ? c.itens.find((it) => it.cardapioId === cardapioId && (it.sabor || '') === mergeKey && (it.add || '') === addKey) : null;
       if (existe) existe.qtd = (Number(existe.qtd) || 0) + 1;
-      else c.itens.push({ id: uid(), cardapioId, nome: nomeItem, preco, qtd: 1, ...(sabor ? { sabor, extras } : {}) });
+      else c.itens.push({
+        id: uid(), cardapioId, nome: nomeItem, preco: precoFinal, qtd: 1,
+        ...(sabor ? { sabor } : {}), ...(addKey ? { add: addKey } : {}),
+        ...(todosExtras.length ? { extras: todosExtras } : {}),
+      });
       await gravarComanda(sb, c);
       return NextResponse.json({ ok: true, comanda: c });
     }
