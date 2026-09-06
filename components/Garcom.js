@@ -7,6 +7,8 @@ import PullToRefresh from './PullToRefresh';
 import Comandas from './Comandas';
 import Caixa from './Caixa';
 import PerdaGarcom from './PerdaGarcom';
+import Notificacoes from './Notificacoes';
+import LembreteAgenda from './LembreteAgenda';
 import PontoCozinha from './PontoCozinha';
 import LembretePonto from './LembretePonto';
 
@@ -63,7 +65,7 @@ export default function Garcom() {
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
-          {[['ponto', 'Ponto'], ['caixa', 'Caixa'], ['comandas', 'Comandas'], ['perdas', 'Perdas']].map(([v, rot]) => (
+          {[['ponto', 'Ponto'], ['caixa', 'Caixa'], ['comandas', 'Comandas'], ['perdas', 'Perdas'], ['avisos', 'Avisos']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
               flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 14, fontWeight: 700,
               background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
@@ -71,8 +73,11 @@ export default function Garcom() {
           ))}
         </div>
         {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
+        {/* Enquanto o app do atendimento estiver aberto, ele confere se tem
+            reserva começando agora — é o que faz o aviso chegar na hora. */}
+        <LembreteAgenda />
 
-        {aba === 'comandas' ? <Comandas papel="garcom" /> : aba === 'perdas' ? <PerdaGarcom /> : aba === 'ponto' ? <PontoCozinha /> : <Caixa papel="garcom" />}
+        {aba === 'comandas' ? <Comandas papel="garcom" /> : aba === 'perdas' ? <PerdaGarcom /> : aba === 'ponto' ? <PontoCozinha /> : aba === 'avisos' ? <Notificacoes papel="garcom" /> : <Caixa papel="garcom" />}
       </div>
     </div>
   );
