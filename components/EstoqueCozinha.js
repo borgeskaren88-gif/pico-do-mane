@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { C, Card, Btn, TextInput, NumInput, Select, Empty, SecTitle, PageTitle } from './ui';
-import { num, fmtDate, CATEGORIAS_PRODUTO } from '../lib/util';
+import { C, Card, Btn, TextInput, NumInput, QtdInput, Select, Empty, SecTitle, PageTitle } from './ui';
+import { num, fmtDate, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
 import { MOTIVOS_SAIDA } from '../lib/estoque';
 
 // Estoque na visão da COZINHA: ver o que tem e fazer as ações físicas que são
@@ -48,7 +48,7 @@ export default function EstoqueCozinha() {
   const abrirAcao = (id, tipo) => { setAcao({ id, tipo }); setAcaoQtd(''); setAcaoMotivo(MOTIVOS_SAIDA[0]); };
   const confirmarAcao = async () => {
     if (String(acaoQtd).trim() === '' || busy) return;
-    const q = num(acaoQtd);
+    const q = numQtd(acaoQtd);
     if (acao.tipo !== 'contagem' && !(q > 0)) return;
     setBusy(true);
     try {
@@ -107,7 +107,7 @@ export default function EstoqueCozinha() {
                       {rotuloAcao[acao.tipo]}{acao.tipo === 'contagem' ? ' — quanto tem AGORA?' : acao.tipo === 'entrada' ? ' — quanto entrou?' : ' — quanto saiu?'}
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <div style={{ width: 110 }}><NumInput value={acaoQtd} onChange={setAcaoQtd} placeholder={acao.tipo === 'contagem' ? String(saldo) : '0'} /></div>
+                      <div style={{ width: 110 }}><QtdInput value={acaoQtd} onChange={setAcaoQtd} placeholder={acao.tipo === 'contagem' ? String(saldo) : '0'} /></div>
                       {acao.tipo === 'saida' && <div style={{ flex: 1, minWidth: 150 }}><Select value={acaoMotivo} onChange={setAcaoMotivo} options={MOTIVOS_SAIDA} /></div>}
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>

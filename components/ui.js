@@ -83,6 +83,21 @@ export function NumInput({ value, onChange, placeholder }) {
   );
 }
 
+// Campo de QUANTIDADE. O teclado numérico do celular e do iPad só tem ponto,
+// e ponto lá significa "os gramas" — então o campo troca por vírgula na hora,
+// pra ela ver 12,992 e não 12.992 (que o sistema leria como doze mil).
+export function QtdInput({ value, onChange, placeholder }) {
+  const paraVirgula = (v) => {
+    const s = String(v == null ? '' : v).replace(/\./g, ',');
+    const i = s.indexOf(',');
+    return i < 0 ? s : s.slice(0, i + 1) + s.slice(i + 1).replace(/,/g, '');
+  };
+  return (
+    <input inputMode="decimal" value={paraVirgula(value)} placeholder={placeholder || '0'}
+      onChange={(e) => onChange(paraVirgula(e.target.value))} style={{ ...inputStyle, fontVariantNumeric: 'tabular-nums' }} />
+  );
+}
+
 export function Select({ value, onChange, options, placeholder }) {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...inputStyle, appearance: 'none' }}>
