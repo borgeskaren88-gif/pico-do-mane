@@ -87,14 +87,34 @@ export function NumInput({ value, onChange, placeholder }) {
 // e ponto lá significa "os gramas" — então o campo troca por vírgula na hora,
 // pra ela ver 12,992 e não 12.992 (que o sistema leria como doze mil).
 export function QtdInput({ value, onChange, placeholder }) {
+  const campoRef = useRef(null);
   const paraVirgula = (v) => {
     const s = String(v == null ? '' : v).replace(/\./g, ',');
     const i = s.indexOf(',');
     return i < 0 ? s : s.slice(0, i + 1) + s.slice(i + 1).replace(/,/g, '');
   };
+  const texto = paraVirgula(value);
+  // O teclado numérico do iPhone abre só com os algarismos — sem vírgula e sem
+  // ponto. Por isso a vírgula fica aqui do lado, num botão: é o que separa os
+  // quilos dos gramas (12,992 = 12 kg e 992 g).
+  const porVirgula = () => {
+    if (texto.includes(',')) return;
+    onChange((texto || '0') + ',');
+    try { campoRef.current && campoRef.current.focus(); } catch { /* ignora */ }
+  };
   return (
-    <input inputMode="decimal" value={paraVirgula(value)} placeholder={placeholder || '0'}
-      onChange={(e) => onChange(paraVirgula(e.target.value))} style={{ ...inputStyle, fontVariantNumeric: 'tabular-nums' }} />
+    <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+      <input ref={campoRef} inputMode="decimal" value={texto} placeholder={placeholder || '0'}
+        onChange={(e) => onChange(paraVirgula(e.target.value))}
+        style={{ ...inputStyle, flex: 1, minWidth: 0, fontVariantNumeric: 'tabular-nums' }} />
+      <button type="button" onClick={porVirgula} aria-label="Vírgula (separar os gramas)" title="Vírgula — separa os gramas"
+        style={{
+          flexShrink: 0, width: 44, borderRadius: 10, cursor: 'pointer',
+          border: `1px solid ${texto.includes(',') ? 'var(--c-hair)' : 'var(--c-line)'}`,
+          background: 'transparent', color: texto.includes(',') ? 'var(--c-faint)' : 'var(--c-accent)',
+          fontSize: 22, fontWeight: 800, lineHeight: 1, paddingBottom: 8,
+        }}>,</button>
+    </div>
   );
 }
 

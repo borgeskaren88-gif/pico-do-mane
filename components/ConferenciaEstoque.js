@@ -147,6 +147,13 @@ export default function ConferenciaEstoque({ estoque = [], fichas = [], cardapio
                   onChange={(e) => setContagem((m) => ({ ...m, [it.id]: paraVirgula(e.target.value) }))}
                   style={{ flex: 1, minWidth: 0, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 9, padding: '9px 12px', color: C.text, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}
                 />
+                {/* O teclado do iPhone não traz vírgula nesse campo — ela vem aqui. */}
+                <button type="button" aria-label="Vírgula" title="Vírgula — separa os gramas"
+                  onClick={() => setContagem((m) => {
+                    const atual = String(m[it.id] == null ? '' : m[it.id]);
+                    return atual.includes(',') ? m : { ...m, [it.id]: (atual || '0') + ',' };
+                  })}
+                  style={{ flexShrink: 0, width: 40, borderRadius: 9, border: `1px solid ${C.line}`, background: 'transparent', color: C.accent, fontSize: 20, fontWeight: 800, lineHeight: 1, paddingBottom: 7, cursor: 'pointer' }}>,</button>
                 <Btn small onClick={() => { if (!temValor || busy === it.id) return; acertar(it); }}>{busy === it.id ? '…' : 'Acertar'}</Btn>
               </div>
               {temValor && dif !== 0 && (
