@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
-import { brl, num, fmtDate, limparNome, todayISO, CATEGORIAS_PRODUTO } from '../lib/util';
+import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
+import { brl, num, fmtDate, limparNome, todayISO, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
 import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome } from '../lib/estoque';
 
 const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '' });
@@ -171,7 +171,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   const fecharAcao = () => { setAcao(null); setAcaoQtd(''); };
   const confirmarAcao = async () => {
     if (String(acaoQtd).trim() === '' || busy) return;
-    const q = num(acaoQtd);
+    const q = numQtd(acaoQtd);
     if (acao.tipo !== 'contagem' && !(q > 0)) return;
     setBusy(true);
     await onAcao({ acao: 'mov', id: acao.id, tipo: acao.tipo, qtd: q, motivo: acao.tipo === 'saida' ? acaoMotivo : undefined });
@@ -311,7 +311,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
           <Field label="Unidade"><Select value={novo.unidade} onChange={set('unidade')} options={UNIDADES} /></Field>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: editId ? '1fr 1fr' : '1fr 1fr 1fr', gap: 10 }}>
-          {!editId && <Field label="Qtd que tem hoje"><NumInput value={novo.saldo} onChange={set('saldo')} /></Field>}
+          {!editId && <Field label="Qtd que tem hoje"><QtdInput value={novo.saldo} onChange={set('saldo')} /></Field>}
           <Field label="Estoque mínimo"><NumInput value={novo.minimo} onChange={set('minimo')} /></Field>
           <Field label="Custo un. (R$)"><NumInput value={novo.custo} onChange={set('custo')} /></Field>
         </div>
@@ -376,13 +376,13 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                       {rotuloAcao[acao.tipo]}{acao.tipo === 'contagem' ? ' — quanto tem AGORA?' : acao.tipo === 'entrada' ? ' — quanto entrou?' : ' — quanto saiu?'}
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <div style={{ width: 110 }}><NumInput value={acaoQtd} onChange={setAcaoQtd} placeholder={acao.tipo === 'contagem' ? String(saldo) : '0'} /></div>
+                      <div style={{ width: 110 }}><QtdInput value={acaoQtd} onChange={setAcaoQtd} placeholder={acao.tipo === 'contagem' ? String(saldo) : '0'} /></div>
                       {acao.tipo === 'saida' && <div style={{ flex: 1, minWidth: 150 }}><Select value={acaoMotivo} onChange={setAcaoMotivo} options={MOTIVOS_SAIDA} /></div>}
                     </div>
                     {/* Prévia do que o sistema entendeu. Digitar "12.992" pensando
                         em 12 kg e 992 g virava doze mil — agora dá pra ver antes. */}
                     {(() => {
-                      const q = num(acaoQtd);
+                      const q = numQtd(acaoQtd);
                       if (!(q > 0)) return null;
                       const depois = acao.tipo === 'contagem' ? q : acao.tipo === 'entrada' ? saldo + q : saldo - q;
                       const absurdo = q >= 1000 && saldo > 0 && q > saldo * 50;

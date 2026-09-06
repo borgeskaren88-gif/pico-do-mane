@@ -10,6 +10,14 @@ import { qtdNaUnidadeDoItem } from '../lib/estoque';
 //  2) Diferença entre o que o sistema espera e a contagem real (a dona digita a
 //     contagem e acerta na hora), com um resumo de "pra onde foi" pelos
 //     movimentos guardados de cada item.
+// O teclado do celular só tem ponto, e em quantidade ponto quer dizer "os
+// gramas". Troca por vírgula na hora, pra 12.992 não virar doze mil.
+const paraVirgula = (v) => {
+  const s = String(v == null ? '' : v).replace(/\./g, ',');
+  const i = s.indexOf(',');
+  return i < 0 ? s : s.slice(0, i + 1) + s.slice(i + 1).replace(/,/g, '');
+};
+
 export default function ConferenciaEstoque({ estoque = [], fichas = [], cardapio = [], vendas = [], onAcao, carregado = true }) {
   const [contagem, setContagem] = useState({}); // { [itemId]: valor digitado }
   const [busy, setBusy] = useState('');
@@ -136,7 +144,7 @@ export default function ConferenciaEstoque({ estoque = [], fichas = [], cardapio
                 <input
                   type="text" inputMode="decimal" placeholder="contagem real"
                   value={digitado == null ? '' : digitado}
-                  onChange={(e) => setContagem((m) => ({ ...m, [it.id]: e.target.value }))}
+                  onChange={(e) => setContagem((m) => ({ ...m, [it.id]: paraVirgula(e.target.value) }))}
                   style={{ flex: 1, minWidth: 0, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 9, padding: '9px 12px', color: C.text, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}
                 />
                 <Btn small onClick={() => { if (!temValor || busy === it.id) return; acertar(it); }}>{busy === it.id ? '…' : 'Acertar'}</Btn>

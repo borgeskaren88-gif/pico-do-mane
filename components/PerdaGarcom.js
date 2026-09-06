@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
-import { C, Card, Btn, Field, TextInput, NumInput, Empty } from './ui';
+import { C, Card, Btn, Field, TextInput, NumInput, Empty, QtdInput } from './ui';
 import { num } from '../lib/util';
 
 // Baixas feitas pela linha de frente (garçom), SEM ver custos e sem tocar no
@@ -107,7 +107,7 @@ export default function PerdaGarcom() {
           <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>{sel.nome}</div>
           {modo === 'perda' ? (
             <>
-              <Field label={`Quanto saiu? (em ${sel.unidade})`}><NumInput value={qtd} onChange={setQtd} /></Field>
+              <Field label={`Quanto saiu? (em ${sel.unidade})`}><QtdInput value={qtd} onChange={setQtd} /></Field>
               <Field label="O que aconteceu?">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {MOTIVOS.map((m) => (
