@@ -379,6 +379,21 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                       <div style={{ width: 110 }}><NumInput value={acaoQtd} onChange={setAcaoQtd} placeholder={acao.tipo === 'contagem' ? String(saldo) : '0'} /></div>
                       {acao.tipo === 'saida' && <div style={{ flex: 1, minWidth: 150 }}><Select value={acaoMotivo} onChange={setAcaoMotivo} options={MOTIVOS_SAIDA} /></div>}
                     </div>
+                    {/* Prévia do que o sistema entendeu. Digitar "12.992" pensando
+                        em 12 kg e 992 g virava doze mil — agora dá pra ver antes. */}
+                    {(() => {
+                      const q = num(acaoQtd);
+                      if (!(q > 0)) return null;
+                      const depois = acao.tipo === 'contagem' ? q : acao.tipo === 'entrada' ? saldo + q : saldo - q;
+                      const absurdo = q >= 1000 && saldo > 0 && q > saldo * 50;
+                      return (
+                        <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.5, color: absurdo ? C.amber : C.muted }}>
+                          Entendi <b style={{ color: absurdo ? C.amber : C.text }}>{fmtQtd(q)} {it.unidade}</b>
+                          {acao.tipo === 'contagem' ? ` — o saldo vai de ${fmtQtd(saldo)} pra ${fmtQtd(depois)} ${it.unidade}.` : ` — o saldo fica em ${fmtQtd(depois)} ${it.unidade}.`}
+                          {absurdo && <><br /><b>Confere:</b> isso é bem mais que o saldo de agora. Se são gramas, escreve com <b>vírgula</b> (12,992 = 12 kg e 992 g). Com ponto, o sistema lê 12.992 como doze mil novecentos e noventa e dois.</>}
+                        </div>
+                      );
+                    })()}
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                       <Btn small onClick={confirmarAcao}>Confirmar</Btn>
                       <Btn kind="ghost" small onClick={fecharAcao}>Cancelar</Btn>

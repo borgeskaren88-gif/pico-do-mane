@@ -14,7 +14,7 @@ function papelAtual() {
 // GET: devolve a chave pública (o app precisa dela pra inscrever o aparelho).
 export async function GET() {
   const p = papelAtual();
-  if (p !== 'dona' && p !== 'cozinha') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
+  if (p !== 'dona' && p !== 'cozinha' && p !== 'garcom') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
     const sb = supabaseServer();
     const cfg = await obterConfigPush(sb);
@@ -29,7 +29,7 @@ export async function GET() {
 
 export async function POST(request) {
   const p = papelAtual();
-  if (p !== 'dona' && p !== 'cozinha') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
+  if (p !== 'dona' && p !== 'cozinha' && p !== 'garcom') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   let body;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
   const acao = String(body?.acao || '');

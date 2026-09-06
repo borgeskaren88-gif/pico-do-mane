@@ -3,7 +3,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, Field, NumInput, PageTitle, SecTitle } from './ui';
 import { pushSuportado, ehIOS, estaInstalado, statusPush, ativarPush, desativarPush, testarPush } from '../lib/pushClient';
 
-export default function Notificacoes() {
+// `papel` muda o que aparece: a dona escolhe quais avisos quer receber; o
+// atendimento só liga/desliga as notificações no aparelho dele (e recebe as
+// reservas da agenda na hora marcada).
+export default function Notificacoes({ papel = 'dona' }) {
   const [suporta, setSuporta] = useState(true);
   const [ios, setIos] = useState(false);
   const [instalado, setInstalado] = useState(true);
@@ -24,9 +27,9 @@ export default function Notificacoes() {
     try {
       const r = await fetch('/api/push', { cache: 'no-store' });
       const j = await r.json();
-      if (j && j.ok && j.avisos) setAvisos(j.avisos);
+      if (j && j.ok && j.avisos && papel === 'dona') setAvisos(j.avisos);
     } catch { /* sem conexão: mostra sem os interruptores */ }
-  }, []);
+  }, [papel]);
   useEffect(() => { conferir(); }, [conferir]);
 
   const ativar = async () => {
@@ -87,7 +90,9 @@ export default function Notificacoes() {
 
       <Card style={{ marginBottom: 14, background: C.panel2 }}>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}>
-          Ative num aparelho e o PicoOS te avisa: <b style={{ color: C.text }}>estoque acabando</b>, <b style={{ color: C.text }}>fiado no limite</b>, <b style={{ color: C.text }}>conta vencendo</b>, <b style={{ color: C.text }}>quem bateu o ponto</b> e o <b style={{ color: C.text }}>resumo do dia</b>. Dá pra ativar em vários aparelhos (celular, iPad, computador).
+          {papel === 'dona'
+            ? <>Ative num aparelho e o PicoOS te avisa: <b style={{ color: C.text }}>estoque acabando</b>, <b style={{ color: C.text }}>fiado no limite</b>, <b style={{ color: C.text }}>conta vencendo</b>, <b style={{ color: C.text }}>quem bateu o ponto</b>, <b style={{ color: C.text }}>reserva da agenda</b> e o <b style={{ color: C.text }}>resumo do dia</b>. Dá pra ativar em vários aparelhos (celular, iPad, computador).</>
+            : <>Ative neste aparelho pra receber os avisos do salão: <b style={{ color: C.text }}>reserva da agenda na hora marcada</b> e as <b style={{ color: C.text }}>tarefas novas</b>. Precisa ativar em cada aparelho que for usar.</>}
         </div>
       </Card>
 
@@ -136,7 +141,7 @@ export default function Notificacoes() {
               ) : (
                 <>
                   <Btn onClick={testar} disabled={busy}>{busy ? '…' : 'Enviar teste'}</Btn>
-                  <Btn kind="ghost" onClick={resumoAgora} disabled={busy}>Ver resumo agora</Btn>
+                  {papel === 'dona' && <Btn kind="ghost" onClick={resumoAgora} disabled={busy}>Ver resumo agora</Btn>}
                   <Btn kind="ghost" onClick={desativar} disabled={busy}>Desativar neste aparelho</Btn>
                 </>
               )}
@@ -152,6 +157,7 @@ export default function Notificacoes() {
           <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 4 }}>Avisos na hora</div>
           <div style={{ fontSize: 12.5, color: C.faint, lineHeight: 1.5, marginBottom: 6 }}>Escolha o que vale te interromper. O resumo da manhã continua vindo de qualquer jeito.</div>
           {[
+            ['agenda', 'Reserva da agenda', 'Na hora marcada, no teu aparelho e no do atendimento'],
             ['comandaFiado', 'Comanda no fiado', 'Toda vez que uma conta sair fiada, com o nome de quem ficou devendo'],
             ['caixa', 'Caixa aberto e fechado', 'No fechamento vem recebido, gaveta e a diferença da conferência'],
             ['perda', 'Perda, quebra e cortesia', 'Saída sem venda, com o valor do que se perdeu'],
@@ -178,11 +184,11 @@ export default function Notificacoes() {
         </Card>
       )}
 
-      {suporta && !precisaInstalar && inscrito && (
+      {suporta && !precisaInstalar && inscrito && papel === 'dona' && (
         <Card style={{ marginBottom: 14, background: C.panel2 }}>
           <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 8 }}>O que você recebe</div>
           <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>
-            Todo dia de manhã (a partir das <b style={{ color: C.text }}>7h</b>) chega um <b style={{ color: C.text }}>resumo</b> com o que precisa de atenção: quanto vendeu ontem, <b style={{ color: C.text }}>agenda do dia</b>, contas vencendo hoje, estoque no mínimo e fiados no limite. E <b style={{ color: C.text }}>na hora</b>, o que estiver ligado aí em cima: comanda no fiado, caixa aberto e fechado, perda e cortesia, ponto da equipe, item acabando — mais o aviso de quando um fiado <b style={{ color: C.text }}>bate o limite</b> de alguém. Cada <b style={{ color: C.text }}>compromisso da agenda</b> também te avisa no <b style={{ color: C.text }}>horário marcado</b> (pelo Calendário do celular). Toque em <b style={{ color: C.text }}>“Ver resumo agora”</b> pra ver como fica.
+            Todo dia de manhã (a partir das <b style={{ color: C.text }}>7h</b>) chega um <b style={{ color: C.text }}>resumo</b> com o que precisa de atenção: quanto vendeu ontem, <b style={{ color: C.text }}>agenda do dia</b>, contas vencendo hoje, estoque no mínimo e fiados no limite. E <b style={{ color: C.text }}>na hora</b>, o que estiver ligado aí em cima: comanda no fiado, caixa aberto e fechado, perda e cortesia, ponto da equipe, item acabando — mais o aviso de quando um fiado <b style={{ color: C.text }}>bate o limite</b> de alguém. Cada <b style={{ color: C.text }}>reserva ou compromisso da agenda</b> avisa no <b style={{ color: C.text }}>horário marcado</b> — no teu aparelho e no do atendimento (que ativa em Avisos, no app deles). Toque em <b style={{ color: C.text }}>“Ver resumo agora”</b> pra ver como fica.
           </div>
         </Card>
       )}

@@ -48,6 +48,7 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const sotaqueRef = useRef('manezinho');
 
   const [escuta, setEscuta] = useState(false); // atender quando chamam pelo nome
+  const [vigiaAtivo, setVigiaAtivo] = useState(false); // o ouvido pegou mesmo?
   useEffect(() => { setOuvirOk(podeOuvir()); sotaqueRef.current = lerSotaque(); setEscuta(lerEscuta()); }, []);
 
   const dadosRef = useRef(dados);
@@ -241,9 +242,11 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
           return;
         }
       };
+      rec.onstart = () => setVigiaAtivo(true);
       rec.onerror = (ev) => {
         const c = (ev && ev.error) || '';
         vigiaRef.current = null;
+        setVigiaAtivo(false);
         if (c === 'not-allowed' || c === 'service-not-allowed') {
           // Sem permissão não adianta insistir: desliga e explica.
           setEscuta(false); salvarEscuta(false);
@@ -255,7 +258,20 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
       try { rec.start(); } catch { vigiaRef.current = null; }
     };
     ligar();
-    return () => { vivo = false; if (reinicio) clearTimeout(reinicio); parar(); };
+    // Alguns aparelhos (o iPad e o iPhone, por exemplo) até têm o comando, mas
+    // não começam a escutar de verdade. Se em três segundos não engatou, desliga
+    // e diz isso — melhor que ficar com um interruptor ligado que não faz nada.
+    const prova = setTimeout(() => {
+      if (!vivo) return;
+      setVigiaAtivo((ok) => {
+        if (!ok) {
+          setEscuta(false); salvarEscuta(false);
+          setAviso('Neste aparelho não dá pra eu ficar esperando o nome — o Safari do iPad e do iPhone não deixa. Aqui é pelo botão, e a pergunta pelo microfone do teclado.');
+        }
+        return ok;
+      });
+    }, 3000);
+    return () => { vivo = false; clearTimeout(prova); if (reinicio) clearTimeout(reinicio); parar(); setVigiaAtivo(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [escuta, ouvirOk, ouvindo, falando, pensando]);
 
@@ -333,7 +349,10 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
                 <input type="checkbox" checked={escuta} onChange={(e) => { setEscuta(e.target.checked); salvarEscuta(e.target.checked); }}
                   style={{ width: 17, height: 17, accentColor: C.accent, flexShrink: 0 }} />
                 <span style={{ fontSize: 12, color: escuta ? C.text : C.muted, lineHeight: 1.35 }}>
-                  Atender quando eu chamar <b>“Darci”</b>{escuta ? ' · microfone ligado' : ''}
+                  Atender quando eu chamar <b>“Darci”</b>
+                  {escuta && (vigiaAtivo
+                    ? <span style={{ color: C.green, fontWeight: 700 }}> · ouvindo</span>
+                    : <span style={{ color: C.faint }}> · tentando…</span>)}
                 </span>
               </label>
             )}
@@ -470,7 +489,7 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
           {novas.length > 0 && !aberto && (
             <span style={{ width: 7, height: 7, borderRadius: 999, background: C.amber, marginLeft: 6, flexShrink: 0 }} />
           )}
-          {escuta && !aberto && novas.length === 0 && (
+          {escuta && vigiaAtivo && !aberto && novas.length === 0 && (
             <span title="Ouvindo pelo nome" style={{ width: 7, height: 7, borderRadius: 999, background: C.green, marginLeft: 6, flexShrink: 0 }} />
           )}
         </button>

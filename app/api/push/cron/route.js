@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '../../../../lib/supabase';
-import { montarResumoDiario, enviarPush, jaMandouResumoHoje, marcarResumoEnviado } from '../../../../lib/push';
+import { montarResumoDiario, enviarPush, jaMandouResumoHoje, marcarResumoEnviado , notificarAgenda } from '../../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -23,6 +23,9 @@ export async function GET(request) {
   if (!autorizado(request)) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
     const sb = supabaseServer();
+    // Aproveita a batida do cron pra conferir a agenda também (não custa nada e
+    // cobre o caso de ninguém ter o app aberto na hora).
+    try { await notificarAgenda(sb); } catch { /* agenda nunca quebra o resumo */ }
     if (await jaMandouResumoHoje(sb)) return NextResponse.json({ ok: true, enviado: false, motivo: 'já enviado hoje' });
     const resumo = await montarResumoDiario(sb);
     if (!resumo) { await marcarResumoEnviado(sb); return NextResponse.json({ ok: true, enviado: false, motivo: 'nada a avisar' }); }
