@@ -50,14 +50,19 @@ export async function POST(request) {
   if (acao === 'receberValor') {
     const ids = Array.isArray(body?.ids) ? body.ids.map((x) => txt(x, 40)).filter(Boolean) : [];
     const valor = Math.round((Number(body?.valor) || 0) * 100) / 100;
-    const forma = txt(body?.formaRecebida, 20) || 'Dinheiro';
+    // Baixa SEM entrada de dinheiro (desconto no salário, cortesia, acerto):
+    // a dívida some da lista, mas nada entra no caixa nem vira receita. Por isso
+    // o recebimento fica sem caixaId — é ele que faz o valor contar no turno.
+    const semDinheiro = !!body?.semDinheiro;
+    const motivo = txt(body?.motivo, 40);
+    const forma = semDinheiro ? (motivo || 'Sem dinheiro') : (txt(body?.formaRecebida, 20) || 'Dinheiro');
     const ref = txt(body?.ref, 40); // etiqueta pra poder desfazer depois
     if (!ids.length) return NextResponse.json({ ok: false, erro: 'Nenhum fiado informado.' }, { status: 400 });
     if (!(valor > 0)) return NextResponse.json({ ok: false, erro: 'Informe um valor maior que zero.' }, { status: 400 });
     try {
       const sb = supabaseServer();
       const hoje = hojeBrasil();
-      const cxId = await caixaAbertoId(sb);
+      const cxId = semDinheiro ? null : await caixaAbertoId(sb);
       // Lê os fiados escolhidos, mantém só os ainda em aberto, mais antigo primeiro.
       const linhas = [];
       for (const vid of ids) {
@@ -75,9 +80,10 @@ export async function POST(request) {
         const paga = Math.min(aberto, resta);
         v.abatido = Math.round(((Number(v.abatido) || 0) + paga) * 100) / 100;
         v.recebimentos = Array.isArray(v.recebimentos) ? v.recebimentos : [];
-        v.recebimentos.push({ data: hoje, valor: paga, forma, caixaId: cxId, ref: ref || undefined });
+        v.recebimentos.push({ data: hoje, valor: paga, forma, caixaId: cxId, ref: ref || undefined, semDinheiro: semDinheiro || undefined, motivo: motivo || undefined });
         if (v.abatido >= (Number(v.fiado != null ? v.fiado : (v.pagamento === 'Fiado' ? v.total : 0)) || 0) - 0.005) {
           v.pago = true; v.pagoEm = hoje; v.formaRecebida = forma;
+          v.semDinheiro = semDinheiro || undefined; // pra tela mostrar que não entrou grana
           if (ref) v.quitadoPor = ref; // foi ESTA baixa que quitou — o desfazer precisa saber
         }
         alterados.push(v);
@@ -119,7 +125,7 @@ export async function POST(request) {
         if (!(tirado > 0.005)) continue;
         v.recebimentos = ficam;
         v.abatido = Math.round(Math.max(0, (Number(v.abatido) || 0) - tirado) * 100) / 100;
-        if (v.quitadoPor === ref) { v.pago = false; v.pagoEm = null; v.formaRecebida = null; v.quitadoPor = null; }
+        if (v.quitadoPor === ref) { v.pago = false; v.pagoEm = null; v.formaRecebida = null; v.quitadoPor = null; v.semDinheiro = undefined; }
         devolvido = Math.round((devolvido + tirado) * 100) / 100;
         alterados.push([linha.chave, v]);
       }
@@ -147,19 +153,23 @@ export async function POST(request) {
       const v = data?.valor;
       if (!v) return NextResponse.json({ ok: false, erro: 'Venda não encontrada.' }, { status: 404 });
       const hoje = hojeBrasil();
-      const forma = txt(body?.formaRecebida, 20) || 'Dinheiro';
+      // Baixa sem entrada de dinheiro: sem caixaId, pra não contar no turno.
+      const semDinheiro = !!body?.semDinheiro;
+      const motivo = txt(body?.motivo, 40);
+      const forma = semDinheiro ? (motivo || 'Sem dinheiro') : (txt(body?.formaRecebida, 20) || 'Dinheiro');
       const ref = txt(body?.ref, 40);
       // Quanto ainda faltava (fiado menos o já abatido) — é o que entra no caixa agora.
       const base = Number(v.fiado != null ? v.fiado : (v.pagamento === 'Fiado' ? v.total : 0)) || 0;
       const falta = Math.round((base - (Number(v.abatido) || 0)) * 100) / 100;
       if (falta > 0.005) {
         v.recebimentos = Array.isArray(v.recebimentos) ? v.recebimentos : [];
-        v.recebimentos.push({ data: hoje, valor: falta, forma, caixaId: await caixaAbertoId(sb), ref: ref || undefined });
+        v.recebimentos.push({ data: hoje, valor: falta, forma, caixaId: semDinheiro ? null : await caixaAbertoId(sb), ref: ref || undefined, semDinheiro: semDinheiro || undefined, motivo: motivo || undefined });
         v.abatido = Math.round(((Number(v.abatido) || 0) + falta) * 100) / 100;
       }
       v.pago = true;
       v.pagoEm = hoje;
       v.formaRecebida = forma;
+      v.semDinheiro = semDinheiro || undefined;
       if (ref) v.quitadoPor = ref; // pra saber que foi ESSA baixa que quitou
       const { error } = await sb.from('pdm_dados').upsert({ chave, valor: v, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
