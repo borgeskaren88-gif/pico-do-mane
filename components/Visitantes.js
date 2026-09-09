@@ -39,18 +39,24 @@ export default function Visitantes({ dados = [], onChange }) {
   const ordenado = [...dados].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
 
   return (
-    <Card style={{ marginBottom: 18 }}>
+    <Card style={{
+      marginBottom: 18,
+      // Azul fraquinho pra o bloco saltar aos olhos no meio do Log — fechado
+      // ele é só uma linha, e sem cor a dona passava direto.
+      background: `color-mix(in srgb, ${C.accent} 9%, ${C.panel})`,
+      borderColor: `color-mix(in srgb, ${C.accent} 38%, transparent)`,
+    }}>
       {/* Só o título: toca e abre. */}
       <button onClick={() => setExpandido((v) => !v)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ minWidth: 0, flex: 1 }}>
-          <span style={{ fontSize: 17, fontWeight: 800, color: C.text, display: 'block' }}>Visitantes em destaque</span>
-          <span style={{ fontSize: 12.5, color: C.faint, display: 'block', marginTop: 3 }}>
+          <span style={{ fontSize: 17, fontWeight: 800, color: C.accent, display: 'block' }}>Visitantes em destaque</span>
+          <span style={{ fontSize: 12.5, color: C.muted, display: 'block', marginTop: 3 }}>
             {resumo.doMes.length > 0
               ? `${resumo.pessoasMes} pessoa(s) este mês · ${ordenado.length} registro(s) no total`
               : ordenado.length > 0 ? `${ordenado.length} registro(s) · nenhum este mês` : 'turistas, Instagram, histórias legais do bar'}
           </span>
         </span>
-        <span style={{ color: C.faint, fontSize: 13, fontWeight: 900, flexShrink: 0 }}>{expandido ? '▾' : '▸'}</span>
+        <span style={{ color: C.accent, fontSize: 13, fontWeight: 900, flexShrink: 0 }}>{expandido ? '▾' : '▸'}</span>
       </button>
 
       {expandido && (
