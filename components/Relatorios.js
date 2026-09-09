@@ -5,6 +5,7 @@ import {
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell,
 } from 'recharts';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle, Label } from './ui';
+import RelatorioPonto from './RelatorioPonto';
 
 // Medidor (gauge) semicircular de leque, em azul — usado na nota média do mês.
 function Medidor({ valor = 0, max = 10 }) {
@@ -342,6 +343,10 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
           <KPI titulo="Pedidos fiados no mês" valor={fiadoMes} cor={C.accent2} />
         </>
       )}
+
+      {/* Ponto por funcionário, mês a mês — com histórico próprio, que o ponto
+          pode ter mês que as Finanças ainda não têm (e vice-versa). */}
+      <RelatorioPonto mesInicial={mes} />
     </div>
   );
 }
