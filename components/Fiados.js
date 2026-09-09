@@ -30,6 +30,10 @@ const FONTE_ATRASADO = 'Recebimento Atrasado';
 // no caixa nem vira receita. É o caso do consumo de funcionário que foi
 // descontado do salário, da cortesia da casa e do que a gente já sabe que não
 // vem mais. Sempre com motivo, pra depois dar pra explicar o que aconteceu.
+// Como a pessoa pagou o fiado. Os nomes são os mesmos do caixa, senão o valor
+// entra no balde errado no fechamento do turno.
+const FORMAS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
+
 const MOTIVOS_SEM = [
   'Desconto no salário',
   'Cortesia da casa',
@@ -50,6 +54,8 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
   const [valorPago, setValorPago] = useState({}); // { [chave]: 'texto do valor' }
   const [caixaAberto, setCaixaAberto] = useState(null); // null=ainda não sei, true/false
   const [ultima, setUltima] = useState(null); // última baixa: { ref, nome, valor, semDinheiro, motivo } — pra desfazer
+  const [forma, setForma] = useState({}); // { [chave]: 'Pix' } — como o cliente pagou
+  const [recebendo, setRecebendo] = useState({}); // { [vendaId]: true } — escolhendo a forma de uma compra
   const [semAberto, setSemAberto] = useState({}); // { [chave]: true } — painel "baixar sem dinheiro"
   const [motivoSem, setMotivoSem] = useState({}); // { [chave]: 'Desconto no salário' }
   const [valorSem, setValorSem] = useState({}); // { [chave]: 'texto do valor' }
@@ -96,11 +102,12 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
   // Toda baixa de fiado já entra em Receitas como "Recebimento Atrasado", na
   // data de hoje (dia operacional: madrugada conta como a noite anterior). A
   // etiqueta (ref) liga o lançamento à baixa, pra o Desfazer levar os dois.
-  const lancarReceita = (ref, nome, valor) => {
+  const lancarReceita = (ref, nome, valor, comoPagou) => {
     if (!onReceitas || !Array.isArray(receitas) || !(valor > 0.005)) return;
     onReceitas([{
       id: uid(), data: diaOperacional(), categoria: FONTE_ATRASADO,
-      descricao: `Fiado recebido — ${nome}`, valor: Math.round(valor * 100) / 100, obs: '', refFiado: ref,
+      descricao: `Fiado recebido — ${nome}${comoPagou ? ` (${comoPagou})` : ''}`,
+      valor: Math.round(valor * 100) / 100, obs: '', refFiado: ref, forma: comoPagou || 'Dinheiro',
     }, ...receitas]);
   };
 
@@ -122,14 +129,20 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
     finally { setBusy(false); }
   };
 
-  const receber = async (id) => {
+  const receber = async (id, comoPagou) => {
+    setRecebendo((m) => ({ ...m, [id]: false }));
     if (!confirmaSemCaixa()) return;
     const v = vendas.find((x) => x.id === id);
     const nome = v ? rotulo(v.nome, v.mesa) : 'cliente';
     const valor = v ? abertoDaVenda(v) : 0;
+    const pg = comoPagou || 'Dinheiro';
     const ref = uid();
-    const j = await acao({ acao: 'receber', id, ref });
-    if (j && j.ok) { lancarReceita(ref, nome, num(j.aplicado) || valor); setUltima({ ref, nome, valor: num(j.aplicado) || valor }); }
+    const j = await acao({ acao: 'receber', id, ref, formaRecebida: pg });
+    if (j && j.ok) {
+      const entrou = num(j.aplicado) || valor;
+      lancarReceita(ref, nome, entrou, pg);
+      setUltima({ ref, nome, valor: entrou, forma: pg });
+    }
   };
   // Excluir apaga a VENDA inteira — some também do histórico do dia em que foi
   // feita. Só serve pra comanda lançada por engano. Pra tirar a dívida sem
@@ -151,12 +164,13 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
     if (valor > g.total + 0.005 && typeof window !== 'undefined' &&
         !window.confirm(`O valor (${brl(valor)}) é maior que a dívida (${brl(g.total)}). Vou quitar tudo e o resto (${brl(valor - g.total)}) fica como troco. Continuar?`)) return;
     if (!confirmaSemCaixa()) return;
+    const pg = forma[g.chave] || 'Dinheiro';
     const ref = uid();
-    const j = await acao({ acao: 'receberValor', ids: g.vendas.map((v) => v.id), valor, ref });
+    const j = await acao({ acao: 'receberValor', ids: g.vendas.map((v) => v.id), valor, ref, formaRecebida: pg });
     if (j && j.ok) {
       const entrou = num(j.aplicado) || valor;
-      lancarReceita(ref, g.nome, entrou);
-      setUltima({ ref, nome: g.nome, valor: entrou });
+      lancarReceita(ref, g.nome, entrou, pg);
+      setUltima({ ref, nome: g.nome, valor: entrou, forma: pg });
     }
     setValorPago((m) => ({ ...m, [g.chave]: '' }));
     setPagarAberto((m) => ({ ...m, [g.chave]: false }));
@@ -250,7 +264,7 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
         <KPI
           titulo={dentroDoPrazo ? `A receber até dia ${DIA_LIMITE}` : `Vencido (era até dia ${DIA_LIMITE})`}
           valor={brl(totalAgora)}
-          cor={totalAgora > 0 ? (dentroDoPrazo ? C.amber : C.red) : C.faint}
+          cor={totalAgora > 0 ? (dentroDoPrazo ? C.roxo : C.red) : C.faint}
           sub={totalAgora > 0
             ? (dentroDoPrazo
               ? (faltamDias > 0 ? `quem tem conta do mês passado · faltam ${faltamDias} dia(s)` : 'quem tem conta do mês passado · o prazo acaba hoje')
@@ -271,7 +285,7 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
           <span style={{ fontSize: 13, color: C.text, lineHeight: 1.45, flex: 1, minWidth: 180 }}>
             {ultima.semDinheiro
               ? <>Baixei <b>{brl(ultima.valor)}</b> de <b>{ultima.nome}</b> como <b>{ultima.motivo}</b> — saiu da lista e <b>não entrou dinheiro</b>.</>
-              : <>Recebi <b>{brl(ultima.valor)}</b> de <b>{ultima.nome}</b> — já lancei em Receitas como <b>Recebimento Atrasado</b>.</>}
+              : <>Recebi <b>{brl(ultima.valor)}</b> de <b>{ultima.nome}</b>{ultima.forma ? <> em <b>{ultima.forma}</b></> : null} — já lancei em Receitas como <b>Recebimento Atrasado</b>.</>}
           </span>
           <Btn kind="ghost" small onClick={desfazerUltima} disabled={busy}>Desfazer</Btn>
           <button onClick={() => setUltima(null)} aria-label="Fechar aviso" style={{ background: 'none', border: 'none', color: C.faint, fontSize: 18, lineHeight: 1, cursor: 'pointer', padding: '0 2px' }}>×</button>
@@ -320,7 +334,7 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
 
                   {/* Este cliente entra na cobrança de agora ou fica pra próxima? */}
                   {g.agora > 0.005 ? (
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: dentroDoPrazo ? C.amber : C.red, marginTop: 8, lineHeight: 1.45 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: dentroDoPrazo ? C.roxo : C.red, marginTop: 8, lineHeight: 1.45 }}>
                       {dentroDoPrazo ? `Cobrar até o dia ${DIA_LIMITE}` : `Vencido — passou do dia ${DIA_LIMITE}`}
                       {g.desteMes > 0.005 && (
                         <span style={{ fontWeight: 500, color: C.faint }}>
@@ -346,6 +360,24 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                       </div>
                     ) : (
                       <div style={{ background: C.panel2, borderRadius: 10, padding: 10 }}>
+                        {/* Como a pessoa pagou — vai pro caixa no balde certo. */}
+                        <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Como {g.nome} pagou?</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                          {FORMAS.map((f) => {
+                            const ativo = (forma[g.chave] || 'Dinheiro') === f;
+                            return (
+                              <button
+                                key={f}
+                                onClick={() => setForma((x) => ({ ...x, [g.chave]: f }))}
+                                style={{
+                                  background: ativo ? C.accent : C.panel, color: ativo ? '#0b0b0c' : C.text,
+                                  border: `1px solid ${ativo ? C.accent : C.line}`, borderRadius: 999,
+                                  padding: '7px 13px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                                }}
+                              >{f}</button>
+                            );
+                          })}
+                        </div>
                         <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Quanto {g.nome} pagou agora? (abate do total de {brl(g.total)})</div>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           <input
@@ -439,10 +471,28 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                               ))}
                             </div>
                           )}
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 8 }}>
-                            <Btn kind="ok" small onClick={() => receber(v.id)} disabled={busy}>Recebi</Btn>
-                            <Btn kind="danger" small onClick={() => excluir(v.id)} disabled={busy}>Excluir</Btn>
-                          </div>
+                          {!recebendo[v.id] ? (
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 8 }}>
+                              <Btn kind="ok" small onClick={() => setRecebendo((m) => ({ ...m, [v.id]: true }))} disabled={busy}>Recebi</Btn>
+                              <Btn kind="danger" small onClick={() => excluir(v.id)} disabled={busy}>Excluir</Btn>
+                            </div>
+                          ) : (
+                            /* Um toque a mais só pra dizer como entrou o dinheiro. */
+                            <div style={{ background: C.panel2, borderRadius: 10, padding: 10, marginTop: 8 }}>
+                              <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>Recebi {brl(abertoDaVenda(v))} — como {g.nome} pagou?</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {FORMAS.map((f) => (
+                                  <button
+                                    key={f}
+                                    onClick={() => receber(v.id, f)}
+                                    disabled={busy}
+                                    style={{ background: C.panel, color: C.text, border: `1px solid ${C.line}`, borderRadius: 999, padding: '8px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}
+                                  >{f}</button>
+                                ))}
+                              </div>
+                              <button onClick={() => setRecebendo((m) => ({ ...m, [v.id]: false }))} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0, marginTop: 8 }}>cancelar</button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -468,7 +518,8 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: C.faint }}>{rotulo(v.nome, v.mesa)}</div>
                       <div style={{ fontSize: 12, color: C.faint }}>
-                        {semGrana ? 'Baixado' : 'Recebido'} {v.pagoEm ? fmtDate(v.pagoEm) : ''} · compra {fmtDate(v.data)}
+                        {semGrana ? 'Baixado' : 'Recebido'} {v.pagoEm ? fmtDate(v.pagoEm) : ''}
+                        {!semGrana && v.formaRecebida ? ` em ${v.formaRecebida}` : ''} · compra {fmtDate(v.data)}
                       </div>
                       {semGrana && (
                         <div style={{ fontSize: 11, color: C.amber, fontWeight: 700, marginTop: 2 }}>
