@@ -1,16 +1,14 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, KPI, Empty, SecTitle, PageTitle } from './ui';
-import { brl, num, fmtDate, uid, diaOperacional, fiadoDaVenda, abertoDaVenda } from '../lib/util';
+import { brl, num, fmtDate, uid, diaOperacional, fiadoDaVenda, abertoDaVenda, classificarFiado } from '../lib/util';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
-// O ciclo do fiado do Pico: o que a pessoa consome num mês se paga do dia 01 ao
-// 10 do mês SEGUINTE. Então o que ela pegou em agosto vence agora, em setembro;
-// o que ela está pegando agora só cai mês que vem.
+// O ciclo do fiado do Pico: cobra-se do dia 01 ao 10. Enquanto a pessoa não
+// acerta, tudo que ela deve é "deste mês"; depois que acerta, o que ela consumir
+// já fica pro mês que vem. Quem faz essa conta é classificarFiado, em lib/util.
 const DIA_LIMITE = 10;
-const ymDe = (v) => String((v && (v.data || v.fechadaEm)) || '').slice(0, 7);
-const venceAgora = (v, ymAtual) => { const y = ymDe(v); return !!y && y < ymAtual; };
 
 // Link do WhatsApp com a mensagem pronta. Telefone brasileiro sem o 55 ganha o
 // 55 na frente; sem telefone cadastrado não dá link (aí a gente copia o texto).
@@ -166,7 +164,10 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
   const hojeISO = diaOperacional();
   const ymAtual = hojeISO.slice(0, 7);
   const diaDoMes = Number(hojeISO.slice(8, 10)) || 1;
-  const totalAgora = abertos.filter((v) => venceAgora(v, ymAtual)).reduce((s, v) => s + abertoDaVenda(v), 0);
+  // A idade de cada fiado sai do histórico de pagamento de cada cliente.
+  const idade = useMemo(() => classificarFiado(vendas, ymAtual), [vendas, ymAtual]);
+  const venceAgora = (v) => idade.balde.get(v.id) !== 'proximo';
+  const totalAgora = abertos.filter(venceAgora).reduce((s, v) => s + abertoDaVenda(v), 0);
   const totalProximo = Math.round((totalDevido - totalAgora) * 100) / 100;
   const dentroDoPrazo = diaDoMes <= DIA_LIMITE;
   const faltamDias = DIA_LIMITE - diaDoMes;
@@ -180,15 +181,17 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
       if (!g) { g = { chave: k, nome: rotulo(v.nome, v.mesa), total: 0, agora: 0, proximo: 0, vendas: [] }; map.set(k, g); }
       const aberto = abertoDaVenda(v);
       g.total += aberto;
-      if (venceAgora(v, ymAtual)) g.agora += aberto; else g.proximo += aberto;
+      if (venceAgora(v)) g.agora += aberto; else g.proximo += aberto;
       g.vendas.push(v);
     }
     for (const g of map.values()) {
       g.vendas.sort((a, b) => (b.fechadaEm || b.data || '').localeCompare(a.fechadaEm || a.data || ''));
       g.limite = limiteDe(g.nome);
+      g.ultimoPag = idade.ultimoPag.get(idade.chaveDe(g.vendas[0])) || '';
+      g.acertou = !!g.ultimoPag && g.ultimoPag.slice(0, 7) === ymAtual;
     }
     return [...map.values()].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' }));
-  }, [vendas, clientes, ymAtual]);
+  }, [vendas, clientes, ymAtual, idade]);
 
   const itensDe = (v) => (Array.isArray(v.itens) ? v.itens : []);
 
@@ -205,15 +208,15 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
           cor={totalAgora > 0 ? (dentroDoPrazo ? C.amber : C.red) : C.faint}
           sub={totalAgora > 0
             ? (dentroDoPrazo
-              ? (faltamDias > 0 ? `consumo dos meses anteriores · faltam ${faltamDias} dia(s)` : 'consumo dos meses anteriores · último dia é hoje')
-              : 'consumo dos meses anteriores · prazo passou')
-            : 'ninguém devendo de mês passado'}
+              ? (faltamDias > 0 ? `de quem ainda não acertou · faltam ${faltamDias} dia(s)` : 'de quem ainda não acertou · o prazo acaba hoje')
+              : 'de quem ainda não acertou · o prazo já passou')
+            : 'todo mundo em dia com o ciclo'}
         />
         <KPI
           titulo="Cai só mês que vem"
           valor={brl(totalProximo)}
           cor={totalProximo > 0 ? C.accent2 : C.faint}
-          sub={`consumo deste mês · vence dia 01 a ${DIA_LIMITE} do mês que vem`}
+          sub={`consumo de quem já acertou · vence dia 01 a ${DIA_LIMITE} do mês que vem`}
         />
       </div>
       <KPI titulo="Total em aberto" valor={brl(totalDevido)} cor={totalDevido > 0 ? C.text : C.faint} sub={`${grupos.length} cliente(s) · ${abertos.length} fiado(s)`} />
@@ -286,7 +289,7 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                   )}
                   {g.proximo > 0.005 && g.agora <= 0.005 && (
                     <div style={{ fontSize: 11.5, fontWeight: 700, color: C.accent2, marginTop: 8 }}>
-                      Consumo deste mês — só paga do dia 01 ao {DIA_LIMITE} do mês que vem.
+                      Já acertou{g.ultimoPag ? ` em ${fmtDate(g.ultimoPag)}` : ''} — isso aqui é depois do pagamento e só cai mês que vem.
                     </div>
                   )}
 
