@@ -8,7 +8,7 @@ export const C = {
   ink: 'var(--c-ink)', panel: 'var(--c-panel)', panel2: 'var(--c-panel2)', raised: 'var(--c-raised)',
   line: 'var(--c-line)', hair: 'var(--c-hair)', accent: 'var(--c-accent)', accent2: 'var(--c-accent2)',
   text: 'var(--c-text)', muted: 'var(--c-muted)', faint: 'var(--c-faint)',
-  green: 'var(--c-green)', red: 'var(--c-red)', amber: 'var(--c-amber)',
+  green: 'var(--c-green)', red: 'var(--c-red)', amber: 'var(--c-amber)', roxo: 'var(--c-roxo)',
   redSoft: 'var(--c-red-soft)', barBg: 'var(--c-bar-bg)',
   cardBorder: 'var(--c-card-border)', cardShadow: 'var(--c-card-shadow)',
 };
