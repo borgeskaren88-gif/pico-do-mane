@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, Empty, SecTitle } from './ui';
+import RelogioPonto from './RelogioPonto';
 import { fmtDate, todayISO } from '../lib/util';
 
 const norm = (s) => (s || '').trim().toLowerCase();
@@ -167,6 +168,11 @@ export default function RelatorioPonto({ mesInicial }) {
 
                   {abertoAqui && (
                     <div style={{ marginTop: 10, borderTop: `1px solid ${C.line}`, paddingTop: 8 }}>
+                      {/* Como a pessoa fechou o mês, em desenho: verde fechou as
+                          horas, vermelho ainda falta. */}
+                      <div style={{ padding: '10px 0 14px' }}>
+                        <RelogioPonto horas={p.horas} esperado={p.esperado} tamanho={166} />
+                      </div>
                       {p.turnos.map((r) => (
                         <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '6px 0', fontSize: 13, borderTop: `1px solid ${C.hair}` }}>
                           <span style={{ color: C.muted }}>

@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, Empty, SecTitle, PageTitle, KPI } from './ui';
+import RelogioPonto from './RelogioPonto';
 import { fmtDate, todayISO } from '../lib/util';
 
 const norm = (s) => (s || '').trim().toLowerCase();
@@ -125,6 +126,17 @@ export default function PontoDona() {
   }, [registros, ym]);
 
   const totalHoras = pessoas.reduce((s, p) => s + p.horas, 0);
+  // Soma da equipe pro relógio grande: só entra quem tem jornada configurada,
+  // senão o "esperado" ficaria menor que o trabalhado e o anel mentiria.
+  const equipe = useMemo(() => {
+    let horas = 0, esperado = 0, quantos = 0;
+    for (const p of pessoas) {
+      const esp = esperadoDoPapel(p.papel);
+      if (esp == null) continue;
+      horas += p.horas; esperado += esp; quantos += 1;
+    }
+    return { horas, esperado: quantos ? esperado : null, quantos };
+  }, [pessoas, esperadoDoPapel]);
   const trabalhandoAgora = registros.filter((r) => !r.saida);
   const rotuloSetor = (papel) => (SETORES.find(([k]) => k === papel)?.[1] || '');
 
@@ -142,6 +154,18 @@ export default function PontoDona() {
   return (
     <div>
       <PageTitle sub="Horas da equipe neste mês — a equipe bate o ponto, você acompanha aqui">Ponto</PageTitle>
+
+      {/* Relógio da equipe: enche conforme o mês anda. Vermelho enquanto falta
+          hora pra fechar a jornada, verde quando já bateu. */}
+      {equipe.esperado != null && (
+        <Card style={{ padding: '18px 14px 16px', marginBottom: 12 }}>
+          <RelogioPonto horas={equipe.horas} esperado={equipe.esperado} tamanho={196} />
+          <div style={{ fontSize: 12, color: C.faint, textAlign: 'center', marginTop: 10, lineHeight: 1.45 }}>
+            A equipe toda neste mês ({equipe.quantos} pessoa(s) com jornada configurada).
+            <br />Verde = já fechou as horas · Vermelho = ainda falta.
+          </div>
+        </Card>
+      )}
 
       <KPI titulo="Horas no mês" valor={fmtHoras(totalHoras)} cor={C.accent} sub={`${pessoas.length} pessoa(s)`} />
 
@@ -272,6 +296,10 @@ export default function PontoDona() {
             </button>
             {ab && (
               <div style={{ marginTop: 8 }}>
+                {/* O relógio da pessoa: quanto ela já bateu do que era esperado. */}
+                <Card style={{ marginBottom: 8, padding: '16px 14px 14px' }}>
+                  <RelogioPonto horas={p.horas} esperado={esperadoDoPapel(p.papel)} tamanho={168} nome={p.nome} />
+                </Card>
                 {p.turnos.map((r) => (
                   <Card key={r.id} style={{ marginBottom: 6, padding: '10px 14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
