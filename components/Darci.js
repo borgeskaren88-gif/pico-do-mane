@@ -4,7 +4,7 @@ import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
-import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs } from '../lib/darciVoz';
+import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs, lerVozNome, vozEscolhidaFalta } from '../lib/darciVoz';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -88,7 +88,13 @@ export default function Darci({ onAnotar, ...dados }) {
     });
   }, [vozId, tom, nome, sotaque, carregarVozes]);
 
-  const trocarVoz = (id) => { setVozId(id); salvarVoz(id); };
+  const trocarVoz = (id) => {
+    setVozId(id);
+    // Guarda também o nome ("Microsoft Daniel") pra os outros aparelhos
+    // conseguirem dizer qual voz ela escolheu, mesmo sem ter essa voz.
+    const v = vozes.find((x) => x.voiceURI === id);
+    salvarVoz(id, v ? v.name : '');
+  };
   const trocarTom = (v) => { setTom(v); salvarTom(v); };
   const trocarNome = (v) => { setNome(v); salvarNome(v); };
   const trocarSotaque = (v) => {
@@ -121,6 +127,8 @@ export default function Darci({ onAnotar, ...dados }) {
   const vozesPt = vozes.filter(ehPt);
   const vozesOutras = vozes.filter((v) => !ehPt(v));
   const semPt = vozesPt.length === 0;
+  const vozFalta = vozOk && vozes.length > 0 && vozEscolhidaFalta(vozes);
+  const vozNomeSalvo = vozFalta ? lerVozNome() : '';
   // Nomes repetidos (o iPhone lista a mesma voz em versão simples e melhorada):
   // numera pra dar pra testar cada uma.
   const rotuloVoz = (v) => {
@@ -176,6 +184,20 @@ export default function Darci({ onAnotar, ...dados }) {
               <button onClick={() => falar('Ó, Karen. Sou o Darci, teu sócio aqui do Pico.')}
                 style={{ background: 'none', border: `1px solid ${C.line}`, color: C.accent, borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>testar</button>
             </div>
+
+            {/* A voz escolhida no computador pode não existir aqui: voz da
+                Microsoft é arquivo do Windows, o celular não tem. Avisa em vez
+                de trocar calado — senão parece que o ajuste não pegou. */}
+            {vozFalta && (
+              <div style={{ maxWidth: 340, margin: '10px auto 0', background: C.panel2, border: `1px solid ${C.amber}`, borderRadius: 10, padding: '9px 12px', fontSize: 11.5, color: C.muted, lineHeight: 1.5, textAlign: 'left' }}>
+                <b style={{ color: C.amber }}>Esta voz não existe neste aparelho.</b>{' '}
+                {vozNomeSalvo ? <>Você escolheu <b>{vozNomeSalvo}</b> no computador — ela é um arquivo do Windows, e o celular não tem como baixar.</> : 'A voz que você escolheu em outro aparelho não está aqui.'}
+                {' '}Por enquanto ele está falando com a voz deste aparelho.
+                {vozNuvemOk
+                  ? <> Pra ter a mesma voz em todos, escolhe <b>“A voz do Darci”</b> aqui embaixo.</>
+                  : <> Pra ter a mesma voz em todos, dá pra ligar a voz própria dele — me pede que eu te explico.</>}
+              </div>
+            )}
 
             {/* Tom da voz: o iPhone não libera voz masculina pra apps, então
                 abaixar o tom é o que deixa o Darci com voz de homem. */}

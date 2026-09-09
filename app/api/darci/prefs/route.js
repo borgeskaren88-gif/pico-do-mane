@@ -25,6 +25,9 @@ function limpar(p) {
   if (Number.isFinite(tom) && tom >= 0.5 && tom <= 1.2) out.tom = tom;
   if (p.sotaque === 'leve' || p.sotaque === 'manezinho' || p.sotaque === 'carregado') out.sotaque = p.sotaque;
   if (typeof p.vozId === 'string') out.vozId = p.vozId.slice(0, 300);
+  // O nome legível ("Microsoft Daniel") serve pra o celular conseguir dizer
+  // QUAL voz foi escolhida no computador, mesmo não tendo ela instalada.
+  if (typeof p.vozNome === 'string') out.vozNome = p.vozNome.slice(0, 120);
   if (p.motor === 'exclusiva' || p.motor === 'aparelho') out.motor = p.motor;
   return out;
 }
