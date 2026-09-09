@@ -27,7 +27,7 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 async function lerCasa(sb) {
   const { data } = await sb.from('casa_dados').select('valor').eq('chave', CHAVE).maybeSingle();
   const v = data?.valor || {};
-  return { habitos: arr(v.habitos), checkins: (v.checkins && typeof v.checkins === 'object') ? v.checkins : {}, lista: arr(v.lista), cartoes: arr(v.cartoes), compras: arr(v.compras), pagamentos: (v.pagamentos && typeof v.pagamentos === 'object') ? v.pagamentos : {}, tarefas: arr(v.tarefas) };
+  return { habitos: arr(v.habitos), checkins: (v.checkins && typeof v.checkins === 'object') ? v.checkins : {}, lista: arr(v.lista), cartoes: arr(v.cartoes), compras: arr(v.compras), pagamentos: (v.pagamentos && typeof v.pagamentos === 'object') ? v.pagamentos : {}, tarefas: arr(v.tarefas), humores: arr(v.humores) };
 }
 
 async function gravarCasa(sb, casa) {
@@ -196,6 +196,23 @@ export async function POST(request) {
     if (acao === 'listaLimparComprados') {
       const sec = txt(body?.secao, 10);
       casa.lista = casa.lista.filter((it) => !it.comprado || (sec && (it.secao || 'dia') !== sec));
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+
+    // ---- Humor do dia (cada um registra o seu; um por pessoa por dia) ----
+    if (acao === 'humorSet') {
+      const humor = txt(body?.humor, 20);
+      const dia = /^\d{4}-\d{2}-\d{2}$/.test(body?.data) ? body.data : '';
+      if (!humor || !dia) return NextResponse.json({ ok: false, erro: 'Humor inválido.' }, { status: 400 });
+      const outros = casa.humores.filter((h) => !(h.usuario === usuario.nome && h.data === dia));
+      casa.humores = [{ id: uid(), usuario: usuario.nome, data: dia, humor, criadoEm: Date.now() }, ...outros].slice(0, 800);
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'humorDel') {
+      const dia = txt(body?.data, 10);
+      casa.humores = casa.humores.filter((h) => !(h.usuario === usuario.nome && h.data === dia));
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }

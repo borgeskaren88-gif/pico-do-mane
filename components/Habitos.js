@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { C, Card, Label, Empty, SecTitle, inputStyle, Icone } from './ui';
 import { CORES_HABITO, todayISO, ymHoje, mesLabel, passoMes, fmtDate } from '../lib/util';
+import { HUMORES, LABEL_HUMOR, Carinha } from './Carinhas';
 
 const DIAS_SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const WD3 = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
@@ -22,6 +23,7 @@ function diasDoMes(ym) {
 export default function Habitos({ usuario }) {
   const [habitos, setHabitos] = useState([]);
   const [checkins, setCheckins] = useState({});
+  const [humores, setHumores] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   const [nome, setNome] = useState('');
@@ -30,7 +32,7 @@ export default function Habitos({ usuario }) {
   const [mes, setMes] = useState(ymHoje());
   const [diaSel, setDiaSel] = useState(todayISO());
 
-  const aplicar = (j) => { if (j && j.ok) { setHabitos(j.habitos || []); setCheckins(j.checkins || {}); } };
+  const aplicar = (j) => { if (j && j.ok) { setHabitos(j.habitos || []); setCheckins(j.checkins || {}); setHumores(j.humores || []); } };
   const carregar = useCallback(async () => {
     setCarregando(true); setErro('');
     try {
@@ -84,6 +86,9 @@ export default function Habitos({ usuario }) {
       {erro && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{erro}</div>}
       {carregando ? <Empty>Carregando…</Empty> : (
         <>
+          {/* ===== Humor do dia ===== */}
+          <Humor humores={humores} usuario={usuario} hoje={hoje} acao={acao} />
+
           {/* ===== Marcar hábitos do dia (Hoje) ===== */}
           <Card style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -233,6 +238,49 @@ function EstaSemana({ meus, feitosNo, hoje }) {
         <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 999, background: C.amber, marginRight: 5 }} />40–60% Bom</span>
       </div>
     </Card>
+  );
+}
+
+// Registro de humor do dia, com carinhas fofas. Cada pessoa marca o seu; dá
+// pra ver o humor da outra também (fofo pra um casal).
+function Humor({ humores, usuario, hoje, acao }) {
+  const meu = humores.find((h) => h.usuario === usuario.nome && h.data === hoje);
+  const outros = humores.filter((h) => h.data === hoje && h.usuario !== usuario.nome);
+  const escolher = (k) => acao(meu && meu.humor === k ? { acao: 'humorDel', data: hoje } : { acao: 'humorSet', humor: k, data: hoje });
+  return (
+    <Card style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Como você está se sentindo?</div>
+      <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>{meu ? 'Toque de novo pra tirar. ' : ''}Neste momento…</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        {HUMORES.map(([k, label]) => {
+          const on = meu && meu.humor === k;
+          return (
+            <button key={k} onClick={() => escolher(k)}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '10px 4px', borderRadius: 14, cursor: 'pointer', border: `1.5px solid ${on ? C.accent : 'transparent'}`, background: on ? C.glassBg : 'transparent', opacity: !meu || on ? 1 : 0.6, transition: 'opacity .15s' }}>
+              <Carinha humor={k} size={52} />
+              <span style={{ fontSize: 12, color: on ? C.text : C.muted, fontWeight: on ? 800 : 600 }}>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {(meu || outros.length > 0) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.hair}` }}>
+          {meu && <HumorMini nome="Você" humor={meu.humor} />}
+          {outros.map((h) => <HumorMini key={h.usuario} nome={h.usuario} humor={h.humor} />)}
+        </div>
+      )}
+    </Card>
+  );
+}
+function HumorMini({ nome, humor }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <Carinha humor={humor} size={30} />
+      <div style={{ lineHeight: 1.15 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>{nome}</div>
+        <div style={{ fontSize: 11, color: C.muted }}>{LABEL_HUMOR[humor] || humor}</div>
+      </div>
+    </div>
   );
 }
 
