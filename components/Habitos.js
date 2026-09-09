@@ -258,22 +258,22 @@ function Sequencia({ meus, checkins, feitosNo, hoje }) {
   }, [checkins, meus]);
   const cont = (n, r) => (
     <div style={{ flex: 1, textAlign: 'center' }}>
-      <div style={{ fontSize: 20, fontWeight: 800, color: '#2A1D16' }}>{n}</div>
-      <div style={{ fontSize: 11, color: '#5A4632', fontWeight: 600 }}>{r}</div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: '#F3ECE0' }}>{n}</div>
+      <div style={{ fontSize: 11, color: 'rgba(243,236,224,0.72)', fontWeight: 600 }}>{r}</div>
     </div>
   );
   return (
-    <div style={{ borderRadius: 16, padding: 18, marginBottom: 12, background: 'linear-gradient(135deg, #D9B06A 0%, #C0794D 100%)', boxShadow: '0 10px 32px rgba(0,0,0,0.22)' }}>
+    <div style={{ borderRadius: 16, padding: 18, marginBottom: 12, background: 'linear-gradient(135deg, #7A5A42 0%, #4A3323 100%)', boxShadow: '0 10px 32px rgba(0,0,0,0.28)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ width: 56, height: 56, borderRadius: 999, background: 'rgba(255,255,255,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7A3B1E' }}>
+        <div style={{ width: 56, height: 56, borderRadius: 999, background: 'rgba(255,255,255,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#E9C79E' }}>
           <Icone name="flame" size={30} />
         </div>
         <div>
-          <div style={{ fontSize: 13, color: '#5A4632', fontWeight: 600 }}>Sequência atual</div>
-          <div style={{ fontSize: 30, fontWeight: 900, color: '#2A1D16', lineHeight: 1.1 }}>{seq} <span style={{ fontSize: 16, fontWeight: 700 }}>dias</span></div>
+          <div style={{ fontSize: 13, color: 'rgba(243,236,224,0.78)', fontWeight: 600 }}>Sequência atual</div>
+          <div style={{ fontSize: 30, fontWeight: 900, color: '#F8F2E7', lineHeight: 1.1 }}>{seq} <span style={{ fontSize: 16, fontWeight: 700 }}>dias</span></div>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(90,70,50,0.25)' }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,246,235,0.20)' }}>
         {cont(stats.ativos, 'Dias ativos')}
         {cont(stats.perfeitos, 'Dias perfeitos')}
         {cont(stats.checks, 'Checks')}
