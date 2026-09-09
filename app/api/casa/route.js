@@ -223,7 +223,17 @@ export async function POST(request) {
       const titulo = txt(body?.titulo, 80);
       if (!titulo) return NextResponse.json({ ok: false, erro: 'Escreva a tarefa.' }, { status: 400 });
       const meta = Math.min(99, Math.max(1, Math.round(num(body?.meta) || 1)));
-      casa.tarefas = [{ id: uid(), pessoa, titulo, meta, feitos: 0, criadoPor: usuario.nome, criadoEm: Date.now() }, ...casa.tarefas];
+      const data = /^\d{4}-\d{2}-\d{2}$/.test(body?.data) ? body.data : '';
+      const hora = /^\d{2}:\d{2}$/.test(body?.hora) ? body.hora : '';
+      casa.tarefas = [{ id: uid(), pessoa, titulo, meta, feitos: 0, data, hora, notificado: false, criadoPor: usuario.nome, criadoEm: Date.now() }, ...casa.tarefas];
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'tarefaQuando') {
+      const id = txt(body?.id, 40);
+      const data = /^\d{4}-\d{2}-\d{2}$/.test(body?.data) ? body.data : '';
+      const hora = /^\d{2}:\d{2}$/.test(body?.hora) ? body.hora : '';
+      casa.tarefas = casa.tarefas.map((t) => t.id === id ? { ...t, data, hora, notificado: false } : t);
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }

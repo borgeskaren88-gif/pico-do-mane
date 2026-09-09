@@ -97,6 +97,8 @@ export function Icone({ name, size = 20, stroke = 2 }) {
       return (<svg {...props}><rect x="3" y="3" width="6" height="18" rx="1.4" /><rect x="10.5" y="3" width="6" height="12" rx="1.4" /><rect x="18" y="3" width="3" height="8" rx="1.2" /></svg>);
     case 'plus':
       return (<svg {...props}><path d="M12 5v14M5 12h14" /></svg>);
+    case 'clock':
+      return (<svg {...props}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>);
     default:
       return null;
   }

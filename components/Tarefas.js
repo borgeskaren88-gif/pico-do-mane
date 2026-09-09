@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { C, Card, Label, inputStyle, Empty, Icone } from './ui';
+import { todayISO } from '../lib/util';
 
 // Quadro de tarefas da casa, uma coluna por pessoa. Aurora é a pet da casa :)
 const PESSOAS = [
@@ -16,6 +17,8 @@ export default function Tarefas({ usuario }) {
   const [pessoa, setPessoa] = useState('karen');
   const [titulo, setTitulo] = useState('');
   const [meta, setMeta] = useState('1');
+  const [cData, setCData] = useState('');
+  const [cHora, setCHora] = useState('');
   const [salvando, setSalvando] = useState(false);
 
   const aplicar = (j) => { if (j && j.ok) setTarefas(j.tarefas || []); };
@@ -43,8 +46,8 @@ export default function Tarefas({ usuario }) {
     e.preventDefault();
     if (!titulo.trim() || salvando) return;
     setSalvando(true);
-    await acao({ acao: 'tarefaAdd', pessoa, titulo: titulo.trim(), meta });
-    setTitulo(''); setMeta('1'); setSalvando(false);
+    await acao({ acao: 'tarefaAdd', pessoa, titulo: titulo.trim(), meta, data: cData, hora: cHora });
+    setTitulo(''); setMeta('1'); setCData(''); setCHora(''); setSalvando(false);
   };
 
   const porPessoa = useMemo(() => {
@@ -76,6 +79,12 @@ export default function Tarefas({ usuario }) {
             <button type="submit" disabled={salvando} style={{ background: C.accent, color: C.onAccent, border: 'none', borderRadius: 10, padding: '0 16px', height: 44, fontSize: 15, fontWeight: 700, cursor: 'pointer', flexShrink: 0, opacity: salvando ? 0.7 : 1 }}>+</button>
           </div>
           <div style={{ fontSize: 11, color: C.faint, marginTop: 6 }}>O número é quantas vezes a tarefa precisa ser feita (ex.: 6 = seis vezes).</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+            <span style={{ fontSize: 12, color: C.muted, display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}><Icone name="clock" size={14} /> Quando (opcional):</span>
+            <input type="date" value={cData} onChange={(e) => setCData(e.target.value)} style={{ ...inputStyle, padding: '8px 10px', WebkitAppearance: 'none', appearance: 'none', colorScheme: 'dark', minWidth: 0 }} />
+            <input type="time" value={cHora} onChange={(e) => setCHora(e.target.value)} disabled={!cData} title={cData ? '' : 'Escolha o dia primeiro'} style={{ ...inputStyle, padding: '8px 10px', WebkitAppearance: 'none', appearance: 'none', colorScheme: 'dark', width: 96, flexShrink: 0, opacity: cData ? 1 : 0.5 }} />
+          </div>
+          <div style={{ fontSize: 11, color: C.faint, marginTop: 5 }}>Se puser um dia, a pessoa recebe uma notificação de manhã. A hora é só pra lembrar.</div>
         </form>
       </Card>
 
@@ -108,16 +117,48 @@ function Coluna({ id, nome, cor, itens, acao }) {
   );
 }
 
+function quandoLabel(data, hoje) {
+  if (!data) return '';
+  const amanha = new Date(hoje + 'T12:00:00'); amanha.setDate(amanha.getDate() + 1);
+  const iso2 = amanha.toISOString().slice(0, 10);
+  if (data === hoje) return 'hoje';
+  if (data === iso2) return 'amanhã';
+  const [, m, d] = data.split('-');
+  return `${d}/${m}`;
+}
+
 function TarefaCard({ t, cor, acao }) {
   const feitos = Number(t.feitos) || 0;
   const pronta = feitos >= t.meta;
   const pct = t.meta > 0 ? Math.round((feitos / t.meta) * 100) : 0;
+  const hoje = todayISO();
+  const [edit, setEdit] = useState(false);
+  const [d, setD] = useState(t.data || '');
+  const [h, setH] = useState(t.hora || '');
+  const atrasada = t.data && !pronta && t.data < hoje;
+  const salvarQuando = () => { acao({ acao: 'tarefaQuando', id: t.id, data: d, hora: h }); setEdit(false); };
   return (
     <div style={{ background: C.glassBg, border: `1px solid ${pronta ? cor : C.glassBorder}`, borderRadius: 12, padding: '9px 9px 8px', position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
         <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, lineHeight: 1.25, color: pronta ? C.muted : C.text, textDecoration: pronta ? 'line-through' : 'none', wordBreak: 'break-word' }}>{t.titulo}</div>
         <button onClick={() => acao({ acao: 'tarefaDel', id: t.id })} title="Apagar" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
       </div>
+
+      {/* Quando: badge de data/hora (toque pra editar) */}
+      <button onClick={() => setEdit((v) => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 5, background: t.data ? `${cor}22` : 'transparent', border: `1px solid ${t.data ? `${cor}55` : C.line}`, borderRadius: 999, padding: '2px 7px', cursor: 'pointer', color: atrasada ? C.red : t.data ? C.text : C.faint, fontSize: 10.5, fontWeight: 700 }}>
+        <Icone name="clock" size={11} />
+        {t.data ? `${quandoLabel(t.data, hoje)}${t.hora ? ` ${t.hora}` : ''}${atrasada ? ' · atrasou' : ''}` : 'pôr hora'}
+      </button>
+      {edit && (
+        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <input type="date" value={d} onChange={(e) => setD(e.target.value)} style={{ ...inputStyle, padding: '7px 8px', fontSize: 12, colorScheme: 'dark', WebkitAppearance: 'none', appearance: 'none', minWidth: 0 }} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input type="time" value={h} onChange={(e) => setH(e.target.value)} disabled={!d} style={{ ...inputStyle, padding: '7px 8px', fontSize: 12, colorScheme: 'dark', WebkitAppearance: 'none', appearance: 'none', minWidth: 0, opacity: d ? 1 : 0.5 }} />
+            <button onClick={salvarQuando} style={{ background: cor, color: '#20180F', border: 'none', borderRadius: 8, padding: '0 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>ok</button>
+          </div>
+          {t.data && <button onClick={() => { setD(''); setH(''); acao({ acao: 'tarefaQuando', id: t.id, data: '', hora: '' }); setEdit(false); }} style={{ background: 'none', border: 'none', color: C.faint, fontSize: 11, cursor: 'pointer', padding: 0, textAlign: 'left' }}>tirar data</button>}
+        </div>
+      )}
       {/* barra de progresso com estrela */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 7 }}>
         <div style={{ flex: 1, minWidth: 0, height: 14, background: 'rgba(160,150,130,0.20)', borderRadius: 999, overflow: 'hidden', position: 'relative' }}>
