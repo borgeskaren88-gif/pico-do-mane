@@ -5,9 +5,10 @@ import { brl, num, fmtDate, uid, diaOperacional, fiadoDaVenda, abertoDaVenda, cl
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
-// O fiado do Pico funciona como fatura de cartão: fecha no fim do mês e se paga
-// do dia 01 ao 10 do mês seguinte. O que a pessoa consome depois do dia 1º já é
-// da próxima fatura. Quem faz essa conta é classificarFiado, em lib/util.
+// O fiado do Pico fecha no fim do mês e se paga do dia 01 ao 10 do seguinte.
+// Se a pessoa tem conta do mês passado em aberto, junta tudo o que ela deve
+// nessa cobrança; se ela só começou a consumir depois do dia 1º, fica toda pro
+// mês que vem. Quem faz essa conta é classificarFiado, em lib/util.
 const DIA_LIMITE = 10;
 
 // Link do WhatsApp com a mensagem pronta. Telefone brasileiro sem o 55 ganha o
@@ -178,10 +179,11 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
     for (const v of abertos) {
       const k = norm(v.nome) || `mesa:${v.mesa}:${v.id}`;
       let g = map.get(k);
-      if (!g) { g = { chave: k, nome: rotulo(v.nome, v.mesa), total: 0, agora: 0, proximo: 0, vendas: [] }; map.set(k, g); }
+      if (!g) { g = { chave: k, nome: rotulo(v.nome, v.mesa), total: 0, agora: 0, proximo: 0, doMesPassado: 0, desteMes: 0, vendas: [] }; map.set(k, g); }
       const aberto = abertoDaVenda(v);
       g.total += aberto;
       if (venceAgora(v)) g.agora += aberto; else g.proximo += aberto;
+      if (idade.atrasada.get(v.id)) g.doMesPassado += aberto; else g.desteMes += aberto;
       g.vendas.push(v);
     }
     for (const g of map.values()) {
@@ -208,15 +210,15 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
           cor={totalAgora > 0 ? (dentroDoPrazo ? C.amber : C.red) : C.faint}
           sub={totalAgora > 0
             ? (dentroDoPrazo
-              ? (faltamDias > 0 ? `consumo até o fim do mês passado · faltam ${faltamDias} dia(s)` : 'consumo até o fim do mês passado · o prazo acaba hoje')
-              : 'consumo até o fim do mês passado · o prazo já passou')
-            : 'a fatura fechada está toda paga'}
+              ? (faltamDias > 0 ? `quem tem conta do mês passado · faltam ${faltamDias} dia(s)` : 'quem tem conta do mês passado · o prazo acaba hoje')
+              : 'quem tem conta do mês passado · o prazo já passou')
+            : 'ninguém com conta do mês passado em aberto'}
         />
         <KPI
           titulo="Cai só mês que vem"
           valor={brl(totalProximo)}
           cor={totalProximo > 0 ? C.accent2 : C.faint}
-          sub={`consumo deste mês · fecha no fim do mês e vence dia 01 a ${DIA_LIMITE}`}
+          sub={`quem só consumiu depois que o mês virou · vence dia 01 a ${DIA_LIMITE} do mês que vem`}
         />
       </div>
       <KPI titulo="Total em aberto" valor={brl(totalDevido)} cor={totalDevido > 0 ? C.text : C.faint} sub={`${grupos.length} cliente(s) · ${abertos.length} fiado(s)`} />
@@ -271,25 +273,19 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                     <div style={{ fontSize: 11, color: C.faint, marginTop: 6 }}>sem limite cadastrado</div>
                   )}
 
-                  {/* Quanto desse total já venceu e quanto ainda está correndo. */}
-                  {g.agora > 0.005 && g.proximo > 0.005 && (
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                      <span style={{ fontSize: 11.5, fontWeight: 800, color: dentroDoPrazo ? C.amber : C.red, border: `1px solid ${dentroDoPrazo ? C.amber : C.red}`, borderRadius: 999, padding: '2px 9px' }}>
-                        {brl(g.agora)} {dentroDoPrazo ? `até dia ${DIA_LIMITE}` : 'vencido'}
-                      </span>
-                      <span style={{ fontSize: 11.5, fontWeight: 800, color: C.accent2, border: `1px solid ${C.accent2}`, borderRadius: 999, padding: '2px 9px' }}>
-                        {brl(g.proximo)} da próxima fatura
-                      </span>
+                  {/* Este cliente entra na cobrança de agora ou fica pra próxima? */}
+                  {g.agora > 0.005 ? (
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: dentroDoPrazo ? C.amber : C.red, marginTop: 8, lineHeight: 1.45 }}>
+                      {dentroDoPrazo ? `Cobrar até o dia ${DIA_LIMITE}` : `Vencido — passou do dia ${DIA_LIMITE}`}
+                      {g.desteMes > 0.005 && (
+                        <span style={{ fontWeight: 500, color: C.faint }}>
+                          {' '}· {brl(g.doMesPassado)} do mês passado + {brl(g.desteMes)} deste mês, tudo junto
+                        </span>
+                      )}
                     </div>
-                  )}
-                  {g.agora > 0.005 && g.proximo <= 0.005 && (
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: dentroDoPrazo ? C.amber : C.red, marginTop: 8 }}>
-                      {dentroDoPrazo ? `Tudo vence agora, até o dia ${DIA_LIMITE}.` : `Passou do dia ${DIA_LIMITE} — está vencido.`}
-                    </div>
-                  )}
-                  {g.proximo > 0.005 && g.agora <= 0.005 && (
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: C.accent2, marginTop: 8 }}>
-                      Consumo deste mês{g.acertou ? ` (já acertou a fatura anterior em ${fmtDate(g.ultimoPag)})` : ''} — só paga do dia 01 ao {DIA_LIMITE} do mês que vem.
+                  ) : (
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: C.accent2, marginTop: 8, lineHeight: 1.45 }}>
+                      Só consumiu depois que o mês virou{g.acertou ? ` (acertou a conta em ${fmtDate(g.ultimoPag)})` : ''} — paga do dia 01 ao {DIA_LIMITE} do mês que vem.
                     </div>
                   )}
 
