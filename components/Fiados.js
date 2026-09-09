@@ -26,6 +26,18 @@ const msgCobranca = (nome, total) => (
 
 const FONTE_ATRASADO = 'Recebimento Atrasado';
 
+// Baixa sem entrar dinheiro: a conta some da lista de quem deve, mas nada entra
+// no caixa nem vira receita. É o caso do consumo de funcionário que foi
+// descontado do salário, da cortesia da casa e do que a gente já sabe que não
+// vem mais. Sempre com motivo, pra depois dar pra explicar o que aconteceu.
+const MOTIVOS_SEM = [
+  'Desconto no salário',
+  'Cortesia da casa',
+  'Troca / acerto',
+  'Lançado por engano',
+  'Não vou receber (perda)',
+];
+
 export default function Fiados({ onMudou, clientes = [], receitas = null, onReceitas = null }) {
   const [vendas, setVendas] = useState([]);
   const [carregado, setCarregado] = useState(false);
@@ -37,7 +49,10 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
   const [pagarAberto, setPagarAberto] = useState({}); // { [chave]: true } — abre o campo "receber valor"
   const [valorPago, setValorPago] = useState({}); // { [chave]: 'texto do valor' }
   const [caixaAberto, setCaixaAberto] = useState(null); // null=ainda não sei, true/false
-  const [ultima, setUltima] = useState(null); // última baixa: { ref, nome, valor } — pra desfazer
+  const [ultima, setUltima] = useState(null); // última baixa: { ref, nome, valor, semDinheiro, motivo } — pra desfazer
+  const [semAberto, setSemAberto] = useState({}); // { [chave]: true } — painel "baixar sem dinheiro"
+  const [motivoSem, setMotivoSem] = useState({}); // { [chave]: 'Desconto no salário' }
+  const [valorSem, setValorSem] = useState({}); // { [chave]: 'texto do valor' }
 
   const carregar = useCallback(async () => {
     try {
@@ -116,7 +131,16 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
     const j = await acao({ acao: 'receber', id, ref });
     if (j && j.ok) { lancarReceita(ref, nome, num(j.aplicado) || valor); setUltima({ ref, nome, valor: num(j.aplicado) || valor }); }
   };
-  const excluir = (id) => { if (typeof window !== 'undefined' && !window.confirm('Excluir este fiado? Não vai mais aparecer nem contar em lugar nenhum.')) return; acao({ acao: 'excluir', id }); };
+  // Excluir apaga a VENDA inteira — some também do histórico do dia em que foi
+  // feita. Só serve pra comanda lançada por engano. Pra tirar a dívida sem
+  // mexer no passado, o certo é "Baixar sem dinheiro".
+  const excluir = (id) => {
+    if (typeof window !== 'undefined' && !window.confirm(
+      'Excluir apaga a comanda INTEIRA — some da lista de fiados e também do movimento do dia em que ela foi feita. Isso não dá pra desfazer.\n\n'
+      + 'Se o que você quer é só tirar a dívida (desconto no salário, cortesia), volte e use "Baixar sem dinheiro".\n\n'
+      + 'Excluir mesmo assim?')) return;
+    acao({ acao: 'excluir', id });
+  };
   const toggleItens = (id) => setItensAbertos((m) => ({ ...m, [id]: !m[id] }));
 
   // Recebe um VALOR do cliente e abate dos fiados dele (do mais antigo pro mais
@@ -136,6 +160,25 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
     }
     setValorPago((m) => ({ ...m, [g.chave]: '' }));
     setPagarAberto((m) => ({ ...m, [g.chave]: false }));
+  };
+
+  // Tirar a dívida da lista SEM entrar dinheiro (desconto no salário, cortesia,
+  // engano). Usa a mesma baixa do "receber valor", só que marcada — então não
+  // entra no caixa, não vira receita e o Desfazer funciona igual.
+  const baixarSemDinheiro = async (g) => {
+    const motivo = motivoSem[g.chave] || MOTIVOS_SEM[0];
+    const digitado = String(valorSem[g.chave] || '').trim();
+    const valor = digitado ? num(digitado) : g.total;
+    if (!(valor > 0)) { setErro('Digite um valor maior que zero.'); return; }
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Baixar ${brl(valor)} de ${g.nome} como "${motivo}"?\n\n`
+      + 'A conta sai da lista de quem deve e NÃO entra dinheiro nenhum: não vai pro caixa nem pras receitas.\n\n'
+      + 'Se errar, dá pra desfazer no aviso verde que aparece em cima.')) return;
+    const ref = uid();
+    const j = await acao({ acao: 'receberValor', ids: g.vendas.map((v) => v.id), valor, ref, semDinheiro: true, motivo });
+    if (j && j.ok) setUltima({ ref, nome: g.nome, valor: num(j.aplicado) || valor, semDinheiro: true, motivo });
+    setValorSem((m) => ({ ...m, [g.chave]: '' }));
+    setSemAberto((m) => ({ ...m, [g.chave]: false }));
   };
 
   const limiteDe = (nome) => { const c = clientes.find((x) => norm(x.nome) === norm(nome)); return c ? num(c.limite) : 0; };
@@ -226,7 +269,9 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
       {ultima && (
         <div style={{ background: C.panel2, border: `1px solid ${C.green}`, borderRadius: 10, padding: '11px 14px', marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, color: C.text, lineHeight: 1.45, flex: 1, minWidth: 180 }}>
-            Recebi <b>{brl(ultima.valor)}</b> de <b>{ultima.nome}</b> — já lancei em Receitas como <b>Recebimento Atrasado</b>.
+            {ultima.semDinheiro
+              ? <>Baixei <b>{brl(ultima.valor)}</b> de <b>{ultima.nome}</b> como <b>{ultima.motivo}</b> — saiu da lista e <b>não entrou dinheiro</b>.</>
+              : <>Recebi <b>{brl(ultima.valor)}</b> de <b>{ultima.nome}</b> — já lancei em Receitas como <b>Recebimento Atrasado</b>.</>}
           </span>
           <Btn kind="ghost" small onClick={desfazerUltima} disabled={busy}>Desfazer</Btn>
           <button onClick={() => setUltima(null)} aria-label="Fechar aviso" style={{ background: 'none', border: 'none', color: C.faint, fontSize: 18, lineHeight: 1, cursor: 'pointer', padding: '0 2px' }}>×</button>
@@ -296,6 +341,8 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                         <Btn kind="ok" small onClick={() => setPagarAberto((m) => ({ ...m, [g.chave]: true }))} disabled={busy}>Receber valor</Btn>
                         {/* Cobrança pronta: abre a conversa da pessoa no WhatsApp com o texto escrito. */}
                         <Btn kind="ghost" small onClick={() => cobrar(g)}>Cobrar no WhatsApp</Btn>
+                        {/* Tirar da lista sem entrar dinheiro (desconto no salário, cortesia…). */}
+                        <Btn kind="ghost" small onClick={() => setSemAberto((m) => ({ ...m, [g.chave]: true }))} disabled={busy}>Baixar sem dinheiro</Btn>
                       </div>
                     ) : (
                       <div style={{ background: C.panel2, borderRadius: 10, padding: 10 }}>
@@ -314,6 +361,46 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                           <button onClick={() => setValorPago((m) => ({ ...m, [g.chave]: String(g.total).replace('.', ',') }))} style={{ background: 'none', border: 'none', color: C.accent, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0 }}>quitar tudo ({brl(g.total)})</button>
                           <button onClick={() => { setPagarAberto((m) => ({ ...m, [g.chave]: false })); setValorPago((m) => ({ ...m, [g.chave]: '' })); }} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0 }}>cancelar</button>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Baixa sem entrar dinheiro: escolhe o motivo e quanto tirar. */}
+                    {semAberto[g.chave] && (
+                      <div style={{ background: C.panel2, borderRadius: 10, padding: 10, marginTop: 8 }}>
+                        <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>
+                          Tirar a conta de <b>{g.nome}</b> da lista <b>sem entrar dinheiro</b>. Por quê?
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                          {MOTIVOS_SEM.map((m) => {
+                            const ativo = (motivoSem[g.chave] || MOTIVOS_SEM[0]) === m;
+                            return (
+                              <button
+                                key={m}
+                                onClick={() => setMotivoSem((x) => ({ ...x, [g.chave]: m }))}
+                                style={{
+                                  background: ativo ? C.accent : C.panel, color: ativo ? '#0b0b0c' : C.text,
+                                  border: `1px solid ${ativo ? C.accent : C.line}`, borderRadius: 999,
+                                  padding: '6px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                                }}
+                              >{m}</button>
+                            );
+                          })}
+                        </div>
+                        <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Quanto tirar? (vazio = tudo, {brl(g.total)})</div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input
+                            type="text" inputMode="decimal" placeholder={`R$ ${brl(g.total).replace('R$ ', '')} (tudo)`}
+                            value={valorSem[g.chave] || ''}
+                            onChange={(e) => setValorSem((m) => ({ ...m, [g.chave]: e.target.value }))}
+                            onKeyDown={(e) => { if (e.key === 'Enter') baixarSemDinheiro(g); }}
+                            style={{ flex: 1, minWidth: 0, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 9, padding: '9px 12px', color: C.text, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}
+                          />
+                          <Btn kind="danger" small onClick={() => baixarSemDinheiro(g)} disabled={busy}>Baixar</Btn>
+                        </div>
+                        <div style={{ fontSize: 11, color: C.faint, marginTop: 8, lineHeight: 1.45 }}>
+                          Não vai pro caixa nem pras receitas — some só da lista de quem deve. Dá pra desfazer logo depois.
+                        </div>
+                        <button onClick={() => { setSemAberto((m) => ({ ...m, [g.chave]: false })); setValorSem((m) => ({ ...m, [g.chave]: '' })); }} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0, marginTop: 8 }}>cancelar</button>
                       </div>
                     )}
                   </div>
@@ -373,17 +460,27 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
           </button>
           {verPagos && (
             <div style={{ marginTop: 10 }}>
-              {pagos.slice(0, 40).map((v) => (
+              {pagos.slice(0, 40).map((v) => {
+                const semGrana = !!v.semDinheiro || (Array.isArray(v.recebimentos) && v.recebimentos.some((r) => r && r.semDinheiro));
+                return (
                 <Card key={v.id} style={{ marginBottom: 6, padding: '10px 14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: C.faint }}>{rotulo(v.nome, v.mesa)}</div>
-                      <div style={{ fontSize: 12, color: C.faint }}>Recebido {v.pagoEm ? fmtDate(v.pagoEm) : ''} · compra {fmtDate(v.data)}</div>
+                      <div style={{ fontSize: 12, color: C.faint }}>
+                        {semGrana ? 'Baixado' : 'Recebido'} {v.pagoEm ? fmtDate(v.pagoEm) : ''} · compra {fmtDate(v.data)}
+                      </div>
+                      {semGrana && (
+                        <div style={{ fontSize: 11, color: C.amber, fontWeight: 700, marginTop: 2 }}>
+                          sem entrada de dinheiro{v.formaRecebida ? ` · ${v.formaRecebida}` : ''}
+                        </div>
+                      )}
                     </div>
-                    <div style={{ fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(fiadoDaVenda(v))}</div>
+                    <div style={{ fontWeight: 700, color: semGrana ? C.faint : C.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(fiadoDaVenda(v))}</div>
                   </div>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
