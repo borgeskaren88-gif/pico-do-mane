@@ -307,7 +307,8 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
             grupos.map((g) => {
               const pct = g.limite > 0 ? Math.min(1, g.total / g.limite) : 0;
               const noLimite = g.limite > 0 && g.total >= g.limite - 0.005;
-              const cor = noLimite ? C.red : C.amber;
+              // Azul enquanto o fiado está dentro do limite; vermelho ao encostar nele.
+              const cor = noLimite ? C.red : C.accent;
               return (
                 <Card key={g.chave} style={{ marginBottom: 10, padding: 14 }}>
                   {/* Clicar no nome abre/fecha o histórico (datas + consumo) do cliente. */}
@@ -457,7 +458,7 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                               )}
                             </div>
                             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                              <div style={{ fontWeight: 800, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{brl(abertoDaVenda(v))}</div>
+                              <div style={{ fontWeight: 800, color: C.accent, fontVariantNumeric: 'tabular-nums' }}>{brl(abertoDaVenda(v))}</div>
                               {num(v.abatido) > 0.005 && <div style={{ fontSize: 11, color: C.green, fontVariantNumeric: 'tabular-nums' }}>já pagou {brl(num(v.abatido))}</div>}
                             </div>
                           </div>
