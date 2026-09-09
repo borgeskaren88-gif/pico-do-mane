@@ -1,9 +1,13 @@
 'use client';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { C, Card, Label, inputStyle, Empty, Icone } from './ui';
-import { todayISO, fmtDate, MESES_LONGO } from '../lib/util';
+import { todayISO, fmtDate, MESES_LONGO, CORES_HABITO } from '../lib/util';
 
 const serif = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif";
+// Papel dos post-its: creme com tinta café — cara de recadinho de verdade, e
+// combina com a paleta linho/café do app tanto no tema claro quanto no escuro.
+const PAPEL = '#EFE7D6', INK = '#3A2C20', INK_SOFT = '#6E5B49';
+const TILTS = [-2.2, 1.6, -1.4, 2.2, -1.8, 1.2];
 const DIAS_SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
 
 // Data por extenso pra dar o ar de "diário": "quarta-feira, 9 de setembro de 2026".
@@ -125,21 +129,56 @@ function Notas({ notas, acao }) {
       </Card>
 
       {notas.length === 0 ? <Empty>Nenhuma nota ainda.<br />Guarde uma ideia, um recado, um desabafo.</Empty> : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {notas.map((n) => (
-            <Card key={n.id} style={{ padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {n.titulo && <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, marginBottom: n.texto ? 4 : 0 }}>{n.titulo}</div>}
-                  {n.texto && <div style={{ fontSize: 14, color: C.muted, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{n.texto}</div>}
-                </div>
-                <button onClick={() => editar(n)} title="Editar" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', padding: 4 }}><Icone name="pencil" size={16} /></button>
-                <button onClick={() => { if (window.confirm('Apagar esta nota?')) acao({ acao: 'notaDel', id: n.id }); }} title="Apagar" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
-              </div>
-            </Card>
+        <div style={{ paddingTop: 6 }}>
+          {notas.map((n, i) => (
+            <NotaCard key={n.id} n={n} i={i} onEdit={() => editar(n)} onDel={() => { if (window.confirm('Apagar esta nota?')) acao({ acao: 'notaDel', id: n.id }); }} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Tachinha (pushpin) colorida, com brilho e sombrinha, igual à inspiração.
+function Pin({ cor }) {
+  return (
+    <svg width="28" height="32" viewBox="0 0 28 32" style={{ display: 'block' }} aria-hidden="true">
+      <ellipse cx="14" cy="29" rx="3.2" ry="1.4" fill="rgba(0,0,0,0.22)" />
+      <line x1="14" y1="12" x2="14" y2="29" stroke="#6E5B49" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="14" cy="10" r="8.5" fill={cor} />
+      <circle cx="14" cy="10" r="8.5" fill="url(#pin-sheen)" />
+      <circle cx="10.6" cy="6.6" r="2.6" fill="#FFFFFF" opacity="0.55" />
+      <defs>
+        <radialGradient id="pin-sheen" cx="0.35" cy="0.3" r="0.8">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.35" />
+          <stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="1" stopColor="#000000" stopOpacity="0.18" />
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
+
+// Nota como post-it espetado: papel creme, número, leve inclinação e a tachinha.
+function NotaCard({ n, i, onEdit, onDel }) {
+  const cor = CORES_HABITO[i % CORES_HABITO.length];
+  const tilt = TILTS[i % TILTS.length];
+  const shift = i % 2 === 0 ? -8 : 8;
+  return (
+    <div style={{ position: 'relative', marginBottom: 26, paddingTop: 6 }}>
+      {i > 0 && <div style={{ width: 0, height: 14, borderLeft: '2px dashed rgba(255,246,235,0.20)', margin: '-14px auto 8px', transform: `translateX(${shift / 2}px)` }} />}
+      <div style={{ transform: `rotate(${tilt}deg) translateX(${shift}px)`, transformOrigin: 'top center', position: 'relative', background: PAPEL, borderRadius: 14, boxShadow: '0 14px 30px rgba(0,0,0,0.30)', backgroundImage: 'repeating-linear-gradient(180deg, transparent, transparent 27px, rgba(110,91,73,0.10) 28px)' }}>
+        <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}><Pin cor={cor} /></div>
+        <div style={{ padding: '16px 16px 14px' }}>
+          <div style={{ fontFamily: serif, fontSize: 15, fontWeight: 700, color: cor, letterSpacing: '.02em' }}>{String(i + 1).padStart(2, '0')}</div>
+          {n.titulo && <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, color: INK, margin: '2px 0 4px', lineHeight: 1.2 }}>{n.titulo}</div>}
+          {n.texto && <div style={{ fontSize: 14, color: INK_SOFT, whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{n.texto}</div>}
+          <div style={{ display: 'flex', gap: 14, marginTop: 12, justifyContent: 'flex-end' }}>
+            <button onClick={onEdit} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: INK_SOFT, cursor: 'pointer', padding: 0, fontSize: 13, fontWeight: 600 }}><Icone name="pencil" size={15} /> editar</button>
+            <button onClick={onDel} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: INK_SOFT, cursor: 'pointer', padding: 0, fontSize: 13, fontWeight: 600 }}>apagar</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
