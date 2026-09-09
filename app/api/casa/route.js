@@ -24,10 +24,19 @@ const txt = (v, max) => String(v == null ? '' : v).slice(0, max).trim();
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const arr = (v) => (Array.isArray(v) ? v : []);
 
+// Pessoas do quadro de tarefas. Vêm com esses padrões, mas os nomes (e a lista)
+// podem ser editados. Os ids ficam fixos pra não quebrar as tarefas já criadas.
+const PESSOAS_PADRAO = [
+  { id: 'mariele', nome: 'Mariele', cor: '#88937B' },
+  { id: 'karen', nome: 'Karen', cor: '#9A7BA0' },
+  { id: 'aurora', nome: 'Aurora', cor: '#D3A45C' },
+];
+const pessoasDe = (casa) => (casa.pessoas && casa.pessoas.length ? casa.pessoas : PESSOAS_PADRAO.map((p) => ({ ...p })));
+
 async function lerCasa(sb) {
   const { data } = await sb.from('casa_dados').select('valor').eq('chave', CHAVE).maybeSingle();
   const v = data?.valor || {};
-  return { habitos: arr(v.habitos), checkins: (v.checkins && typeof v.checkins === 'object') ? v.checkins : {}, lista: arr(v.lista), cartoes: arr(v.cartoes), compras: arr(v.compras), pagamentos: (v.pagamentos && typeof v.pagamentos === 'object') ? v.pagamentos : {}, tarefas: arr(v.tarefas), humores: arr(v.humores) };
+  return { habitos: arr(v.habitos), checkins: (v.checkins && typeof v.checkins === 'object') ? v.checkins : {}, lista: arr(v.lista), cartoes: arr(v.cartoes), compras: arr(v.compras), pagamentos: (v.pagamentos && typeof v.pagamentos === 'object') ? v.pagamentos : {}, tarefas: arr(v.tarefas), humores: arr(v.humores), pessoas: arr(v.pessoas) };
 }
 
 async function gravarCasa(sb, casa) {
@@ -217,9 +226,46 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, ...casa });
     }
 
-    // ---- Tarefas (quadro compartilhado: Mariele / Karen / Aurora) ----
+    // ---- Pessoas do quadro (nomes editáveis) ----
+    if (acao === 'pessoaRenomear') {
+      const id = txt(body?.id, 40);
+      const nome = txt(body?.nome, 40);
+      if (!nome) return NextResponse.json({ ok: false, erro: 'Dê um nome.' }, { status: 400 });
+      casa.pessoas = pessoasDe(casa).map((p) => p.id === id ? { ...p, nome } : p);
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'pessoaAdd') {
+      const nome = txt(body?.nome, 40);
+      if (!nome) return NextResponse.json({ ok: false, erro: 'Dê um nome.' }, { status: 400 });
+      const lista = pessoasDe(casa);
+      const cor = CORES_HABITO.includes(body?.cor) ? body.cor : CORES_HABITO[lista.length % CORES_HABITO.length];
+      casa.pessoas = [...lista, { id: uid(), nome, cor }];
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'pessoaCor') {
+      const id = txt(body?.id, 40);
+      const cor = CORES_HABITO.includes(body?.cor) ? body.cor : CORES_HABITO[0];
+      casa.pessoas = pessoasDe(casa).map((p) => p.id === id ? { ...p, cor } : p);
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'pessoaDel') {
+      const id = txt(body?.id, 40);
+      const lista = pessoasDe(casa);
+      if (lista.length <= 1) return NextResponse.json({ ok: false, erro: 'Deixe pelo menos uma pessoa.' }, { status: 400 });
+      casa.pessoas = lista.filter((p) => p.id !== id);
+      casa.tarefas = casa.tarefas.filter((t) => t.pessoa !== id); // tira as tarefas dela
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+
+    // ---- Tarefas (quadro compartilhado, uma coluna por pessoa) ----
     if (acao === 'tarefaAdd') {
-      const pessoa = ['mariele', 'karen', 'aurora'].includes(body?.pessoa) ? body.pessoa : 'karen';
+      const lista = pessoasDe(casa);
+      const pid = txt(body?.pessoa, 40);
+      const pessoa = lista.some((p) => p.id === pid) ? pid : lista[0].id;
       const titulo = txt(body?.titulo, 80);
       if (!titulo) return NextResponse.json({ ok: false, erro: 'Escreva a tarefa.' }, { status: 400 });
       const meta = Math.min(99, Math.max(1, Math.round(num(body?.meta) || 1)));
@@ -234,6 +280,15 @@ export async function POST(request) {
       const data = /^\d{4}-\d{2}-\d{2}$/.test(body?.data) ? body.data : '';
       const hora = /^\d{2}:\d{2}$/.test(body?.hora) ? body.hora : '';
       casa.tarefas = casa.tarefas.map((t) => t.id === id ? { ...t, data, hora, notificado: false } : t);
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'tarefaRenomear') {
+      const id = txt(body?.id, 40);
+      const titulo = txt(body?.titulo, 80);
+      if (!titulo) return NextResponse.json({ ok: false, erro: 'Escreva a tarefa.' }, { status: 400 });
+      const meta = body?.meta != null ? Math.min(99, Math.max(1, Math.round(num(body?.meta) || 1))) : undefined;
+      casa.tarefas = casa.tarefas.map((t) => t.id === id ? { ...t, titulo, ...(meta != null ? { meta, feitos: Math.min(t.feitos, meta) } : {}) } : t);
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }
