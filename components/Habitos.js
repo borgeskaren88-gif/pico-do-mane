@@ -78,6 +78,12 @@ export default function Habitos({ usuario }) {
   }, [habitos, usuario.nome]);
 
   const meus = useMemo(() => habitos.filter((h) => h.usuario === usuario.nome), [habitos, usuario.nome]);
+  // Mapa humor por pessoa: humorDia[nome][data] = humor (pro calendário).
+  const humorDia = useMemo(() => {
+    const m = {};
+    for (const h of humores) { (m[h.usuario] = m[h.usuario] || {})[h.data] = h.humor; }
+    return m;
+  }, [humores]);
   const hoje = todayISO();
   const feitosNo = useCallback((dia, hset) => hset.filter((h) => checkins[`${h.id}|${dia}`]).length, [checkins]);
 
@@ -138,7 +144,8 @@ export default function Habitos({ usuario }) {
               <button onClick={() => setMes(passoMes(mes, 1))} style={miniNav}>›</button>
             </div>
             <EstatLinhaMes habitos={meus} feitosNo={feitosNo} mes={mes} />
-            <Grade mes={mes} habitos={meus} feitosNo={feitosNo} corDe={corDe} diaSel={diaSel} onDia={setDiaSel} hoje={hoje} />
+            <Grade mes={mes} habitos={meus} feitosNo={feitosNo} corDe={corDe} diaSel={diaSel} onDia={setDiaSel} hoje={hoje} humorPorDia={humorDia[usuario.nome]} />
+            <div style={{ fontSize: 11, color: C.faint, marginTop: 8, textAlign: 'center' }}>A carinha de cada dia é o humor que você registrou lá em cima.</div>
           </Card>
 
           {/* ===== Melhores dias da semana (do mês) ===== */}
@@ -179,7 +186,7 @@ export default function Habitos({ usuario }) {
               <SecTitle>Hábitos de {g.pessoa}</SecTitle>
               <Card>
                 <div style={{ marginBottom: 12 }}><EstatLinhaMes habitos={g.itens} feitosNo={feitosNo} mes={mes} /></div>
-                <Grade mes={mes} habitos={g.itens} feitosNo={feitosNo} corDe={corDe} hoje={hoje} />
+                <Grade mes={mes} habitos={g.itens} feitosNo={feitosNo} corDe={corDe} hoje={hoje} humorPorDia={humorDia[g.pessoa]} />
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
                   {g.itens.map((h) => (
                     <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
@@ -246,11 +253,37 @@ function EstaSemana({ meus, feitosNo, hoje }) {
 function Humor({ humores, usuario, hoje, acao }) {
   const meu = humores.find((h) => h.usuario === usuario.nome && h.data === hoje);
   const outros = humores.filter((h) => h.data === hoje && h.usuario !== usuario.nome);
-  const escolher = (k) => acao(meu && meu.humor === k ? { acao: 'humorDel', data: hoje } : { acao: 'humorSet', humor: k, data: hoje });
+  // Começa minimizado se você já registrou hoje; aberto se ainda não.
+  const [aberto, setAberto] = useState(!meu);
+  const escolher = (k) => {
+    if (meu && meu.humor === k) { acao({ acao: 'humorDel', data: hoje }); setAberto(true); }
+    else { acao({ acao: 'humorSet', humor: k, data: hoje }); setAberto(false); }
+  };
+
+  // Minimizado: uma barrinha com o humor de hoje e um "mudar".
+  if (!aberto) {
+    return (
+      <Card style={{ marginBottom: 12, padding: '12px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+            {meu ? <HumorMini nome="Você" humor={meu.humor} /> : <div style={{ fontSize: 13, color: C.muted }}>Humor de hoje</div>}
+            {outros.map((h) => <HumorMini key={h.usuario} nome={h.usuario} humor={h.humor} />)}
+          </div>
+          <button onClick={() => setAberto(true)} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.accent, cursor: 'pointer', fontSize: 12, fontWeight: 700, borderRadius: 999, padding: '6px 12px', flexShrink: 0 }}>{meu ? 'mudar' : 'registrar'}</button>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Como você está se sentindo?</div>
-      <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>{meu ? 'Toque de novo pra tirar. ' : ''}Neste momento…</div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Como você está se sentindo?</div>
+          <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>{meu ? 'Toque de novo pra tirar. ' : ''}Neste momento…</div>
+        </div>
+        {meu && <button onClick={() => setAberto(false)} title="Minimizar" style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4, flexShrink: 0 }}>▾</button>}
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
         {HUMORES.map(([k, label]) => {
           const on = meu && meu.humor === k;
@@ -263,9 +296,8 @@ function Humor({ humores, usuario, hoje, acao }) {
           );
         })}
       </div>
-      {(meu || outros.length > 0) && (
+      {outros.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.hair}` }}>
-          {meu && <HumorMini nome="Você" humor={meu.humor} />}
           {outros.map((h) => <HumorMini key={h.usuario} nome={h.usuario} humor={h.humor} />)}
         </div>
       )}
@@ -430,7 +462,7 @@ function EstatLinhaMes({ habitos, feitosNo, mes }) {
   );
 }
 
-function Grade({ mes, habitos, feitosNo, corDe, diaSel, onDia, hoje }) {
+function Grade({ mes, habitos, feitosNo, corDe, diaSel, onDia, hoje, humorPorDia }) {
   const dias = useMemo(() => diasDoMes(mes), [mes]);
   const editavel = typeof onDia === 'function';
   return (
@@ -444,17 +476,19 @@ function Grade({ mes, habitos, feitosNo, corDe, diaSel, onDia, hoje }) {
         const ehHoje = iso === hoje;
         const selec = iso === diaSel;
         const perfeito = habitos.length > 0 && cores.length === habitos.length;
+        const humor = humorPorDia ? humorPorDia[iso] : null;
         return (
           <button key={iso} onClick={() => editavel && onDia(iso)} disabled={!editavel}
             style={{
               aspectRatio: '1', borderRadius: 10, cursor: editavel ? 'pointer' : 'default', padding: 2,
               border: `1.5px solid ${ehHoje ? C.accent : perfeito ? C.green : 'transparent'}`,
               background: selec ? 'rgba(160,150,130,0.18)' : 'transparent',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
             }}>
-            <span style={{ fontSize: 13, fontWeight: ehHoje ? 800 : 500, color: C.text }}>{Number(iso.slice(8))}</span>
-            <span style={{ display: 'flex', gap: 2, height: 6, alignItems: 'center' }}>
-              {cores.slice(0, 4).map((c, k) => <span key={k} style={{ width: 6, height: 6, borderRadius: 999, background: c }} />)}
+            <span style={{ fontSize: 11, fontWeight: ehHoje ? 800 : 500, color: C.text, lineHeight: 1 }}>{Number(iso.slice(8))}</span>
+            {humor && <Carinha humor={humor} size={19} />}
+            <span style={{ display: 'flex', gap: 2, height: humor ? 4 : 6, alignItems: 'center' }}>
+              {cores.slice(0, 4).map((c, k) => <span key={k} style={{ width: humor ? 4 : 6, height: humor ? 4 : 6, borderRadius: 999, background: c }} />)}
               {cores.length > 4 && <span style={{ fontSize: 8, color: C.muted }}>+</span>}
             </span>
           </button>
