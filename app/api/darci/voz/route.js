@@ -56,16 +56,18 @@ export async function POST(request) {
         }),
       });
     } else {
-      r = await fetch('https://api.openai.com/v1/audio/speech', {
+      const voz = process.env.OPENAI_TTS_VOICE || 'onyx';
+      const pedir = (modelo) => fetch('https://api.openai.com/v1/audio/speech', {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
-          voice: process.env.OPENAI_TTS_VOICE || 'onyx',
-          input: texto,
-          response_format: 'mp3',
-        }),
+        body: JSON.stringify({ model: modelo, voice: voz, input: texto, response_format: 'mp3' }),
       });
+      // Tenta primeiro o modelo mais novo (fala melhor). Se a conta dela ainda
+      // não tiver acesso a ele, cai no antigo, que existe pra todo mundo — em
+      // vez de a dona ficar sem voz nenhuma sem entender por quê.
+      const preferido = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
+      r = await pedir(preferido);
+      if (!r.ok && preferido !== 'tts-1') r = await pedir('tts-1');
     }
     if (!r.ok) {
       const detalhe = await r.text().catch(() => '');
