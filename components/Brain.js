@@ -51,6 +51,7 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
   const [novaTarefa, setNovaTarefa] = useState('');
   const [novaTarefaData, setNovaTarefaData] = useState('');
   const [verConcluidas, setVerConcluidas] = useState(false);
+  const [chkAberto, setChkAberto] = useState(false); // fechada por padrão: só o resumo
   const tarefasAbertas = tarefas.filter((t) => !t.feito).sort((a, b) => {
     if (a.data && b.data) return a.data.localeCompare(b.data);
     if (a.data) return -1;
@@ -67,6 +68,14 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
   const toggleTarefa = (id) => onTarefas(tarefas.map((t) => (t.id === id ? { ...t, feito: !t.feito, feitoEm: !t.feito ? Date.now() : null } : t)));
   const removerTarefa = (id) => onTarefas(tarefas.filter((t) => t.id !== id));
   const limparConcluidas = () => onTarefas(tarefas.filter((t) => !t.feito));
+  // Resumo pra tela fechada: o quanto já foi feito, a próxima e a cor do aviso
+  // (vermelho se tem coisa atrasada, amarelo se vence hoje).
+  const totalChk = tarefas.length;
+  const pctChk = totalChk ? tarefasFeitas.length / totalChk : 0;
+  const proxima = tarefasAbertas[0] || null;
+  const temAtrasada = tarefasAbertas.some((t) => t.data && t.data < todayISO());
+  const temHoje = tarefasAbertas.some((t) => t.data === todayISO());
+  const corChk = temAtrasada ? C.red : temHoje ? C.amber : C.accent;
 
   return (
     <div>
@@ -77,57 +86,89 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
         <div style={{ flex: '1 1 300px', minWidth: 0, maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <AgendaMes />
 
-          <Card style={{ padding: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ fontSize: 15, fontWeight: 800 }}>Checklist</div>
-              {tarefasAbertas.length > 0 && <div style={{ fontSize: 12, color: C.muted }}>{tarefasAbertas.length} pend.</div>}
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: tarefasAbertas.length || tarefasFeitas.length ? 12 : 0 }}>
-              <input value={novaTarefa} onChange={(e) => setNovaTarefa(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addTarefa(); }}
-                placeholder="Nova tarefa… (ex: pagar boleto Ambev)" style={{ ...inputStyle, flex: '1 1 100%' }} />
-              <input type="date" value={novaTarefaData} onChange={(e) => setNovaTarefaData(e.target.value)}
-                title="Data (opcional) — pra receber aviso no dia" style={{ ...inputStyle, flex: '1 1 120px' }} />
-              <Btn small onClick={addTarefa}>Add</Btn>
-            </div>
-
-            {tarefasAbertas.length === 0 && tarefasFeitas.length === 0 && (
-              <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '10px 0 2px' }}>Nenhuma tarefa. Anote o que precisa fazer.</div>
-            )}
-
-            {tarefasAbertas.map((t) => {
-              const atrasada = t.data && t.data < todayISO();
-              const venceHoje = t.data === todayISO();
-              return (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
-                  <button onClick={() => toggleTarefa(t.id)} aria-label="Concluir" style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${C.line}`, background: 'transparent', cursor: 'pointer', flexShrink: 0 }} />
-                  <div style={{ flex: 1, fontSize: 14, color: C.text }}>
-                    {t.texto}
-                    {t.data && (
-                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: atrasada ? C.red : venceHoje ? C.amber : C.faint, whiteSpace: 'nowrap' }}>
-                        {atrasada ? `atrasada · ${fmtDate(t.data)}` : venceHoje ? 'hoje' : fmtDate(t.data)}
-                      </span>
-                    )}
-                  </div>
-                  <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
+          {/* Checklist minimalista: fechado mostra só o essencial (quantas
+              faltam, a barrinha e a próxima). Toca e amplia pra mexer. */}
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            <button onClick={() => setChkAberto((v) => !v)} style={{ width: '100%', background: 'none', border: 'none', padding: '13px 14px', cursor: 'pointer', textAlign: 'left', display: 'block' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <span style={{ width: 9, height: 9, borderRadius: 999, background: corChk, flexShrink: 0 }} />
+                <span style={{ fontSize: 15, fontWeight: 900, color: C.text, letterSpacing: '-.01em' }}>Checklist</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: C.faint }}>
+                  {tarefasAbertas.length > 0 ? `${tarefasAbertas.length} pra fazer` : totalChk > 0 ? 'tudo feito' : 'vazia'}
+                </span>
+                <span style={{ marginLeft: 'auto', color: C.faint, fontSize: 12, fontWeight: 900, flexShrink: 0 }}>{chkAberto ? '▾' : '▸'}</span>
+              </div>
+              {totalChk > 0 && (
+                <div style={{ height: 5, background: C.panel2, borderRadius: 999, overflow: 'hidden', marginTop: 10 }}>
+                  <div style={{ width: `${Math.round(pctChk * 100)}%`, height: '100%', background: tarefasAbertas.length === 0 ? C.green : corChk, borderRadius: 999 }} />
                 </div>
-              );
-            })}
-
-            {tarefasFeitas.length > 0 && (
-              <div style={{ marginTop: 12, borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <button onClick={() => setVerConcluidas((v) => !v)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: 0 }}>
-                    {verConcluidas ? '▾' : '▸'} Concluídas ({tarefasFeitas.length})
-                  </button>
-                  <button onClick={limparConcluidas} style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>limpar concluídas</button>
+              )}
+              {!chkAberto && proxima && (
+                <div style={{ fontSize: 12.5, color: C.muted, marginTop: 9, display: 'flex', gap: 7, alignItems: 'baseline' }}>
+                  <span style={{ color: C.faint, fontWeight: 800, flexShrink: 0 }}>próxima</span>
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxima.texto}</span>
+                  {proxima.data && (
+                    <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: corChk }}>
+                      {proxima.data < todayISO() ? 'atrasada' : proxima.data === todayISO() ? 'hoje' : fmtDate(proxima.data)}
+                    </span>
+                  )}
                 </div>
-                {verConcluidas && tarefasFeitas.map((t) => (
-                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-                    <button onClick={() => toggleTarefa(t.id)} aria-label="Reabrir" style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${C.green}`, background: C.green, color: '#052014', cursor: 'pointer', flexShrink: 0, fontWeight: 900, fontSize: 13, lineHeight: 1 }} />
-                    <div style={{ flex: 1, fontSize: 14, color: C.faint, textDecoration: 'line-through' }}>{t.texto}</div>
-                    <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4 }}>×</button>
+              )}
+            </button>
+
+            {chkAberto && (
+              <div style={{ padding: '0 14px 14px' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, borderTop: `1px solid ${C.hair}`, paddingTop: 12 }}>
+                  <input value={novaTarefa} onChange={(e) => setNovaTarefa(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addTarefa(); }}
+                    placeholder="O que precisa fazer…" style={{ ...inputStyle, flex: '1 1 100%' }} />
+                  <input type="date" value={novaTarefaData} onChange={(e) => setNovaTarefaData(e.target.value)}
+                    title="Data (opcional) — pra receber aviso no dia" style={{ ...inputStyle, flex: '1 1 120px' }} />
+                  <Btn small onClick={addTarefa}>Add</Btn>
+                </div>
+
+                {tarefasAbertas.length === 0 && tarefasFeitas.length === 0 && (
+                  <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', padding: '6px 0 2px', lineHeight: 1.5 }}>
+                    Nada na lista.<br /><span style={{ fontSize: 12 }}>Escreve aí em cima o que não pode esquecer.</span>
                   </div>
-                ))}
+                )}
+
+                {tarefasAbertas.map((t) => {
+                  const atrasada = t.data && t.data < todayISO();
+                  const venceHoje = t.data === todayISO();
+                  const cor = atrasada ? C.red : venceHoje ? C.amber : C.faint;
+                  return (
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '10px 0', borderTop: `1px solid ${C.hair}` }}>
+                      <button onClick={() => toggleTarefa(t.id)} aria-label="Concluir" style={{ marginTop: 1, width: 19, height: 19, borderRadius: 999, border: `2.5px solid ${atrasada ? C.red : C.line}`, background: 'transparent', cursor: 'pointer', flexShrink: 0, padding: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, color: C.text, lineHeight: 1.4, overflowWrap: 'anywhere' }}>{t.texto}</div>
+                        {t.data && (
+                          <div style={{ fontSize: 11, fontWeight: 800, color: cor, marginTop: 3 }}>
+                            {atrasada ? `atrasada · ${fmtDate(t.data)}` : venceHoje ? 'hoje' : fmtDate(t.data)}
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 17, lineHeight: 1, padding: 2, flexShrink: 0 }}>×</button>
+                    </div>
+                  );
+                })}
+
+                {tarefasFeitas.length > 0 && (
+                  <div style={{ marginTop: 10, borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                      <button onClick={() => setVerConcluidas((v) => !v)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 12.5, fontWeight: 800, padding: 0 }}>
+                        {verConcluidas ? '▾' : '▸'} Feitas ({tarefasFeitas.length})
+                      </button>
+                      <button onClick={limparConcluidas} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, padding: 0 }}>limpar feitas</button>
+                    </div>
+                    {verConcluidas && tarefasFeitas.map((t) => (
+                      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '8px 0' }}>
+                        <button onClick={() => toggleTarefa(t.id)} aria-label="Reabrir" style={{ width: 19, height: 19, borderRadius: 999, border: `2.5px solid ${C.green}`, background: C.green, cursor: 'pointer', flexShrink: 0, padding: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0, fontSize: 14, color: C.faint, textDecoration: 'line-through', overflowWrap: 'anywhere' }}>{t.texto}</div>
+                        <button onClick={() => removerTarefa(t.id)} aria-label="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 17, lineHeight: 1, padding: 2, flexShrink: 0 }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </Card>
