@@ -27,7 +27,7 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 async function lerCasa(sb) {
   const { data } = await sb.from('casa_dados').select('valor').eq('chave', CHAVE).maybeSingle();
   const v = data?.valor || {};
-  return { habitos: arr(v.habitos), checkins: (v.checkins && typeof v.checkins === 'object') ? v.checkins : {}, lista: arr(v.lista), cartoes: arr(v.cartoes), compras: arr(v.compras), pagamentos: (v.pagamentos && typeof v.pagamentos === 'object') ? v.pagamentos : {} };
+  return { habitos: arr(v.habitos), checkins: (v.checkins && typeof v.checkins === 'object') ? v.checkins : {}, lista: arr(v.lista), cartoes: arr(v.cartoes), compras: arr(v.compras), pagamentos: (v.pagamentos && typeof v.pagamentos === 'object') ? v.pagamentos : {}, tarefas: arr(v.tarefas) };
 }
 
 async function gravarCasa(sb, casa) {
@@ -196,6 +196,36 @@ export async function POST(request) {
     if (acao === 'listaLimparComprados') {
       const sec = txt(body?.secao, 10);
       casa.lista = casa.lista.filter((it) => !it.comprado || (sec && (it.secao || 'dia') !== sec));
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+
+    // ---- Tarefas (quadro compartilhado: Mariele / Karen / Aurora) ----
+    if (acao === 'tarefaAdd') {
+      const pessoa = ['mariele', 'karen', 'aurora'].includes(body?.pessoa) ? body.pessoa : 'karen';
+      const titulo = txt(body?.titulo, 80);
+      if (!titulo) return NextResponse.json({ ok: false, erro: 'Escreva a tarefa.' }, { status: 400 });
+      const meta = Math.min(99, Math.max(1, Math.round(num(body?.meta) || 1)));
+      casa.tarefas = [{ id: uid(), pessoa, titulo, meta, feitos: 0, criadoPor: usuario.nome, criadoEm: Date.now() }, ...casa.tarefas];
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'tarefaProgresso') {
+      const id = txt(body?.id, 40);
+      const delta = num(body?.delta) >= 0 ? 1 : -1;
+      casa.tarefas = casa.tarefas.map((t) => t.id === id ? { ...t, feitos: Math.min(t.meta, Math.max(0, (Number(t.feitos) || 0) + delta)) } : t);
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'tarefaDel') {
+      const id = txt(body?.id, 40);
+      casa.tarefas = casa.tarefas.filter((t) => t.id !== id);
+      await gravarCasa(sb, casa);
+      return NextResponse.json({ ok: true, ...casa });
+    }
+    if (acao === 'tarefaLimparProntas') {
+      const pessoa = txt(body?.pessoa, 10);
+      casa.tarefas = casa.tarefas.filter((t) => !(t.feitos >= t.meta && (!pessoa || t.pessoa === pessoa)));
       await gravarCasa(sb, casa);
       return NextResponse.json({ ok: true, ...casa });
     }

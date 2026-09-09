@@ -91,6 +91,12 @@ export function Icone({ name, size = 20, stroke = 2 }) {
       return (<svg {...props}><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>);
     case 'bell':
       return (<svg {...props}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>);
+    case 'star':
+      return (<svg {...props}><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L4.5 9.2l5.9-.9z" /></svg>);
+    case 'tasks':
+      return (<svg {...props}><rect x="3" y="3" width="6" height="18" rx="1.4" /><rect x="10.5" y="3" width="6" height="12" rx="1.4" /><rect x="18" y="3" width="3" height="8" rx="1.2" /></svg>);
+    case 'plus':
+      return (<svg {...props}><path d="M12 5v14M5 12h14" /></svg>);
     default:
       return null;
   }

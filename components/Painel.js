@@ -6,11 +6,13 @@ import Financas from './Financas';
 import Habitos from './Habitos';
 import ListaCompras from './ListaCompras';
 import Caderno from './Caderno';
+import Tarefas from './Tarefas';
 
 const ABAS = [
   ['financas', 'Finanças', 'wallet'],
   ['habitos', 'Hábitos', 'flame'],
   ['lista', 'Lista', 'cart'],
+  ['tarefas', 'Tarefas', 'tasks'],
   ['caderno', 'Caderno', 'book'],
 ];
 
@@ -26,7 +28,7 @@ export default function Painel({ usuario }) {
     } catch {}
     try {
       const a = new URLSearchParams(window.location.search).get('aba');
-      if (['financas', 'habitos', 'lista', 'caderno'].includes(a)) setAba(a);
+      if (['financas', 'habitos', 'lista', 'tarefas', 'caderno'].includes(a)) setAba(a);
     } catch {}
   }, []);
   const trocarTema = () => {
@@ -69,6 +71,7 @@ export default function Painel({ usuario }) {
         {aba === 'financas' && <Financas usuario={usuario} tema={tema} />}
         {aba === 'habitos' && <Habitos usuario={usuario} />}
         {aba === 'lista' && <ListaCompras usuario={usuario} />}
+        {aba === 'tarefas' && <Tarefas usuario={usuario} />}
         {aba === 'caderno' && <Caderno usuario={usuario} />}
       </div>
 
@@ -79,9 +82,9 @@ export default function Painel({ usuario }) {
             const ativo = aba === id;
             return (
               <button key={id} onClick={() => { setAba(id); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }}
-                style={{ flex: 1, border: 'none', cursor: 'pointer', borderRadius: 12, padding: '8px 6px', background: ativo ? C.accent : 'transparent', color: ativo ? C.onAccent : C.muted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                <Icone name={ico} size={21} />
-                <span style={{ fontSize: 12, fontWeight: 700 }}>{rot}</span>
+                style={{ flex: 1, minWidth: 0, border: 'none', cursor: 'pointer', borderRadius: 12, padding: '8px 2px', background: ativo ? C.accent : 'transparent', color: ativo ? C.onAccent : C.muted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                <Icone name={ico} size={20} />
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '-.01em' }}>{rot}</span>
               </button>
             );
           })}
