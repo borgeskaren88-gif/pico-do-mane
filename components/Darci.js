@@ -4,7 +4,7 @@ import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
-import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala } from '../lib/darciVoz';
+import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio } from '../lib/darciVoz';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -20,6 +20,8 @@ export default function Darci({ onAnotar, ...dados }) {
   const [tom, setTom] = useState(0.7);
   const [nome, setNome] = useState(NOME_PADRAO); // como ele fala o nome dela
   const [sotaque, setSotaque] = useState('manezinho'); // jeito de falar
+  const [motorVoz, setMotorVoz] = useState('exclusiva'); // 'exclusiva' (nuvem) | 'aparelho'
+  const [vozNuvemOk, setVozNuvemOk] = useState(false); // tem serviço de voz ligado?
   const [verTodas, setVerTodas] = useState(false); // vozes de outros idiomas
   const [pedido, setPedido] = useState(null); // ordem entendida, esperando confirmação
   const [edit, setEdit] = useState({}); // campos da ordem, editáveis antes de gravar
@@ -56,6 +58,8 @@ export default function Darci({ onAnotar, ...dados }) {
     setTom(lerTom());
     setNome(lerNome());
     setSotaque(lerSotaque());
+    setMotorVoz(lerMotorVoz());
+    vozExclusivaDisponivel().then(setVozNuvemOk).catch(() => setVozNuvemOk(false));
     if (!ok) return;
     carregarVozes();
     window.speechSynthesis.addEventListener?.('voiceschanged', carregarVozes);
@@ -69,6 +73,7 @@ export default function Darci({ onAnotar, ...dados }) {
   useEffect(() => { try { fimRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch { /* ignora */ } }, [conversa]);
 
   const falar = useCallback((texto) => {
+    destravarAudio(); // libera o som no iPhone (só vale se vier de um toque)
     falarTexto(texto, {
       vozId, tom, nome, sotaque,
       aoIniciar: () => setFalando(true),
@@ -213,6 +218,33 @@ export default function Darci({ onAnotar, ...dados }) {
                 </label>
               </div>
             )}
+
+            {/* A voz do Darci: a dele mesmo (nuvem) ou a de fábrica do aparelho.
+                Só aparece a escolha quando o serviço de voz está configurado. */}
+            <div style={{ maxWidth: 320, margin: '14px auto 0', textAlign: 'left' }}>
+              <div style={{ fontSize: 11, color: C.faint, fontWeight: 700, marginBottom: 5 }}>A voz</div>
+              {vozNuvemOk ? (
+                <>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {[['exclusiva', 'A voz do Darci'], ['aparelho', 'Voz do aparelho']].map(([v, rot]) => (
+                      <button key={v} onClick={() => { destravarAudio(); setMotorVoz(v); salvarMotorVoz(v); falarTexto(temperar('Ó, Karen. É assim que eu falo.', sotaque), { vozId, tom, nome, sotaque, aoIniciar: () => setFalando(true), aoTerminar: () => setFalando(false) }); }} style={{
+                        flex: 1, borderRadius: 999, padding: '8px 6px', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                        border: `1px solid ${motorVoz === v ? C.accent : C.line}`,
+                        background: motorVoz === v ? C.accent : 'transparent',
+                        color: motorVoz === v ? '#06101F' : C.muted,
+                      }}>{rot}</button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: C.faint, marginTop: 5, lineHeight: 1.45 }}>
+                    A <b>voz do Darci</b> vem da internet e é a mesma no celular, no iPad e no notebook. Sem sinal, ele volta sozinho pra voz do aparelho.
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 10.5, color: C.faint, lineHeight: 1.45 }}>
+                  Hoje ele usa a <b>voz de fábrica do aparelho</b>. Dá pra dar uma voz só dele (a mesma em todos os aparelhos, falando português direito) — é ligar um serviço de voz nas configurações do site. Me pede que eu te explico o passo a passo.
+                </div>
+              )}
+            </div>
 
             {/* Quanto de ilha ele põe na fala. O conteúdo é o mesmo — muda o jeito. */}
             <div style={{ maxWidth: 320, margin: '14px auto 0', textAlign: 'left' }}>

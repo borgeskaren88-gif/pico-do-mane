@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { C, inputStyle } from './ui';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
-import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome } from '../lib/darciVoz';
+import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome, destravarAudio } from '../lib/darciVoz';
 
 // A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
 // a barra de cima no celular), em linha com os outros botões. Ao tocar ela NÃO
@@ -88,6 +88,7 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
       const resp = responder(q, analisarBar({ ...dadosRef.current, desdeMs: desdeRef.current }), sotaqueRef.current);
       setPensando(false);
       setResposta(resp);
+      destravarAudio(); // libera o som no iPhone
       falarTexto(resp, { sotaque: sotaqueRef.current, aoIniciar: () => setFalando(true), aoTerminar: () => setFalando(false) });
     }, 380);
   }, [onAnotar]);
