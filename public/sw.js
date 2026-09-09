@@ -17,6 +17,32 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// ---- Notificações push (lembretes do caderno) ----
+self.addEventListener('push', (e) => {
+  let dado = {};
+  try { dado = e.data ? e.data.json() : {}; } catch { dado = { corpo: e.data ? e.data.text() : '' }; }
+  const titulo = dado.titulo || 'Nossa Casa';
+  const opcoes = {
+    body: dado.corpo || 'Você tem um lembrete.',
+    icon: '/apple-touch-icon.png',
+    badge: '/favicon-32.png',
+    tag: dado.tag || 'lembrete',
+    data: { url: dado.url || '/?aba=caderno' },
+  };
+  e.waitUntil(self.registration.showNotification(titulo, opcoes));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const alvo = (e.notification.data && e.notification.data.url) || '/?aba=caderno';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cls) => {
+      for (const c of cls) { if ('focus' in c) { c.navigate(alvo); return c.focus(); } }
+      if (self.clients.openWindow) return self.clients.openWindow(alvo);
+    })
+  );
+});
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return; // POST de dados passa direto pra rede

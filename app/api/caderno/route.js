@@ -25,7 +25,7 @@ function chaveDe(usuario) {
 async function lerCaderno(sb, usuario) {
   const { data } = await sb.from('casa_dados').select('valor').eq('chave', chaveDe(usuario)).maybeSingle();
   const v = data?.valor || {};
-  return { notas: arr(v.notas), lembretes: arr(v.lembretes), checklist: arr(v.checklist) };
+  return { notas: arr(v.notas), lembretes: arr(v.lembretes), checklist: arr(v.checklist), pushSubs: arr(v.pushSubs) };
 }
 
 async function gravarCaderno(sb, usuario, cad) {
@@ -37,12 +37,15 @@ async function gravarCaderno(sb, usuario, cad) {
   return cad;
 }
 
+// Não devolvemos as inscrições de push pro cliente (não precisa lá).
+const semSubs = (cad) => ({ notas: cad.notas, lembretes: cad.lembretes, checklist: cad.checklist });
+
 export async function GET() {
   const usuario = usuarioLogado();
   if (!usuario) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
     const cad = await lerCaderno(supabaseServer(), usuario);
-    return NextResponse.json({ ok: true, ...cad });
+    return NextResponse.json({ ok: true, ...semSubs(cad) });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar.' }, { status: 500 });
   }
@@ -57,7 +60,21 @@ export async function POST(request) {
   try {
     const sb = supabaseServer();
     const cad = await lerCaderno(sb, usuario);
-    const ok = () => NextResponse.json({ ok: true, ...cad });
+    const ok = () => NextResponse.json({ ok: true, ...semSubs(cad) });
+
+    // ---- Push: inscrição do aparelho (pra receber notificação no celular) ----
+    if (acao === 'pushSub') {
+      const sub = body?.sub;
+      if (!sub || !sub.endpoint) return NextResponse.json({ ok: false, erro: 'Inscrição inválida.' }, { status: 400 });
+      const outras = cad.pushSubs.filter((s) => s.endpoint !== sub.endpoint);
+      cad.pushSubs = [...outras, sub].slice(-8); // guarda os aparelhos recentes
+      await gravarCaderno(sb, usuario, cad); return ok();
+    }
+    if (acao === 'pushUnsub') {
+      const endpoint = txt(body?.endpoint, 500);
+      cad.pushSubs = cad.pushSubs.filter((s) => s.endpoint !== endpoint);
+      await gravarCaderno(sb, usuario, cad); return ok();
+    }
 
     // ---- Notas ----
     if (acao === 'notaAdd') {

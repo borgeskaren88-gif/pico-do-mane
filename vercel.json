@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/push/enviar", "schedule": "0 11 * * *" }
+  ]
+}

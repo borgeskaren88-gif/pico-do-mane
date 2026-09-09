@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { C, Card, Label, inputStyle, Empty, Icone } from './ui';
 import { todayISO, fmtDate, MESES_LONGO, CORES_HABITO } from '../lib/util';
+import { VAPID_PUBLIC, urlB64ToUint8Array } from '../lib/push';
 
 const serif = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif";
 // Papel dos post-its: creme com tinta café — cara de recadinho de verdade, e
@@ -26,7 +27,33 @@ export default function Caderno({ usuario }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   const [sec, setSec] = useState('notas');
+  const [notif, setNotif] = useState('carregando'); // 'on' | 'off' | 'nao' (não dá) | 'ativando' | 'erro-instalar'
   const hoje = todayISO();
+  const devidos = useMemo(() => lembretes.filter((l) => !l.feito && l.data && l.data <= hoje), [lembretes, hoje]);
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) { setNotif('nao'); return; }
+      setNotif(Notification.permission === 'granted' ? 'on' : 'off');
+    } catch { setNotif('nao'); }
+  }, []);
+
+  const ativarNotif = async () => {
+    setNotif('ativando'); setErro('');
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { setNotif('off'); return; }
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC) });
+      await acao({ acao: 'pushSub', sub: sub.toJSON() });
+      setNotif('on');
+    } catch (e) {
+      // No iPhone o push só funciona com o app na Tela de Início.
+      setNotif('erro-instalar');
+    }
+  };
 
   const aplicar = (j) => { if (j && j.ok) { setNotas(j.notas || []); setLembretes(j.lembretes || []); setChecklist(j.checklist || []); } };
   const carregar = useCallback(async () => {
@@ -61,6 +88,28 @@ export default function Caderno({ usuario }) {
           <Icone name="lock" size={13} /> Só você vê — a outra pessoa não tem acesso
         </div>
       </div>
+
+      {/* Aviso dos lembretes do dia (aparece ao abrir o app) */}
+      {devidos.length > 0 && (
+        <button onClick={() => setSec('lembretes')} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', border: `1px solid ${C.accent}`, background: 'linear-gradient(135deg, rgba(136,147,123,0.28), rgba(136,147,123,0.12))', color: C.text, borderRadius: 14, padding: '12px 14px', marginBottom: 12, cursor: 'pointer' }}>
+          <span style={{ width: 34, height: 34, borderRadius: 999, background: C.accent, color: C.onAccent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icone name="bell" size={18} /></span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 14, fontWeight: 800 }}>{devidos.length === 1 ? '1 lembrete pra hoje' : `${devidos.length} lembretes pra hoje`}</span>
+            <span style={{ display: 'block', fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{devidos.map((l) => l.texto).join(' · ')}</span>
+          </span>
+          <span style={{ color: C.accent, fontWeight: 800, flexShrink: 0 }}>ver ›</span>
+        </button>
+      )}
+
+      {/* Ativar notificações no celular */}
+      {notif === 'off' && (
+        <button onClick={ativarNotif} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', border: `1px dashed ${C.line}`, background: C.glassBg, color: C.text, borderRadius: 12, padding: '10px 12px', marginBottom: 12, cursor: 'pointer', fontSize: 13 }}>
+          <Icone name="bell" size={16} /> <span style={{ flex: 1 }}>Ativar notificações no celular</span> <span style={{ color: C.accent, fontWeight: 700 }}>ativar</span>
+        </button>
+      )}
+      {notif === 'ativando' && <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Ativando… confirme "Permitir" quando aparecer.</div>}
+      {notif === 'on' && <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.green, marginBottom: 12 }}><Icone name="check" size={14} /> Notificações ativadas neste aparelho</div>}
+      {notif === 'erro-instalar' && <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>Pra receber no iPhone, primeiro adicione o app à Tela de Início (botão compartilhar → "Adicionar à Tela de Início"), abra por lá e toque em ativar de novo.</div>}
 
       {/* Seletor de seção */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
