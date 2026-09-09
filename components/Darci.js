@@ -49,7 +49,11 @@ export default function Darci({ onAnotar, ...dados }) {
     const lista = listarVozes();
     if (!lista.length) return;
     setVozes(lista);
-    setVozId((atual) => (atual && lista.some((v) => v.voiceURI === atual) ? atual : vozPadrao(lista)));
+    // Sempre recalcula a melhor voz. O Edge só entrega as vozes "Natural"
+    // (que vêm da internet) uns segundos depois de abrir — se a gente travasse
+    // na primeira lista, ficaria pra sempre com a voz simples do aparelho,
+    // mesmo com a boa já disponível. `vozPadrao` respeita a escolhida à mão.
+    setVozId(vozPadrao(lista));
   }, []);
 
   useEffect(() => {
