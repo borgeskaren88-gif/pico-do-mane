@@ -5,11 +5,13 @@ import { C, Icone, LogoMark, pageBg } from './ui';
 import Financas from './Financas';
 import Habitos from './Habitos';
 import ListaCompras from './ListaCompras';
+import Caderno from './Caderno';
 
 const ABAS = [
   ['financas', 'Finanças', 'wallet'],
   ['habitos', 'Hábitos', 'flame'],
   ['lista', 'Lista', 'cart'],
+  ['caderno', 'Caderno', 'book'],
 ];
 
 export default function Painel({ usuario }) {
@@ -24,7 +26,7 @@ export default function Painel({ usuario }) {
     } catch {}
     try {
       const a = new URLSearchParams(window.location.search).get('aba');
-      if (['financas', 'habitos', 'lista'].includes(a)) setAba(a);
+      if (['financas', 'habitos', 'lista', 'caderno'].includes(a)) setAba(a);
     } catch {}
   }, []);
   const trocarTema = () => {
@@ -67,6 +69,7 @@ export default function Painel({ usuario }) {
         {aba === 'financas' && <Financas usuario={usuario} tema={tema} />}
         {aba === 'habitos' && <Habitos usuario={usuario} />}
         {aba === 'lista' && <ListaCompras usuario={usuario} />}
+        {aba === 'caderno' && <Caderno usuario={usuario} />}
       </div>
 
       {/* Barra de abas (embaixo) */}
