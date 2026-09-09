@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { C, inputStyle } from './ui';
 import OndaDarci from './OndaDarci';
-import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
+import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS, NAO_ENTENDI } from '../lib/darci';
 import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome, destravarAudio, baixarPrefs } from '../lib/darciVoz';
 
 // A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
@@ -35,6 +35,7 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const [desdeMs, setDesdeMs] = useState(0); // até onde ela já foi informada
 
   useEffect(() => { setDesdeMs(lerVisto()); }, []);
+  const [verTudo, setVerTudo] = useState(false); // mostrar todas as sugestões
 
   // O que mudou desde a última conversa. É o que faz a onda piscar chamando.
   // As dependências são as listas em si (e não o objeto de props, que nasce novo
@@ -158,6 +159,13 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const abrir = () => {
     posicionar();
     setAberto(true);
+    // iPhone/iPad: o Safari não deixa o site escutar. Em vez de a dona apertar
+    // o microfone pra só então descobrir isso, já abre com o campo pronto e o
+    // recado do microfone do teclado.
+    if (!podeOuvir()) {
+      setAviso('Aqui eu não escuto direto — toca no campo e usa o 🎤 do teclado. Ou toca numa sugestão aqui embaixo.');
+      setTimeout(() => { try { campoRef.current?.focus(); } catch { /* ignora */ } }, 60);
+    }
     setAviso('');
     try { onAbrir && onAbrir(); } catch { /* ignora */ }
     if (falando || pensando) return;
@@ -458,14 +466,34 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: 6, marginTop: 9, overflowX: 'auto', paddingBottom: 2 }}>
-              {ATALHOS.slice(0, 4).map((a) => (
-                <button key={a} onClick={() => responderAgora(a)} style={{
-                  border: `1px solid ${C.line}`, background: 'transparent', color: C.muted, borderRadius: 999,
-                  padding: '6px 11px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                }}>{a}</button>
-              ))}
-            </div>
+            {/* Sugestões prontas: no iPhone o ditado erra bastante, então tocar
+                é o caminho mais curto. Quando ele não entende a pergunta, a
+                lista abre inteira sozinha. */}
+            {(() => {
+              const naoEntendeu = typeof resposta === 'string' && resposta.startsWith(NAO_ENTENDI);
+              const todas = verTudo || naoEntendeu;
+              return (
+                <div style={{ marginTop: 9 }}>
+                  {naoEntendeu && <div style={{ fontSize: 11, color: C.faint, fontWeight: 700, marginBottom: 6 }}>Toca numa destas:</div>}
+                  <div style={todas
+                    ? { display: 'flex', gap: 6, flexWrap: 'wrap' }
+                    : { display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+                    {(todas ? ATALHOS : ATALHOS.slice(0, 4)).map((a) => (
+                      <button key={a} onClick={() => { setVerTudo(false); responderAgora(a); }} style={{
+                        border: `1px solid ${C.line}`, background: 'transparent', color: C.muted, borderRadius: 999,
+                        padding: '6px 11px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                      }}>{a}</button>
+                    ))}
+                    {!todas && (
+                      <button onClick={() => setVerTudo(true)} style={{
+                        border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 999,
+                        padding: '6px 11px', fontSize: 11.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                      }}>ver tudo</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {falando && (
               <div style={{ marginTop: 9, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
