@@ -12,6 +12,10 @@ export default function Visitantes({ dados = [], onChange }) {
   const [form, setForm] = useState(vazio());
   const [editId, setEditId] = useState(null);
   const [aberto, setAberto] = useState(false);
+  // O bloco inteiro nasce fechado: no Log ele ficava comprido demais e empurrava
+  // o resto da tela pra baixo. Fechado mostra só o título e o número do mês.
+  const [expandido, setExpandido] = useState(false);
+  const [historiaAberta, setHistoriaAberta] = useState({}); // { [id]: true }
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   const salvar = () => {
@@ -20,7 +24,7 @@ export default function Visitantes({ dados = [], onChange }) {
     else onChange([{ ...form, id: uid() }, ...dados]);
     setForm(vazio()); setEditId(null); setAberto(false);
   };
-  const editar = (d) => { setForm({ ...vazio(), ...d }); setEditId(d.id); setAberto(true); };
+  const editar = (d) => { setForm({ ...vazio(), ...d }); setEditId(d.id); setAberto(true); setExpandido(true); };
   const excluir = (id) => { if (id === editId) { setForm(vazio()); setEditId(null); } onChange(dados.filter((d) => d.id !== id)); };
 
   const resumo = useMemo(() => {
@@ -36,8 +40,22 @@ export default function Visitantes({ dados = [], onChange }) {
 
   return (
     <Card style={{ marginBottom: 18 }}>
-      <div style={{ fontSize: 17, fontWeight: 800 }}>Visitantes em destaque</div>
-      <div style={{ fontSize: 13, color: C.muted, marginTop: 3, marginBottom: 12 }}>Turistas, quem veio pelo Instagram, histórias legais de quem apareceu no bar.</div>
+      {/* Só o título: toca e abre. */}
+      <button onClick={() => setExpandido((v) => !v)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: 17, fontWeight: 800, color: C.text, display: 'block' }}>Visitantes em destaque</span>
+          <span style={{ fontSize: 12.5, color: C.faint, display: 'block', marginTop: 3 }}>
+            {resumo.doMes.length > 0
+              ? `${resumo.pessoasMes} pessoa(s) este mês · ${ordenado.length} registro(s) no total`
+              : ordenado.length > 0 ? `${ordenado.length} registro(s) · nenhum este mês` : 'turistas, Instagram, histórias legais do bar'}
+          </span>
+        </span>
+        <span style={{ color: C.faint, fontSize: 13, fontWeight: 900, flexShrink: 0 }}>{expandido ? '▾' : '▸'}</span>
+      </button>
+
+      {expandido && (
+      <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>Turistas, quem veio pelo Instagram, histórias legais de quem apareceu no bar.</div>
 
       {resumo.doMes.length > 0 && (
         <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: '11px 12px', marginBottom: 14 }}>
@@ -86,11 +104,20 @@ export default function Visitantes({ dados = [], onChange }) {
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 600, color: d.comoConheceu === 'Instagram' ? C.accent : C.muted, background: `${C.hair}`, borderRadius: 999, padding: '2px 8px', flexShrink: 0, whiteSpace: 'nowrap' }}>{d.comoConheceu || 'Outro'}</span>
               </div>
-              {d.obs && <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{d.obs}</div>}
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <Btn kind="ghost" small onClick={() => editar(d)}>Editar</Btn>
-                <Btn kind="danger" small onClick={() => excluir(d.id)}>Excluir</Btn>
-              </div>
+              {/* A história fica guardada: toca no registro pra ler. Assim a
+                  lista continua curta mesmo com muita gente anotada. */}
+              <button onClick={() => setHistoriaAberta((m) => ({ ...m, [d.id]: !m[d.id] }))} style={{ background: 'none', border: 'none', padding: '4px 0 0', cursor: 'pointer', color: C.accent, fontSize: 12, fontWeight: 700 }}>
+                {historiaAberta[d.id] ? 'ocultar' : (d.obs ? 'ver a história' : 'abrir')}
+              </button>
+              {historiaAberta[d.id] && (
+                <>
+                  {d.obs && <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{d.obs}</div>}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <Btn kind="ghost" small onClick={() => editar(d)}>Editar</Btn>
+                    <Btn kind="danger" small onClick={() => excluir(d.id)}>Excluir</Btn>
+                  </div>
+                </>
+              )}
             </div>
           ))}
           {ordenado.length > 12 && <div style={{ fontSize: 12, color: C.faint, textAlign: 'center', marginTop: 8 }}>Mostrando os 12 mais recentes de {ordenado.length}.</div>}
@@ -99,6 +126,8 @@ export default function Visitantes({ dados = [], onChange }) {
 
       {ordenado.length === 0 && !aberto && (
         <div style={{ fontSize: 13, color: C.faint, marginTop: 12 }}>Nenhum visitante registrado ainda.</div>
+      )}
+      </div>
       )}
     </Card>
   );
