@@ -4,7 +4,7 @@ import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
-import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio } from '../lib/darciVoz';
+import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs } from '../lib/darciVoz';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -60,6 +60,13 @@ export default function Darci({ onAnotar, ...dados }) {
     setSotaque(lerSotaque());
     setMotorVoz(lerMotorVoz());
     vozExclusivaDisponivel().then(setVozNuvemOk).catch(() => setVozNuvemOk(false));
+    // Os ajustes ficam guardados no servidor: o que ela regulou no notebook
+    // vale também no celular e no iPad, sem precisar refazer em cada um.
+    baixarPrefs().then((mudou) => {
+      if (!mudou) return;
+      setTom(lerTom()); setNome(lerNome()); setSotaque(lerSotaque()); setMotorVoz(lerMotorVoz());
+      carregarVozes();
+    }).catch(() => { /* sem conexão: fica o do aparelho */ });
     if (!ok) return;
     carregarVozes();
     window.speechSynthesis.addEventListener?.('voiceschanged', carregarVozes);
