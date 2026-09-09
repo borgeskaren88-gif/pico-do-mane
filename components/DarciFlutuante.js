@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { C, inputStyle } from './ui';
 import OndaDarci from './OndaDarci';
-import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS, NAO_ENTENDI } from '../lib/darci';
+import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS, NAO_ENTENDI } from '../lib/darci';
 import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome, destravarAudio, baixarPrefs } from '../lib/darciVoz';
 
 // A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
@@ -36,6 +36,16 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
 
   useEffect(() => { setDesdeMs(lerVisto()); }, []);
   const [verTudo, setVerTudo] = useState(false); // mostrar todas as sugestões
+  const [abertura, setAbertura] = useState(false); // painel "o que eu olharia agora"
+
+  // O que precisa de atenção agora — contas vencidas, salário, estoque no fim,
+  // fiado a receber, como foi ontem. Mesmas dependências das novidades: são as
+  // listas em si, senão isso recalcularia a cada render.
+  const avisos = useMemo(
+    () => alertas(analisarBar({ ...dados, desdeMs })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [desdeMs, dados.vendas, dados.estoque, dados.receitas, dados.despesas, dados.compras, dados.tarefas, dados.clientes, dados.fichas, dados.cardapio],
+  );
 
   // O que mudou desde a última conversa. É o que faz a onda piscar chamando.
   // As dependências são as listas em si (e não o objeto de props, que nasce novo
@@ -46,6 +56,26 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
     [desdeMs, dados.vendas, dados.estoque, dados.receitas, dados.despesas, dados.compras, dados.tarefas],
   );
   const jaVi = () => { const agora = Date.now(); marcarVisto(agora); setDesdeMs(agora); };
+
+  // Assim que ela abre o PicoOS, o Darci se apresenta com o que importa. Uma
+  // vez por dia em cada aparelho — não pra ficar incomodando, mas pra ela não
+  // precisar lembrar de perguntar.
+  const CHAVE_ABERTURA = 'picoos-darci-abertura';
+  const hojeChave = () => { try { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); } catch { return String(new Date().getDate()); } };
+  useEffect(() => {
+    if (!avisos.length) return undefined;
+    let ja = '';
+    try { ja = localStorage.getItem(CHAVE_ABERTURA) || ''; } catch { /* ignora */ }
+    if (ja === hojeChave()) return undefined;
+    // Um respiro antes de aparecer: deixa a tela terminar de carregar.
+    const t = setTimeout(() => { posicionar(); setAberto(true); setAbertura(true); }, 1100);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avisos.length]);
+  const fecharAbertura = () => {
+    try { localStorage.setItem(CHAVE_ABERTURA, hojeChave()); } catch { /* ignora */ }
+    setAbertura(false);
+  };
   const sotaqueRef = useRef('manezinho');
 
   const [escuta, setEscuta] = useState(false); // atender quando chamam pelo nome
@@ -331,6 +361,45 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
               <span style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>{estado}</span>
               <button onClick={esconder} aria-label="Fechar" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.muted, fontSize: 20, lineHeight: 1, padding: '0 2px', cursor: 'pointer' }}>×</button>
             </div>
+
+            {/* A apresentação do dia: o que o Darci olharia agora, na ordem em
+                que dói. Toca no aviso e ele explica aquilo em voz alta. */}
+            {abertura && avisos.length > 0 && (
+              <div style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 14, padding: '11px 12px', marginBottom: 9 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 900, color: C.accent, letterSpacing: '.04em', marginBottom: 7 }}>Ó, KAREN — O QUE EU OLHARIA AGORA</div>
+                {avisos.slice(0, 5).map((av) => {
+                  const cor = av.nivel === 'urgente' ? C.red : av.nivel === 'atencao' ? C.amber : C.accent2;
+                  return (
+                    <button key={av.id} onClick={() => { fecharAbertura(); responderAgora(av.pergunta); }} style={{
+                      display: 'flex', gap: 9, alignItems: 'flex-start', width: '100%', textAlign: 'left',
+                      background: 'none', border: 'none', borderTop: `1px solid ${C.hair}`, padding: '8px 0 7px', cursor: 'pointer',
+                    }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 999, background: cor, flexShrink: 0, marginTop: 5 }} />
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: C.text, lineHeight: 1.35 }}>{av.titulo}</span>
+                        <span style={{ display: 'block', fontSize: 11.5, color: C.faint, lineHeight: 1.4, marginTop: 2 }}>{av.detalhe}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+                <div style={{ display: 'flex', gap: 12, marginTop: 9, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button onClick={() => { fecharAbertura(); responderAgora('Briefing do dia'); }} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12, fontWeight: 800, padding: 0, cursor: 'pointer' }}>me conta tudo</button>
+                  <button onClick={fecharAbertura} style={{ background: 'none', border: 'none', color: C.faint, fontSize: 12, fontWeight: 700, padding: 0, cursor: 'pointer' }}>beleza, já vi</button>
+                </div>
+              </div>
+            )}
+
+            {/* Depois de fechada a apresentação, ela volta com um toque. */}
+            {!abertura && avisos.length > 0 && !pensando && !resposta && (
+              <button onClick={() => setAbertura(true)} style={{
+                display: 'block', width: '100%', textAlign: 'left', background: 'none', cursor: 'pointer',
+                border: `1px dashed ${C.line}`, borderRadius: 12, padding: '8px 11px', marginBottom: 9,
+                color: C.muted, fontSize: 12, fontWeight: 700,
+              }}>
+                <span style={{ color: avisos.some((a) => a.nivel === 'urgente') ? C.red : C.accent }}>●</span>{' '}
+                {avisos.length} coisa(s) pra tu olhar — toca aqui
+              </button>
+            )}
 
             {novas.length > 0 && (
               <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 14, padding: '10px 12px', marginBottom: 9 }}>

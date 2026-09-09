@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
-import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
+import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS } from '../lib/darci';
 import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs, lerVozNome, vozEscolhidaFalta } from '../lib/darciVoz';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
@@ -310,6 +310,34 @@ export default function Darci({ onAnotar, ...dados }) {
           </div>
         )}
       </div>
+
+      {/* O que precisa de atenção agora. Vem antes de tudo porque é o motivo
+          de ela ter aberto o app — conta vencida, salário, estoque no fim. */}
+      {(() => {
+        const avisos = alertas(n);
+        if (!avisos.length) return null;
+        return (
+          <Card style={{ margin: '16px 0 0', borderColor: avisos.some((a) => a.nivel === 'urgente') ? C.red : C.accent }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 8 }}>O que eu olharia agora</div>
+            {avisos.map((av) => {
+              const cor = av.nivel === 'urgente' ? C.red : av.nivel === 'atencao' ? C.amber : C.accent2;
+              return (
+                <button key={av.id} onClick={() => enviar(av.pergunta)} style={{
+                  display: 'flex', gap: 10, alignItems: 'flex-start', width: '100%', textAlign: 'left',
+                  background: 'none', border: 'none', borderTop: `1px solid ${C.hair}`, padding: '9px 0 8px', cursor: 'pointer',
+                }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 999, background: cor, flexShrink: 0, marginTop: 5 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 800, color: C.text, lineHeight: 1.35 }}>{av.titulo}</span>
+                    <span style={{ display: 'block', fontSize: 12, color: C.faint, lineHeight: 1.45, marginTop: 2 }}>{av.detalhe}</span>
+                  </span>
+                </button>
+              );
+            })}
+            <div style={{ fontSize: 11.5, color: C.faint, marginTop: 9 }}>Toca num aviso que eu explico esse em voz alta.</div>
+          </Card>
+        );
+      })()}
 
       {/* O que mudou desde a última visita — é isso que mantém ela atualizada
           sem precisar perguntar nada. */}
