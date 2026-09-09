@@ -13,12 +13,19 @@ export const runtime = 'nodejs';
 // chega no navegador. Se não houver chave nenhuma, o app avisa que a voz
 // exclusiva está desligada e continua usando a voz do aparelho.
 //
-// Aceita dois serviços — vale o que tiver chave:
+// Aceita três serviços — vale o que tiver chave, nesta ordem:
+//   AZURE_SPEECH_KEY    (+ AZURE_SPEECH_REGION, AZURE_SPEECH_VOICE)
+//        → as MESMAS vozes "Natural" da Microsoft que aparecem no Edge do
+//          notebook (Antônio, Francisca…), agora em qualquer aparelho.
 //   ELEVENLABS_API_KEY  (+ ELEVENLABS_VOICE_ID)  → voz que dá pra desenhar
 //   OPENAI_API_KEY      (+ OPENAI_TTS_VOICE)     → mais simples e barato
 const LIMITE = 900; // caracteres por fala — trava de gasto, o Darci é breve
 
+// Escapa o que não pode ir cru dentro do XML da Microsoft.
+const xml = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+
 function motor() {
+  if (process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION) return 'azure';
   if (process.env.ELEVENLABS_API_KEY) return 'elevenlabs';
   if (process.env.OPENAI_API_KEY) return 'openai';
   return null;
@@ -44,7 +51,21 @@ export async function POST(request) {
 
   try {
     let r;
-    if (m === 'elevenlabs') {
+    if (m === 'azure') {
+      const voz = process.env.AZURE_SPEECH_VOICE || 'pt-BR-AntonioNeural';
+      const regiao = process.env.AZURE_SPEECH_REGION;
+      const ssml = `<speak version='1.0' xml:lang='pt-BR'><voice name='${xml(voz)}'>${xml(texto)}</voice></speak>`;
+      r = await fetch(`https://${encodeURIComponent(regiao)}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': process.env.AZURE_SPEECH_KEY,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+          'User-Agent': 'PicoOS',
+        },
+        body: ssml,
+      });
+    } else if (m === 'elevenlabs') {
       const voz = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
       r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voz)}?output_format=mp3_44100_64`, {
         method: 'POST',

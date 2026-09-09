@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { C, inputStyle } from './ui';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, ATALHOS } from '../lib/darci';
-import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome, destravarAudio } from '../lib/darciVoz';
+import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome, destravarAudio, baixarPrefs } from '../lib/darciVoz';
 
 // A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
 // a barra de cima no celular), em linha com os outros botões. Ao tocar ela NÃO
@@ -49,7 +49,12 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
 
   const [escuta, setEscuta] = useState(false); // atender quando chamam pelo nome
   const [vigiaAtivo, setVigiaAtivo] = useState(false); // o ouvido pegou mesmo?
-  useEffect(() => { setOuvirOk(podeOuvir()); sotaqueRef.current = lerSotaque(); setEscuta(lerEscuta()); }, []);
+  useEffect(() => {
+    setOuvirOk(podeOuvir()); sotaqueRef.current = lerSotaque(); setEscuta(lerEscuta());
+    // Puxa os ajustes do servidor: o jeito de falar regulado no notebook vale
+    // aqui no celular também.
+    baixarPrefs().then((mudou) => { if (mudou) sotaqueRef.current = lerSotaque(); }).catch(() => { /* fica o do aparelho */ });
+  }, []);
 
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
