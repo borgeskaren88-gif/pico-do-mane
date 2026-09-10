@@ -9,6 +9,7 @@ import Brain from './Brain';
 import Darci from './Darci';
 import DarciFlutuante from './DarciFlutuante';
 import Hoje from './Hoje';
+import AvisoReservas from './AvisoReservas';
 import Diario from './Diario';
 import Marketing from './Marketing';
 import PontoDona from './PontoDona';
@@ -676,6 +677,8 @@ export default function Dashboard() {
       <div style={{ maxWidth: tab === 'brain' ? 1180 : 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {tab === 'darci' && <Darci {...propsDarci} />}
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
+        {/* Mesa reservada hoje/amanhã — a dona vê logo ao abrir o painel. */}
+        {tab === 'hoje' && <AvisoReservas />}
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={<DarciFlutuante {...propsDarci} />} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
         {tab === 'financas' && (

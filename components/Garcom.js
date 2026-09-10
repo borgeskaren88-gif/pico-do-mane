@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, LogoMark, pageBg } from './ui';
+import AvisoReservas from './AvisoReservas';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 import Comandas from './Comandas';
@@ -64,6 +65,8 @@ export default function Garcom() {
       </div>
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
+        {/* Mesa reservada hoje/amanhã: a primeira coisa que aparece ao entrar. */}
+        <AvisoReservas />
         <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
           {[['ponto', 'Ponto'], ['caixa', 'Caixa'], ['comandas', 'Comandas'], ['perdas', 'Perdas'], ['avisos', 'Avisos']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
