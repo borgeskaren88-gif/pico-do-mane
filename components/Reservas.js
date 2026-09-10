@@ -4,6 +4,7 @@ import { C, Card, Btn, Empty, pageBg, LogoMark } from './ui';
 import AvisoReservas from './AvisoReservas';
 import SinoNotificacoes from './SinoNotificacoes';
 import ListaMercado from './ListaMercado';
+import Pasta from './Pasta';
 import { todayISO, addDays, fmtDate, weekday, ymOf } from '../lib/util';
 
 const MESES_LONGOS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -19,6 +20,8 @@ const vazio = (dia) => ({ id: '', nome: '', data: dia, hora: '20:00', pessoas: '
 //     horas, quantas pessoas e o que mais precisar.
 //  2. LISTA DE COMPRAS — a lista que a cozinha anota, pra quando ela for ao
 //     mercado resolver: risca o item quando põe no carrinho.
+//  3. PASTA — os textos do bar: modelo de cobrança, ficha técnica de prato e de
+//     drink. Guardado num lugar só, pronto pra copiar.
 //
 // Nada de dinheiro, nada de comanda. Ao salvar uma reserva nova, todo mundo
 // (dona, cozinha e atendimento) recebe o aviso no celular — e o dia da reserva
@@ -33,7 +36,7 @@ export default function Reservas() {
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState('');
   const [recado, setRecado] = useState('');
-  const [aba, setAba] = useState('reservas'); // 'reservas' | 'compras'
+  const [aba, setAba] = useState('reservas'); // 'reservas' | 'compras' | 'pasta'
 
   const carregar = useCallback(async () => {
     try {
@@ -128,15 +131,15 @@ export default function Reservas() {
         </div>
 
         <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 14 }}>
-          {[['reservas', 'Reservas'], ['compras', 'Lista de Compras']].map(([v, rot]) => (
+          {[['reservas', 'Reservas'], ['compras', 'Compras'], ['pasta', 'Pasta']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
-              flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 14, fontWeight: 800,
+              flex: 1, minWidth: 0, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 6px', fontSize: 13.5, fontWeight: 800,
               background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
             }}>{rot}</button>
           ))}
         </div>
 
-        {aba === 'compras' ? <ListaMercado /> : (
+        {aba === 'compras' ? <ListaMercado /> : aba === 'pasta' ? <Pasta /> : (
         <>
         <AvisoReservas />
 
@@ -297,7 +300,9 @@ export default function Reservas() {
         <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.55 }}>
           {aba === 'compras'
             ? 'A lista é a mesma que a cozinha anota. O que tu riscar aqui some da lista deles na hora.'
-            : 'Toca num dia pra ver e anotar as reservas dele. Os dias com bolinha já têm mesa guardada.'}
+            : aba === 'pasta'
+              ? 'Cada texto fica numa pasta que tu mesma cria. O botão “copiar” manda o texto inteiro pra área de transferência.'
+              : 'Toca num dia pra ver e anotar as reservas dele. Os dias com bolinha já têm mesa guardada.'}
         </div>
       </div>
     </div>
