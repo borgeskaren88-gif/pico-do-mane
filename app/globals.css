@@ -63,6 +63,12 @@
 
 html, body {
   background: var(--c-bg-bottom);
+  /* A letra e a cor do texto do PicoOS ficam aqui, no corpo da página. Cada
+     tela até repete isso no estilo dela, mas se uma esquecer (foi o que
+     aconteceu com a tela da Mari), o navegador caía na fonte serifada dele. */
+  color: var(--c-text);
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
   /* Puxar-para-atualizar próprio: desliga o refresh nativo do navegador no topo
      pra não brigar com o gesto do PicoOS (e funcionar também no app instalado). */
   overscroll-behavior-y: contain;
