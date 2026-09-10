@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, Card, Field, inputStyle, LogoMark, pageBg } from './ui';
 
-const PAPEIS = [['dona', 'Karen'], ['cozinha', 'Cozinha'], ['garcom', 'Atendimento']];
+const PAPEIS = [['dona', 'Karen'], ['cozinha', 'Cozinha'], ['garcom', 'Atendimento'], ['reservas', 'Reservas']];
 
 export default function LoginForm() {
   const router = useRouter();
@@ -57,10 +57,10 @@ export default function LoginForm() {
         <Card>
           <form onSubmit={entrar}>
             <Field label="Quem está entrando?">
-              <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 3, gap: 3 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 3, gap: 3 }}>
                 {PAPEIS.map(([v, rot]) => (
                   <button key={v} type="button" onClick={() => { setPapel(v); setErro(''); }} style={{
-                    flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '9px 6px', fontSize: 14, fontWeight: 700,
+                    flex: '1 1 45%', minWidth: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '9px 6px', fontSize: 14, fontWeight: 700,
                     background: papel === v ? C.accent : 'transparent', color: papel === v ? '#06101F' : C.muted,
                   }}>{rot}</button>
                 ))}
