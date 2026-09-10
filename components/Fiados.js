@@ -18,22 +18,36 @@ const zapLink = (telefone, msg) => {
   const numero = d.length >= 12 ? d : (d.length >= 10 ? '55' + d : '');
   return numero ? `https://wa.me/${numero}?text=${encodeURIComponent(msg)}` : '';
 };
-const msgCobranca = (nome, total) => (
-  `Oi ${nome}, tudo bem? Aqui é do Pico do Mané.\n\n`
-  + `Passando pra lembrar do teu consumo, que está em ${brl(total)}. `
-  + `Dá pra acertar até o dia 10?\n\nQualquer coisa é só me chamar por aqui. Obrigada!`
+// Só o primeiro nome: a cobrança fica pessoal sem ficar formal demais.
+const primeiroNome = (n) => (String(n || '').trim().split(/\s+/)[0] || 'tudo bem');
+// Data curtinha, do jeito que se lê no zap: 01/09.
+const ddmm = (iso) => (/^\d{4}-\d{2}-\d{2}/.test(String(iso || '')) ? `${String(iso).slice(8, 10)}/${String(iso).slice(5, 7)}` : '');
+// O dia 10 de qual mês: o deste mês pra quem está na cobrança de agora, o do
+// mês que vem pra quem só consumiu depois que o mês virou.
+const diaDoVencimento = (hoje, cobrarAgora) => {
+  const [ano, mes] = hoje.split('-').map(Number);
+  if (cobrarAgora) return `${hoje.slice(0, 7)}-${String(DIA_LIMITE).padStart(2, '0')}`;
+  const ym = mes === 12 ? `${ano + 1}-01` : `${ano}-${String(mes + 1).padStart(2, '0')}`;
+  return `${ym}-${String(DIA_LIMITE).padStart(2, '0')}`;
+};
+const msgCobranca = (nome, total, ateISO, venceISO) => (
+  `Olá ${nome}!\n`
+  + `Informamos que o seu débito está em ${brl(total)} correspondendo até o dia ${ddmm(ateISO)}. `
+  + 'O valor está sujeito a alteração até a data do pagamento.\n\n'
+  + `Lembrando a todos que o débito deve ser quitado até o dia ${ddmm(venceISO)}, `
+  + 'passando da data de pagamento a conta será encerrada.'
 );
 
 const FONTE_ATRASADO = 'Recebimento Atrasado';
+
+// Como a pessoa pagou o fiado. Os nomes são os mesmos do caixa, senão o valor
+// entra no balde errado no fechamento do turno.
+const FORMAS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
 
 // Baixa sem entrar dinheiro: a conta some da lista de quem deve, mas nada entra
 // no caixa nem vira receita. É o caso do consumo de funcionário que foi
 // descontado do salário, da cortesia da casa e do que a gente já sabe que não
 // vem mais. Sempre com motivo, pra depois dar pra explicar o que aconteceu.
-// Como a pessoa pagou o fiado. Os nomes são os mesmos do caixa, senão o valor
-// entra no balde errado no fechamento do turno.
-const FORMAS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
-
 const MOTIVOS_SEM = [
   'Desconto no salário',
   'Cortesia da casa',
@@ -202,7 +216,13 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
   // telefone cadastrado, copia a mensagem pra ela colar onde quiser.
   const cobrar = async (g) => {
     // Cobra o que já venceu; se não venceu nada ainda, fala do total mesmo.
-    const msg = msgCobranca(g.nome, g.agora > 0.005 ? g.agora : g.total);
+    const cobrarAgora = g.agora > 0.005;
+    // "correspondendo até o dia X" = o último consumo que entrou nessa conta.
+    // É a data que explica o valor — e o que vier depois dela muda o total, por
+    // isso a frase avisa que o valor pode mudar até o pagamento.
+    const ultima = g.vendas[0] || null;
+    const ateISO = String((ultima && (ultima.data || ultima.fechadaEm)) || hojeISO).slice(0, 10);
+    const msg = msgCobranca(primeiroNome(g.nome), cobrarAgora ? g.agora : g.total, ateISO, diaDoVencimento(hojeISO, cobrarAgora));
     const link = zapLink(telefoneDe(g.nome), msg);
     if (link) { try { window.open(link, '_blank', 'noopener'); } catch { /* ignora */ } return; }
     try {
