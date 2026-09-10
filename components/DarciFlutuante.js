@@ -72,6 +72,8 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [avisos.length]);
+  // Tem aviso que não pode esperar? É o que decide a cor do pontinho na bola.
+  const temUrgente = avisos.some((a) => a.nivel === 'urgente');
   const fecharAbertura = () => {
     try { localStorage.setItem(CHAVE_ABERTURA, hojeChave()); } catch { /* ignora */ }
     setAbertura(false);
@@ -588,11 +590,16 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
           }}
         >
           <OndaDarci ativo={ativa} neon={false} largura={30} altura={18} />
-          {/* Pontinho: tem coisa nova pra ela saber. */}
-          {novas.length > 0 && !aberto && (
-            <span style={{ width: 7, height: 7, borderRadius: 999, background: C.amber, marginLeft: 6, flexShrink: 0 }} />
+          {/* Pontinho: tem coisa nova pra ela saber. Fica VERMELHO quando tem
+              coisa urgente esperando (conta vencida, salário, estoque zerado),
+              pra ela ver de longe que não é só novidade — é pra hoje. */}
+          {(novas.length > 0 || temUrgente) && !aberto && (
+            <span
+              title={temUrgente ? 'Tem coisa urgente pra tu ver' : 'Tem novidade'}
+              style={{ width: 7, height: 7, borderRadius: 999, background: temUrgente ? C.red : C.amber, marginLeft: 6, flexShrink: 0 }}
+            />
           )}
-          {escuta && vigiaAtivo && !aberto && novas.length === 0 && (
+          {escuta && vigiaAtivo && !aberto && novas.length === 0 && !temUrgente && (
             <span title="Ouvindo pelo nome" style={{ width: 7, height: 7, borderRadius: 999, background: C.green, marginLeft: 6, flexShrink: 0 }} />
           )}
         </button>
