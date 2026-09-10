@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { C, Card, Btn, Empty, pageBg, LogoMark } from './ui';
 import AvisoReservas from './AvisoReservas';
 import SinoNotificacoes from './SinoNotificacoes';
+import ListaMercado from './ListaMercado';
 import { todayISO, addDays, fmtDate, weekday, ymOf } from '../lib/util';
 
 const MESES_LONGOS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -12,12 +13,16 @@ const diaDaSemana = (iso) => { const [y, m, d] = iso.split('-').map(Number); ret
 const semanaDe = (iso) => { const ini = addDays(iso, -diaDaSemana(iso)); return Array.from({ length: 7 }, (_, i) => addDays(ini, i)); };
 const vazio = (dia) => ({ id: '', nome: '', data: dia, hora: '20:00', pessoas: '2', obs: '', telefone: '' });
 
-// A tela de quem cuida das reservas. É só isso que essa pessoa vê: um
-// calendário pra marcar quem reservou mesa, pra que dia, que horas, quantas
-// pessoas e o que mais precisar. Nada de dinheiro, nada de comanda.
+// A tela da Mari. Duas coisas, e só essas duas:
 //
-// Ao salvar uma reserva nova, todo mundo (dona, cozinha e atendimento) recebe o
-// aviso no celular — e o dia da reserva aparece no login de cada um.
+//  1. RESERVAS — o calendário pra marcar quem reservou mesa, pra que dia, que
+//     horas, quantas pessoas e o que mais precisar.
+//  2. LISTA DE COMPRAS — a lista que a cozinha anota, pra quando ela for ao
+//     mercado resolver: risca o item quando põe no carrinho.
+//
+// Nada de dinheiro, nada de comanda. Ao salvar uma reserva nova, todo mundo
+// (dona, cozinha e atendimento) recebe o aviso no celular — e o dia da reserva
+// aparece no login de cada um.
 export default function Reservas() {
   const hoje = todayISO();
   const [reservas, setReservas] = useState([]);
@@ -28,6 +33,7 @@ export default function Reservas() {
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState('');
   const [recado, setRecado] = useState('');
+  const [aba, setAba] = useState('reservas'); // 'reservas' | 'compras'
 
   const carregar = useCallback(async () => {
     try {
@@ -115,12 +121,23 @@ export default function Reservas() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <LogoMark size={34} radius={10} />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 17, fontWeight: 900, lineHeight: 1 }}>Reservas</div>
+            <div style={{ fontSize: 17, fontWeight: 900, lineHeight: 1 }}>Mari</div>
             <div style={{ fontSize: 10.5, color: C.accent, letterSpacing: '.12em', textTransform: 'uppercase', marginTop: 3, fontWeight: 700 }}>Pico do Mané</div>
           </div>
           <button onClick={sair} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, padding: '7px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Sair</button>
         </div>
 
+        <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 14 }}>
+          {[['reservas', 'Reservas'], ['compras', 'Lista de Compras']].map(([v, rot]) => (
+            <button key={v} onClick={() => setAba(v)} style={{
+              flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 14, fontWeight: 800,
+              background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
+            }}>{rot}</button>
+          ))}
+        </div>
+
+        {aba === 'compras' ? <ListaMercado /> : (
+        <>
         <AvisoReservas />
 
         {recado && (
@@ -268,6 +285,9 @@ export default function Reservas() {
           </div>
         </Card>
 
+        </>
+        )}
+
         {/* Ela também recebe os avisos: se a Karen ou o atendimento marcarem
             uma mesa, o celular dela toca igual. */}
         <div style={{ marginBottom: 12 }}>
@@ -275,7 +295,9 @@ export default function Reservas() {
         </div>
 
         <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.55 }}>
-          Toca num dia pra ver e anotar as reservas dele. Os dias com bolinha já têm mesa guardada.
+          {aba === 'compras'
+            ? 'A lista é a mesma que a cozinha anota. O que tu riscar aqui some da lista deles na hora.'
+            : 'Toca num dia pra ver e anotar as reservas dele. Os dias com bolinha já têm mesa guardada.'}
         </div>
       </div>
     </div>

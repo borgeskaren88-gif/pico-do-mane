@@ -39,9 +39,15 @@ export async function GET() {
     if (error) throw error;
     const blob = data?.valor || {};
     // A cozinha tem a lista dela (listaCozinha), separada da lista da dona.
-    const lista = Array.isArray(blob.listaCozinha) ? blob.listaCozinha.filter((i) => !i.comprado) : [];
+    const todos = Array.isArray(blob.listaCozinha) ? blob.listaCozinha : [];
+    const lista = todos.filter((i) => !i.comprado);
+    // O que já foi comprado volta separado: quem está no mercado precisa ver o
+    // que acabou de riscar (e poder desmarcar se errou).
+    const comprados = todos.filter((i) => i.comprado)
+      .sort((a, b) => String(b.compradoEm || '').localeCompare(String(a.compradoEm || '')))
+      .slice(0, 40);
     const tarefas = Array.isArray(blob.tarefasCozinha) ? blob.tarefasCozinha : [];
-    return NextResponse.json({ ok: true, listaCompras: lista, tarefas });
+    return NextResponse.json({ ok: true, listaCompras: lista, comprados, tarefas });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar a lista.' }, { status: 500 });
   }
@@ -67,6 +73,20 @@ export async function POST(request) {
     if (Array.isArray(body?.listaCompras)) {
       const comprados = Array.isArray(blob.listaCozinha) ? blob.listaCozinha.filter((i) => i.comprado) : [];
       patch.listaCozinha = [...limparItens(body.listaCompras), ...comprados];
+    }
+    // Riscar o que já foi comprado no mercado. Só troca o "comprado" de itens
+    // que já existem — quem está no mercado nunca reescreve a lista inteira,
+    // então não tem como apagar sem querer o que a cozinha acabou de pedir.
+    if (body?.marcarComprado && typeof body.marcarComprado === 'object') {
+      const marcas = body.marcarComprado;
+      const base = Array.isArray(patch.listaCozinha) ? patch.listaCozinha
+        : (Array.isArray(blob.listaCozinha) ? blob.listaCozinha : []);
+      const agora = new Date().toISOString();
+      patch.listaCozinha = base.map((i) => {
+        if (!i || !Object.prototype.hasOwnProperty.call(marcas, i.id)) return i;
+        const comprado = !!marcas[i.id];
+        return { ...i, comprado, compradoEm: comprado ? agora : '', compradoPor: comprado ? papel() : '' };
+      });
     }
     // Marcar/desmarcar tarefa como feita: só troca o "feito" de tarefas que já
     // existem. A cozinha nunca cria, apaga ou edita o texto (isso é da dona).

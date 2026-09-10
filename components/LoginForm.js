@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, Card, Field, inputStyle, LogoMark, pageBg } from './ui';
 
-const PAPEIS = [['dona', 'Karen'], ['cozinha', 'Cozinha'], ['garcom', 'Atendimento'], ['reservas', 'Reservas']];
+const PAPEIS = [['dona', 'Karen'], ['cozinha', 'Cozinha'], ['garcom', 'Atendimento'], ['reservas', 'Mari']];
 
 export default function LoginForm() {
   const router = useRouter();
