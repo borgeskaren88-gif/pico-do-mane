@@ -120,16 +120,21 @@ export default function Reservas() {
 
   return (
     <div style={{ minHeight: '100dvh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <div style={{ maxWidth: 620, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+      {/* Barra de cima: o recuo do topo tem que contar a "faixa do relógio" do
+          iPhone (env(safe-area-inset-top)), senão o nome e o Sair ficam por
+          baixo do relógio e da bateria. Mesmo formato da cozinha e do garçom. */}
+      <div style={{ padding: 'calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 13px calc(16px + env(safe-area-inset-left))', borderBottom: `1px solid ${C.hair}` }}>
+        <div style={{ maxWidth: 620, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           <LogoMark size={34} radius={10} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 17, fontWeight: 900, lineHeight: 1 }}>Mari</div>
             <div style={{ fontSize: 10.5, color: C.accent, letterSpacing: '.12em', textTransform: 'uppercase', marginTop: 3, fontWeight: 700 }}>Pico do Mané</div>
           </div>
-          <button onClick={sair} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, padding: '7px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Sair</button>
+          <button onClick={sair} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, padding: '7px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Sair</button>
         </div>
+      </div>
 
+      <div style={{ maxWidth: 620, margin: '0 auto', padding: '16px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 14 }}>
           {[['reservas', 'Reservas'], ['compras', 'Compras'], ['pasta', 'Pasta']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
