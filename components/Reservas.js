@@ -29,8 +29,12 @@ const msgConfirmacao = (r, hoje) => {
   const q = Number(r.pessoas) || 1;
   const quando = r.data === addDays(hoje, 1) ? 'amanhã' : r.data === hoje ? 'hoje' : `no dia ${r.data.slice(8, 10)}/${r.data.slice(5, 7)}`;
   return `Olá ${primeiroNome(r.nome)}! Aqui é do Pico do Mané.\n\n`
-    + `Passando pra confirmar a tua mesa ${quando}${r.hora ? `, às ${r.hora}` : ''}, para ${q} ${q === 1 ? 'pessoa' : 'pessoas'}.\n\n`
-    + 'Está tudo certo? Se precisar mudar alguma coisa é só me avisar por aqui. Até logo!';
+    + `Passando para confirmar a tua reserva ${quando}${r.hora ? `, às ${r.hora}` : ''}, para ${q} ${q === 1 ? 'pessoa' : 'pessoas'}.\n\n`
+    + 'Está tudo certo?\n'
+    + 'Lembrando que nossa política de reserva permite atraso de até 15 min. '
+    + 'Então não hesite em nos contatar caso haja alguma intercorrência.\n\n'
+    + 'Seguimos à disposição e se precisar é só me avisar por aqui.\n\n'
+    + 'Até logo!';
 };
 
 // A tela da Mari. Duas coisas, e só essas duas:
