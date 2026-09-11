@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, LogoMark, pageBg } from './ui';
 import AvisoReservas from './AvisoReservas';
+import ReservasLista from './ReservasLista';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 import Comandas from './Comandas';
@@ -67,10 +68,10 @@ export default function Garcom() {
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {/* Mesa reservada hoje/amanhã: a primeira coisa que aparece ao entrar. */}
         <AvisoReservas />
-        <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
-          {[['ponto', 'Ponto'], ['caixa', 'Caixa'], ['comandas', 'Comandas'], ['perdas', 'Perdas'], ['avisos', 'Avisos']].map(([v, rot]) => (
+        <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
+          {[['ponto', 'Ponto'], ['caixa', 'Caixa'], ['comandas', 'Comandas'], ['reservas', 'Reservas'], ['perdas', 'Perdas'], ['avisos', 'Avisos']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
-              flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 14, fontWeight: 700,
+              flex: '1 0 auto', whiteSpace: 'nowrap', border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 12px', fontSize: 14, fontWeight: 700,
               background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
             }}>{rot}</button>
           ))}
@@ -80,7 +81,7 @@ export default function Garcom() {
             reserva começando agora — é o que faz o aviso chegar na hora. */}
         <LembreteAgenda />
 
-        {aba === 'comandas' ? <Comandas papel="garcom" /> : aba === 'perdas' ? <PerdaGarcom /> : aba === 'ponto' ? <PontoCozinha /> : aba === 'avisos' ? <Notificacoes papel="garcom" /> : <Caixa papel="garcom" />}
+        {aba === 'comandas' ? <Comandas papel="garcom" /> : aba === 'reservas' ? <ReservasLista sub="O que já está marcado, pra guardar a mesa. Quem anota é a Mari." /> : aba === 'perdas' ? <PerdaGarcom /> : aba === 'ponto' ? <PontoCozinha /> : aba === 'avisos' ? <Notificacoes papel="garcom" /> : <Caixa papel="garcom" />}
       </div>
     </div>
   );
