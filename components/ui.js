@@ -196,9 +196,12 @@ export function KPI({ titulo, valor, cor, sub }) {
   );
 }
 
+// Fila de números do topo da tela. No celular, três colunas fixas espremiam
+// tudo ("ABAIXO DO …", "R$ 4.472,…"): agora as colunas quebram sozinhas quando
+// não cabem, e no computador continuam lado a lado.
 export function Resumo({ items }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: 10, marginBottom: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 16 }}>
       {items.map((it, i) => <KPI key={i} titulo={it.t} valor={it.v} cor={it.c} sub={it.s} />)}
     </div>
   );
