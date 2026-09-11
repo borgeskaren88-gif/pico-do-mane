@@ -54,6 +54,28 @@ export async function POST(request) {
   try {
     const sb = supabaseServer();
 
+    // Marcar/desmarcar "já confirmei com o cliente". Mexe só nesse campo, então
+    // não tem como esbarrar no resto da reserva, e some do lembrete da véspera.
+    if (acao === 'confirmar') {
+      const id = txt(body?.id, 40);
+      if (!id) return NextResponse.json({ ok: false, erro: 'Reserva não informada.' }, { status: 400 });
+      const { data: atual } = await sb.from('pdm_dados').select('valor').eq('chave', PREFIXO + id).maybeSingle();
+      if (!atual?.valor) return NextResponse.json({ ok: false, erro: 'Reserva não encontrada.' }, { status: 404 });
+      const confirmada = body?.confirmada !== false;
+      const reserva = {
+        ...atual.valor,
+        confirmada,
+        confirmadaEm: confirmada ? new Date().toISOString() : '',
+        confirmadaPor: confirmada ? p : '',
+      };
+      const { error } = await sb.from('pdm_dados').upsert(
+        { chave: PREFIXO + id, valor: reserva, atualizado_em: new Date().toISOString() },
+        { onConflict: 'chave' },
+      );
+      if (error) throw error;
+      return NextResponse.json({ ok: true, reserva });
+    }
+
     if (acao === 'excluir') {
       const id = txt(body?.id, 40);
       if (!id) return NextResponse.json({ ok: false, erro: 'Reserva não informada.' }, { status: 400 });
@@ -84,6 +106,8 @@ export async function POST(request) {
     const reserva = {
       id, nome, data, hora, pessoas, obs, telefone,
       googleId: antes?.valor?.googleId || '',
+      confirmada: !!antes?.valor?.confirmada,
+      confirmadaEm: antes?.valor?.confirmadaEm || '',
       criadoPor: antes?.valor?.criadoPor || p,
       criadoEm: antes?.valor?.criadoEm || new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
