@@ -7,6 +7,9 @@ import ListaMercado from './ListaMercado';
 import Pasta from './Pasta';
 import TrocarSenha from './TrocarSenha';
 import LembreteAgenda from './LembreteAgenda';
+import EstiloShell from './EstiloShell';
+import BotaoAtualizar from './BotaoAtualizar';
+import VersaoApp from './VersaoApp';
 import { todayISO, addDays, fmtDate, weekday, ymOf } from '../lib/util';
 
 const MESES_LONGOS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -60,6 +63,28 @@ export default function Reservas() {
   const [erro, setErro] = useState('');
   const [recado, setRecado] = useState('');
   const [aba, setAba] = useState('reservas'); // 'reservas' | 'compras' | 'pasta'
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [lateralRecolhida, setLateralRecolhida] = useState(false);
+  const recolherLateral = (v) => setLateralRecolhida((cur) => {
+    const nv = v == null ? !cur : v;
+    try { localStorage.setItem('picoos-lateral', nv ? 'recolhida' : 'aberta'); } catch { /* ignora */ }
+    return nv;
+  });
+  useEffect(() => { try { setLateralRecolhida(localStorage.getItem('picoos-lateral') === 'recolhida'); } catch { /* ignora */ } }, []);
+
+  // Tema claro/escuro (mesmo comportamento do resto do app).
+  const [tema, setTema] = useState('escuro');
+  useEffect(() => { setTema(document.documentElement.getAttribute('data-theme') === 'claro' ? 'claro' : 'escuro'); }, []);
+  const trocarTema = () => {
+    const novo = tema === 'claro' ? 'escuro' : 'claro';
+    setTema(novo);
+    document.documentElement.setAttribute('data-theme', novo);
+    try { localStorage.setItem('picoos-tema', novo); } catch { /* ignora */ }
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', novo === 'claro' ? '#F6F9FD' : '#0A1220');
+  };
+  const MENU = [['reservas', 'Reservas'], ['compras', 'Lista de Compras'], ['pasta', 'Pasta']];
+  const irPara = (v) => { setAba(v); setMenuAberto(false); };
 
   const carregar = useCallback(async () => {
     try {
@@ -168,35 +193,67 @@ export default function Reservas() {
   const inp = { background: C.panel2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 10, padding: '11px 12px', fontSize: 15, width: '100%', boxSizing: 'border-box' };
   const tituloDoDia = diaSel === hoje ? 'Hoje' : diaSel === addDays(hoje, 1) ? 'Amanhã' : `${weekday(diaSel)}, ${fmtDate(diaSel)}`;
 
+  const iconeTema = tema === 'claro'
+    ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
+    : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.2M12 19.3v2.2M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.4 19.6l1.6-1.6M18 6l1.6-1.6" /></svg>;
+
   return (
     <div style={{ minHeight: '100dvh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      {/* Barra de cima: o recuo do topo tem que contar a "faixa do relógio" do
-          iPhone (env(safe-area-inset-top)), senão o nome e o Sair ficam por
-          baixo do relógio e da bateria. Mesmo formato da cozinha e do garçom. */}
-      <div style={{ padding: 'calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 13px calc(16px + env(safe-area-inset-left))', borderBottom: `1px solid ${C.hair}` }}>
-        <div style={{ maxWidth: 620, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <LogoMark size={34} radius={10} />
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 17, fontWeight: 900, lineHeight: 1 }}>Mari</div>
-            {/* O cargo dela embaixo do nome. Fica com menos espaçamento que o
-                resto porque é uma linha longa e precisa caber no celular. */}
-            <div style={{ fontSize: 10, color: C.accent, letterSpacing: '.08em', textTransform: 'uppercase', marginTop: 4, fontWeight: 800, lineHeight: 1.3 }}>
-              Coordenadora de Operações
-            </div>
-          </div>
-          <button onClick={sair} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, padding: '7px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Sair</button>
-        </div>
-      </div>
+      <EstiloShell />
 
-      <div style={{ maxWidth: 620, margin: '0 auto', padding: '16px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
-        <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 14 }}>
-          {[['reservas', 'Reservas'], ['compras', 'Compras'], ['pasta', 'Pasta']].map(([v, rot]) => (
-            <button key={v} onClick={() => setAba(v)} style={{
-              flex: 1, minWidth: 0, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 6px', fontSize: 13.5, fontWeight: 800,
-              background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
-            }}>{rot}</button>
-          ))}
-        </div>
+      {/* Mesma casca do painel da Karen: lateral no computador, gaveta no
+          celular. Só o que tem dentro do menu é que muda. */}
+      <div className={`pos-shell${lateralRecolhida ? ' pos-recolhida' : ''}`}>
+        {menuAberto && <div className="pos-overlay" onClick={() => setMenuAberto(false)} />}
+        <aside className={`pos-sidebar${menuAberto ? ' pos-open' : ''}`}>
+          <div className="pos-side-head">
+            <LogoMark size={34} radius={10} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 900, lineHeight: 1 }}>Mari</div>
+              <div style={{ fontSize: 9.5, color: C.accent, letterSpacing: '.08em', textTransform: 'uppercase', marginTop: 3, fontWeight: 800, lineHeight: 1.3 }}>
+                Coordenadora de Operações
+              </div>
+            </div>
+            <button className="pos-recolher" onClick={() => recolherLateral(true)} title="Recolher a lateral" aria-label="Recolher a lateral" style={{ marginLeft: 'auto' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+            </button>
+          </div>
+          <nav className="pos-nav">
+            <div className="pos-group">
+              <div className="pos-group-title">Operação</div>
+              {MENU.map(([v, rot]) => (
+                <button key={v} onClick={() => irPara(v)} className={`pos-navitem${aba === v ? ' pos-active' : ''}`}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rot}</span>
+                </button>
+              ))}
+            </div>
+          </nav>
+          <div className="pos-side-foot">
+            <BotaoAtualizar />
+            <button onClick={trocarTema} title={tema === 'claro' ? 'Mudar para escuro' : 'Mudar para claro'} aria-label="Trocar tema"
+              style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {iconeTema}
+            </button>
+            <button onClick={sair} style={{ flex: 1, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Sair</button>
+          </div>
+          <VersaoApp />
+        </aside>
+
+        <div className="pos-content">
+          <div className="pos-topbar">
+            <button className="pos-burger" onClick={() => { if (typeof window !== 'undefined' && window.innerWidth >= 820) recolherLateral(false); else setMenuAberto(true); }} aria-label="Abrir menu">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
+              <LogoMark size={28} radius={9} />
+              <div style={{ fontSize: 16, fontWeight: 900, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {MENU.find(([v]) => v === aba)?.[1] || 'Mari'}
+              </div>
+            </div>
+            <BotaoAtualizar />
+          </div>
+
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
 
         {aba === 'compras' ? <ListaMercado /> : aba === 'pasta' ? <Pasta /> : (
         <>
@@ -373,6 +430,8 @@ export default function Reservas() {
             : aba === 'pasta'
               ? 'Cada texto fica numa pasta que tu mesma cria. O botão “copiar” manda o texto inteiro pra área de transferência.'
               : 'Toca num dia pra ver e anotar as reservas dele. Os dias com bolinha já têm mesa guardada.'}
+        </div>
+      </div>
         </div>
       </div>
     </div>
