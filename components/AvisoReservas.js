@@ -35,7 +35,13 @@ export default function AvisoReservas({ compacto = false }) {
   const amanha = addDays(hoje, 1);
   const doDia = reservas.filter((r) => r.data === hoje);
   const doAmanha = reservas.filter((r) => r.data === amanha);
-  if (!carregado || (!doDia.length && !doAmanha.length)) return null;
+  // Mesa marcada pra daqui a alguns dias também precisa aparecer — senão a
+  // reserva do dia 20 só existe pra quem a anotou, até o dia 19.
+  const proximas = reservas
+    .filter((r) => r.data > amanha)
+    .sort((a, b) => `${a.data} ${a.hora || ''}`.localeCompare(`${b.data} ${b.hora || ''}`))
+    .slice(0, 3);
+  if (!carregado || (!doDia.length && !doAmanha.length && !proximas.length)) return null;
 
   const agora = horaAgora();
   const pessoasDe = (lista) => lista.reduce((s, r) => s + (Number(r.pessoas) || 1), 0);
@@ -73,6 +79,23 @@ export default function AvisoReservas({ compacto = false }) {
             AMANHÃ · {doAmanha.length} {doAmanha.length === 1 ? 'reserva' : 'reservas'} · {pessoasDe(doAmanha)} pessoas
           </div>
           {doAmanha.map((r) => <Linha key={r.id} r={r} />)}
+        </div>
+      )}
+      {proximas.length > 0 && (
+        <div style={(doDia.length || doAmanha.length) ? { marginTop: 9, paddingTop: 8, borderTop: `1px solid ${C.hair}` } : undefined}>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: C.muted, letterSpacing: '.04em', marginBottom: 4 }}>
+            {(doDia.length || doAmanha.length) ? 'DEPOIS' : 'PRÓXIMAS MESAS RESERVADAS'}
+          </div>
+          {proximas.map((r) => (
+            <div key={r.id} style={{ display: 'flex', gap: 9, alignItems: 'baseline', padding: '3px 0' }}>
+              <span style={{ fontSize: 12.5, fontWeight: 900, color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 78 }}>
+                {r.data.slice(8, 10)}/{r.data.slice(5, 7)}{r.hora ? ` ${r.hora}` : ''}
+              </span>
+              <span style={{ minWidth: 0, fontSize: 13, color: C.muted, lineHeight: 1.4 }}>
+                <b style={{ color: C.text }}>{r.nome}</b> · {Number(r.pessoas) || 1} {(Number(r.pessoas) || 1) === 1 ? 'pessoa' : 'pessoas'}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>

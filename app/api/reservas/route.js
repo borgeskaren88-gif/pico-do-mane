@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { notificarReservaNova } from '../../../lib/push';
+import { criarEvento, atualizarEvento, apagarEvento } from '../../../lib/google';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs'; // o aviso usa web-push, que precisa do Node.
@@ -12,6 +13,12 @@ export const runtime = 'nodejs'; // o aviso usa web-push, que precisa do Node.
 // atendimento precisa guardar a mesa. Por isso a leitura é livre pra quem está
 // logado e só a escrita é fechada.
 const PREFIXO = 'reserva:';
+
+// Como a reserva aparece na agenda: "Reserva: Ana Paula · 8 pessoas".
+const tituloDaAgenda = (r) => {
+  const q = Number(r.pessoas) || 1;
+  return `Reserva: ${r.nome} · ${q} ${q === 1 ? 'pessoa' : 'pessoas'}`;
+};
 
 const txt = (v, max) => String(v == null ? '' : v).slice(0, max).trim();
 const ehData = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
@@ -50,6 +57,10 @@ export async function POST(request) {
     if (acao === 'excluir') {
       const id = txt(body?.id, 40);
       if (!id) return NextResponse.json({ ok: false, erro: 'Reserva não informada.' }, { status: 400 });
+      // Tira também do Google Agenda, senão ficava lá uma mesa que não existe.
+      const { data: antiga } = await sb.from('pdm_dados').select('valor').eq('chave', PREFIXO + id).maybeSingle();
+      const gid = antiga?.valor?.googleId;
+      if (gid) { try { await apagarEvento(gid); } catch { /* sem Google: a reserva some do PicoOS do mesmo jeito */ } }
       const { error } = await sb.from('pdm_dados').delete().eq('chave', PREFIXO + id);
       if (error) throw error;
       return NextResponse.json({ ok: true, excluida: true });
@@ -72,10 +83,25 @@ export async function POST(request) {
     const nova = !antes?.valor;
     const reserva = {
       id, nome, data, hora, pessoas, obs, telefone,
+      googleId: antes?.valor?.googleId || '',
       criadoPor: antes?.valor?.criadoPor || p,
       criadoEm: antes?.valor?.criadoEm || new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
     };
+
+    // A reserva também vira compromisso no Google Agenda: assim ela aparece no
+    // calendário do celular de quem usa a agenda e ainda dispara o aviso 15 min
+    // antes que o PicoOS já fazia pros compromissos. Se o Google não estiver
+    // conectado, nada disso acontece e a reserva é salva igual.
+    const naAgenda = { titulo: tituloDaAgenda(reserva), data, hora, diaTodo: !hora };
+    try {
+      if (reserva.googleId) {
+        await atualizarEvento(reserva.googleId, naAgenda);
+      } else {
+        const ev = await criarEvento(naAgenda);
+        if (ev && ev.id) reserva.googleId = ev.id;
+      }
+    } catch { /* Google fora do ar ou não conectado: segue sem ele */ }
     const { error } = await sb.from('pdm_dados').upsert(
       { chave: PREFIXO + id, valor: reserva, atualizado_em: new Date().toISOString() },
       { onConflict: 'chave' },

@@ -18,6 +18,7 @@ const semanaDe = (iso) => { const ini = addDays(iso, -diaDaSemana(iso)); return 
 export default function AgendaMes() {
   const hoje = todayISO();
   const [agenda, setAgenda] = useState(null); // null = não conectado / carregando
+  const [reservas, setReservas] = useState([]); // mesas reservadas (da Mari)
   const [diaSel, setDiaSel] = useState(hoje);
   const [mesAberto, setMesAberto] = useState(false); // o quadradão do mês inteiro
   const [novoAberto, setNovoAberto] = useState(false);
@@ -37,7 +38,16 @@ export default function AgendaMes() {
       setAgenda(j.ok && j.conectado ? (j.eventos || []) : null);
     } catch { setAgenda(null); }
   };
-  useEffect(() => { carregarAgenda(); }, []);
+  // As mesas reservadas vêm do PicoOS, não do Google — então aparecem no
+  // calendário mesmo que a agenda do Google não esteja conectada.
+  const carregarReservas = async () => {
+    try {
+      const r = await fetch('/api/reservas', { cache: 'no-store' });
+      const j = await r.json();
+      setReservas(j.ok && Array.isArray(j.reservas) ? j.reservas : []);
+    } catch { setReservas([]); }
+  };
+  useEffect(() => { carregarAgenda(); carregarReservas(); }, []);
 
   // "Dar ok" numa tarefa: risca (marca como feita) ou desmarca no Google. Ela
   // fica na lista, só riscada — como num calendário digital.
@@ -55,16 +65,34 @@ export default function AgendaMes() {
 
   const porDia = useMemo(() => {
     const m = new Map();
+    // A reserva que já virou compromisso no Google chegaria duas vezes (uma por
+    // aqui, outra pela agenda). Fica valendo a nossa, que sabe quantas pessoas
+    // são e traz a observação.
+    const idsNoGoogle = new Set(reservas.map((r) => r && r.googleId).filter(Boolean));
+    const põe = (d, item) => { if (!m.has(d)) m.set(d, []); m.get(d).push(item); };
     for (const ev of (agenda || [])) {
       const d = (ev.inicio || '').slice(0, 10);
-      if (!d) continue;
-      if (!m.has(d)) m.set(d, []);
-      m.get(d).push(ev);
+      if (!d || idsNoGoogle.has(ev.id)) continue;
+      põe(d, ev);
+    }
+    for (const r of reservas) {
+      if (!r || !r.data) continue;
+      const q = Number(r.pessoas) || 1;
+      põe(r.data, {
+        id: 'reserva-' + r.id,
+        titulo: `${r.nome} · ${q} ${q === 1 ? 'pessoa' : 'pessoas'}`,
+        inicio: r.hora ? `${r.data}T${r.hora}:00` : r.data,
+        diaTodo: !r.hora,
+        tarefa: false,
+        reserva: true,
+        obs: r.obs || '',
+      });
     }
     for (const evs of m.values()) evs.sort((a, b) => String(a.inicio).localeCompare(String(b.inicio)));
     return m;
-  }, [agenda]);
+  }, [agenda, reservas]);
   const diasComEvento = useMemo(() => new Set(porDia.keys()), [porDia]);
+  const diasComReserva = useMemo(() => new Set(reservas.map((r) => r && r.data).filter(Boolean)), [reservas]);
 
   const mes = ymOf(diaSel);
   const cabMes = (() => { const [y, m] = diaSel.split('-'); return `${MESES_LONGOS[Number(m) - 1]}, ${y}`; })();
@@ -81,8 +109,8 @@ export default function AgendaMes() {
   }, [mes]);
 
   const ehBoleto = (ev) => ev.tarefa && /^\s*boleto/i.test(ev.titulo || '');
-  const corEvento = (ev) => (ehBoleto(ev) ? C.amber : ev.tarefa ? C.roxo : ev.diaTodo ? C.accent2 : C.accent);
-  const etiquetaEvento = (ev) => (ehBoleto(ev) ? 'A pagar' : ev.tarefa ? 'Tarefa' : ev.diaTodo ? 'Dia todo' : ev.inicio.slice(11, 16));
+  const corEvento = (ev) => (ev.reserva ? C.green : ehBoleto(ev) ? C.amber : ev.tarefa ? C.roxo : ev.diaTodo ? C.accent2 : C.accent);
+  const etiquetaEvento = (ev) => (ev.reserva ? 'Mesa reservada' : ehBoleto(ev) ? 'A pagar' : ev.tarefa ? 'Tarefa' : ev.diaTodo ? 'Dia todo' : ev.inicio.slice(11, 16));
   const horaEvento = (ev) => (ev.diaTodo || !ev.inicio || ev.inicio.length < 16 ? '' : ev.inicio.slice(11, 16));
 
   // A lista do dia em forma de linha do tempo: bolinha, fio ligando e o cartão
@@ -122,6 +150,7 @@ export default function AgendaMes() {
                 </div>
                 <div style={{ fontSize: 14.5, fontWeight: 800, color: C.text, lineHeight: 1.35, margin: '3px 0 7px', textDecoration: ev.concluida ? 'line-through' : 'none', overflowWrap: 'anywhere' }}>
                   {ev.titulo}
+                  {ev.obs ? <span style={{ display: 'block', fontSize: 12, fontWeight: 500, color: C.faint, marginTop: 3, lineHeight: 1.45 }}>{ev.obs}</span> : null}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 11, fontWeight: 800, color: cor, background: `color-mix(in srgb, ${cor} 20%, transparent)`, borderRadius: 999, padding: '3px 10px' }}>
@@ -149,13 +178,15 @@ export default function AgendaMes() {
     try {
       const r = await fetch('/api/google/criar-evento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titulo: evTitulo.trim(), data: evData, hora: evHora, diaTodo: evDiaTodo }) });
       const j = await r.json();
-      if (j.ok) { setNovoAberto(false); setEvTitulo(''); setEvDiaTodo(false); setDiaSel(evData); await carregarAgenda(); }
+      if (j.ok) { setNovoAberto(false); setEvTitulo(''); setEvDiaTodo(false); setDiaSel(evData); await carregarAgenda(); await carregarReservas(); }
       else setEvErro(j.erro || 'Não consegui criar o evento.');
     } catch { setEvErro('Não consegui criar o evento.'); }
     setSalvandoEv(false);
   };
 
-  if (agenda === null) return null;
+  // Antes o calendário sumia quando o Google não estava conectado. Agora, se
+  // houver mesa reservada, ele fica: a reserva é do PicoOS e não depende disso.
+  if (agenda === null && reservas.length === 0) return null;
 
   const tituloDoDia = diaSel === hoje ? 'Hoje' : diaSel === addDays(hoje, 1) ? 'Amanhã' : diaSel === addDays(hoje, -1) ? 'Ontem' : `${weekday(diaSel)}, ${fmtDate(diaSel)}`;
   const quantosNoDia = (porDia.get(diaSel) || []).length;
@@ -217,7 +248,7 @@ export default function AgendaMes() {
                     fontSize: 13, fontWeight: sel || ehHoje ? 800 : 600, fontVariantNumeric: 'tabular-nums',
                   }}>
                     {Number(d.slice(8))}
-                    {temEv && !sel && <span style={{ position: 'absolute', bottom: 5, width: 4, height: 4, borderRadius: '50%', background: C.accent }} />}
+                    {temEv && !sel && <span style={{ position: 'absolute', bottom: 5, width: 4, height: 4, borderRadius: '50%', background: diasComReserva.has(d) ? C.green : C.accent }} />}
                   </button>
                 );
               })}
