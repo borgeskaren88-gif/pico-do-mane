@@ -5,6 +5,7 @@ import AvisoReservas from './AvisoReservas';
 import SinoNotificacoes from './SinoNotificacoes';
 import ListaMercado from './ListaMercado';
 import Pasta from './Pasta';
+import TrocarSenha from './TrocarSenha';
 import { todayISO, addDays, fmtDate, weekday, ymOf } from '../lib/util';
 
 const MESES_LONGOS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -302,7 +303,10 @@ export default function Reservas() {
           <SinoNotificacoes titulo="Avisos no celular" descricao="Receba um aviso quando alguém marcar uma mesa." />
         </div>
 
-        <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.55 }}>
+        {/* Trocar a própria senha: ela mesma escolhe, sem depender de ninguém. */}
+        <TrocarSenha quem="deste acesso (a Mari)" />
+
+        <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.55, marginTop: 18 }}>
           {aba === 'compras'
             ? 'A lista é a mesma que a cozinha anota. O que tu riscar aqui some da lista deles na hora.'
             : aba === 'pasta'

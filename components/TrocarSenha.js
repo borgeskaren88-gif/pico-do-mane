@@ -2,9 +2,12 @@
 import React, { useState } from 'react';
 import { C, Card, Btn, Field, SecTitle, inputStyle } from './ui';
 
-// Trocar a senha da Karen, dentro do app. Pede a senha atual + a nova (2×) e
-// grava no servidor. A partir daí, o login e a trava usam a senha nova.
-export default function TrocarSenha() {
+// Trocar a PRÓPRIA senha, dentro do app. Pede a senha atual + a nova (2×) e
+// grava no servidor. A partir daí, o login usa a senha nova.
+//
+// Serve pra qualquer acesso que troca a senha dele: quem manda o pedido é
+// quem está logado, então ninguém troca a senha de outra pessoa.
+export default function TrocarSenha({ quem = 'da Karen (login e desbloqueio)' }) {
   const [aberto, setAberto] = useState(false);
   const [atual, setAtual] = useState('');
   const [nova, setNova] = useState('');
@@ -44,7 +47,7 @@ export default function TrocarSenha() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>Senha de acesso</div>
-              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Trocar a senha da Karen (login e desbloqueio).</div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Trocar a senha {quem}.</div>
             </div>
             <Btn small onClick={() => { setMsg(null); setAberto(true); }}>Trocar senha</Btn>
           </div>

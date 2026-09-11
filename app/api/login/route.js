@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, valorSessaoValida, valorSessaoCozinha, valorSessaoGarcom, valorSessaoReservas } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { conferirSenhaDona, temSenhaDona } from '../../../lib/senha';
+import { conferirSenhaDona, temSenhaDona, conferirSenhaPapel } from '../../../lib/senha';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,6 @@ export async function POST(request) {
   // Senha da cozinha e do garçom: padrão "1234" se não houver variável.
   const senhaCozinha = process.env.APP_PASSWORD_COZINHA || '1234';
   const senhaGarcom = process.env.APP_PASSWORD_GARCOM || '1234';
-  const senhaReservas = process.env.APP_PASSWORD_RESERVAS || '1234';
   const sb = supabaseServer();
   // A senha da dona pode ter sido trocada no app (guardada no banco) ou vir da
   // APP_PASSWORD. Se não houver nenhuma das duas, aí sim é falta de config.
@@ -52,7 +51,8 @@ export async function POST(request) {
   } else if (papelPedido === 'garcom') {
     if (senha && comparaSegura(senha, senhaGarcom)) { valorCookie = valorSessaoGarcom(); papel = 'garcom'; }
   } else if (papelPedido === 'reservas') {
-    if (senha && comparaSegura(senha, senhaReservas)) { valorCookie = valorSessaoReservas(); papel = 'reservas'; }
+    // A Mari pode ter trocado a senha dela dentro do app — aí vale a do banco.
+    if (senha && await conferirSenhaPapel(sb, 'reservas', senha)) { valorCookie = valorSessaoReservas(); papel = 'reservas'; }
   } else if (papelPedido === 'dona' || !papelPedido) {
     // 'dona' explícito, ou sem papel (compatibilidade): tenta dona e, se não for,
     // ainda aceita cozinha pela senha (não quebra quem já usava só a senha).
