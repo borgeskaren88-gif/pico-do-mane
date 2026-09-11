@@ -6,6 +6,7 @@ import SinoNotificacoes from './SinoNotificacoes';
 import ListaMercado from './ListaMercado';
 import Pasta from './Pasta';
 import TrocarSenha from './TrocarSenha';
+import LembreteAgenda from './LembreteAgenda';
 import { todayISO, addDays, fmtDate, weekday, ymOf } from '../lib/util';
 
 const MESES_LONGOS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -14,6 +15,23 @@ const SEM_CURTO = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 const diaDaSemana = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).getDay(); };
 const semanaDe = (iso) => { const ini = addDays(iso, -diaDaSemana(iso)); return Array.from({ length: 7 }, (_, i) => addDays(ini, i)); };
 const vazio = (dia) => ({ id: '', nome: '', data: dia, hora: '20:00', pessoas: '2', obs: '', telefone: '' });
+
+// Link do WhatsApp com a mensagem pronta — mesma ideia da cobrança do fiado.
+// Telefone brasileiro sem o 55 ganha o 55 na frente; sem telefone não dá link
+// (aí a gente copia o texto pra ela colar onde quiser).
+const zapLink = (telefone, msg) => {
+  const d = String(telefone || '').replace(/\D/g, '');
+  const numero = d.length >= 12 ? d : (d.length >= 10 ? '55' + d : '');
+  return numero ? `https://wa.me/${numero}?text=${encodeURIComponent(msg)}` : '';
+};
+const primeiroNome = (n) => (String(n || '').trim().split(/\s+/)[0] || 'tudo bem');
+const msgConfirmacao = (r, hoje) => {
+  const q = Number(r.pessoas) || 1;
+  const quando = r.data === addDays(hoje, 1) ? 'amanhã' : r.data === hoje ? 'hoje' : `no dia ${r.data.slice(8, 10)}/${r.data.slice(5, 7)}`;
+  return `Olá ${primeiroNome(r.nome)}! Aqui é do Pico do Mané.\n\n`
+    + `Passando pra confirmar a tua mesa ${quando}${r.hora ? `, às ${r.hora}` : ''}, para ${q} ${q === 1 ? 'pessoa' : 'pessoas'}.\n\n`
+    + 'Está tudo certo? Se precisar mudar alguma coisa é só me avisar por aqui. Até logo!';
+};
 
 // A tela da Mari. Duas coisas, e só essas duas:
 //
@@ -111,6 +129,33 @@ export default function Reservas() {
     finally { setBusy(false); }
   };
 
+  // "Já confirmei com o cliente" — some do lembrete da véspera.
+  const confirmar = async (r, confirmada) => {
+    setBusy(true); setErro('');
+    try {
+      const resp = await fetch('/api/reservas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'confirmar', id: r.id, confirmada }),
+      });
+      const j = await resp.json();
+      if (!j.ok) { setErro(j.erro || 'Não consegui marcar.'); return; }
+      await carregar();
+    } catch { setErro('Sem conexão.'); }
+    finally { setBusy(false); }
+  };
+
+  // Abre a conversa da pessoa no WhatsApp com o texto pronto. Sem telefone
+  // cadastrado, copia a mensagem pra ela colar onde quiser.
+  const chamarNoZap = async (r) => {
+    const msg = msgConfirmacao(r, hoje);
+    const link = zapLink(r.telefone, msg);
+    if (link) { try { window.open(link, '_blank', 'noopener'); } catch { /* ignora */ } return; }
+    try {
+      await navigator.clipboard.writeText(msg);
+      setRecado(`${r.nome} está sem telefone aqui. Copiei a mensagem pra tu colar no WhatsApp.`);
+    } catch { setErro('Sem telefone cadastrado nessa reserva.'); }
+  };
+
   const sair = async () => {
     try { await fetch('/api/logout', { method: 'POST' }); } catch { /* ignora */ }
     if (typeof window !== 'undefined') window.location.reload();
@@ -147,6 +192,7 @@ export default function Reservas() {
 
         {aba === 'compras' ? <ListaMercado /> : aba === 'pasta' ? <Pasta /> : (
         <>
+        <LembreteAgenda />
         <AvisoReservas />
 
         {recado && (
@@ -235,7 +281,14 @@ export default function Reservas() {
                     {r.telefone ? ` · ${r.telefone}` : ''}
                   </div>
                   {r.obs ? <div style={{ fontSize: 12.5, color: C.faint, marginTop: 4, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{r.obs}</div> : null}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  {r.confirmada && (
+                    <div style={{ fontSize: 11.5, fontWeight: 800, color: C.green, marginTop: 5 }}>✓ confirmada com o cliente</div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                    <button onClick={() => chamarNoZap(r)} style={{ ...acaoBtn, color: C.accent, borderColor: C.accent }}>confirmar no WhatsApp</button>
+                    <button onClick={() => confirmar(r, !r.confirmada)} disabled={busy} style={{ ...acaoBtn, color: r.confirmada ? C.faint : C.green, borderColor: r.confirmada ? C.line : C.green }}>
+                      {r.confirmada ? 'desmarcar' : 'já confirmei'}
+                    </button>
                     <button onClick={() => setForm({ ...vazio(r.data), ...r, pessoas: String(r.pessoas || 1) })} style={acaoBtn}>editar</button>
                     <button onClick={() => excluir(r.id)} disabled={busy} style={{ ...acaoBtn, color: C.red }}>apagar</button>
                   </div>

@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../../lib/auth';
 import { supabaseServer } from '../../../../lib/supabase';
-import { notificarAgenda } from '../../../../lib/push';
+import { notificarAgenda, notificarReservasAmanha } from '../../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs'; // web-push precisa do Node (crypto), não do Edge.
@@ -13,12 +13,16 @@ export const runtime = 'nodejs'; // web-push precisa do Node (crypto), não do E
 // É idempotente: o mesmo evento nunca é avisado duas vezes.
 export async function POST() {
   const p = papelDaSessao(cookies().get(nomeCookie())?.value);
-  if (p !== 'dona' && p !== 'garcom' && p !== 'cozinha') {
+  if (p !== 'dona' && p !== 'garcom' && p !== 'cozinha' && p !== 'reservas') {
     return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   }
   try {
-    const r = await notificarAgenda(supabaseServer());
-    return NextResponse.json({ ok: true, ...r });
+    const sb = supabaseServer();
+    const r = await notificarAgenda(sb);
+    // Na mesma batida, o lembrete de confirmar as mesas de amanhã.
+    let reservas = null;
+    try { reservas = await notificarReservasAmanha(sb); } catch { /* nunca derruba a agenda */ }
+    return NextResponse.json({ ok: true, ...r, reservas });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao conferir a agenda.' }, { status: 500 });
   }
