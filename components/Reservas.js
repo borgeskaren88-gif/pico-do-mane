@@ -178,7 +178,11 @@ export default function Reservas() {
           <LogoMark size={34} radius={10} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 17, fontWeight: 900, lineHeight: 1 }}>Mari</div>
-            <div style={{ fontSize: 10.5, color: C.accent, letterSpacing: '.12em', textTransform: 'uppercase', marginTop: 3, fontWeight: 700 }}>Pico do Mané</div>
+            {/* O cargo dela embaixo do nome. Fica com menos espaçamento que o
+                resto porque é uma linha longa e precisa caber no celular. */}
+            <div style={{ fontSize: 10, color: C.accent, letterSpacing: '.08em', textTransform: 'uppercase', marginTop: 4, fontWeight: 800, lineHeight: 1.3 }}>
+              Coordenadora de Operações
+            </div>
           </div>
           <button onClick={sair} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, padding: '7px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Sair</button>
         </div>
