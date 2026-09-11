@@ -10,6 +10,7 @@ import Darci from './Darci';
 import DarciFlutuante from './DarciFlutuante';
 import Hoje from './Hoje';
 import AvisoReservas from './AvisoReservas';
+import Pasta from './Pasta';
 import EstiloShell from './EstiloShell';
 import Diario from './Diario';
 import Marketing from './Marketing';
@@ -439,7 +440,7 @@ export default function Dashboard() {
     ['darci', 'Darci'], ['brain', 'Brain'], ['hoje', 'Dashboard'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['previsao', 'Previsão'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'], ['despesarapida', 'Despesa Rápida'],
-    ['ponto', 'Ponto'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['backup', 'Backup'],
+    ['ponto', 'Ponto'], ['pasta', 'Pasta'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['backup', 'Backup'],
   ];
 
   // Barra lateral: as áreas agrupadas por assunto (no PC fica fixa na lateral;
@@ -451,7 +452,7 @@ export default function Dashboard() {
   useEffect(() => { try { if (localStorage.getItem('picoos-lateral') === 'recolhida') setLateralRecolhida(true); } catch { /* ignora */ } }, []);
   const recolherLateral = (v) => setLateralRecolhida((cur) => { const nv = v == null ? !cur : v; try { localStorage.setItem('picoos-lateral', nv ? 'recolhida' : 'aberta'); } catch { /* ignora */ } return nv; });
   const grupos = [
-    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ['darci', 'Darci'], ['brain', 'Brain']] },
+    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ['darci', 'Darci'], ['brain', 'Brain'], ['pasta', 'Pasta']] },
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento'], ['previsao', 'Previsão']] },
     { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
@@ -647,6 +648,9 @@ export default function Dashboard() {
       <div style={{ maxWidth: tab === 'brain' ? 1180 : 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {tab === 'darci' && <Darci {...propsDarci} />}
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
+        {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
+            ficha técnica de prato e de drink. As duas leem e escrevem. */}
+        {tab === 'pasta' && <Pasta />}
         {/* Mesa reservada hoje/amanhã — a dona vê logo ao abrir o painel. */}
         {tab === 'hoje' && <AvisoReservas />}
         {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={<DarciFlutuante {...propsDarci} />} />}
