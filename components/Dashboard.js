@@ -714,10 +714,14 @@ export default function Dashboard() {
             )}
             {subAbast === 'estoque' && (
               <>
-                <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
+                {/* Estas abas somam mais largura do que cabe num celular. Com
+                    flex:1 e texto sem quebra, o mínimo delas empurrava a PÁGINA
+                    inteira pro lado. Aqui elas rolam dentro da própria barra,
+                    igual à barra de cima. */}
+                <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
                   {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas'], ['conferencia', 'Conferência'], ['cortesia', 'Cortesia / Consumo']].map(([v, rot]) => (
                     <button key={v} onClick={() => setSubEstoque(v)} style={{
-                      flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 10px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
+                      flex: '1 0 auto', border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
                       background: subEstoque === v ? C.accent : 'transparent', color: subEstoque === v ? '#06101F' : C.muted,
                     }}>{rot}</button>
                   ))}
