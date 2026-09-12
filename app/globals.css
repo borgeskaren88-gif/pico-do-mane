@@ -39,34 +39,34 @@
 
 :root[data-theme="claro"] {
   color-scheme: light;
-  --c-ink: #E9DCC6;
-  --c-panel: #FFFDF8;
-  --c-panel2: #F3E9D7;
-  --c-raised: #FFFDF8;
-  --c-line: #E1CFB4;
-  --c-hair: #EDE1CB;
+  --c-ink: #EEE7D8;
+  --c-panel: #FFFFFF;
+  --c-panel2: #F6F1E7;
+  --c-raised: #FFFFFF;
+  --c-line: #E7DECB;
+  --c-hair: #EFE8DA;
   --c-accent: #7C8A6C;
   --c-accent2: #9BAA8B;
   /* Cor do texto/ícone em cima do botão de destaque (sage -> texto claro linho). */
-  --c-on-accent: #F5F0E6;
+  --c-on-accent: #F7F3EC;
   --c-text: #2E3327;
-  --c-muted: #5E6653;
-  --c-faint: #8E9484;
+  --c-muted: #6B7360;
+  --c-faint: #9A9C8C;
   --c-green: #5E8A54;
   --c-red: #A65B3E;
   --c-amber: #8F6A1F;
-  --c-red-soft: rgba(166, 91, 62, 0.33);
-  --c-bar-bg: rgba(249, 240, 226, 0.6);
-  --c-glow-a: rgba(176, 137, 104, 0.22);
+  --c-red-soft: rgba(166, 91, 62, 0.30);
+  --c-bar-bg: rgba(250, 246, 238, 0.85);
+  --c-glow-a: rgba(176, 137, 104, 0.14);
   --c-glow-b: rgba(176, 137, 104, 0);
-  --c-bg-top: #F4EFE4;
-  --c-bg-bottom: #E4DED0;
-  /* Vidro (glassmorphism): cartões translúcidos claros com desfoque. */
-  --c-glass-bg: rgba(255, 255, 252, 0.55);
-  --c-glass-border: rgba(70, 78, 60, 0.16);
-  --c-glass-shadow: 0 10px 30px rgba(60, 66, 48, 0.10);
-  --c-card-border: #EDE1CB;
-  --c-card-shadow: 0 1px 2px rgba(59, 42, 34, 0.05), 0 8px 24px rgba(59, 42, 34, 0.08);
+  --c-bg-top: #F7F3EC;
+  --c-bg-bottom: #ECE5D8;
+  /* Cartões branquinhos com sombra suave (visual clean, casa inteligente). */
+  --c-glass-bg: rgba(255, 255, 254, 0.72);
+  --c-glass-border: rgba(70, 78, 60, 0.13);
+  --c-glass-shadow: 0 1px 2px rgba(70, 66, 48, 0.04), 0 10px 26px rgba(70, 66, 48, 0.07);
+  --c-card-border: #EDE6D6;
+  --c-card-shadow: 0 1px 2px rgba(70, 66, 48, 0.04), 0 10px 24px rgba(70, 66, 48, 0.07);
 }
 
 html, body {

@@ -21,7 +21,7 @@ const ABAS = [
 export default function Painel({ usuario }) {
   const router = useRouter();
   const [aba, setAba] = useState('inicio');
-  const [tema, setTema] = useState('escuro');
+  const [tema, setTema] = useState('claro');
 
   useEffect(() => {
     try {
@@ -61,7 +61,7 @@ export default function Painel({ usuario }) {
           <button onClick={() => { setAba('inicio'); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }} title="Ir pro início" style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', padding: 0, cursor: 'pointer', flex: 1, minWidth: 0, textAlign: 'left' }}>
             <LogoMark size={30} radius={9} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.1, color: C.text }}>Nossa Casa</div>
+              <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 17, fontWeight: 700, lineHeight: 1.1, color: C.text }}>Nossa Casa</div>
               <div style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Olá, {usuario.nome} · {tituloAba}</div>
             </div>
           </button>

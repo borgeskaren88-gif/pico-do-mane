@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { C, Card, Icone } from './ui';
 import { todayISO, ymHoje, brl, MESES_LONGO } from '../lib/util';
 
-const serif = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif";
+const serif = "'Playfair Display', 'Iowan Old Style', Georgia, 'Times New Roman', serif";
 const DIAS_SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
 function saudacao() {
   const h = Number(new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }).format(new Date()));

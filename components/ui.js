@@ -64,7 +64,7 @@ export function LogoMark({ size = 42, radius = 12 }) {
 
 // Ícones desenhados (linha), sem emoji. Herdam a cor via currentColor, então
 // acompanham o texto do lugar onde são usados (aba ativa, tema, etc.).
-export function Icone({ name, size = 20, stroke = 2 }) {
+export function Icone({ name, size = 20, stroke = 1.75 }) {
   const props = {
     width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
     strokeWidth: stroke, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,

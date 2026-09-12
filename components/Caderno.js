@@ -4,7 +4,7 @@ import { C, Card, Label, inputStyle, Empty, Icone } from './ui';
 import { todayISO, fmtDate, MESES_LONGO, CORES_HABITO } from '../lib/util';
 import { VAPID_PUBLIC, urlB64ToUint8Array } from '../lib/push';
 
-const serif = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif";
+const serif = "'Playfair Display', 'Iowan Old Style', Georgia, 'Times New Roman', serif";
 // Papel dos post-its: creme com tinta café — cara de recadinho de verdade, e
 // combina com a paleta linho/café do app tanto no tema claro quanto no escuro.
 const PAPEL = '#EFE7D6', INK = '#3A2C20', INK_SOFT = '#6E5B49';

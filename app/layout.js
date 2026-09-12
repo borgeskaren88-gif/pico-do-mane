@@ -8,7 +8,7 @@ export const metadata = {
   appleWebApp: {
     capable: true,
     title: 'Nossa Casa',
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
   },
   icons: {
     icon: '/favicon-32.png',
@@ -17,7 +17,7 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: '#1A130B',
+  themeColor: '#F4EFE4',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -30,12 +30,12 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800;900&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap"
           rel="stylesheet"
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('financas-tema');if(t!=='claro'&&t!=='escuro')t='escuro';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('financas-tema');if(t!=='claro'&&t!=='escuro')t='claro';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
           }}
         />
       </head>
