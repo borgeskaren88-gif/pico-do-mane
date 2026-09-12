@@ -1,3 +1,6 @@
+'use client';
+import { useId } from 'react';
+
 // Cores por variáveis CSS (definidas em app/globals.css), pra permitir tema
 // claro e escuro sem trocar o código dos componentes. Os valores concretos de
 // cada tema ficam no globals.css; aqui só apontamos para as variáveis.
@@ -107,6 +110,45 @@ export function Icone({ name, size = 20, stroke = 1.75 }) {
     default:
       return null;
   }
+}
+
+// Glifos (contorno 24x24) usados nos ícones 3D. Reaproveitam os desenhos.
+const GLYPHS3D = {
+  wallet: <><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></>,
+  flame: <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />,
+  cart: <><path d="M5.5 8h13l-.8 11a2 2 0 0 1-2 1.9H8.3a2 2 0 0 1-2-1.9z" /><path d="M9 9V6.5a3 3 0 0 1 6 0V9" /></>,
+  tasks: <><path d="M4 7l1.7 1.7L9 5" /><path d="M12 7h8" /><path d="M4 17l1.7 1.7L9 15" /><path d="M12 17h8" /></>,
+  book: <><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v15H6.5A2.5 2.5 0 0 0 4 19.5V4.5Z" /><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20" /><path d="M9 7h7M9 11h5" /></>,
+  home: <><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M9.5 21v-6h5v6" /></>,
+  calendar: <><path d="M3 9h18M8 2.5v4M16 2.5v4" /><rect x="3" y="4.5" width="18" height="16" rx="2.5" /></>,
+};
+// Clareia um hex misturando com branco (0..1).
+function clarear(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const m = (v) => Math.round(v + (255 - v) * amt);
+  return `rgb(${m(r)}, ${m(g)}, ${m(b)})`;
+}
+
+// Ícone 3D "glass": uma forma vibrante em degradê atrás (girada), um cartão
+// fosco translúcido na frente e o desenho por cima, com brilho e sombrinha.
+// Fica lindo em tamanho grande (quadradinhos, destaques). `cor` é a cor da área.
+export function Icone3D({ name, cor = '#7C8A6C', size = 48 }) {
+  const raw = useId().replace(/[:]/g, '');
+  const c2 = cor, c1 = clarear(cor, 0.30);
+  const L = { fill: 'none', stroke: c2, strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" style={{ display: 'block', flexShrink: 0, filter: 'drop-shadow(0 5px 8px rgba(80,70,50,0.20))' }}>
+      <defs>
+        <linearGradient id={`${raw}a`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={c1} /><stop offset="1" stopColor={c2} /></linearGradient>
+        <linearGradient id={`${raw}b`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ffffff" stopOpacity="0.92" /><stop offset="1" stopColor={c2} stopOpacity="0.24" /></linearGradient>
+      </defs>
+      <rect x="8" y="6" width="27" height="27" rx="9" fill={`url(#${raw}a)`} transform="rotate(-11 21.5 19.5)" />
+      <rect x="12" y="13" width="29" height="29" rx="10" fill={`url(#${raw}b)`} stroke="#ffffff" strokeOpacity="0.7" strokeWidth="1" />
+      <ellipse cx="22" cy="18" rx="11" ry="4.5" fill="#ffffff" opacity="0.30" />
+      <g transform="translate(14.5,14.5) scale(1.13)" {...L}>{GLYPHS3D[name] || null}</g>
+    </svg>
+  );
 }
 
 export const inputStyle = {

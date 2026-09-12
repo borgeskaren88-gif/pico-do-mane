@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { C, Card, Icone } from './ui';
+import { C, Card, Icone, Icone3D } from './ui';
 import { todayISO, ymHoje, brl, MESES_LONGO } from '../lib/util';
 
 const serif = "'Playfair Display', 'Iowan Old Style', Georgia, 'Times New Roman', serif";
@@ -136,9 +136,9 @@ export default function Inicio({ usuario, onIr }) {
         {tiles.map((t) => (
           <button key={t.id} onClick={() => onIr(t.id)}
             style={{ textAlign: 'left', cursor: 'pointer', color: C.text, background: `linear-gradient(158deg, ${t.cor}22, ${t.cor}0A 55%), ${C.glassBg}`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.cor}3D`, borderRadius: 18, padding: 16, boxShadow: C.glassShadow, display: 'flex', flexDirection: 'column', gap: 14, minHeight: 120 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ width: 44, height: 44, borderRadius: 13, background: `${t.cor}2A`, border: `1px solid ${t.cor}55`, color: t.cor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icone name={t.ico} size={22} /></span>
-              <span style={{ color: t.cor, opacity: 0.6, display: 'flex' }}><Icone name="chevron" size={18} /></span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <Icone3D name={t.ico} cor={t.cor} size={50} />
+              <span style={{ color: t.cor, opacity: 0.55, display: 'flex', marginTop: 4 }}><Icone name="chevron" size={18} /></span>
             </div>
             <div>
               <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, color: C.text, letterSpacing: '.01em' }}>{t.nome}</div>
