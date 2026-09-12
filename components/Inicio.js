@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { C, Card, Icone, Icone3D } from './ui';
 import { todayISO, ymHoje, brl, MESES_LONGO } from '../lib/util';
 
-const serif = "'Playfair Display', 'Iowan Old Style', Georgia, 'Times New Roman', serif";
+const serif = "'Sora', system-ui, -apple-system, sans-serif";
 const DIAS_SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
 function saudacao() {
   const h = Number(new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }).format(new Date()));
@@ -99,7 +99,7 @@ export default function Inicio({ usuario, onIr }) {
     <div>
       {/* Saudação */}
       <div style={{ margin: '2px 2px 16px' }}>
-        <div style={{ fontFamily: serif, fontSize: 27, lineHeight: 1.1, color: C.text }}>{saudacao()}, <span style={{ fontStyle: 'italic' }}>{usuario.nome}</span></div>
+        <div style={{ fontFamily: serif, fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.12, color: C.text }}>{saudacao()}, <span style={{ fontWeight: 800 }}>{usuario.nome}</span></div>
         <div style={{ fontSize: 13, color: C.muted, marginTop: 3, textTransform: 'capitalize' }}>{dataExtenso(hoje)}</div>
       </div>
 
@@ -141,7 +141,7 @@ export default function Inicio({ usuario, onIr }) {
               <span style={{ color: t.cor, opacity: 0.55, display: 'flex', marginTop: 4 }}><Icone name="chevron" size={18} /></span>
             </div>
             <div>
-              <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, color: C.text, letterSpacing: '.01em' }}>{t.nome}</div>
+              <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, color: C.text, letterSpacing: '-0.01em' }}>{t.nome}</div>
               <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.sub}</div>
             </div>
           </button>

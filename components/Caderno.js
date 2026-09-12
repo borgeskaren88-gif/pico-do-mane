@@ -4,7 +4,7 @@ import { C, Card, Label, inputStyle, Empty, Icone } from './ui';
 import { todayISO, fmtDate, MESES_LONGO, CORES_HABITO } from '../lib/util';
 import { VAPID_PUBLIC, urlB64ToUint8Array } from '../lib/push';
 
-const serif = "'Playfair Display', 'Iowan Old Style', Georgia, 'Times New Roman', serif";
+const serif = "'Sora', system-ui, -apple-system, sans-serif";
 // Papel dos post-its: creme com tinta café — cara de recadinho de verdade, e
 // combina com a paleta linho/café do app tanto no tema claro quanto no escuro.
 const PAPEL = '#EFE7D6', INK = '#3A2C20', INK_SOFT = '#6E5B49';
@@ -80,8 +80,8 @@ export default function Caderno({ usuario }) {
     <div>
       {/* Cabeçalho estilo diário */}
       <div style={{ margin: '2px 2px 16px' }}>
-        <div style={{ fontFamily: serif, fontSize: 30, lineHeight: 1.05, color: C.text }}>
-          Meu <span style={{ fontStyle: 'italic' }}>caderno</span>
+        <div style={{ fontFamily: serif, fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.08, color: C.text }}>
+          Meu <span style={{ fontWeight: 800 }}>caderno</span>
         </div>
         <div style={{ fontFamily: serif, fontSize: 13, color: C.muted, marginTop: 4, textTransform: 'capitalize' }}>{dataExtenso(hoje)}</div>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 12, color: C.faint, background: C.glassBg, border: `1px solid ${C.glassBorder}`, borderRadius: 999, padding: '4px 11px' }}>
