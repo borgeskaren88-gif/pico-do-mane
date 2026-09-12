@@ -1,7 +1,19 @@
 'use client';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { C, Card, Label, inputStyle, Empty, Icone } from './ui';
-import { todayISO, CORES_HABITO } from '../lib/util';
+import { todayISO, ymHoje, mesLabel, passoMes, CORES_HABITO } from '../lib/util';
+
+const DIAS_SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+const WD3 = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+function diasDoMes(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const inicio = new Date(y, m - 1, 1).getDay();
+  const total = new Date(y, m, 0).getDate();
+  const out = [];
+  for (let i = 0; i < inicio; i++) out.push(null);
+  for (let d = 1; d <= total; d++) out.push(`${ym}-${String(d).padStart(2, '0')}`);
+  return out;
+}
 
 // Pessoas padrão (nomes editáveis; ids fixos pra não quebrar tarefas antigas).
 const PESSOAS_PADRAO = [
@@ -19,6 +31,7 @@ export default function Tarefas({ usuario }) {
   const [addPessoa, setAddPessoa] = useState(false);
   const [novaPessoa, setNovaPessoa] = useState('');
   const [editPessoa, setEditPessoa] = useState(false);
+  const [modo, setModo] = useState('calendario'); // 'calendario' | 'pessoas'
 
   // Formulário de nova tarefa
   const [titulo, setTitulo] = useState('');
@@ -82,6 +95,22 @@ export default function Tarefas({ usuario }) {
       {erro && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{erro}</div>}
       {carregando ? <Empty>Carregando…</Empty> : (
         <>
+          {/* Alternar visão: Calendário / Por pessoa */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            {[['calendario', 'Calendário', 'calendar'], ['pessoas', 'Por pessoa', 'tasks']].map(([id, rot, ico]) => {
+              const on = modo === id;
+              return (
+                <button key={id} onClick={() => setModo(id)} style={{ flex: 1, padding: '9px 0', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: `1.5px solid ${on ? C.accent : C.line}`, background: on ? C.accent : 'transparent', color: on ? C.onAccent : C.muted, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <Icone name={ico} size={16} /> {rot}
+                </button>
+              );
+            })}
+          </div>
+
+          {modo === 'calendario' ? (
+            <CalendarioTarefas tarefas={tarefas} pessoas={pessoas} acao={acao} />
+          ) : (
+          <>
           {/* Seletor de pessoa (rolagem horizontal) */}
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, marginBottom: 14 }}>
             {pessoas.map((p) => {
@@ -155,11 +184,142 @@ export default function Tarefas({ usuario }) {
               </div>
             </>
           )}
+          </>
+          )}
         </>
       )}
     </div>
   );
 }
+
+// ===== Modo Calendário: mês colorido por pessoa =====
+function CalendarioTarefas({ tarefas, pessoas, acao }) {
+  const [mes, setMes] = useState(ymHoje());
+  const [diaSel, setDiaSel] = useState(todayISO());
+  const [titulo, setTitulo] = useState('');
+  const [hora, setHora] = useState('');
+  const [meta, setMeta] = useState('1');
+  const [selP, setSelP] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const hoje = todayISO();
+
+  useEffect(() => { if (!pessoas.some((p) => p.id === selP)) setSelP(pessoas.find((p) => p.id === 'karen')?.id || pessoas[0]?.id || ''); }, [pessoas, selP]);
+  const corDe = (pid) => (pessoas.find((p) => p.id === pid)?.cor || C.accent);
+  const nomeDe = (pid) => (pessoas.find((p) => p.id === pid)?.nome || '');
+
+  const porDia = useMemo(() => {
+    const m = {};
+    for (const t of tarefas) { if (t.data) (m[t.data] = m[t.data] || []).push(t); }
+    return m;
+  }, [tarefas]);
+  const doDia = (porDia[diaSel] || []).slice().sort((a, b) => (a.hora || '99').localeCompare(b.hora || '99'));
+  const semData = useMemo(() => tarefas.filter((t) => !t.data), [tarefas]);
+  const dias = useMemo(() => diasDoMes(mes), [mes]);
+
+  const adicionar = async (e) => {
+    e.preventDefault();
+    if (!titulo.trim() || salvando || !selP) return;
+    setSalvando(true);
+    await acao({ acao: 'tarefaAdd', pessoa: selP, titulo: titulo.trim(), meta, data: diaSel, hora });
+    setTitulo(''); setHora(''); setMeta('1'); setSalvando(false);
+  };
+
+  const [y, mm, dd] = diaSel.split('-').map(Number);
+  const diaSelLabel = `${WD3[new Date(y, mm - 1, dd).getDay()]}, ${dd}/${String(mm).padStart(2, '0')}`;
+
+  return (
+    <div>
+      {/* Legenda das pessoas */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '0 2px 12px' }}>
+        {pessoas.map((p) => (
+          <div key={p.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted }}>
+            <span style={{ width: 11, height: 11, borderRadius: 999, background: p.cor }} /> {p.nome}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendário do mês */}
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <button onClick={() => setMes(passoMes(mes, -1))} style={navBtn}>‹</button>
+          <div style={{ fontSize: 15, fontWeight: 700, textTransform: 'capitalize' }}>{mesLabel(mes)}</div>
+          <button onClick={() => setMes(passoMes(mes, 1))} style={navBtn}>›</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+          {DIAS_SEMANA.map((d, i) => <div key={i} style={{ textAlign: 'center', fontSize: 11, color: C.faint, fontWeight: 700, paddingBottom: 4 }}>{d}</div>)}
+          {dias.map((iso, i) => {
+            if (!iso) return <div key={`b${i}`} />;
+            const ts = porDia[iso] || [];
+            const ehHoje = iso === hoje;
+            const selec = iso === diaSel;
+            return (
+              <button key={iso} onClick={() => setDiaSel(iso)}
+                style={{ aspectRatio: '1', borderRadius: 10, cursor: 'pointer', padding: 2, border: `1.5px solid ${selec ? C.accent : ehHoje ? C.line : 'transparent'}`, background: selec ? 'rgba(160,150,130,0.18)' : 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                <span style={{ fontSize: 12, fontWeight: ehHoje ? 800 : 500, color: ehHoje ? C.accent : C.text }}>{Number(iso.slice(8))}</span>
+                <span style={{ display: 'flex', gap: 2, height: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {ts.slice(0, 4).map((t) => <span key={t.id} style={{ width: 6, height: 6, borderRadius: 999, background: corDe(t.pessoa), opacity: (Number(t.feitos) || 0) >= t.meta ? 0.4 : 1 }} />)}
+                  {ts.length > 4 && <span style={{ fontSize: 8, color: C.muted }}>+</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Adicionar tarefa no dia escolhido */}
+      <Card style={{ marginBottom: 16 }}>
+        <Label>Nova tarefa · {diaSel === hoje ? 'hoje' : diaSelLabel}</Label>
+        <form onSubmit={adicionar} style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 8 }}>
+            {pessoas.map((p) => {
+              const on = p.id === selP;
+              return (
+                <button type="button" key={p.id} onClick={() => setSelP(p.id)} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 999, cursor: 'pointer', border: `1.5px solid ${on ? p.cor : C.line}`, background: on ? p.cor : 'transparent', color: on ? '#20180F' : C.muted, fontWeight: 700, fontSize: 13 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 999, background: on ? '#20180F' : p.cor }} /> {p.nome}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Passear com a Aurora" style={inputStyle} />
+            <input inputMode="numeric" value={meta} onChange={(e) => setMeta(e.target.value)} title="Quantas vezes" style={{ ...inputStyle, width: 58, flexShrink: 0, textAlign: 'center' }} />
+            <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} style={{ ...inputStyle, padding: '8px 8px', colorScheme: 'dark', WebkitAppearance: 'none', appearance: 'none', width: 92, flexShrink: 0 }} />
+          </div>
+          <button type="submit" disabled={salvando} style={{ width: '100%', marginTop: 10, background: corDe(selP), color: '#20180F', border: 'none', borderRadius: 10, padding: '11px', fontSize: 15, fontWeight: 800, cursor: 'pointer', opacity: salvando ? 0.7 : 1 }}>{salvando ? 'Adicionando…' : `+ Adicionar em ${diaSel === hoje ? 'hoje' : diaSelLabel}`}</button>
+        </form>
+      </Card>
+
+      {/* Tarefas do dia escolhido */}
+      <Label>{diaSel === hoje ? 'Hoje' : diaSelLabel} · {doDia.length} tarefa{doDia.length === 1 ? '' : 's'}</Label>
+      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {doDia.length === 0 ? <Empty>Nada nesse dia.<br />Toque num dia com bolinha ou adicione aqui em cima.</Empty>
+          : doDia.map((t) => (
+            <div key={t.id}>
+              <div style={{ fontSize: 11, color: corDe(t.pessoa), fontWeight: 700, margin: '0 2px 4px' }}>{nomeDe(t.pessoa)}</div>
+              <TarefaLinha t={t} cor={corDe(t.pessoa)} acao={acao} />
+            </div>
+          ))}
+      </div>
+
+      {/* Tarefas sem dia marcado */}
+      {semData.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <Label>Sem dia marcado ({semData.length})</Label>
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {semData.map((t) => (
+              <div key={t.id}>
+                <div style={{ fontSize: 11, color: corDe(t.pessoa), fontWeight: 700, margin: '0 2px 4px' }}>{nomeDe(t.pessoa)}</div>
+                <TarefaLinha t={t} cor={corDe(t.pessoa)} acao={acao} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const navBtn = { width: 36, height: 36, borderRadius: 10, border: `1px solid ${C.line}`, background: C.panel2, color: C.text, cursor: 'pointer', fontSize: 20, lineHeight: 1, flexShrink: 0 };
 
 function EditarPessoa({ pessoa, acao, podeApagar, onFim }) {
   const [nome, setNome] = useState(pessoa.nome);
