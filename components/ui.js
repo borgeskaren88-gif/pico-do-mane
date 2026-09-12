@@ -62,49 +62,48 @@ export function LogoMark({ size = 42, radius = 12 }) {
   );
 }
 
-// Ícones desenhados (linha), sem emoji. Herdam a cor via currentColor, então
-// acompanham o texto do lugar onde são usados (aba ativa, tema, etc.).
+// Ícones "duotone" (sem emoji): uma forminha preenchida bem clarinha por baixo
+// + o contorno fino por cima. Tudo herda a cor via currentColor, então o ícone
+// acompanha a cor do lugar (aba ativa, chip colorido, tema claro/escuro).
 export function Icone({ name, size = 20, stroke = 1.75 }) {
-  const props = {
-    width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-    strokeWidth: stroke, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
-    style: { display: 'block', flexShrink: 0 },
-  };
+  const base = { width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': true, style: { display: 'block', flexShrink: 0 } };
+  const L = { fill: 'none', stroke: 'currentColor', strokeWidth: stroke, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  const F = { fill: 'currentColor', fillOpacity: 0.2, stroke: 'none' };
   switch (name) {
     case 'wallet':
-      return (<svg {...props}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>);
+      return (<svg {...base}><rect x="4" y="6" width="17" height="13" rx="3" {...F} /><g {...L}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></g></svg>);
     case 'flame':
-      return (<svg {...props}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>);
+      return (<svg {...base}><path d="M12 3c1 3.5 5 4.5 5 8.5a5 5 0 0 1-10 0c0-1.3.5-2.3 1.3-3.2C9.5 9 10.3 7 9.8 5 11 5.6 11.5 4.3 12 3z" {...F} /><path {...L} d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>);
     case 'cart':
-      return (<svg {...props}><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.5 3h2l2.6 12.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L22 8H5.1" /></svg>);
+      return (<svg {...base}><path d="M5.5 8h13l-.8 11a2 2 0 0 1-2 1.9H8.3a2 2 0 0 1-2-1.9z" {...F} /><g {...L}><path d="M5.5 8h13l-.8 11a2 2 0 0 1-2 1.9H8.3a2 2 0 0 1-2-1.9z" /><path d="M9 9V6.5a3 3 0 0 1 6 0V9" /></g></svg>);
     case 'check':
-      return (<svg {...props}><path d="M20 6 9 17l-5-5" /></svg>);
+      return (<svg {...base}><path {...L} d="M20 6 9 17l-5-5" /></svg>);
     case 'sun':
-      return (<svg {...props}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>);
+      return (<svg {...base}><circle cx="12" cy="12" r="4.2" {...F} /><g {...L}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></g></svg>);
     case 'moon':
-      return (<svg {...props}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" /></svg>);
+      return (<svg {...base}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" {...F} /><path {...L} d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" /></svg>);
     case 'book':
-      return (<svg {...props}><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v15H6.5A2.5 2.5 0 0 0 4 19.5V4.5Z" /><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20" /><path d="M9 7h7M9 11h5" /></svg>);
+      return (<svg {...base}><path d="M6 3h13v14H6.5A2.5 2.5 0 0 0 4 19.5V5.5A2.5 2.5 0 0 1 6.5 3z" {...F} /><g {...L}><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v15H6.5A2.5 2.5 0 0 0 4 19.5V4.5Z" /><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20" /><path d="M9 7h7M9 11h5" /></g></svg>);
     case 'lock':
-      return (<svg {...props}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>);
+      return (<svg {...base}><rect x="4" y="11" width="16" height="10" rx="2" {...F} /><g {...L}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></g></svg>);
     case 'pencil':
-      return (<svg {...props}><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>);
+      return (<svg {...base}><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" {...F} /><g {...L}><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></g></svg>);
     case 'bell':
-      return (<svg {...props}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>);
+      return (<svg {...base}><path d="M6 9a6 6 0 0 1 12 0c0 5 2.5 7 2.5 7H3.5S6 14 6 9z" {...F} /><g {...L}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></g></svg>);
     case 'star':
-      return (<svg {...props}><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L4.5 9.2l5.9-.9z" /></svg>);
+      return (<svg {...base}><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L4.5 9.2l5.9-.9z" fill="currentColor" fillOpacity="0.28" stroke="none" /><path {...L} d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L4.5 9.2l5.9-.9z" /></svg>);
     case 'tasks':
-      return (<svg {...props}><rect x="3" y="3" width="6" height="18" rx="1.4" /><rect x="10.5" y="3" width="6" height="12" rx="1.4" /><rect x="18" y="3" width="3" height="8" rx="1.2" /></svg>);
+      return (<svg {...base}><g {...F}><rect x="11" y="5.4" width="9" height="3.2" rx="1.6" /><rect x="11" y="15.4" width="9" height="3.2" rx="1.6" /></g><g {...L}><path d="M4 7l1.7 1.7L9 5" /><path d="M12 7h8" /><path d="M4 17l1.7 1.7L9 15" /><path d="M12 17h8" /></g></svg>);
     case 'plus':
-      return (<svg {...props}><path d="M12 5v14M5 12h14" /></svg>);
+      return (<svg {...base}><path {...L} d="M12 5v14M5 12h14" /></svg>);
     case 'clock':
-      return (<svg {...props}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>);
+      return (<svg {...base}><circle cx="12" cy="12" r="9" {...F} /><g {...L}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></g></svg>);
     case 'home':
-      return (<svg {...props}><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M9.5 21v-6h5v6" /></svg>);
+      return (<svg {...base}><path d="M5 10 12 4.2 19 10v10.3h-4v-6H9v6H5z" {...F} /><g {...L}><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M9.5 21v-6h5v6" /></g></svg>);
     case 'calendar':
-      return (<svg {...props}><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9h18M8 2.5v4M16 2.5v4" /></svg>);
+      return (<svg {...base}><rect x="3" y="4.5" width="18" height="16" rx="2.5" {...F} /><g {...L}><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9h18M8 2.5v4M16 2.5v4" /></g></svg>);
     case 'chevron':
-      return (<svg {...props}><path d="M9 6l6 6-6 6" /></svg>);
+      return (<svg {...base}><path {...L} d="M9 6l6 6-6 6" /></svg>);
     default:
       return null;
   }
