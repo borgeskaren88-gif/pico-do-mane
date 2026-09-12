@@ -129,6 +129,13 @@ function clarear(hex, amt) {
   const m = (v) => Math.round(v + (255 - v) * amt);
   return `rgb(${m(r)}, ${m(g)}, ${m(b)})`;
 }
+// Escurece um hex (mistura com preto), pra dar contraste ao desenho.
+function escurecer(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const m = (v) => Math.round(v * (1 - amt));
+  return `rgb(${m(r)}, ${m(g)}, ${m(b)})`;
+}
 
 // Ícone 3D "glass": uma forma vibrante em degradê atrás (girada), um cartão
 // fosco translúcido na frente e o desenho por cima, com brilho e sombrinha.
@@ -136,18 +143,25 @@ function clarear(hex, amt) {
 export function Icone3D({ name, cor = '#7C8A6C', size = 48 }) {
   const raw = useId().replace(/[:]/g, '');
   const c2 = cor, c1 = clarear(cor, 0.30);
-  const L = { fill: 'none', stroke: c2, strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  const glifo = Math.round(size * 0.46);
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" style={{ display: 'block', flexShrink: 0, filter: 'drop-shadow(0 5px 8px rgba(80,70,50,0.20))' }}>
-      <defs>
-        <linearGradient id={`${raw}a`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={c1} /><stop offset="1" stopColor={c2} /></linearGradient>
-        <linearGradient id={`${raw}b`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ffffff" stopOpacity="0.92" /><stop offset="1" stopColor={c2} stopOpacity="0.24" /></linearGradient>
-      </defs>
-      <rect x="8" y="6" width="27" height="27" rx="9" fill={`url(#${raw}a)`} transform="rotate(-11 21.5 19.5)" />
-      <rect x="12" y="13" width="29" height="29" rx="10" fill={`url(#${raw}b)`} stroke="#ffffff" strokeOpacity="0.7" strokeWidth="1" />
-      <ellipse cx="22" cy="18" rx="11" ry="4.5" fill="#ffffff" opacity="0.30" />
-      <g transform="translate(14.5,14.5) scale(1.13)" {...L}>{GLYPHS3D[name] || null}</g>
-    </svg>
+    <span style={{ position: 'relative', width: size, height: size, display: 'inline-flex', flexShrink: 0 }}>
+      {/* Forminha 3D "glass" (só o fundo em degradê + cartão fosco + brilho) */}
+      <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" style={{ display: 'block', filter: 'drop-shadow(0 5px 8px rgba(80,70,50,0.20))' }}>
+        <defs>
+          <linearGradient id={`${raw}a`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={c1} /><stop offset="1" stopColor={c2} /></linearGradient>
+          <linearGradient id={`${raw}b`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ffffff" stopOpacity="0.92" /><stop offset="1" stopColor={c2} stopOpacity="0.24" /></linearGradient>
+        </defs>
+        <rect x="8" y="6" width="27" height="27" rx="9" fill={`url(#${raw}a)`} transform="rotate(-11 21.5 19.5)" />
+        <rect x="12" y="13" width="29" height="29" rx="10" fill={`url(#${raw}b)`} stroke="#ffffff" strokeOpacity="0.7" strokeWidth="1" />
+        <ellipse cx="22" cy="18" rx="11" ry="4.5" fill="#ffffff" opacity="0.30" />
+      </svg>
+      {/* Desenho por cima: usa o ícone normal (que renderiza certinho), num tom
+          escuro da cor pra contrastar com o cartão fosco. */}
+      <span style={{ position: 'absolute', left: '54%', top: '55%', transform: 'translate(-50%, -50%)', color: escurecer(cor, 0.40), display: 'flex' }}>
+        <Icone name={name} size={glifo} stroke={2} />
+      </span>
+    </span>
   );
 }
 
