@@ -3,7 +3,14 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { C, Card, Icone } from './ui';
 import { todayISO, ymHoje, brl, MESES_LONGO } from '../lib/util';
 
+const serif = "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif";
 const DIAS_SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+function saudacao() {
+  const h = Number(new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }).format(new Date()));
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
 const WD3 = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const PESSOAS_PADRAO = [
   { id: 'mariele', nome: 'Mariele', cor: '#88937B' },
@@ -90,14 +97,19 @@ export default function Inicio({ usuario, onIr }) {
 
   return (
     <div>
+      {/* Saudação */}
+      <div style={{ margin: '2px 2px 16px' }}>
+        <div style={{ fontFamily: serif, fontSize: 27, lineHeight: 1.1, color: C.text }}>{saudacao()}, <span style={{ fontStyle: 'italic' }}>{usuario.nome}</span></div>
+        <div style={{ fontSize: 13, color: C.muted, marginTop: 3, textTransform: 'capitalize' }}>{dataExtenso(hoje)}</div>
+      </div>
+
       {/* Agenda / calendário em cima */}
-      <Card style={{ marginBottom: 16, padding: 0, overflow: 'hidden' }}>
-        <div style={{ background: 'linear-gradient(135deg, rgba(136,147,123,0.30), rgba(110,140,160,0.18))', padding: '16px 16px 14px' }}>
+      <Card style={{ marginBottom: 18, padding: 0, overflow: 'hidden' }}>
+        <div style={{ background: `linear-gradient(135deg, ${C.accent}2E, ${C.accent}10 70%)`, padding: '15px 16px 13px', borderBottom: `1px solid ${C.hair}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Icone name="calendar" size={18} />
-            <div style={{ fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase', color: C.muted, fontWeight: 700 }}>Agenda</div>
+            <Icone name="calendar" size={16} />
+            <div style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: C.muted, fontWeight: 700 }}>Agenda de hoje</div>
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, textTransform: 'capitalize', marginTop: 4 }}>{dataExtenso(hoje)}</div>
         </div>
         <div style={{ padding: '6px 6px 8px' }}>
           {agenda.length === 0 ? (
@@ -123,11 +135,14 @@ export default function Inicio({ usuario, onIr }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
         {tiles.map((t) => (
           <button key={t.id} onClick={() => onIr(t.id)}
-            style={{ textAlign: 'left', cursor: 'pointer', background: C.glassBg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${C.glassBorder}`, borderRadius: 16, padding: 15, boxShadow: C.glassShadow, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 104 }}>
-            <span style={{ width: 42, height: 42, borderRadius: 12, background: `${t.cor}26`, border: `1px solid ${t.cor}55`, color: t.cor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icone name={t.ico} size={22} /></span>
+            style={{ textAlign: 'left', cursor: 'pointer', color: C.text, background: `linear-gradient(158deg, ${t.cor}22, ${t.cor}0A 55%), ${C.glassBg}`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${t.cor}3D`, borderRadius: 18, padding: 16, boxShadow: C.glassShadow, display: 'flex', flexDirection: 'column', gap: 14, minHeight: 120 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ width: 44, height: 44, borderRadius: 13, background: `${t.cor}2A`, border: `1px solid ${t.cor}55`, color: t.cor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icone name={t.ico} size={22} /></span>
+              <span style={{ color: t.cor, opacity: 0.6, display: 'flex' }}><Icone name="chevron" size={18} /></span>
+            </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800 }}>{t.nome}</div>
-              <div style={{ fontSize: 12, color: C.muted, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.sub}</div>
+              <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, color: C.text, letterSpacing: '.01em' }}>{t.nome}</div>
+              <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.sub}</div>
             </div>
           </button>
         ))}

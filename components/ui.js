@@ -103,6 +103,8 @@ export function Icone({ name, size = 20, stroke = 2 }) {
       return (<svg {...props}><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M9.5 21v-6h5v6" /></svg>);
     case 'calendar':
       return (<svg {...props}><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9h18M8 2.5v4M16 2.5v4" /></svg>);
+    case 'chevron':
+      return (<svg {...props}><path d="M9 6l6 6-6 6" /></svg>);
     default:
       return null;
   }
