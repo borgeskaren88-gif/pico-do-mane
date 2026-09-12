@@ -155,10 +155,9 @@ const GRAD3D = {
 export function Icone3D({ name, cor = '#7C8A6C', size = 48 }) {
   const raw = useId().replace(/[:]/g, '');
   const [c1, c2] = GRAD3D[name] || [clarear(cor, 0.30), cor];
-  const glifo = Math.round(size * 0.46);
   return (
     <span style={{ position: 'relative', width: size, height: size, display: 'inline-flex', flexShrink: 0 }}>
-      {/* Forminha 3D "glass" (fundo vibrante em degradê + cartão fosco + brilho) */}
+      {/* Só a forminha 3D "glass": fundo vibrante em degradê + cartão fosco + brilho. Sem desenho dentro. */}
       <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" style={{ display: 'block', filter: 'drop-shadow(0 5px 9px rgba(80,70,50,0.24))' }}>
         <defs>
           <linearGradient id={`${raw}a`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={c1} /><stop offset="1" stopColor={c2} /></linearGradient>
@@ -168,10 +167,6 @@ export function Icone3D({ name, cor = '#7C8A6C', size = 48 }) {
         <rect x="12" y="13" width="29" height="29" rx="10" fill={`url(#${raw}b)`} stroke="#ffffff" strokeOpacity="0.75" strokeWidth="1" />
         <ellipse cx="22" cy="18" rx="11" ry="4.5" fill="#ffffff" opacity="0.32" />
       </svg>
-      {/* Desenho por cima: o ícone normal (que renderiza certinho) num tom vivo/escuro. */}
-      <span style={{ position: 'absolute', left: '54%', top: '55%', transform: 'translate(-50%, -50%)', color: c2, display: 'flex' }}>
-        <Icone name={name} size={glifo} stroke={2} />
-      </span>
     </span>
   );
 }
