@@ -73,18 +73,23 @@ export async function POST(request) {
       if (!id || !tipo) return NextResponse.json({ ok: false, erro: 'Dados do movimento incompletos.' }, { status: 400 });
       let achou = false;
       const quem = p === 'cozinha' ? ' (cozinha)' : '';
-      itens = itens.map((it) => { if (it.id !== id) return it; achou = true; return aplicarMovimentoItem(it, tipo, body?.qtd, (body?.motivo || '') + quem); });
+      // Saída lançada pela COZINHA é sempre Desperdício, decidido aqui e não na
+      // tela. Eles perdiam carne na limpeza e marcavam "Consumo da casa" (que
+      // era a primeira opção da lista), e aí a perda sumia do balde de perdas.
+      // Consumo da casa e cortesia são decisão da dona — ela lança na tela dela.
+      const motivo = (p === 'cozinha' && tipo === 'saida') ? 'Desperdício' : String(body?.motivo || '');
+      itens = itens.map((it) => { if (it.id !== id) return it; achou = true; return aplicarMovimentoItem(it, tipo, body?.qtd, motivo + quem); });
       if (!achou) return NextResponse.json({ ok: false, erro: 'Item não encontrado.' }, { status: 404 });
       const novo = await gravarEstoque(sb, blob, { estoque: itens });
       // Saída/contagem podem zerar um item: avisa na hora se cruzou pro mínimo/zero.
       if (tipo === 'saida' || tipo === 'contagem') { try { await notificarEstoqueCritico(sb, arr(blob.estoque), itens); } catch (e) { /* push nunca quebra o movimento */ } }
       // Perda, quebra e vencido também avisam na hora — saída sem venda é a que
       // mais come margem calada.
-      if (tipo === 'saida' && /(desperd|vencid|quebr|perda)/i.test(String(body?.motivo || ''))) {
+      if (tipo === 'saida' && /(desperd|vencid|quebr|perda)/i.test(motivo)) {
         try {
           const it = itens.find((x) => x.id === id);
           await notificarSaidaSemVenda(sb, {
-            titulo: `${String(body?.motivo || 'Perda')}: ${limparNome(it?.nome)}`,
+            titulo: `${motivo || 'Perda'}: ${limparNome(it?.nome)}`,
             descricao: `${num(body?.qtd)} ${it?.unidade || 'un'}${quem ? ' ·' + quem : ''}`,
             valor: num(body?.qtd) * num(it?.custo),
           });

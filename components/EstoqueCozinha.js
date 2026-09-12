@@ -1,8 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { C, Card, Btn, TextInput, NumInput, QtdInput, Select, Empty, SecTitle, PageTitle } from './ui';
+import { C, Card, Btn, TextInput, QtdInput, Empty, SecTitle, PageTitle } from './ui';
 import { num, fmtDate, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
-import { MOTIVOS_SAIDA } from '../lib/estoque';
 
 // Estoque na visão da COZINHA: ver o que tem e fazer as ações físicas que são
 // dela (deu entrada de mercadoria, quebrou/perdeu, contou). O cadastro dos itens,
@@ -12,7 +11,6 @@ export default function EstoqueCozinha() {
   const [carregado, setCarregado] = useState(false);
   const [acao, setAcao] = useState(null); // { id, tipo }
   const [acaoQtd, setAcaoQtd] = useState('');
-  const [acaoMotivo, setAcaoMotivo] = useState(MOTIVOS_SAIDA[0]);
   const [busy, setBusy] = useState(false);
   const [verMov, setVerMov] = useState(null);
   const [busca, setBusca] = useState('');
@@ -45,21 +43,21 @@ export default function EstoqueCozinha() {
       .map(([cat, is]) => ({ cat: cat || 'Outros', itens: is.sort((a, b) => (a.nome || '').localeCompare(b.nome || '')) }));
   }, [itens, busca]);
 
-  const abrirAcao = (id, tipo) => { setAcao({ id, tipo }); setAcaoQtd(''); setAcaoMotivo(MOTIVOS_SAIDA[0]); };
+  const abrirAcao = (id, tipo) => { setAcao({ id, tipo }); setAcaoQtd(''); };
   const confirmarAcao = async () => {
     if (String(acaoQtd).trim() === '' || busy) return;
     const q = numQtd(acaoQtd);
     if (acao.tipo !== 'contagem' && !(q > 0)) return;
     setBusy(true);
     try {
-      const r = await fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'mov', id: acao.id, tipo: acao.tipo, qtd: q, motivo: acao.tipo === 'saida' ? acaoMotivo : undefined }) });
+      const r = await fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'mov', id: acao.id, tipo: acao.tipo, qtd: q }) });
       const j = await r.json();
       if (j.ok && Array.isArray(j.itens)) setItens(j.itens);
     } catch { /* ignora */ }
     setBusy(false); setAcao(null); setAcaoQtd('');
   };
 
-  const rotuloAcao = { entrada: 'Entrada', saida: 'Saída', contagem: 'Contagem' };
+  const rotuloAcao = { entrada: 'Entrada', saida: 'Desperdício', contagem: 'Contagem' };
 
   return (
     <div>
@@ -104,11 +102,18 @@ export default function EstoqueCozinha() {
                 {acao && acao.id === it.id ? (
                   <div style={{ marginTop: 12, borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 8 }}>
-                      {rotuloAcao[acao.tipo]}{acao.tipo === 'contagem' ? ' — quanto tem AGORA?' : acao.tipo === 'entrada' ? ' — quanto entrou?' : ' — quanto saiu?'}
+                      {rotuloAcao[acao.tipo]}{acao.tipo === 'contagem' ? ' — quanto tem AGORA?' : acao.tipo === 'entrada' ? ' — quanto entrou?' : ' — quanto se perdeu?'}
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <div style={{ width: 170 }}><QtdInput value={acaoQtd} onChange={setAcaoQtd} placeholder={acao.tipo === 'contagem' ? String(saldo) : '0'} /></div>
-                      {acao.tipo === 'saida' && <div style={{ flex: 1, minWidth: 150 }}><Select value={acaoMotivo} onChange={setAcaoMotivo} options={MOTIVOS_SAIDA} /></div>}
+                      {/* Sem escolha de motivo: saída da cozinha é desperdício,
+                          e ponto. Cortesia e consumo da casa quem lança é a
+                          Karen, na tela dela. */}
+                      {acao.tipo === 'saida' && (
+                        <div style={{ flex: 1, minWidth: 150, fontSize: 12.5, color: C.muted, lineHeight: 1.45 }}>
+                          Vai entrar como <b style={{ color: C.red }}>Desperdício</b>.
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                       <Btn small onClick={confirmarAcao}>Confirmar</Btn>
@@ -118,7 +123,7 @@ export default function EstoqueCozinha() {
                 ) : (
                   <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
                     <Btn kind="ok" small onClick={() => abrirAcao(it.id, 'entrada')}>+ Entrada</Btn>
-                    <Btn kind="danger" small onClick={() => abrirAcao(it.id, 'saida')}>− Saída</Btn>
+                    <Btn kind="danger" small onClick={() => abrirAcao(it.id, 'saida')}>− Desperdício</Btn>
                     <Btn kind="ghost" small onClick={() => abrirAcao(it.id, 'contagem')}>Contar</Btn>
                     {(it.movimentos || []).length > 0 && (
                       <button onClick={() => setVerMov(aberto ? null : it.id)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '7px 6px', marginLeft: 'auto' }}>{aberto ? 'ocultar' : 'histórico'}</button>
