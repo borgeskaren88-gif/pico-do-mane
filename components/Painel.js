@@ -7,8 +7,10 @@ import Habitos from './Habitos';
 import ListaCompras from './ListaCompras';
 import Caderno from './Caderno';
 import Tarefas from './Tarefas';
+import Inicio from './Inicio';
 
 const ABAS = [
+  ['inicio', 'Início', 'home'],
   ['financas', 'Finanças', 'wallet'],
   ['habitos', 'Hábitos', 'flame'],
   ['lista', 'Lista', 'cart'],
@@ -18,7 +20,7 @@ const ABAS = [
 
 export default function Painel({ usuario }) {
   const router = useRouter();
-  const [aba, setAba] = useState('financas');
+  const [aba, setAba] = useState('inicio');
   const [tema, setTema] = useState('escuro');
 
   useEffect(() => {
@@ -28,7 +30,7 @@ export default function Painel({ usuario }) {
     } catch {}
     try {
       const a = new URLSearchParams(window.location.search).get('aba');
-      if (['financas', 'habitos', 'lista', 'tarefas', 'caderno'].includes(a)) setAba(a);
+      if (['inicio', 'financas', 'habitos', 'lista', 'tarefas', 'caderno'].includes(a)) setAba(a);
     } catch {}
   }, []);
   const trocarTema = () => {
@@ -56,11 +58,13 @@ export default function Painel({ usuario }) {
       {/* Barra do topo */}
       <div style={{ position: 'sticky', top: 0, zIndex: 10, background: C.barBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${C.hair}`, padding: 'calc(10px + env(safe-area-inset-top)) 16px 10px' }}>
         <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <LogoMark size={30} radius={9} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.1 }}>Nossa Casa</div>
-            <div style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Olá, {usuario.nome} · {tituloAba}</div>
-          </div>
+          <button onClick={() => { setAba('inicio'); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }} title="Ir pro início" style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', padding: 0, cursor: 'pointer', flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <LogoMark size={30} radius={9} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.1, color: C.text }}>Nossa Casa</div>
+              <div style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Olá, {usuario.nome} · {tituloAba}</div>
+            </div>
+          </button>
           <button onClick={trocarTema} title="Trocar tema" style={iconBtn}><Icone name={tema === 'escuro' ? 'sun' : 'moon'} size={18} /></button>
           <button onClick={sair} style={{ ...iconBtn, width: 'auto', padding: '0 12px', fontSize: 13, fontWeight: 600 }}>Sair</button>
         </div>
@@ -68,6 +72,7 @@ export default function Painel({ usuario }) {
 
       {/* Conteúdo da aba ativa */}
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '16px 16px calc(96px + env(safe-area-inset-bottom))' }}>
+        {aba === 'inicio' && <Inicio usuario={usuario} onIr={(id) => { setAba(id); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }} />}
         {aba === 'financas' && <Financas usuario={usuario} tema={tema} />}
         {aba === 'habitos' && <Habitos usuario={usuario} />}
         {aba === 'lista' && <ListaCompras usuario={usuario} />}
@@ -77,14 +82,14 @@ export default function Painel({ usuario }) {
 
       {/* Barra de abas (embaixo) */}
       <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 20, background: C.barBg, backdropFilter: 'blur(12px)', borderTop: `1px solid ${C.hair}`, padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }}>
-        <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', gap: 6 }}>
+        <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', gap: 3 }}>
           {ABAS.map(([id, rot, ico]) => {
             const ativo = aba === id;
             return (
               <button key={id} onClick={() => { setAba(id); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }}
-                style={{ flex: 1, minWidth: 0, border: 'none', cursor: 'pointer', borderRadius: 12, padding: '8px 2px', background: ativo ? C.accent : 'transparent', color: ativo ? C.onAccent : C.muted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                <Icone name={ico} size={20} />
-                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '-.01em' }}>{rot}</span>
+                style={{ flex: 1, minWidth: 0, border: 'none', cursor: 'pointer', borderRadius: 12, padding: '7px 1px', background: ativo ? C.accent : 'transparent', color: ativo ? C.onAccent : C.muted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                <Icone name={ico} size={19} />
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '-.02em' }}>{rot}</span>
               </button>
             );
           })}
