@@ -179,9 +179,12 @@ export async function POST(request) {
     if (acao === 'cortesia') {
       const cardapioId = txt(body?.cardapioId, 40);
       const qtd = Math.max(1, Math.floor(Number(body?.qtd) || 1));
-      // Motivo: 'Cortesia' (padrão) ou 'Consumo da casa'. Vai no histórico e
-      // manda a baixa pra categoria certa do resumo "Para onde foi".
-      const motivoBase = txt(body?.motivo, 30) === 'Consumo da casa' ? 'Consumo da casa' : 'Cortesia';
+      // Motivo: 'Cortesia' (padrão), 'Consumo da casa' ou 'Perda' — o drink que
+      // caiu no chão, o prato que voltou. Vai no histórico e manda a baixa pra
+      // categoria certa do resumo "Para onde foi".
+      const motivoPedido = txt(body?.motivo, 30);
+      const motivoBase = motivoPedido === 'Consumo da casa' ? 'Consumo da casa'
+        : motivoPedido === 'Perda' ? 'Perda' : 'Cortesia';
       if (!cardapioId) return NextResponse.json({ ok: false, erro: 'Escolha o produto.' }, { status: 400 });
       const blob = await lerPainel(sb);
       const estoque = Array.isArray(blob.estoque) ? blob.estoque : [];
@@ -192,10 +195,22 @@ export async function POST(request) {
       if (!ficha || !Array.isArray(ficha.itens) || !ficha.itens.length) {
         return NextResponse.json({ ok: false, erro: `"${prato}" não tem ficha técnica, então não dá pra baixar os ingredientes. A dona precisa montar a ficha primeiro.` }, { status: 400 });
       }
+      // O sabor escolhido (a fruta da caipirinha) não está na ficha: ele fica no
+      // cardápio, e numa venda vira "extra". Aqui é igual — sem isso a fruta que
+      // foi pro copo continuaria contada no estoque.
+      const prod = cardapio.find((c) => c.id === cardapioId);
+      const saborNome = txt(body?.sabor, 40);
+      const extras = [];
+      if (saborNome && Array.isArray(prod?.sabores)) {
+        const sv = prod.sabores.find((x) => (x.nome || '').trim().toLowerCase() === saborNome.trim().toLowerCase());
+        if (sv && sv.estoqueId) extras.push({ estoqueId: String(sv.estoqueId), qtd: sv.qtd, unidade: sv.unidade || '' });
+      }
+
       const novoEstoque = estoque.slice();
-      const motivo = `${motivoBase} · ${prato}`;
+      const nomeCompleto = saborNome ? `${prato} (${saborNome})` : prato;
+      const motivo = `${motivoBase} · ${nomeCompleto}`;
       let mudou = false;
-      for (const ing of ficha.itens) {
+      for (const ing of [...ficha.itens, ...extras]) {
         const idx = novoEstoque.findIndex((x) => x.id === ing.estoqueId);
         if (idx < 0) continue;
         const baixa = qtd * qtdNaUnidadeDoItem(ing.qtd, ing.unidade, novoEstoque[idx]);
@@ -206,8 +221,8 @@ export async function POST(request) {
       if (!mudou) return NextResponse.json({ ok: false, erro: 'Não achei ingredientes pra baixar (confira a ficha).' }, { status: 400 });
       await gravarPainelParcial(sb, { estoque: novoEstoque });
       try { await notificarEstoqueCritico(sb, estoque, novoEstoque); } catch (e) { /* push nunca quebra a baixa */ }
-      try { await notificarSaidaSemVenda(sb, { titulo: `${motivoBase}: ${prato}`, descricao: `${qtd} ${qtd === 1 ? 'unidade' : 'unidades'} · lançado pelo atendimento` }); } catch (e) { /* push nunca quebra a baixa */ }
-      return NextResponse.json({ ok: true, prato });
+      try { await notificarSaidaSemVenda(sb, { titulo: `${motivoBase}: ${nomeCompleto}`, descricao: `${qtd} ${qtd === 1 ? 'unidade' : 'unidades'} · lançado pelo atendimento` }); } catch (e) { /* push nunca quebra a baixa */ }
+      return NextResponse.json({ ok: true, prato: nomeCompleto });
     }
 
     // Ações que mexem numa comanda existente: sempre lê -> altera -> grava

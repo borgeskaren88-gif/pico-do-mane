@@ -9,6 +9,9 @@ import { num } from '../lib/util';
 //  - Cortesia: escolhe um produto do CARDÁPIO e o sistema baixa os ingredientes
 //    da ficha técnica sozinho (igual a uma venda, só que de graça).
 const MOTIVOS = ['Quebrou', 'Congelou', 'Estragou', 'Venceu'];
+// O que houve com o produto PRONTO (drink, prato). 'Perda' é o que caiu no
+// chão ou voltou: baixa o estoque igual, mas conta como perda, não cortesia.
+const MOTIVOS_PRONTO = [['Cortesia', 'Cortesia'], ['Consumo da casa', 'Consumo da casa'], ['Perda', 'Perda / derrubou']];
 
 export default function PerdaGarcom() {
   const [modo, setModo] = useState('perda'); // 'perda' | 'cortesia'
@@ -19,6 +22,8 @@ export default function PerdaGarcom() {
   const [selId, setSelId] = useState('');
   const [qtd, setQtd] = useState('');
   const [motivo, setMotivo] = useState('Quebrou');
+  const [motivoPronto, setMotivoPronto] = useState('Perda');
+  const [sabor, setSabor] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [erro, setErro] = useState('');
@@ -33,7 +38,7 @@ export default function PerdaGarcom() {
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
-  const trocarModo = (m) => { setModo(m); setSelId(''); setBusca(''); setErro(''); setMsg(''); setQtd(m === 'cortesia' ? '1' : ''); };
+  const trocarModo = (m) => { setModo(m); setSelId(''); setBusca(''); setErro(''); setMsg(''); setSabor(''); setQtd(m === 'cortesia' ? '1' : ''); };
 
   const lista = modo === 'perda' ? itens : cardapio;
   const filtro = busca.trim().toLowerCase();
@@ -47,15 +52,15 @@ export default function PerdaGarcom() {
     try {
       const body = modo === 'perda'
         ? { acao: 'perda', itemId: selId, qtd: num(qtd), motivo }
-        : { acao: 'cortesia', cardapioId: selId, qtd: num(qtd) };
+        : { acao: 'cortesia', cardapioId: selId, qtd: num(qtd), motivo: motivoPronto, sabor };
       const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const j = await r.json();
       if (!j.ok) { setErro(j.erro || 'Não consegui registrar.'); }
       else {
         setMsg(modo === 'perda'
           ? `Baixa registrada: ${num(qtd)} ${sel?.unidade || ''} de ${sel?.nome || ''} (${motivo}).`
-          : `Cortesia registrada: ${num(qtd)}× ${sel?.nome || ''}. Ingredientes baixados do estoque. 🎁`);
-        setSelId(''); setBusca(''); setQtd(modo === 'cortesia' ? '1' : '');
+          : `${motivoPronto} registrada: ${num(qtd)}× ${j.prato || sel?.nome || ''}. Ingredientes baixados do estoque.`);
+        setSelId(''); setBusca(''); setSabor(''); setQtd(modo === 'cortesia' ? '1' : '');
       }
     } catch { setErro('Sem conexão.'); }
     finally { setBusy(false); }
@@ -64,7 +69,7 @@ export default function PerdaGarcom() {
   return (
     <div>
       <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 14 }}>
-        {[['perda', 'Perda / Quebra'], ['cortesia', 'Cortesia']].map(([v, rot]) => (
+        {[['perda', 'Item do estoque'], ['cortesia', 'Drink / prato pronto']].map(([v, rot]) => (
           <button key={v} onClick={() => trocarModo(v)} style={{
             flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 14, fontWeight: 700,
             background: modo === v ? C.accent : 'transparent', color: modo === v ? '#06101F' : C.muted,
@@ -76,7 +81,7 @@ export default function PerdaGarcom() {
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
           {modo === 'perda'
             ? 'Quebrou, congelou, estragou ou venceu? Escolha o item do estoque e diga quanto saiu. Baixa na hora — não mexe no caixa.'
-            : 'A dona liberou uma cortesia? Escolha o produto do cardápio (narguilé, drink…) e o sistema baixa os ingredientes da ficha sozinho. Não mexe no caixa.'}
+            : 'Drink que caiu no chão, prato que voltou, cortesia liberada pela dona. Escolhe o produto do cardápio e o sistema baixa os ingredientes da ficha sozinho. Não mexe no caixa.'}
         </div>
       </Card>
 
@@ -89,7 +94,7 @@ export default function PerdaGarcom() {
       {!carregado ? <Empty>Carregando…</Empty> : (
         <div style={{ maxHeight: 260, overflowY: 'auto', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {filtrada.length === 0 ? <Empty>Nenhum {modo === 'perda' ? 'item' : 'produto'} encontrado.</Empty> : filtrada.slice(0, 60).map((i) => (
-            <button key={i.id} onClick={() => { setSelId(i.id); setErro(''); }} style={{
+            <button key={i.id} onClick={() => { setSelId(i.id); setSabor(''); setErro(''); }} style={{
               textAlign: 'left', border: `1px solid ${selId === i.id ? C.accent : C.line}`,
               background: selId === i.id ? C.accent : C.panel, color: selId === i.id ? '#06101F' : C.text,
               borderRadius: 10, padding: '10px 12px', cursor: 'pointer', fontSize: 14, fontWeight: 700,
@@ -122,8 +127,39 @@ export default function PerdaGarcom() {
             </>
           ) : (
             <>
-              <Field label="Quantas cortesias?"><NumInput value={qtd} onChange={setQtd} /></Field>
-              <Btn onClick={registrar} disabled={busy}>{busy ? 'Registrando…' : 'Registrar cortesia'}</Btn>
+              <Field label="O que aconteceu?">
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {MOTIVOS_PRONTO.map(([v, rot]) => (
+                    <button key={v} onClick={() => setMotivoPronto(v)} style={{
+                      border: `1px solid ${motivoPronto === v ? C.accent : C.line}`, background: motivoPronto === v ? C.accent : 'transparent',
+                      color: motivoPronto === v ? '#06101F' : C.muted, borderRadius: 999, padding: '7px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    }}>{rot}</button>
+                  ))}
+                </div>
+              </Field>
+              {/* A fruta do sabor não está na ficha (numa venda ela é um
+                  "extra"): sem escolher aqui, o maracujá que foi pro copo
+                  continuaria contado no estoque. */}
+              {Array.isArray(sel.sabores) && sel.sabores.length > 0 && (
+                <Field label="Qual sabor?">
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {sel.sabores.map((sv) => {
+                      const nome = sv.nome || '';
+                      const on = sabor === nome;
+                      return (
+                        <button key={nome} onClick={() => setSabor(on ? '' : nome)} style={{
+                          border: `1px solid ${on ? C.accent : C.line}`, background: on ? C.accent : 'transparent',
+                          color: on ? '#06101F' : C.muted, borderRadius: 999, padding: '7px 13px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                        }}>{nome}</button>
+                      );
+                    })}
+                  </div>
+                </Field>
+              )}
+              <Field label="Quantas?"><NumInput value={qtd} onChange={setQtd} /></Field>
+              <Btn kind={motivoPronto === 'Perda' ? 'danger' : 'primary'} onClick={registrar} disabled={busy}>
+                {busy ? 'Registrando…' : `Registrar ${motivoPronto.toLowerCase()}`}
+              </Btn>
             </>
           )}
         </Card>

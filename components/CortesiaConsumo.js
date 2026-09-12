@@ -6,7 +6,10 @@ import { num } from '../lib/util';
 // Dar cortesia ou registrar consumo da casa de um PRODUTO do cardápio (ex.:
 // narguilé, um drink). O sistema baixa os ingredientes da ficha técnica sozinho.
 // Não vira venda nem toca no caixa/DRE.
-const MOTIVOS = [['Cortesia', 'Cortesia'], ['Consumo da casa', 'Consumo da casa']];
+// O que aconteceu com o produto pronto. 'Perda' é o drink que caiu no chão, o
+// prato que voltou — sai do estoque igual, mas vai pro balde de perdas no
+// resumo "Para onde foi o estoque", não pro de cortesia.
+const MOTIVOS = [['Cortesia', 'Cortesia'], ['Consumo da casa', 'Consumo da casa'], ['Perda', 'Perda / derrubou']];
 
 export default function CortesiaConsumo({ onFeito }) {
   const [cardapio, setCardapio] = useState([]);
@@ -15,6 +18,7 @@ export default function CortesiaConsumo({ onFeito }) {
   const [selId, setSelId] = useState('');
   const [qtd, setQtd] = useState('1');
   const [motivo, setMotivo] = useState('Cortesia');
+  const [sabor, setSabor] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [erro, setErro] = useState('');
@@ -38,10 +42,10 @@ export default function CortesiaConsumo({ onFeito }) {
     if (!(num(qtd) > 0)) { setErro('Diga a quantidade.'); return; }
     setBusy(true); setErro(''); setMsg('');
     try {
-      const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'cortesia', cardapioId: selId, qtd: num(qtd), motivo }) });
+      const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'cortesia', cardapioId: selId, qtd: num(qtd), motivo, sabor }) });
       const j = await r.json();
       if (!j.ok) setErro(j.erro || 'Não consegui registrar.');
-      else { setMsg(`${motivo}: ${num(qtd)}× ${sel?.nome || ''}. Ingredientes baixados do estoque. 🎁`); setSelId(''); setBusca(''); setQtd('1'); if (onFeito) onFeito(); }
+      else { setMsg(`${motivo}: ${num(qtd)}× ${j.prato || sel?.nome || ''}. Ingredientes baixados do estoque.`); setSelId(''); setBusca(''); setQtd('1'); setSabor(''); if (onFeito) onFeito(); }
     } catch { setErro('Sem conexão.'); }
     finally { setBusy(false); }
   };
@@ -70,7 +74,7 @@ export default function CortesiaConsumo({ onFeito }) {
       {!carregado ? <Empty>Carregando…</Empty> : (
         <div style={{ maxHeight: 240, overflowY: 'auto', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {lista.length === 0 ? <Empty>Nenhum produto encontrado.</Empty> : lista.slice(0, 60).map((i) => (
-            <button key={i.id} onClick={() => { setSelId(i.id); setErro(''); }} style={{
+            <button key={i.id} onClick={() => { setSelId(i.id); setSabor(''); setErro(''); }} style={{
               textAlign: 'left', border: `1px solid ${selId === i.id ? C.accent : C.line}`,
               background: selId === i.id ? C.accent : C.panel, color: selId === i.id ? '#06101F' : C.text,
               borderRadius: 10, padding: '10px 12px', cursor: 'pointer', fontSize: 14, fontWeight: 700,
@@ -82,6 +86,25 @@ export default function CortesiaConsumo({ onFeito }) {
       {sel && (
         <Card style={{ borderColor: C.accent }}>
           <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>{sel.nome}</div>
+          {/* A fruta do sabor não está na ficha: numa venda ela é um "extra".
+              Sem escolher aqui, o maracujá que foi pro copo continuaria
+              contado no estoque. */}
+          {Array.isArray(sel.sabores) && sel.sabores.length > 0 && (
+            <Field label="Qual sabor?">
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {sel.sabores.map((sv) => {
+                  const nome = sv.nome || '';
+                  const on = sabor === nome;
+                  return (
+                    <button key={nome} onClick={() => setSabor(on ? '' : nome)} style={{
+                      border: `1px solid ${on ? C.accent : C.line}`, background: on ? C.accent : 'transparent',
+                      color: on ? '#06101F' : C.muted, borderRadius: 999, padding: '7px 13px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    }}>{nome}</button>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
           <Field label="Quantas?"><NumInput value={qtd} onChange={setQtd} /></Field>
           <Btn onClick={registrar} disabled={busy}>{busy ? 'Registrando…' : `Registrar ${motivo.toLowerCase()}`}</Btn>
         </Card>
