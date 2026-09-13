@@ -452,11 +452,11 @@ export default function Dashboard() {
   useEffect(() => { try { if (localStorage.getItem('picoos-lateral') === 'recolhida') setLateralRecolhida(true); } catch { /* ignora */ } }, []);
   const recolherLateral = (v) => setLateralRecolhida((cur) => { const nv = v == null ? !cur : v; try { localStorage.setItem('picoos-lateral', nv ? 'recolhida' : 'aberta'); } catch { /* ignora */ } return nv; });
   const grupos = [
-    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ['darci', 'Darci'], ['brain', 'Brain'], ['pasta', 'Pasta']] },
+    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ['darci', 'Darci'], ['brain', 'Brain']] },
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento'], ['previsao', 'Previsão']] },
     { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
-    { titulo: 'Gestão', itens: [['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['backup', 'Backup']] },
+    { titulo: 'Gestão', itens: [['pasta', 'Pasta'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['backup', 'Backup']] },
   ];
 
   // Lembra a última área aberta (no aparelho), pra que atualizar a página caia na
