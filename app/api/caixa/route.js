@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { notificarCaixa } from '../../../lib/push';
+import { diaOperacional } from '../../../lib/util';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,13 @@ function resumo(caixa, entradas, fiadoRecebido) {
   return { recebido, dinheiroFinal, fiado: entradas.Fiado };
 }
 
+// Vendas de HOJE que ficaram sem caixa nenhum (fechadas com o caixa fechado).
+async function vendasSoltasDoDia(sb) {
+  const hoje = diaOperacional();
+  const { data } = await sb.from('pdm_dados').select('valor').like('chave', VD + '%');
+  return (data || []).map((r) => r.valor).filter((v) => v && !v.caixaId && v.data === hoje);
+}
+
 export async function GET() {
   const p = papel();
   if (!p) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
@@ -77,8 +85,15 @@ export async function GET() {
       const r = await entradasDoCaixa(sb, aberto.id);
       entradas = r.entradas; qtdVendas = r.qtdVendas; servico = r.servico; fiadoRecebido = r.fiadoRecebido; extra = resumo(aberto, r.entradas, r.fiadoRecebido);
     }
+    // Comanda fechada sem caixa aberto fica "solta": não entra no fechamento
+    // nem, por consequência, na receita do dia. Em vez de sumir calada, ela é
+    // contada aqui pra tela poder oferecer o resgate.
+    const soltas = await vendasSoltasDoDia(sb);
     const historico = caixas.filter((c) => !c.aberto).sort((a, b) => (b.fechadoEm || '').localeCompare(a.fechadoEm || '')).slice(0, 15);
-    return NextResponse.json({ ok: true, aberto, entradas, servico, fiadoRecebido, ...(extra || {}), qtdVendas, historico });
+    return NextResponse.json({
+      ok: true, aberto, entradas, servico, fiadoRecebido, ...(extra || {}), qtdVendas, historico,
+      soltas: { qtd: soltas.length, total: n2(soltas.reduce((t, v) => t + (Number(v.total) || 0), 0)) },
+    });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar o caixa.' }, { status: 500 });
   }
@@ -95,6 +110,25 @@ export async function POST(request) {
     const { data } = await sb.from('pdm_dados').select('valor').like('chave', CX + '%');
     const caixas = (data || []).map((r) => r.valor).filter(Boolean);
     const aberto = caixas.find((c) => c.aberto) || null;
+
+    // Puxa pro caixa aberto as vendas de hoje que ficaram soltas. Só mexe no
+    // caixaId — a venda em si (itens, pagamento, fiado) fica intacta —, e como
+    // só pega venda SEM caixa, não tem como roubar venda de outro turno nem
+    // contar duas vezes.
+    if (acao === 'adotarSoltas') {
+      if (!aberto) return NextResponse.json({ ok: false, erro: 'Abra o caixa antes de puxar as vendas.' }, { status: 400 });
+      const soltas = await vendasSoltasDoDia(sb);
+      if (!soltas.length) return NextResponse.json({ ok: true, adotadas: 0 });
+      for (const v of soltas) {
+        const nova = { ...v, caixaId: aberto.id, puxadaPraCaixa: new Date().toISOString() };
+        const { error } = await sb.from('pdm_dados').upsert(
+          { chave: VD + v.id, valor: nova, atualizado_em: new Date().toISOString() },
+          { onConflict: 'chave' },
+        );
+        if (error) throw error;
+      }
+      return NextResponse.json({ ok: true, adotadas: soltas.length, total: n2(soltas.reduce((t, v) => t + (Number(v.total) || 0), 0)) });
+    }
 
     if (acao === 'abrir') {
       if (aberto) return NextResponse.json({ ok: false, erro: 'Já existe um caixa aberto.' }, { status: 400 });

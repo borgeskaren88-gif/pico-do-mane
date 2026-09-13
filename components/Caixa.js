@@ -57,10 +57,13 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
     if (j) { setContado(''); setFechando(false); }
   };
   const salvarSaldo = async () => { const j = await acao({ acao: 'ajustar', id: dados.aberto.id, saldoInicial: saldoEdit }); if (j) setEditSaldo(false); };
+  // Puxa pro caixa as vendas de hoje que foram fechadas com o caixa fechado.
+  const puxarSoltas = async () => { await acao({ acao: 'adotarSoltas' }); };
 
   const aberto = dados?.aberto || null;
   const entradas = dados?.entradas || {};
   const historico = dados?.historico || [];
+  const soltas = dados?.soltas || { qtd: 0, total: 0 };
   // Há quanto tempo o caixa está aberto (pra avisar se passou de 24h).
   const horasAberto = aberto?.abertoEm ? (Date.now() - new Date(aberto.abertoEm).getTime()) / 3600000 : 0;
   const alerta24 = !!aberto && horasAberto >= 24;
@@ -70,6 +73,27 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
     <div>
       <PageTitle sub="Abertura e fechamento do caixa do turno">Caixa</PageTitle>
       {erro && <div style={{ fontSize: 13, color: C.red, marginBottom: 10 }}>{erro}</div>}
+
+      {/* Venda fechada com o caixa fechado fica de fora do turno — e, como a
+          receita do dia sai do fechamento, ficaria de fora do resultado também.
+          Em vez de sumir calada, ela aparece aqui pra ser resgatada. */}
+      {carregado && soltas.qtd > 0 && (
+        <Card style={{ marginBottom: 14, borderColor: C.amber, background: `color-mix(in srgb, ${C.amber} 8%, ${C.panel})` }}>
+          <div style={{ fontSize: 14.5, fontWeight: 800, color: C.amber }}>
+            {soltas.qtd} venda(s) de hoje fora do caixa — {brl(soltas.total)}
+          </div>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 5, lineHeight: 1.5 }}>
+            {aberto
+              ? 'Foram fechadas antes de abrir o caixa, então não estão somando neste turno nem vão pra receita do dia. Toca no botão pra trazer pra cá.'
+              : 'Foram fechadas com o caixa fechado. Abra o caixa e depois traga essas vendas pra cá — senão elas não entram na receita do dia.'}
+          </div>
+          {aberto && (
+            <div style={{ marginTop: 10 }}>
+              <Btn kind="ok" small onClick={puxarSoltas} disabled={busy}>Puxar {brl(soltas.total)} pro caixa</Btn>
+            </div>
+          )}
+        </Card>
+      )}
 
       {!carregado ? <Empty>Carregando…</Empty> : !aberto ? (
         <Card style={{ marginBottom: 16 }}>
