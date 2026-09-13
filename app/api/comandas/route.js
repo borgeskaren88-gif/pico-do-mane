@@ -94,7 +94,11 @@ export async function GET() {
       .map((it) => ({ id: it.id, nome: it.nome, unidade: it.unidade || 'un', categoria: it.categoria || '' }))
       .filter((it) => it.id && it.nome)
       .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
-    return NextResponse.json({ ok: true, comandas, cardapio, mesasQtd: mesasDe(blob), clientes, estoqueItens });
+    // Tem caixa aberto? A tela avisa antes de fechar comanda sem caixa — venda
+    // sem caixa fica de fora do turno e, por tabela, da receita do dia.
+    const { data: cxRows } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
+    const caixaAberto = (cxRows || []).map((r) => r.valor).some((x) => x && x.aberto);
+    return NextResponse.json({ ok: true, comandas, cardapio, mesasQtd: mesasDe(blob), clientes, estoqueItens, caixaAberto });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar comandas.' }, { status: 500 });
   }

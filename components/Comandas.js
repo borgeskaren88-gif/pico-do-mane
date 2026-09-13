@@ -10,6 +10,7 @@ export default function Comandas({ papel = 'dona' }) {
   const [comandas, setComandas] = useState([]);
   const [cardapio, setCardapio] = useState([]);
   const [clientes, setClientes] = useState([]);
+  const [caixaAberto, setCaixaAberto] = useState(true); // otimista: só avisa quando sabe que está fechado
   const [mesasQtd, setMesasQtd] = useState(20);
   const [carregado, setCarregado] = useState(false);
   const [verValores, setVerValores] = useState(true); // mostrar/ocultar os R$ nas mesas (fica lembrado no aparelho)
@@ -39,7 +40,7 @@ export default function Comandas({ papel = 'dona' }) {
     try {
       const r = await fetch('/api/comandas', { cache: 'no-store' });
       const j = await r.json();
-      if (j.ok) { setComandas(j.comandas || []); setCardapio(j.cardapio || []); setClientes(j.clientes || []); if (j.mesasQtd) setMesasQtd(j.mesasQtd); setErro(''); }
+      if (j.ok) { setComandas(j.comandas || []); setCardapio(j.cardapio || []); setClientes(j.clientes || []); setCaixaAberto(j.caixaAberto !== false); if (j.mesasQtd) setMesasQtd(j.mesasQtd); setErro(''); }
       else setErro(j.erro || 'Erro ao carregar.');
     } catch { setErro('Sem conexão.'); }
     finally { setCarregado(true); }
@@ -458,6 +459,15 @@ export default function Comandas({ papel = 'dona' }) {
               <Card style={{ marginBottom: 14, padding: 14, borderColor: C.green }}>
                 <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Fechar conta — {brl(total)}</div>
                 <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Quanto entrou em cada forma? Dá pra dividir. Use “resto” pra completar.</div>
+
+                {/* Sem caixa aberto a venda fica solta: não entra no fechamento
+                    do turno nem, por tabela, na receita do dia. Dá pra fechar
+                    assim mesmo — e depois puxar a venda na tela do Caixa. */}
+                {!caixaAberto && (
+                  <div style={{ background: `color-mix(in srgb, ${C.amber} 12%, transparent)`, border: `1px solid ${C.amber}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>
+                    <b style={{ color: C.amber }}>Não tem caixa aberto.</b> Dá pra fechar assim mesmo, mas essa venda fica de fora do turno e da receita do dia. O certo é abrir o caixa antes — e, se já fechou, é só ir na aba Caixa e puxar a venda pra lá.
+                  </div>
+                )}
 
                 {/* Desconto (%) — abate do total da conta */}
                 <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
