@@ -6,7 +6,7 @@ import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparC
 
 const TAB = { fontVariantNumeric: 'tabular-nums' };
 
-export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], estoque = [], vendas = [], setTab, darci = null }) {
+export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], estoque = [], vendas = [], setTab, darci = null, resumo = null }) {
   const [mostrarValores, setMostrarValores] = useState(true);
   const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
   const [caixaAberto, setCaixaAberto] = useState(null);
@@ -98,6 +98,10 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           </button>
         </div>
       </div>
+
+      {/* O resumo do dia: avisos, mesa reservada e o que mudou, num cartão só.
+          Vem depois do título — o nome da tela aparece antes de tudo. */}
+      {resumo}
 
       {caixaAlerta && (
         <Card style={{ marginBottom: 12, borderColor: C.red }}>
