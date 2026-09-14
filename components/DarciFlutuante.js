@@ -63,6 +63,8 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   // distância, pra quando ela quiser ver sem sair do que está fazendo.
   const CHAVE_ABERTURA = 'picoos-darci-abertura';
   const hojeChave = () => { try { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); } catch { return String(new Date().getDate()); } };
+  // Tem aviso que não pode esperar? É o que decide a cor do pontinho na bola.
+  const temUrgente = avisos.some((a) => a.nivel === 'urgente');
   const fecharAbertura = () => {
     try { localStorage.setItem(CHAVE_ABERTURA, hojeChave()); } catch { /* ignora */ }
     setAbertura(false);
