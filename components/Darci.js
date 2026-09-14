@@ -328,7 +328,9 @@ export default function Darci({ onAnotar, ...dados }) {
                 }}>
                   <span style={{ width: 9, height: 9, borderRadius: 999, background: cor, flexShrink: 0, marginTop: 5 }} />
                   <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 800, color: C.text, lineHeight: 1.35 }}>{av.titulo}</span>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 800, color: C.text, lineHeight: 1.35 }}>
+                      {av.titulo}{av.valor ? <span style={{ color: cor }}> — {av.valor}</span> : null}
+                    </span>
                     <span style={{ display: 'block', fontSize: 12, color: C.faint, lineHeight: 1.45, marginTop: 2 }}>{av.detalhe}</span>
                   </span>
                 </button>

@@ -9,7 +9,7 @@ import Brain from './Brain';
 import Darci from './Darci';
 import DarciFlutuante from './DarciFlutuante';
 import Hoje from './Hoje';
-import AvisoReservas from './AvisoReservas';
+import ResumoDoDia from './ResumoDoDia';
 import Pasta from './Pasta';
 import EstiloShell from './EstiloShell';
 import Diario from './Diario';
@@ -651,9 +651,7 @@ export default function Dashboard() {
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
             ficha técnica de prato e de drink. As duas leem e escrevem. */}
         {tab === 'pasta' && <Pasta />}
-        {/* Mesa reservada hoje/amanhã — a dona vê logo ao abrir o painel. */}
-        {tab === 'hoje' && <AvisoReservas />}
-        {tab === 'hoje' && <Hoje diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={<DarciFlutuante {...propsDarci} />} />}
+        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onPerguntar={() => setTab('darci')} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={<DarciFlutuante {...propsDarci} />} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} />}
         {tab === 'financas' && (
           <>

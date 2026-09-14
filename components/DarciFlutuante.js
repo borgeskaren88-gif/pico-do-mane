@@ -57,23 +57,12 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   );
   const jaVi = () => { const agora = Date.now(); marcarVisto(agora); setDesdeMs(agora); };
 
-  // Assim que ela abre o PicoOS, o Darci se apresenta com o que importa. Uma
-  // vez por dia em cada aparelho — não pra ficar incomodando, mas pra ela não
-  // precisar lembrar de perguntar.
+  // O Darci NÃO abre mais sozinho: quem dá o recado ao abrir o app é o cartão
+  // do topo do Dashboard, que fica no meio da página em vez de por cima dela.
+  // Aqui o painel de avisos continua existindo — só que a um toque de
+  // distância, pra quando ela quiser ver sem sair do que está fazendo.
   const CHAVE_ABERTURA = 'picoos-darci-abertura';
   const hojeChave = () => { try { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); } catch { return String(new Date().getDate()); } };
-  useEffect(() => {
-    if (!avisos.length) return undefined;
-    let ja = '';
-    try { ja = localStorage.getItem(CHAVE_ABERTURA) || ''; } catch { /* ignora */ }
-    if (ja === hojeChave()) return undefined;
-    // Um respiro antes de aparecer: deixa a tela terminar de carregar.
-    const t = setTimeout(() => { posicionar(); setAberto(true); setAbertura(true); }, 1100);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [avisos.length]);
-  // Tem aviso que não pode esperar? É o que decide a cor do pontinho na bola.
-  const temUrgente = avisos.some((a) => a.nivel === 'urgente');
   const fecharAbertura = () => {
     try { localStorage.setItem(CHAVE_ABERTURA, hojeChave()); } catch { /* ignora */ }
     setAbertura(false);
@@ -378,7 +367,9 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
                     }}>
                       <span style={{ width: 8, height: 8, borderRadius: 999, background: cor, flexShrink: 0, marginTop: 5 }} />
                       <span style={{ minWidth: 0 }}>
-                        <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: C.text, lineHeight: 1.35 }}>{av.titulo}</span>
+                        <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: C.text, lineHeight: 1.35 }}>
+                          {av.titulo}{av.valor ? <span style={{ color: cor }}> — {av.valor}</span> : null}
+                        </span>
                         <span style={{ display: 'block', fontSize: 11.5, color: C.faint, lineHeight: 1.4, marginTop: 2 }}>{av.detalhe}</span>
                       </span>
                     </button>
