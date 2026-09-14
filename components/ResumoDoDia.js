@@ -16,7 +16,10 @@ import { todayISO, addDays } from '../lib/util';
 // só quando ela toca. O que não cabe vira "ver as outras N".
 const QUANTAS = 3;
 
-export default function ResumoDoDia({ dados = {}, onPerguntar }) {
+// As props do Darci chegam soltas (receitas, despesas, vendas…), não dentro de
+// um objeto `dados` — é assim que o painel as passa. O `...dados` recolhe todas
+// e deixa de fora só o que é função.
+export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }) {
   const [reservas, setReservas] = useState([]);
   const [desdeMs, setDesdeMs] = useState(0);
   const [tudo, setTudo] = useState(false);
