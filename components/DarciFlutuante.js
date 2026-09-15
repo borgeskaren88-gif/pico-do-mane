@@ -4,6 +4,7 @@ import { C, inputStyle } from './ui';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS, NAO_ENTENDI } from '../lib/darci';
 import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome, destravarAudio, baixarPrefs } from '../lib/darciVoz';
+import useReservas from '../lib/useReservas';
 
 // A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
 // a barra de cima no celular), em linha com os outros botões. Ao tocar ela NÃO
@@ -41,10 +42,11 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   // O que precisa de atenção agora — contas vencidas, salário, estoque no fim,
   // fiado a receber, como foi ontem. Mesmas dependências das novidades: são as
   // listas em si, senão isso recalcularia a cada render.
+  const reservas = useReservas();
   const avisos = useMemo(
-    () => alertas(analisarBar({ ...dados, desdeMs })),
+    () => alertas(analisarBar({ ...dados, reservas, desdeMs })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [desdeMs, dados.vendas, dados.estoque, dados.receitas, dados.despesas, dados.compras, dados.tarefas, dados.clientes, dados.fichas, dados.cardapio],
+    [desdeMs, reservas, dados.vendas, dados.estoque, dados.receitas, dados.despesas, dados.compras, dados.tarefas, dados.clientes, dados.fichas, dados.cardapio],
   );
 
   // O que mudou desde a última conversa. É o que faz a onda piscar chamando.
@@ -82,6 +84,8 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
 
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
+  const reservasRef = useRef(reservas);
+  reservasRef.current = reservas;
   const desdeRef = useRef(0);
   desdeRef.current = desdeMs;
   const recRef = useRef(null);
@@ -114,7 +118,7 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
     }
     setPensando(true);
     timerRef.current = setTimeout(() => {
-      const resp = responder(q, analisarBar({ ...dadosRef.current, desdeMs: desdeRef.current }), sotaqueRef.current);
+      const resp = responder(q, analisarBar({ ...dadosRef.current, reservas: reservasRef.current, desdeMs: desdeRef.current }), sotaqueRef.current);
       setPensando(false);
       setResposta(resp);
       destravarAudio(); // libera o som no iPhone

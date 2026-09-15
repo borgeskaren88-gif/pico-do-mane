@@ -5,6 +5,7 @@ import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS } from '../lib/darci';
 import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs, lerVozNome, vozEscolhidaFalta } from '../lib/darciVoz';
+import useReservas from '../lib/useReservas';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -43,7 +44,10 @@ export default function Darci({ onAnotar, ...dados }) {
   const [desdeMs] = useState(() => lerVisto());
   useEffect(() => { const t = setTimeout(() => marcarVisto(Date.now()), 4000); return () => clearTimeout(t); }, []);
 
-  const n = useMemo(() => analisarBar({ ...dados, desdeMs }), [dados, desdeMs]);
+  // As mesas reservadas entram no cérebro dele: é assim que ele cruza "sexta
+  // tem mesa de 12" com "o gelo acaba quinta".
+  const reservas = useReservas();
+  const n = useMemo(() => analisarBar({ ...dados, reservas, desdeMs }), [dados, reservas, desdeMs]);
 
   const carregarVozes = useCallback(() => {
     const lista = listarVozes();

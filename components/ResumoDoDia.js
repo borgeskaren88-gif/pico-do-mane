@@ -1,8 +1,9 @@
 'use client';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { C, Card } from './ui';
 import { alertas, analisarBar, faz, lerVisto, marcarVisto } from '../lib/darci';
 import { todayISO, addDays } from '../lib/util';
+import useReservas from '../lib/useReservas';
 
 // O topo do Dashboard, num cartão só.
 //
@@ -20,7 +21,7 @@ const QUANTAS = 3;
 // um objeto `dados` — é assim que o painel as passa. O `...dados` recolhe todas
 // e deixa de fora só o que é função.
 export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }) {
-  const [reservas, setReservas] = useState([]);
+  const reservas = useReservas();
   const [desdeMs, setDesdeMs] = useState(0);
   const [tudo, setTudo] = useState(false);
   const [abertoId, setAbertoId] = useState('');
@@ -28,24 +29,10 @@ export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }
 
   useEffect(() => { setDesdeMs(lerVisto()); }, []);
 
-  const carregarReservas = useCallback(async () => {
-    try {
-      const r = await fetch('/api/reservas', { cache: 'no-store' });
-      const j = await r.json();
-      setReservas(j.ok && Array.isArray(j.reservas) ? j.reservas : []);
-    } catch { /* sem conexão: some a faixa das reservas */ }
-  }, []);
-  useEffect(() => {
-    carregarReservas();
-    const aoVoltar = () => { if (!document.hidden) carregarReservas(); };
-    document.addEventListener('visibilitychange', aoVoltar);
-    return () => document.removeEventListener('visibilitychange', aoVoltar);
-  }, [carregarReservas]);
-
   const n = useMemo(
-    () => analisarBar({ ...dados, desdeMs }),
+    () => analisarBar({ ...dados, reservas, desdeMs }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [desdeMs, dados.vendas, dados.estoque, dados.receitas, dados.despesas, dados.compras, dados.tarefas, dados.clientes, dados.fichas, dados.cardapio],
+    [desdeMs, reservas, dados.vendas, dados.estoque, dados.receitas, dados.despesas, dados.compras, dados.tarefas, dados.clientes, dados.fichas, dados.cardapio],
   );
   const avisos = useMemo(() => alertas(n), [n]);
   const novidades = n.novidades || [];
