@@ -4,7 +4,7 @@ import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS } from '../lib/darci';
-import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs, lerVozNome, vozEscolhidaFalta } from '../lib/darciVoz';
+import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs, lerVozNome, vozEscolhidaFalta, testarVoz } from '../lib/darciVoz';
 import useReservas from '../lib/useReservas';
 import { resolverDarci, testarIA } from '../lib/perguntarDarci';
 import CamposPedido, { podeGravarPedido } from './CamposPedido';
@@ -31,12 +31,17 @@ export default function Darci({ onAnotar, ...dados }) {
   const [escutaOk, setEscutaOk] = useState(true); // este aparelho deixa escutar?
   const [escuta, setEscuta] = useState(false); // atender quando chamam pelo nome
   const [ia, setIa] = useState({ estado: 'vendo' }); // a IA responde mesmo? (testa de verdade)
+  const [voz, setVoz] = useState({ estado: 'parado' }); // e a voz própria, sai som mesmo?
   useEffect(() => { setEscutaOk(podeOuvir()); setEscuta(lerEscuta()); }, []);
   const verIA = useCallback(() => {
     setIa({ estado: 'vendo' });
     testarIA().then(setIa).catch(() => setIa({ estado: 'erro', erro: 'Não consegui testar.' }));
   }, []);
   useEffect(() => { verIA(); }, [verIA]);
+  const verVoz = useCallback(() => {
+    setVoz({ estado: 'vendo' });
+    testarVoz().then(setVoz).catch(() => setVoz({ estado: 'erro', erro: 'Não consegui testar a voz.' }));
+  }, []);
   useEffect(() => { setEdit(pedido ? { ...pedido.dados } : {}); }, [pedido]);
   const podeGravar = podeGravarPedido(pedido, edit);
   const fimRef = useRef(null);
@@ -359,6 +364,36 @@ export default function Darci({ onAnotar, ...dados }) {
                   Hoje ele usa a <b>voz de fábrica do aparelho</b>. Dá pra dar uma voz só dele (a mesma em todos os aparelhos, falando português direito) — é ligar um serviço de voz nas configurações do site. Me pede que eu te explico o passo a passo.
                 </div>
               )}
+
+              {/* Mesma ideia do teste da IA: chave de voz existindo mas
+                  recusada dava voz do aparelho em silêncio. Aqui ela vê. */}
+              {voz.estado === 'erro' && (
+                <div style={{ fontSize: 11, color: C.text, marginTop: 7, lineHeight: 1.5 }}>
+                  <b style={{ color: C.red }}>A voz está configurada, mas não saiu som.</b>
+                  <span style={{ display: 'block', marginTop: 4 }}>{voz.erro}</span>
+                </div>
+              )}
+              {voz.estado === 'ok' && (
+                <div style={{ fontSize: 11, color: C.green, marginTop: 7, fontWeight: 700 }}>
+                  Voz própria funcionando{voz.motor ? ` (${voz.motor}${voz.ms ? `, ${voz.ms}ms` : ''})` : ''}.
+                </div>
+              )}
+              <button onClick={verVoz} disabled={voz.estado === 'vendo'} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 11.5, fontWeight: 800, padding: '7px 0 0', cursor: 'pointer' }}>
+                {voz.estado === 'vendo' ? 'testando…' : 'testar a voz agora'}
+              </button>
+              {voz.onde ? (
+                <div style={{ fontSize: 10.5, color: C.faint, lineHeight: 1.5, wordBreak: 'break-word' }}>
+                  quem respondeu: <b style={{ color: C.muted }}>{voz.onde.publicacao}</b><br />
+                  Azure: <b style={{ color: voz.onde.temAzure ? C.green : C.red }}>{voz.onde.temAzure ? `sim (${voz.onde.regiao}, ${voz.onde.voz})` : voz.onde.azureSoChave ? 'FALTA A REGIÃO' : 'não'}</b>
+                  {' · '}ElevenLabs: {voz.onde.temEleven ? 'sim' : 'não'} · OpenAI: {voz.onde.temOpenai ? 'sim' : 'não'}
+                </div>
+              ) : null}
+              {voz.estado === 'erro' && voz.cru ? (
+                <details style={{ marginTop: 4 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 11, color: C.faint }}>detalhe técnico (pra me mandar)</summary>
+                  <div style={{ fontSize: 10.5, color: C.faint, marginTop: 4, lineHeight: 1.5, wordBreak: 'break-word' }}>{voz.cru}</div>
+                </details>
+              ) : null}
             </div>
 
             {/* Quanto de ilha ele põe na fala. O conteúdo é o mesmo — muda o jeito. */}
