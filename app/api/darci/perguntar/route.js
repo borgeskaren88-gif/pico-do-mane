@@ -92,6 +92,47 @@ async function perguntarOpenAI(ficha, jeito, antes, pergunta) {
   return String(j?.choices?.[0]?.message?.content || '').trim();
 }
 
+// Traduz o erro técnico pro que a Karen precisa FAZER. Sem isso ela fica com
+// uma frase em inglês na mão e nenhuma pista do que resolver.
+function explicar(e) {
+  const st = e?.status || 0;
+  const cru = String(e?.message || e || '').slice(0, 300);
+  if (st === 401 || /authentication|invalid x-api-key|invalid api key/i.test(cru)) {
+    return 'A chave foi recusada. Confere se colou ela inteira, sem espaço sobrando, e se é a chave da API (do console) — não a senha da conta.';
+  }
+  if (st === 400 && /model|not_found|does not exist/i.test(cru)) {
+    return 'Essa conta não tem acesso ao modelo que eu pedi. Dá pra trocar o modelo numa variável na Vercel — me diz que eu te passo qual.';
+  }
+  if (st === 404) return 'O modelo que eu pedi não existe pra essa conta. Dá pra trocar numa variável na Vercel.';
+  if (st === 400) return `O pedido foi recusado pela IA. Mensagem dela: ${cru}`;
+  if (st === 402 || /credit|billing|quota|insufficient/i.test(cru)) {
+    return 'A conta da IA está sem crédito. Entra no console dela, em Billing, e põe crédito.';
+  }
+  if (st === 429) return 'Bateu no limite de uso da IA por agora. Espera um pouco e tenta de novo.';
+  if (st >= 500) return 'A IA está fora do ar neste momento. Não é coisa tua — tenta daqui a pouco.';
+  if (/timeout|aborted|ETIMEDOUT/i.test(cru)) return 'A IA demorou demais pra responder e o tempo estourou. Me avisa que eu ajusto isso.';
+  return `Deu um erro que eu não esperava: ${cru}`;
+}
+
+// O botão "testar a IA" da tela do Darci. Faz uma chamada DE VERDADE, curtinha,
+// e devolve o erro exato quando falha — porque o caminho normal esconde a falha
+// de propósito (volta pro cérebro local sem assustar ninguém no meio do serviço).
+async function testar(motor) {
+  const t0 = Date.now();
+  try {
+    const r = motor === 'claude'
+      ? await perguntarClaude('(teste)', '', [], 'Responde só: ok')
+      : await perguntarOpenAI('(teste)', '', [], 'Responde só: ok');
+    if (!r) return { ok: false, motor, modelo: motor === 'claude' ? MODELO_CLAUDE : MODELO_OPENAI, ms: Date.now() - t0, erro: 'A IA respondeu vazio.' };
+    return { ok: true, motor, modelo: motor === 'claude' ? MODELO_CLAUDE : MODELO_OPENAI, ms: Date.now() - t0, resposta: r.slice(0, 80) };
+  } catch (e) {
+    return {
+      ok: false, motor, modelo: motor === 'claude' ? MODELO_CLAUDE : MODELO_OPENAI, ms: Date.now() - t0,
+      erro: explicar(e), status: e?.status || 0, cru: String(e?.message || e || '').slice(0, 300),
+    };
+  }
+}
+
 export async function POST(request) {
   if (papelDaSessao(cookies().get(nomeCookie())?.value) !== 'dona') {
     return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
@@ -102,6 +143,7 @@ export async function POST(request) {
 
   let body;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
+  if (body?.acao === 'teste') return NextResponse.json(await testar(motor));
   const pergunta = String(body?.pergunta || '').trim().slice(0, 500);
   if (!pergunta) return NextResponse.json({ ok: false, erro: 'Pergunta vazia.' }, { status: 400 });
 
