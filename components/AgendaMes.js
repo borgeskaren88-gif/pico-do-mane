@@ -11,13 +11,16 @@ const diaDaSemana = (iso) => { const [y, m, d] = iso.split('-').map(Number); ret
 // Os 7 dias da semana (domingo a sábado) em que o dia escolhido cai.
 const semanaDe = (iso) => { const ini = addDays(iso, -diaDaSemana(iso)); return Array.from({ length: 7 }, (_, i) => addDays(ini, i)); };
 
-// Calendário do mês (Google Agenda): a faixa da semana pra bater o olho no dia,
-// e o mês inteiro quando quiser a visão larga. Self-contained — busca os
-// próprios eventos. Só aparece quando o Google Agenda está conectado (senão
-// devolve null e quem usa mostra a tela de conexão).
+// Calendário do mês: a faixa da semana pra bater o olho no dia, e o mês inteiro
+// quando quiser a visão larga. Self-contained — busca os próprios compromissos.
+//
+// O que ela marca aqui fica guardado no PicoOS. O Google Agenda é só um extra
+// em cima disso: quando está conectado, o mesmo compromisso também aparece no
+// celular. Se não estiver, marcar continua funcionando igual — antes não ia.
 export default function AgendaMes() {
   const hoje = todayISO();
-  const [agenda, setAgenda] = useState(null); // null = não conectado / carregando
+  const [agenda, setAgenda] = useState(null); // null = Google não conectado
+  const [compromissos, setCompromissos] = useState([]); // o que ela marca aqui
   const [reservas, setReservas] = useState([]); // mesas reservadas (da Mari)
   const [diaSel, setDiaSel] = useState(hoje);
   const [mesAberto, setMesAberto] = useState(false); // o quadradão do mês inteiro
@@ -30,6 +33,7 @@ export default function AgendaMes() {
   const [evErro, setEvErro] = useState('');
 
   const [concluindo, setConcluindo] = useState('');
+  const [apagando, setApagando] = useState('');
 
   const carregarAgenda = async () => {
     try {
@@ -47,33 +51,76 @@ export default function AgendaMes() {
       setReservas(j.ok && Array.isArray(j.reservas) ? j.reservas : []);
     } catch { setReservas([]); }
   };
-  useEffect(() => { carregarAgenda(); carregarReservas(); }, []);
+  // Os compromissos que ela marca aqui — esses são do PicoOS e nunca dependem
+  // do Google.
+  const carregarCompromissos = async () => {
+    try {
+      const r = await fetch('/api/agenda', { cache: 'no-store' });
+      const j = await r.json();
+      setCompromissos(j.ok && Array.isArray(j.compromissos) ? j.compromissos : []);
+    } catch { setCompromissos([]); }
+  };
+  useEffect(() => { carregarAgenda(); carregarReservas(); carregarCompromissos(); }, []);
 
-  // "Dar ok" numa tarefa: risca (marca como feita) ou desmarca no Google. Ela
-  // fica na lista, só riscada — como num calendário digital.
+  // "Dar ok": risca (marca como feito) ou desmarca. O compromisso dela é riscado
+  // aqui; a tarefa que veio do Google é riscada lá. Nos dois casos ela continua
+  // na lista, só riscada — como num calendário digital.
   const alternarTarefaAg = async (ev) => {
     if (concluindo) return;
     setConcluindo(ev.id);
     const novo = !ev.concluida;
     try {
-      const r = await fetch('/api/google/concluir-tarefa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ev.id, concluida: novo }) });
-      const j = await r.json();
-      if (j.ok) setAgenda((a) => (a || []).map((x) => (x.id === ev.id ? { ...x, concluida: novo } : x)));
+      if (ev.proprio) {
+        const r = await fetch('/api/agenda', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'concluir', id: ev.compId, concluida: novo }) });
+        const j = await r.json();
+        if (j.ok) setCompromissos((cs) => cs.map((c) => (c.id === ev.compId ? { ...c, concluida: novo } : c)));
+      } else {
+        const r = await fetch('/api/google/concluir-tarefa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ev.id, concluida: novo }) });
+        const j = await r.json();
+        if (j.ok) setAgenda((a) => (a || []).map((x) => (x.id === ev.id ? { ...x, concluida: novo } : x)));
+      }
     } catch { /* ignora */ }
     setConcluindo('');
   };
 
+  const apagarCompromisso = async (ev) => {
+    if (apagando) return;
+    if (typeof window !== 'undefined' && !window.confirm(`Apagar “${ev.titulo}” da agenda?`)) return;
+    setApagando(ev.id);
+    try {
+      const r = await fetch('/api/agenda', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'excluir', id: ev.compId }) });
+      const j = await r.json();
+      if (j.ok) setCompromissos((cs) => cs.filter((c) => c.id !== ev.compId));
+    } catch { /* ignora */ }
+    setApagando('');
+  };
+
   const porDia = useMemo(() => {
     const m = new Map();
-    // A reserva que já virou compromisso no Google chegaria duas vezes (uma por
-    // aqui, outra pela agenda). Fica valendo a nossa, que sabe quantas pessoas
-    // são e traz a observação.
-    const idsNoGoogle = new Set(reservas.map((r) => r && r.googleId).filter(Boolean));
+    // O que o PicoOS mandou pro Google chegaria duas vezes (uma por aqui, outra
+    // pela agenda do Google). Fica valendo a nossa cópia, que sabe se é mesa
+    // reservada, quantas pessoas são e traz a observação.
+    const idsNoGoogle = new Set(
+      [...reservas, ...compromissos].map((r) => r && r.googleId).filter(Boolean),
+    );
     const põe = (d, item) => { if (!m.has(d)) m.set(d, []); m.get(d).push(item); };
     for (const ev of (agenda || [])) {
       const d = (ev.inicio || '').slice(0, 10);
       if (!d || idsNoGoogle.has(ev.id)) continue;
       põe(d, ev);
+    }
+    for (const c of compromissos) {
+      if (!c || !c.data) continue;
+      põe(c.data, {
+        id: 'comp-' + c.id,
+        compId: c.id,
+        titulo: c.titulo,
+        inicio: c.hora ? `${c.data}T${c.hora}:00` : c.data,
+        diaTodo: !c.hora,
+        tarefa: false,
+        proprio: true,
+        concluida: !!c.concluida,
+      });
     }
     for (const r of reservas) {
       if (!r || !r.data) continue;
@@ -90,7 +137,7 @@ export default function AgendaMes() {
     }
     for (const evs of m.values()) evs.sort((a, b) => String(a.inicio).localeCompare(String(b.inicio)));
     return m;
-  }, [agenda, reservas]);
+  }, [agenda, reservas, compromissos]);
   const diasComEvento = useMemo(() => new Set(porDia.keys()), [porDia]);
   const diasComReserva = useMemo(() => new Set(reservas.map((r) => r && r.data).filter(Boolean)), [reservas]);
 
@@ -110,7 +157,7 @@ export default function AgendaMes() {
 
   const ehBoleto = (ev) => ev.tarefa && /^\s*boleto/i.test(ev.titulo || '');
   const corEvento = (ev) => (ev.reserva ? C.green : ehBoleto(ev) ? C.amber : ev.tarefa ? C.roxo : ev.diaTodo ? C.accent2 : C.accent);
-  const etiquetaEvento = (ev) => (ev.reserva ? 'Mesa reservada' : ehBoleto(ev) ? 'A pagar' : ev.tarefa ? 'Tarefa' : ev.diaTodo ? 'Dia todo' : ev.inicio.slice(11, 16));
+  const etiquetaEvento = (ev) => (ev.reserva ? 'Mesa reservada' : ehBoleto(ev) ? 'A pagar' : ev.tarefa ? 'Tarefa' : ev.diaTodo ? 'Dia todo' : ev.proprio ? 'Compromisso' : ev.inicio.slice(11, 16));
   const horaEvento = (ev) => (ev.diaTodo || !ev.inicio || ev.inicio.length < 16 ? '' : ev.inicio.slice(11, 16));
 
   // A lista do dia em forma de linha do tempo: bolinha, fio ligando e o cartão
@@ -156,9 +203,15 @@ export default function AgendaMes() {
                   <span style={{ fontSize: 11, fontWeight: 800, color: cor, background: `color-mix(in srgb, ${cor} 20%, transparent)`, borderRadius: 999, padding: '3px 10px' }}>
                     {etiquetaEvento(ev)}
                   </span>
-                  {ev.tarefa && !ehBoleto(ev) && (
+                  {ev.proprio && (
+                    <button onClick={() => apagarCompromisso(ev)} disabled={apagando === ev.id}
+                      style={{ marginLeft: 'auto', border: 'none', background: 'none', color: C.faint, fontSize: 12, fontWeight: 800, cursor: 'pointer', padding: '4px 2px', whiteSpace: 'nowrap' }}>
+                      {apagando === ev.id ? '…' : 'apagar'}
+                    </button>
+                  )}
+                  {((ev.tarefa && !ehBoleto(ev)) || ev.proprio) && (
                     <button onClick={() => alternarTarefaAg(ev)} disabled={concluindo === ev.id} title={ev.concluida ? 'Desmarcar' : 'Marcar como feito'}
-                      style={{ marginLeft: 'auto', border: `1px solid ${cor}`, background: ev.concluida ? cor : 'transparent', color: ev.concluida ? '#fff' : cor, borderRadius: 999, padding: '4px 13px', fontSize: 12, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      style={{ marginLeft: ev.proprio ? 0 : 'auto', border: `1px solid ${cor}`, background: ev.concluida ? cor : 'transparent', color: ev.concluida ? '#fff' : cor, borderRadius: 999, padding: '4px 13px', fontSize: 12, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                       {concluindo === ev.id ? '…' : ev.concluida ? '✓ feito' : 'ok'}
                     </button>
                   )}
@@ -173,20 +226,22 @@ export default function AgendaMes() {
 
   const abrirNovo = () => { setEvData(diaSel); setEvErro(''); setNovoAberto(true); };
   const salvarEvento = async () => {
-    if (!evTitulo.trim() || salvandoEv) return;
+    if (!evTitulo.trim()) { setEvErro('Escreve o que é o compromisso.'); return; }
+    if (salvandoEv) return;
     setSalvandoEv(true); setEvErro('');
     try {
-      const r = await fetch('/api/google/criar-evento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titulo: evTitulo.trim(), data: evData, hora: evHora, diaTodo: evDiaTodo }) });
+      const r = await fetch('/api/agenda', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titulo: evTitulo.trim(), data: evData, hora: evHora, diaTodo: evDiaTodo }) });
       const j = await r.json();
-      if (j.ok) { setNovoAberto(false); setEvTitulo(''); setEvDiaTodo(false); setDiaSel(evData); await carregarAgenda(); await carregarReservas(); }
-      else setEvErro(j.erro || 'Não consegui criar o evento.');
-    } catch { setEvErro('Não consegui criar o evento.'); }
+      if (j.ok) {
+        setNovoAberto(false); setEvTitulo(''); setEvDiaTodo(false); setDiaSel(evData);
+        await carregarCompromissos(); await carregarAgenda();
+      } else setEvErro(j.erro || 'Não consegui marcar o compromisso.');
+    } catch { setEvErro('Não consegui marcar — parece que está sem internet.'); }
     setSalvandoEv(false);
   };
 
-  // Antes o calendário sumia quando o Google não estava conectado. Agora, se
-  // houver mesa reservada, ele fica: a reserva é do PicoOS e não depende disso.
-  if (agenda === null && reservas.length === 0) return null;
+  // O calendário aparece sempre. Antes ele sumia quando o Google não estava
+  // conectado — e o que ela marcasse não ia pra lugar nenhum.
 
   const tituloDoDia = diaSel === hoje ? 'Hoje' : diaSel === addDays(hoje, 1) ? 'Amanhã' : diaSel === addDays(hoje, -1) ? 'Ontem' : `${weekday(diaSel)}, ${fmtDate(diaSel)}`;
   const quantosNoDia = (porDia.get(diaSel) || []).length;
@@ -266,7 +321,15 @@ export default function AgendaMes() {
         <div className="agenda-dia-lista">{listaDoDia(diaSel)}</div>
 
         {!novoAberto ? (
-          <button onClick={abrirNovo} style={{ marginTop: 14, width: '100%', background: 'transparent', border: `1px dashed ${C.line}`, color: C.accent, borderRadius: 12, padding: '11px', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>+ Novo compromisso</button>
+          <>
+            <button onClick={abrirNovo} style={{ marginTop: 14, width: '100%', background: 'transparent', border: `1px dashed ${C.line}`, color: C.accent, borderRadius: 12, padding: '11px', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>+ Novo compromisso</button>
+            {agenda === null && (
+              <div style={{ fontSize: 11.5, color: C.faint, textAlign: 'center', marginTop: 8, lineHeight: 1.45 }}>
+                O que você marcar fica salvo aqui. Pra aparecer também no celular,
+                conecte o Google Agenda lá embaixo.
+              </div>
+            )}
+          </>
         ) : (
           <div style={{ marginTop: 14, borderTop: `1px solid ${C.line}`, paddingTop: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>Novo compromisso</div>
