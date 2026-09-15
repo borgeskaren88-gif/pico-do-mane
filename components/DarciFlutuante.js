@@ -5,6 +5,7 @@ import OndaDarci from './OndaDarci';
 import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS, NAO_ENTENDI } from '../lib/darci';
 import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome, destravarAudio, baixarPrefs } from '../lib/darciVoz';
 import useReservas from '../lib/useReservas';
+import { perguntarDarci } from '../lib/perguntarDarci';
 
 // A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
 // a barra de cima no celular), em linha com os outros botões. Ao tocar ela NÃO
@@ -93,8 +94,10 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const caixaRef = useRef(null);
   const botaoRef = useRef(null);
   const timerRef = useRef(null);
+  const pedidoRef = useRef(0); // ignora a resposta que chega depois de outra pergunta
 
   const pararTudo = useCallback(() => {
+    pedidoRef.current++; // resposta que ainda estiver vindo da IA deixa de valer
     try { recRef.current && recRef.current.abort(); } catch { /* ignora */ }
     recRef.current = null;
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -117,13 +120,17 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
       if (cmd) { setPedido(cmd); setResposta(''); return; }
     }
     setPensando(true);
-    timerRef.current = setTimeout(() => {
-      const resp = responder(q, analisarBar({ ...dadosRef.current, reservas: reservasRef.current, desdeMs: desdeRef.current }), sotaqueRef.current);
+    // A IA entende a pergunta de qualquer jeito; sem ela (ou se falhar), o
+    // cérebro daqui responde igual, na hora.
+    const meu = ++pedidoRef.current;
+    const n = analisarBar({ ...dadosRef.current, reservas: reservasRef.current, desdeMs: desdeRef.current });
+    perguntarDarci(q, n, sotaqueRef.current).then((resp) => {
+      if (meu !== pedidoRef.current) return; // ela já perguntou outra coisa
       setPensando(false);
       setResposta(resp);
       destravarAudio(); // libera o som no iPhone
       falarTexto(resp, { sotaque: sotaqueRef.current, aoIniciar: () => setFalando(true), aoTerminar: () => setFalando(false) });
-    }, 380);
+    });
   }, [onAnotar]);
 
   // Começa a ouvir. Só funciona onde o navegador tem reconhecimento de fala.

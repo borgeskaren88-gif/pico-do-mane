@@ -6,6 +6,7 @@ import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS } from '../lib/darci';
 import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs, lerVozNome, vozEscolhidaFalta } from '../lib/darciVoz';
 import useReservas from '../lib/useReservas';
+import { perguntarDarci, iaLigada } from '../lib/perguntarDarci';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -28,7 +29,9 @@ export default function Darci({ onAnotar, ...dados }) {
   const [edit, setEdit] = useState({}); // campos da ordem, editáveis antes de gravar
   const [escutaOk, setEscutaOk] = useState(true); // este aparelho deixa escutar?
   const [escuta, setEscuta] = useState(false); // atender quando chamam pelo nome
+  const [iaOk, setIaOk] = useState(null); // a IA que entende qualquer pergunta está ligada?
   useEffect(() => { setEscutaOk(podeOuvir()); setEscuta(lerEscuta()); }, []);
+  useEffect(() => { iaLigada().then(setIaOk).catch(() => setIaOk(false)); }, []);
   useEffect(() => { setEdit(pedido ? { ...pedido.dados } : {}); }, [pedido]);
   const podeGravar = !pedido ? false
     : pedido.tipo === 'despesa' ? (Number(edit.valor) > 0 && String(edit.descricao || '').trim().length > 1)
@@ -37,6 +40,7 @@ export default function Darci({ onAnotar, ...dados }) {
           : Number(edit.qtd) > 0;
   const fimRef = useRef(null);
   const timerRef = useRef(null);
+  const pedidoRef = useRef(0); // ignora a resposta que chega depois de outra pergunta
 
   // Até onde ela já foi informada. Fica fixo enquanto a tela está aberta (pra o
   // cartão não sumir no meio da leitura) e é marcado como visto poucos segundos
@@ -123,12 +127,15 @@ export default function Darci({ onAnotar, ...dados }) {
       if (cmd) { setPedido(cmd); return; }
     }
     setPensando(true);
-    timerRef.current = setTimeout(() => {
-      const resp = responder(q, n, sotaque);
+    // A IA entende a pergunta escrita de qualquer jeito. Se ela não estiver
+    // ligada (ou falhar), `perguntarDarci` responde pelo cérebro daqui mesmo.
+    const meu = ++pedidoRef.current;
+    perguntarDarci(q, n, sotaque, conversa).then((resp) => {
+      if (meu !== pedidoRef.current) return; // ela já perguntou outra coisa
       setPensando(false);
       setConversa((c) => [...c, { de: 'darci', texto: resp }]);
       falar(resp);
-    }, 520);
+    });
   };
 
   const ativa = falando || pensando;
@@ -255,6 +262,19 @@ export default function Darci({ onAnotar, ...dados }) {
                 </label>
               </div>
             )}
+
+            {/* Como ele entende: com IA ele lê a pergunta escrita de qualquer
+                jeito; sem ela, é por palavra-chave, que também funciona. */}
+            <div style={{ maxWidth: 320, margin: '14px auto 0', textAlign: 'left' }}>
+              <div style={{ fontSize: 11, color: C.faint, fontWeight: 700, marginBottom: 5 }}>Como ele entende</div>
+              <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
+                {iaOk === null ? 'Vendo…' : iaOk ? (
+                  <>Com <b style={{ color: C.green }}>IA ligada</b>: pode perguntar do teu jeito, com as tuas palavras. Os números continuam saindo do PicoOS — ele não inventa.</>
+                ) : (
+                  <>Sem IA: ele entende por palavra-chave, então funciona melhor com perguntas parecidas com os atalhos aqui embaixo. Pra ele entender qualquer jeito de falar, me pede que eu te explico o passo a passo.</>
+                )}
+              </div>
+            </div>
 
             {/* A voz do Darci: a dele mesmo (nuvem) ou a de fábrica do aparelho.
                 Só aparece a escolha quando o serviço de voz está configurado. */}
