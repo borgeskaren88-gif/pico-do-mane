@@ -282,9 +282,24 @@ export default function Darci({ onAnotar, ...dados }) {
                       <b style={{ color: C.red }}>A IA está configurada, mas não respondeu.</b> Enquanto isso ele responde
                       por palavra-chave, igual antes — nada quebrou.
                       <span style={{ display: 'block', marginTop: 6, color: C.text }}>{ia.erro}</span>
+                      {ia.sugestao ? <span style={{ display: 'block', marginTop: 5, color: C.amber }}>{ia.sugestao}</span> : null}
                     </>
                   )}
               </div>
+
+              {/* Os degraus do teste: dá pra ver EM QUAL a coisa parou. */}
+              {Array.isArray(ia.passos) && ia.passos.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  {ia.passos.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', padding: '3px 0' }}>
+                      <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 900, color: p.ok ? C.green : C.red }}>{p.ok ? '✓' : '✕'}</span>
+                      <span style={{ minWidth: 0, fontSize: 11, color: C.muted, lineHeight: 1.45 }}>
+                        <b style={{ color: C.text }}>{p.nome}</b> — {p.detalhe}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <button onClick={verIA} disabled={ia.estado === 'vendo'} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 11.5, fontWeight: 800, padding: '7px 0 0', cursor: 'pointer' }}>
                 {ia.estado === 'vendo' ? 'testando…' : 'testar a IA agora'}
               </button>
