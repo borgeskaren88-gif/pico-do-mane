@@ -6,7 +6,7 @@ import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS } from '../lib/darci';
 import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs, lerVozNome, vozEscolhidaFalta } from '../lib/darciVoz';
 import useReservas from '../lib/useReservas';
-import { perguntarDarci, iaLigada } from '../lib/perguntarDarci';
+import { perguntarDarci, testarIA } from '../lib/perguntarDarci';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -29,9 +29,13 @@ export default function Darci({ onAnotar, ...dados }) {
   const [edit, setEdit] = useState({}); // campos da ordem, editáveis antes de gravar
   const [escutaOk, setEscutaOk] = useState(true); // este aparelho deixa escutar?
   const [escuta, setEscuta] = useState(false); // atender quando chamam pelo nome
-  const [iaOk, setIaOk] = useState(null); // a IA que entende qualquer pergunta está ligada?
+  const [ia, setIa] = useState({ estado: 'vendo' }); // a IA responde mesmo? (testa de verdade)
   useEffect(() => { setEscutaOk(podeOuvir()); setEscuta(lerEscuta()); }, []);
-  useEffect(() => { iaLigada().then(setIaOk).catch(() => setIaOk(false)); }, []);
+  const verIA = useCallback(() => {
+    setIa({ estado: 'vendo' });
+    testarIA().then(setIa).catch(() => setIa({ estado: 'erro', erro: 'Não consegui testar.' }));
+  }, []);
+  useEffect(() => { verIA(); }, [verIA]);
   useEffect(() => { setEdit(pedido ? { ...pedido.dados } : {}); }, [pedido]);
   const podeGravar = !pedido ? false
     : pedido.tipo === 'despesa' ? (Number(edit.valor) > 0 && String(edit.descricao || '').trim().length > 1)
@@ -268,12 +272,32 @@ export default function Darci({ onAnotar, ...dados }) {
             <div style={{ maxWidth: 320, margin: '14px auto 0', textAlign: 'left' }}>
               <div style={{ fontSize: 11, color: C.faint, fontWeight: 700, marginBottom: 5 }}>Como ele entende</div>
               <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
-                {iaOk === null ? 'Vendo…' : iaOk ? (
-                  <>Com <b style={{ color: C.green }}>IA ligada</b>: pode perguntar do teu jeito, com as tuas palavras. Os números continuam saindo do PicoOS — ele não inventa.</>
-                ) : (
-                  <>Sem IA: ele entende por palavra-chave, então funciona melhor com perguntas parecidas com os atalhos aqui embaixo. Pra ele entender qualquer jeito de falar, me pede que eu te explico o passo a passo.</>
-                )}
+                {ia.estado === 'vendo' ? 'Testando…'
+                  : ia.estado === 'ok' ? (
+                    <>Com <b style={{ color: C.green }}>IA ligada</b>: pode perguntar do teu jeito, com as tuas palavras. Os números continuam saindo do PicoOS — ele não inventa.</>
+                  ) : ia.estado === 'sem-chave' ? (
+                    <>Sem IA: ele entende por palavra-chave, então funciona melhor com perguntas parecidas com os atalhos aqui embaixo. Pra ele entender qualquer jeito de falar, me pede que eu te explico o passo a passo.</>
+                  ) : (
+                    <>
+                      <b style={{ color: C.red }}>A IA está configurada, mas não respondeu.</b> Enquanto isso ele responde
+                      por palavra-chave, igual antes — nada quebrou.
+                      <span style={{ display: 'block', marginTop: 6, color: C.text }}>{ia.erro}</span>
+                    </>
+                  )}
               </div>
+              <button onClick={verIA} disabled={ia.estado === 'vendo'} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 11.5, fontWeight: 800, padding: '7px 0 0', cursor: 'pointer' }}>
+                {ia.estado === 'vendo' ? 'testando…' : 'testar a IA agora'}
+              </button>
+              {/* O detalhe técnico fica escondido: não serve pra ela, serve pra
+                  me mandar quando a mensagem de cima não for suficiente. */}
+              {ia.estado === 'erro' && ia.cru ? (
+                <details style={{ marginTop: 4 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 11, color: C.faint }}>detalhe técnico (pra me mandar)</summary>
+                  <div style={{ fontSize: 10.5, color: C.faint, marginTop: 4, lineHeight: 1.5, wordBreak: 'break-word' }}>
+                    motor {ia.motor || '—'} · modelo {ia.modelo || '—'} · status {ia.status || '—'}<br />{ia.cru}
+                  </div>
+                </details>
+              ) : null}
             </div>
 
             {/* A voz do Darci: a dele mesmo (nuvem) ou a de fábrica do aparelho.
