@@ -6,7 +6,8 @@ import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS } from '../lib/darci';
 import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs, lerVozNome, vozEscolhidaFalta } from '../lib/darciVoz';
 import useReservas from '../lib/useReservas';
-import { perguntarDarci, testarIA } from '../lib/perguntarDarci';
+import { resolverDarci, testarIA } from '../lib/perguntarDarci';
+import CamposPedido, { podeGravarPedido } from './CamposPedido';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -37,11 +38,7 @@ export default function Darci({ onAnotar, ...dados }) {
   }, []);
   useEffect(() => { verIA(); }, [verIA]);
   useEffect(() => { setEdit(pedido ? { ...pedido.dados } : {}); }, [pedido]);
-  const podeGravar = !pedido ? false
-    : pedido.tipo === 'despesa' ? (Number(edit.valor) > 0 && String(edit.descricao || '').trim().length > 1)
-      : pedido.tipo === 'tarefa' ? String(edit.texto || '').trim().length > 1
-        : pedido.tipo === 'agenda' ? (String(edit.titulo || '').trim().length > 2 && /^\d{4}-\d{2}-\d{2}$/.test(edit.data || ''))
-          : Number(edit.qtd) > 0;
+  const podeGravar = podeGravarPedido(pedido, edit);
   const fimRef = useRef(null);
   const timerRef = useRef(null);
   const pedidoRef = useRef(0); // ignora a resposta que chega depois de outra pergunta
@@ -131,12 +128,14 @@ export default function Darci({ onAnotar, ...dados }) {
       if (cmd) { setPedido(cmd); return; }
     }
     setPensando(true);
-    // A IA entende a pergunta escrita de qualquer jeito. Se ela não estiver
-    // ligada (ou falhar), `perguntarDarci` responde pelo cérebro daqui mesmo.
+    // A IA entende de qualquer jeito: se a frase for ORDEM, volta o pedido pra
+    // ela confirmar; se for pergunta, volta a resposta. Sem IA (ou se falhar),
+    // o cérebro daqui responde do mesmo jeito.
     const meu = ++pedidoRef.current;
-    perguntarDarci(q, n, sotaque, conversa).then((resp) => {
+    resolverDarci(q, n, sotaque, conversa, !!onAnotar).then(({ pedido: ordem, texto: resp }) => {
       if (meu !== pedidoRef.current) return; // ela já perguntou outra coisa
       setPensando(false);
+      if (ordem) { setPedido(ordem); return; } // espera o confirmar dela
       setConversa((c) => [...c, { de: 'darci', texto: resp }]);
       falar(resp);
     });
@@ -491,41 +490,7 @@ export default function Darci({ onAnotar, ...dados }) {
       {pedido && (
         <Card style={{ marginBottom: 14, borderColor: C.accent }}>
           <div style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, letterSpacing: '.06em', marginBottom: 8 }}>{(pedido.titulo || 'Confirma?').toUpperCase()}</div>
-          {pedido.tipo === 'despesa' && (
-            <>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <input value={edit.valor ?? ''} onChange={(e) => setEdit((m) => ({ ...m, valor: e.target.value.replace(',', '.') }))}
-                  inputMode="decimal" placeholder="Valor" style={{ ...inputStyle, width: 110 }} />
-                <input value={edit.descricao ?? ''} onChange={(e) => setEdit((m) => ({ ...m, descricao: e.target.value }))}
-                  placeholder="Do que foi?" autoFocus={!String(pedido.dados.descricao || '').trim()}
-                  style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
-              </div>
-              <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Categoria: {edit.categoria || 'A classificar'} · hoje</div>
-            </>
-          )}
-          {pedido.tipo === 'tarefa' && (
-            <input value={edit.texto ?? ''} onChange={(e) => setEdit((m) => ({ ...m, texto: e.target.value }))}
-              style={{ ...inputStyle, width: '100%', marginBottom: 12 }} />
-          )}
-          {pedido.tipo === 'agenda' && (
-            <>
-              <input value={edit.titulo ?? ''} onChange={(e) => setEdit((m) => ({ ...m, titulo: e.target.value }))}
-                placeholder="O que é?" style={{ ...inputStyle, width: '100%', marginBottom: 8 }} />
-              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                <input type="date" value={edit.data ?? ''} onChange={(e) => setEdit((m) => ({ ...m, data: e.target.value }))}
-                  style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
-                <input type="time" value={edit.hora ?? ''} onChange={(e) => setEdit((m) => ({ ...m, hora: e.target.value, diaTodo: !e.target.value }))}
-                  style={{ ...inputStyle, width: 130 }} />
-              </div>
-            </>
-          )}
-          {pedido.tipo === 'perda' && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-              <input value={edit.qtd ?? ''} onChange={(e) => setEdit((m) => ({ ...m, qtd: e.target.value.replace(',', '.') }))}
-                inputMode="decimal" style={{ ...inputStyle, width: 110 }} />
-              <span style={{ fontSize: 14, color: C.text }}>{edit.unidade} de <b>{edit.nome}</b> · {String(edit.motivo || '').toLowerCase()}</span>
-            </div>
-          )}
+          <CamposPedido pedido={pedido} edit={edit} setEdit={setEdit} />
           <div style={{ display: 'flex', gap: 8 }}>
             <Btn onClick={async () => {
               if (!podeGravar) return;

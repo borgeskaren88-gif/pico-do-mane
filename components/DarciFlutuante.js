@@ -5,7 +5,8 @@ import OndaDarci from './OndaDarci';
 import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS, NAO_ENTENDI } from '../lib/darci';
 import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome, destravarAudio, baixarPrefs } from '../lib/darciVoz';
 import useReservas from '../lib/useReservas';
-import { perguntarDarci } from '../lib/perguntarDarci';
+import { resolverDarci } from '../lib/perguntarDarci';
+import CamposPedido, { podeGravarPedido } from './CamposPedido';
 
 // A onda do Darci: encaixa numa barra que já existe (a lateral no computador,
 // a barra de cima no celular), em linha com os outros botões. Ao tocar ela NÃO
@@ -27,11 +28,7 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const [aviso, setAviso] = useState('');       // por que ele não conseguiu ouvir
   const [edit, setEdit] = useState({});         // campos da ordem, editáveis antes de gravar
   useEffect(() => { setEdit(pedido ? { ...pedido.dados } : {}); }, [pedido]);
-  const podeGravar = !pedido ? false
-    : pedido.tipo === 'despesa' ? (Number(edit.valor) > 0 && String(edit.descricao || '').trim().length > 1)
-      : pedido.tipo === 'tarefa' ? String(edit.texto || '').trim().length > 1
-        : pedido.tipo === 'agenda' ? (String(edit.titulo || '').trim().length > 2 && /^\d{4}-\d{2}-\d{2}$/.test(edit.data || ''))
-          : Number(edit.qtd) > 0;
+  const podeGravar = podeGravarPedido(pedido, edit);
   const [ouvirOk, setOuvirOk] = useState(false); // este aparelho entende voz?
   const [pos, setPos] = useState(null); // onde o balão abre, medido no botão
   const [desdeMs, setDesdeMs] = useState(0); // até onde ela já foi informada
@@ -124,9 +121,10 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
     // cérebro daqui responde igual, na hora.
     const meu = ++pedidoRef.current;
     const n = analisarBar({ ...dadosRef.current, reservas: reservasRef.current, desdeMs: desdeRef.current });
-    perguntarDarci(q, n, sotaqueRef.current).then((resp) => {
+    resolverDarci(q, n, sotaqueRef.current, [], !!onAnotar).then(({ pedido: ordem, texto: resp }) => {
       if (meu !== pedidoRef.current) return; // ela já perguntou outra coisa
       setPensando(false);
+      if (ordem) { setPedido(ordem); return; } // espera o confirmar dela
       setResposta(resp);
       destravarAudio(); // libera o som no iPhone
       falarTexto(resp, { sotaque: sotaqueRef.current, aoIniciar: () => setFalando(true), aoTerminar: () => setFalando(false) });
@@ -457,42 +455,7 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
             {pedido && (
               <div style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 14, padding: '11px 12px', marginBottom: 10 }}>
                 <div style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, marginBottom: 6 }}>{(pedido.titulo || 'Confirma?').toUpperCase()}</div>
-                {pedido.tipo === 'despesa' && (
-                  <>
-                    <div style={{ display: 'flex', gap: 7, marginBottom: 7 }}>
-                      <input value={edit.valor ?? ''} onChange={(e) => setEdit((m) => ({ ...m, valor: e.target.value.replace(',', '.') }))}
-                        inputMode="decimal" placeholder="Valor"
-                        style={{ ...inputStyle, width: 92, padding: '9px 10px', fontSize: 13 }} />
-                      <input value={edit.descricao ?? ''} onChange={(e) => setEdit((m) => ({ ...m, descricao: e.target.value }))}
-                        placeholder="Do que foi?" autoFocus={!String(pedido.dados.descricao || '').trim()}
-                        style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '9px 10px', fontSize: 13 }} />
-                    </div>
-                    <div style={{ fontSize: 11.5, color: C.faint }}>Categoria: {edit.categoria || 'A classificar'} · hoje</div>
-                  </>
-                )}
-                {pedido.tipo === 'tarefa' && (
-                  <input value={edit.texto ?? ''} onChange={(e) => setEdit((m) => ({ ...m, texto: e.target.value }))}
-                    style={{ ...inputStyle, width: '100%', padding: '9px 10px', fontSize: 13 }} />
-                )}
-                {pedido.tipo === 'agenda' && (
-                  <>
-                    <input value={edit.titulo ?? ''} onChange={(e) => setEdit((m) => ({ ...m, titulo: e.target.value }))}
-                      placeholder="O que é?" style={{ ...inputStyle, width: '100%', padding: '9px 10px', fontSize: 13, marginBottom: 7 }} />
-                    <div style={{ display: 'flex', gap: 7 }}>
-                      <input type="date" value={edit.data ?? ''} onChange={(e) => setEdit((m) => ({ ...m, data: e.target.value }))}
-                        style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '9px 10px', fontSize: 13 }} />
-                      <input type="time" value={edit.hora ?? ''} onChange={(e) => setEdit((m) => ({ ...m, hora: e.target.value, diaTodo: !e.target.value }))}
-                        style={{ ...inputStyle, width: 110, padding: '9px 10px', fontSize: 13 }} />
-                    </div>
-                  </>
-                )}
-                {pedido.tipo === 'perda' && (
-                  <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                    <input value={edit.qtd ?? ''} onChange={(e) => setEdit((m) => ({ ...m, qtd: e.target.value.replace(',', '.') }))}
-                      inputMode="decimal" style={{ ...inputStyle, width: 92, padding: '9px 10px', fontSize: 13 }} />
-                    <span style={{ fontSize: 13, color: C.text }}>{edit.unidade} de <b>{edit.nome}</b> · {String(edit.motivo || '').toLowerCase()}</span>
-                  </div>
-                )}
+                <CamposPedido pedido={pedido} edit={edit} setEdit={setEdit} compacto />
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                   <button disabled={!podeGravar} onClick={async () => {
                     if (!podeGravar) return;

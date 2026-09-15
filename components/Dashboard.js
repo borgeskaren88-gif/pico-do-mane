@@ -542,22 +542,40 @@ export default function Dashboard() {
         upd.tarefas([{ id: uid(), texto: d.texto || '', data: '', feito: false, criadoEm: Date.now() }, ...tarefas]);
         return { ok: true, msg: `Anotei: ${d.texto}. Está no Brain.` };
       }
+      if (pedido.tipo === 'receita') {
+        const nova = { id: uid(), data: todayISO(), categoria: 'Outras entradas', descricao: d.descricao || '', valor: num(d.valor), obs: 'Anotado pelo Darci' };
+        upd.receitas([nova, ...receitas]);
+        return { ok: true, msg: `Lancei a entrada de ${brl(num(d.valor))} — ${d.descricao}. Está em Finanças.` };
+      }
+      if (pedido.tipo === 'compra') {
+        // Conta a pagar: entra em aberto, do jeito que a tela de Compras grava.
+        const nova = {
+          id: uid(), data: todayISO(), produto: d.produto || d.fornecedor || 'Conta',
+          fornecedor: d.fornecedor || '', categoria: '', quantidade: '1',
+          valorUnit: String(num(d.valor)), vencimento: d.vencimento || '',
+          formaPagto: 'A prazo', pago: 'Não', nota: '', obs: 'Anotado pelo Darci',
+        };
+        upd.compras([nova, ...compras]);
+        const quando = d.vencimento ? `, vence ${d.vencimento.slice(8, 10)}/${d.vencimento.slice(5, 7)}` : '';
+        return { ok: true, msg: `Lancei a conta de ${brl(num(d.valor))} — ${nova.produto}${quando}. Está em Contas a pagar.` };
+      }
       if (pedido.tipo === 'agenda') {
-        // Vai pra agenda do Google (a mesma que já avisa no horário marcado).
-        // Sem Google conectado, não perde o compromisso: vira tarefa com data.
+        // A agenda é do PicoOS (o Google é bônus lá dentro). Antes isto escrevia
+        // direto no Google: sem Google conectado, o compromisso ia pro TO DO e
+        // nunca aparecia no calendário.
         try {
-          const r = await fetch('/api/google/criar-evento', {
+          const r = await fetch('/api/agenda', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ titulo: d.titulo, data: d.data, hora: d.hora, diaTodo: !d.hora }),
           });
           const j = await r.json();
           if (j && j.ok) {
             const quando = `${d.data.slice(8, 10)}/${d.data.slice(5, 7)}${d.hora ? ` às ${d.hora}` : ''}`;
-            return { ok: true, msg: `Marquei na agenda: ${d.titulo}, ${quando}. O celular te avisa na hora.` };
+            return { ok: true, msg: `Marquei na agenda: ${d.titulo}, ${quando}. Está no Brain, no calendário.` };
           }
         } catch { /* cai no plano B */ }
         upd.tarefas([{ id: uid(), texto: d.titulo, data: d.data, feito: false, criadoEm: Date.now() }, ...tarefas]);
-        return { ok: true, msg: `A agenda do Google não está conectada, então anotei no TO DO com a data: ${d.titulo}, dia ${d.data.slice(8, 10)}/${d.data.slice(5, 7)}.` };
+        return { ok: true, msg: `Não consegui salvar na agenda agora, então anotei no TO DO com a data: ${d.titulo}, dia ${d.data.slice(8, 10)}/${d.data.slice(5, 7)}.` };
       }
       if (pedido.tipo === 'perda') {
         const j = await estoqueAcao({ acao: 'mov', id: d.itemId, tipo: 'saida', qtd: d.qtd, motivo: d.motivo });
