@@ -29,6 +29,22 @@ const motorDisponivel = () => {
   return '';
 };
 
+// Quem está respondendo agora: qual publicação, de qual projeto da Vercel, e
+// quais chaves ela enxerga.
+//
+// Isso existe porque o mesmo repositório está ligado a mais de um projeto na
+// Vercel, cada um com suas próprias variáveis. Dá pra salvar a chave num
+// projeto e usar o site do outro a tarde inteira sem entender por que não
+// funciona — foi exatamente o que aconteceu. Aqui o site diz, ele mesmo, de
+// qual projeto ele é.
+const ondeEstou = () => ({
+  publicacao: process.env.VERCEL_URL || 'rodando fora da Vercel',
+  ambiente: process.env.VERCEL_ENV || 'local',
+  versao: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7),
+  temAnthropic: !!process.env.ANTHROPIC_API_KEY,
+  temOpenai: !!process.env.OPENAI_API_KEY,
+});
+
 // O ajuste "Leve / Manezinho / Carregado" da tela dele continua valendo: em vez
 // de mexer no texto depois de pronto, avisa a IA antes de ela escrever.
 const JEITO = {
@@ -207,7 +223,7 @@ async function testar(motor) {
   const tudoOk = passos.every((p) => p.ok);
   const primeiroRuim = passos.find((p) => !p.ok);
   return {
-    ok: tudoOk, motor, modelo, passos, sugestao,
+    ok: tudoOk, motor, modelo, passos, sugestao, onde: ondeEstou(),
     erro: tudoOk ? '' : (primeiroRuim?.detalhe || 'Alguma coisa falhou.'),
     cru: tudoOk ? '' : (primeiroRuim?.cru || ''),
   };
@@ -218,12 +234,13 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   }
   const motor = motorDisponivel();
-  // Sem chave não é erro: é o estado normal de quem ainda não ligou a IA.
-  if (!motor) return NextResponse.json({ ok: false, semChave: true });
 
   let body;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
-  if (body?.acao === 'teste') return NextResponse.json(await testar(motor));
+  // Sem chave não é erro: é o estado normal de quem ainda não ligou a IA. Mas
+  // no TESTE ela precisa saber onde a chave deveria estar e não está.
+  if (body?.acao === 'teste') return NextResponse.json(motor ? await testar(motor) : { ok: false, semChave: true, onde: ondeEstou() });
+  if (!motor) return NextResponse.json({ ok: false, semChave: true });
   const pergunta = String(body?.pergunta || '').trim().slice(0, 500);
   if (!pergunta) return NextResponse.json({ ok: false, erro: 'Pergunta vazia.' }, { status: 400 });
 

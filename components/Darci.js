@@ -275,6 +275,15 @@ export default function Darci({ onAnotar, ...dados }) {
                 {ia.estado === 'vendo' ? 'Testando…'
                   : ia.estado === 'ok' ? (
                     <>Com <b style={{ color: C.green }}>IA ligada</b>: pode perguntar do teu jeito, com as tuas palavras. Os números continuam saindo do PicoOS — ele não inventa.</>
+                  ) : ia.estado === 'sem-chave' && ia.onde ? (
+                    // Ela já apertou "testar": aqui o texto genérico atrapalha.
+                    // O que ela precisa saber é que o SERVIDOR não vê chave
+                    // nenhuma — e de qual publicação ele está falando.
+                    <>
+                      <b style={{ color: C.red }}>Este site não está enxergando chave nenhuma.</b> Ou ela foi salva noutro
+                      projeto da Vercel, ou este projeto ainda não foi republicado depois de salvar. Enquanto isso ele
+                      responde por palavra-chave, igual antes.
+                    </>
                   ) : ia.estado === 'sem-chave' ? (
                     <>Sem IA: ele entende por palavra-chave, então funciona melhor com perguntas parecidas com os atalhos aqui embaixo. Pra ele entender qualquer jeito de falar, me pede que eu te explico o passo a passo.</>
                   ) : (
@@ -303,6 +312,17 @@ export default function Darci({ onAnotar, ...dados }) {
               <button onClick={verIA} disabled={ia.estado === 'vendo'} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 11.5, fontWeight: 800, padding: '7px 0 0', cursor: 'pointer' }}>
                 {ia.estado === 'vendo' ? 'testando…' : 'testar a IA agora'}
               </button>
+              {/* Qual publicação está respondendo. É o que resolve a confusão
+                  de ter o mesmo app em mais de um projeto na Vercel. */}
+              {ia.onde ? (
+                <div style={{ marginTop: 8, fontSize: 10.5, color: C.faint, lineHeight: 1.5, wordBreak: 'break-word' }}>
+                  quem respondeu: <b style={{ color: C.muted }}>{ia.onde.publicacao}</b>
+                  {ia.onde.versao ? ` · versão ${ia.onde.versao}` : ''}<br />
+                  chave da Anthropic aqui dentro: <b style={{ color: ia.onde.temAnthropic ? C.green : C.red }}>{ia.onde.temAnthropic ? 'sim' : 'NÃO'}</b>
+                  {' · '}chave da OpenAI: <b style={{ color: ia.onde.temOpenai ? C.green : C.muted }}>{ia.onde.temOpenai ? 'sim' : 'não'}</b>
+                </div>
+              ) : null}
+
               {/* O detalhe técnico fica escondido: não serve pra ela, serve pra
                   me mandar quando a mensagem de cima não for suficiente. */}
               {ia.estado === 'erro' && ia.cru ? (
