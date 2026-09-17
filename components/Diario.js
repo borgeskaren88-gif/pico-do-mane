@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle } from './ui';
+import Movimento from './Movimento';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import CalendarioPedidos from './CalendarioPedidos';
 import Visitantes from './Visitantes';
@@ -24,8 +25,8 @@ const migrarRelato = (d) => {
 };
 const FONTE_ATRASADO = 'Recebimento Atrasado';
 const atrVazio = () => ({ data: todayISO(), valor: '', descricao: '' });
-export default function Diario({ dados, onChange, receitas = [], onReceitas, visitantes = [], onVisitantes, onRepor, pessoasPorDia = {}, pedidosPorDia = {}, fiadosPorDia = {} }) {
-  const [abaLog, setAbaLog] = useState('fechamento'); // 'fechamento' | 'atrasados'
+export default function Diario({ dados, onChange, receitas = [], onReceitas, visitantes = [], onVisitantes, onRepor, pessoasPorDia = {}, pedidosPorDia = {}, fiadosPorDia = {}, vendas = [] }) {
+  const [abaLog, setAbaLog] = useState('fechamento'); // 'fechamento' | 'atrasados' | 'movimento'
   const [form, setForm] = useState(diarioVazio());
   const [atrForm, setAtrForm] = useState(atrVazio());
   const setAtr = (k) => (v) => setAtrForm((f) => ({ ...f, [k]: v }));
@@ -151,7 +152,7 @@ export default function Diario({ dados, onChange, receitas = [], onReceitas, vis
       </div>
 
       <div style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
-        {[['fechamento', 'Fechamento'], ['atrasados', 'Recebimentos atrasados']].map(([v, rot]) => (
+        {[['fechamento', 'Fechamento'], ['movimento', 'Movimento'], ['atrasados', 'Recebimentos atrasados']].map(([v, rot]) => (
           <button key={v} onClick={() => setAbaLog(v)} style={{
             flex: 1, border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 8px', fontSize: 13.5, fontWeight: 700,
             background: abaLog === v ? C.accent : 'transparent', color: abaLog === v ? '#06101F' : C.muted,
@@ -270,6 +271,8 @@ export default function Diario({ dados, onChange, receitas = [], onReceitas, vis
           </Card>
         ))}
       </>)}
+
+      {abaLog === 'movimento' && <Movimento vendas={vendas} />}
 
       {abaLog === 'atrasados' && (<>
         <Card style={{ marginBottom: 14, background: C.panel2 }}>
