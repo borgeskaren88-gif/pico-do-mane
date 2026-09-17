@@ -5,6 +5,7 @@ import {
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell,
 } from 'recharts';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle, Label } from './ui';
+import { previsao30, disponivelDeVerdade } from '../lib/previsao';
 import RelatorioPonto from './RelatorioPonto';
 
 // Medidor (gauge) semicircular de leque, em azul — usado na nota média do mês.
@@ -58,7 +59,8 @@ function Delta({ atual, anterior, boaSubida = true }) {
 }
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, FONTES_NAO_OPERACIONAL, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 
-export default function Relatorios({ diario, receitas, despesas, mes, setMes }) {
+export default function Relatorios({ diario, receitas, despesas, mes, setMes, vendas = [], compras = [], estoque = [] }) {
+  const [verDias, setVerDias] = useState(false); // abre o dia a dia da previsão
   const mesesDisp = [...new Set([...receitas, ...despesas].map((d) => ymOf(d.data)))].sort().reverse();
   const opts = mesesDisp.length ? mesesDisp : [ymOf(todayISO())];
   const recMes = receitas.filter((r) => ymOf(r.data) === mes);
@@ -127,6 +129,12 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
   const melhorDiaVenda = porDiaSemana.reduce((a, b) => (b.receita > a.receita ? b : a), porDiaSemana[0]);
   const temPadraoSemana = porDiaSemana.some((d) => d.receita > 0 || d.despesa > 0);
 
+  // As duas contas que o DRE não responde: o que vem, e o que é dela de fato.
+  const proximos30 = useMemo(() => previsao30({ despesas, compras }, vendas), [despesas, compras, vendas]);
+  const disp = useMemo(() => disponivelDeVerdade({ receitas, despesas, compras, estoque }, vendas, mes), [receitas, despesas, compras, estoque, vendas, mes]);
+  const ddmm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+  const piorDia = proximos30.linhas.length ? proximos30.linhas.reduce((p, l) => (l.saldo < p.saldo ? l : p), proximos30.linhas[0]) : null;
+
   // Pizza de despesas por categoria (com %).
   const totalDesp = porCategoria.reduce((s, c) => s + c.val, 0);
   const pizza = porCategoria.map((c, i) => ({ ...c, cor: PIZZA[i % PIZZA.length], pct: totalDesp ? (c.val / totalDesp) * 100 : 0 }));
@@ -135,6 +143,122 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes }) 
     <div>
       <PageTitle sub="Resultado do mês">Relatórios</PageTitle>
       <div style={{ marginBottom: 14 }}><Label>Mês do relatório</Label><Select value={mes} onChange={setMes} options={opts} /></div>
+
+      {/* ------------------------------------------------------------------
+          O QUE SOBROU DE VERDADE — o DRE ali em cima diz o resultado da
+          operação; isto diz quanto ainda é dela depois de honrar o que deve.
+          ------------------------------------------------------------------ */}
+      <SecTitle>Quanto sobrou de verdade</SecTitle>
+      <Card style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
+          Lucro no papel não paga fornecedor. Aqui entra o que tu <b style={{ color: C.text }}>ainda deve</b> e o que
+          tu <b style={{ color: C.text }}>ainda tem pra receber</b>.
+        </div>
+
+        {[
+          ['Entrou no mês', disp.entrou, C.green, ''],
+          ['Saiu no mês', -disp.saiu, C.amber, ''],
+        ].map(([rot, v, cor]) => (
+          <div key={rot} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 0', fontSize: 13.5, color: C.muted }}>
+            <span>{rot}</span>
+            <span style={{ color: cor, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{v < 0 ? '− ' : ''}{brl(Math.abs(v))}</span>
+          </div>
+        ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}`, fontSize: 14, fontWeight: 800 }}>
+          <span style={{ color: C.text }}>Sobrou no papel</span>
+          <span style={{ color: disp.noPapel >= 0 ? C.text : C.red, fontVariantNumeric: 'tabular-nums' }}>{brl(disp.noPapel)}</span>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 0', fontSize: 13.5, color: C.muted }}>
+          <span>Contas em aberto {disp.nAPagar > 0 ? <span style={{ color: C.faint }}>({disp.nAPagar})</span> : null}</span>
+          <span style={{ color: C.red, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>− {brl(disp.aPagar)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 0', fontSize: 13.5, color: C.muted }}>
+          <span>Fiado a receber</span>
+          <span style={{ color: C.green, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>+ {brl(disp.aReceber)}</span>
+        </div>
+
+        <div style={{
+          marginTop: 10, borderRadius: 14, padding: '13px 14px',
+          background: `color-mix(in srgb, ${disp.disponivel >= 0 ? C.green : C.red} 14%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${disp.disponivel >= 0 ? C.green : C.red} 45%, transparent)`,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12.5, fontWeight: 900, letterSpacing: '.05em', color: disp.disponivel >= 0 ? C.green : C.red }}>DISPONÍVEL DE VERDADE</span>
+            <span style={{ fontSize: 22, fontWeight: 900, color: disp.disponivel >= 0 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>{brl(disp.disponivel)}</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: C.text, marginTop: 7, lineHeight: 1.55 }}>{disp.recado}</div>
+        </div>
+
+        {disp.emEstoque > 0.005 && (
+          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>
+            Fora disso, tu tem <b style={{ color: C.muted }}>{brl(disp.emEstoque)}</b> parado em mercadoria — já é teu, mas
+            só vira dinheiro quando vender.
+          </div>
+        )}
+      </Card>
+
+      {/* ------------------------------------------------------------------
+          PREVISÃO DOS PRÓXIMOS 30 DIAS
+          ------------------------------------------------------------------ */}
+      <SecTitle>Previsão dos próximos 30 dias</SecTitle>
+      <Card style={{ marginBottom: 14 }}>
+        {!proximos30.confiavel ? (
+          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}>
+            Ainda não dá pra prever com honestidade. Preciso de algumas semanas de comanda fechada (pra saber quanto cada
+            dia da semana rende) e de pelo menos um mês fechado de despesas (pra saber tuas contas fixas).
+            {proximos30.diasComBase > 0 && <> Por enquanto tenho {proximos30.diasComBase} dia(s) da semana com histórico.</>}
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
+              Entrada estimada pela média de cada dia da semana (últimas 8 semanas, só o que cai no caixa).
+              Saída = contas já lançadas com vencimento + a média das tuas contas fixas ({proximos30.mesesDeFixas} mês(es)).
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 12 }}>
+              <KPI titulo="Deve entrar" valor={brl(proximos30.entra)} cor={C.green} sub="vendas + fiado do dia 10" />
+              <KPI titulo="Deve sair" valor={brl(proximos30.sai)} cor={C.amber} sub="contas + fixas" />
+              <KPI titulo="Sobra prevista" valor={brl(proximos30.sobra)} cor={proximos30.sobra >= 0 ? C.accent : C.red} sub="nos 30 dias" />
+            </div>
+
+            {proximos30.nVencidas > 0 && (
+              <div style={{ fontSize: 12.5, color: C.red, marginBottom: 10, lineHeight: 1.5 }}>
+                ⚠️ {proximos30.nVencidas} conta(s) já vencida(s), somando {brl(proximos30.vencidas)}. Isso está contado na saída — e é o
+                que tu paga primeiro.
+              </div>
+            )}
+
+            {piorDia && piorDia.saldo < 0 && (
+              <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.55, background: `color-mix(in srgb, ${C.amber} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${C.amber} 45%, transparent)`, borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
+                <b style={{ color: C.amber }}>Aperto à vista: </b>
+                por volta de <b>{ddmm(piorDia.data)}</b> o caixa fica negativo em {brl(Math.abs(piorDia.saldo))}, se nada mudar.
+                Dá pra adiantar cobrança de fiado ou negociar o vencimento de alguma conta.
+              </div>
+            )}
+
+            <button onClick={() => setVerDias((v) => !v)} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12.5, fontWeight: 800, padding: '4px 0', cursor: 'pointer' }}>
+              {verDias ? 'esconder o dia a dia' : 'ver dia a dia'}
+            </button>
+
+            {verDias && (
+              <div style={{ marginTop: 8, maxHeight: 340, overflowY: 'auto' }}>
+                {proximos30.linhas.map((l) => (
+                  <div key={l.data} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, borderTop: `1px solid ${C.hair}`, padding: '5px 0', fontSize: 12.5 }}>
+                    <span style={{ width: 48, flexShrink: 0, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{ddmm(l.data)}</span>
+                    <span style={{ flex: 1, minWidth: 0, color: C.faint, fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {l.fiado > 0 ? 'fiado do ciclo' : ''}{l.fiado > 0 && l.contas.length ? ' · ' : ''}{l.contas.map((c) => c.nome).join(', ')}
+                    </span>
+                    <span style={{ flexShrink: 0, color: C.green, fontVariantNumeric: 'tabular-nums' }}>+{brl(l.entra)}</span>
+                    <span style={{ flexShrink: 0, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>−{brl(l.sai)}</span>
+                    <span style={{ width: 86, flexShrink: 0, textAlign: 'right', fontWeight: 800, color: l.saldo >= 0 ? C.text : C.red, fontVariantNumeric: 'tabular-nums' }}>{brl(l.saldo)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </Card>
 
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 700, marginBottom: 4 }}>Crescimento</div>
