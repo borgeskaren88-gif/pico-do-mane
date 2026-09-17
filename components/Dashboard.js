@@ -147,6 +147,7 @@ export default function Dashboard() {
   const [clientes, setClientes] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [fichas, setFichas] = useState([]);         // fichas técnicas (fonte: /api/estoque)
+  const [dupIgnorados, setDupIgnorados] = useState([]); // grupos que ela já disse que não são o mesmo produto
   const [estCarregado, setEstCarregado] = useState(false);
   const [subEstoque, setSubEstoque] = useState('itens'); // 'itens' | 'fichas'
   const [subAbast, setSubAbast] = useState('estoque'); // 'estoque' | 'lista' | 'compras' | 'cotacoes'
@@ -357,7 +358,7 @@ export default function Dashboard() {
       }
       const r = await fetch('/api/estoque', { cache: 'no-store' });
       const j = await r.json();
-      if (j?.ok) { setEstoque(j.itens || []); setFichas(j.fichas || []); }
+      if (j?.ok) { setEstoque(j.itens || []); setFichas(j.fichas || []); setDupIgnorados(j.duplicadosIgnorados || []); }
     } catch { /* ignora */ }
     finally { setEstCarregado(true); }
   }, []);
@@ -377,7 +378,14 @@ export default function Dashboard() {
     try {
       const r = await fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const j = await r.json();
-      if (j?.ok) { if (Array.isArray(j.itens)) setEstoque(j.itens); if (Array.isArray(j.fichas)) setFichas(j.fichas); }
+      if (j?.ok) {
+        if (Array.isArray(j.itens)) setEstoque(j.itens);
+        if (Array.isArray(j.fichas)) setFichas(j.fichas);
+        if (Array.isArray(j.duplicadosIgnorados)) setDupIgnorados(j.duplicadosIgnorados);
+        // Juntar itens repetidos remenda as compras que apontavam pro item
+        // absorvido — o servidor devolve a lista já corrigida.
+        if (Array.isArray(j.compras)) setCompras(j.compras);
+      }
       return j;
     } catch { return { ok: false }; }
   };
@@ -717,7 +725,7 @@ export default function Dashboard() {
                     }}>{rot}</button>
                   ))}
                 </div>
-                {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} onRepor={reporLista} />}
+                {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} fichas={fichas} duplicadosIgnorados={dupIgnorados} onRepor={reporLista} />}
                 {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={estoqueAcao} />}
                 {subEstoque === 'conferencia' && <ConferenciaEstoque estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} onAcao={estoqueAcao} carregado={estCarregado} />}
                 {subEstoque === 'cortesia' && <CortesiaConsumo onFeito={() => carregarEstoque({})} />}
