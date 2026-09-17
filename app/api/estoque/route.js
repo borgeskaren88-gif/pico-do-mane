@@ -78,7 +78,7 @@ export async function POST(request) {
       // era a primeira opção da lista), e aí a perda sumia do balde de perdas.
       // Consumo da casa e cortesia são decisão da dona — ela lança na tela dela.
       const motivo = (p === 'cozinha' && tipo === 'saida') ? 'Desperdício' : String(body?.motivo || '');
-      itens = itens.map((it) => { if (it.id !== id) return it; achou = true; return aplicarMovimentoItem(it, tipo, body?.qtd, motivo + quem); });
+      itens = itens.map((it) => { if (it.id !== id) return it; achou = true; return aplicarMovimentoItem(it, tipo, body?.qtd, motivo + quem, body?.validade); });
       if (!achou) return NextResponse.json({ ok: false, erro: 'Item não encontrado.' }, { status: 404 });
       const novo = await gravarEstoque(sb, blob, { estoque: itens });
       // Saída/contagem podem zerar um item: avisa na hora se cruzou pro mínimo/zero.

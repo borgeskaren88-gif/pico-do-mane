@@ -1,10 +1,14 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
-import { brl, num, fmtDate, limparNome, todayISO, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
-import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome } from '../lib/estoque';
+import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
+import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo } from '../lib/estoque';
 
-const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '' });
+const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '', validade: '' });
+
+// A cor de quem está pra vencer. Vermelho é "usa hoje ou perde"; amarelo ainda
+// dá pra encaixar num prato ou numa promoção.
+const CORES_VAL = { vencido: '#FF5A5A', urgente: '#FF5A5A', atencao: '#F5A524' };
 
 // Mostra a quantidade no jeito brasileiro: vírgula no decimal e ponto no milhar.
 // Sem isso, um saldo fracionário (ex.: barril de chopp em 1.817) parecia "1817".
@@ -20,6 +24,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   const [acao, setAcao] = useState(null);   // { id, tipo: 'entrada'|'saida'|'contagem' }
   const [acaoQtd, setAcaoQtd] = useState('');
   const [acaoMotivo, setAcaoMotivo] = useState(MOTIVOS_SAIDA[0]);
+  const [acaoVal, setAcaoVal] = useState(''); // validade informada ao abastecer
   const [verMov, setVerMov] = useState(null);
   const [menuMov, setMenuMov] = useState(null); // id do movimento com o menu corrigir/desfazer aberto
   const [busca, setBusca] = useState('');
@@ -28,6 +33,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   const [corrigindo, setCorrigindo] = useState(false);
   const [msgCorrige, setMsgCorrige] = useState('');
   const [catAberta, setCatAberta] = useState({}); // { [categoria]: true } — categoria expandida
+  const hoje = diaOperacional(); // mesmo 'hoje' do Darci: a madrugada conta como ontem
   const toggleCat = (cat) => setCatAberta((m) => ({ ...m, [cat]: !m[cat] }));
   const set = (k) => (v) => setNovo((f) => ({ ...f, [k]: v }));
 
@@ -52,12 +58,17 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   }, [itens]);
 
   const abaixoDoMin = useMemo(() => itens.filter((it) => num(it.minimo) > 0 && num(it.saldo) <= num(it.minimo)), [itens]);
+  // O que está pra vencer nos próximos 7 dias (e o que já venceu).
+  const vencendo = useMemo(() => itensVencendo(itens, hoje, 7), [itens, hoje]);
 
   // "Para onde foi o estoque" no mês atual: junta as saídas de todos os itens e
   // separa por tipo (venda, perda/quebra, consumo da casa, outros), com o valor
   // em R$ (qtd baixada × custo do item). Lê o histórico que cada item já guarda.
   const [periodoSaidas, setPeriodoSaidas] = useState('mes'); // 'hoje' | 'mes'
   const saidasMes = useMemo(() => {
+    // Aqui é o dia do CALENDÁRIO de propósito: compara com a data gravada em
+    // cada movimento, que é do calendário. Usar o dia operacional faria o
+    // filtro "hoje" não achar nada entre meia-noite e as 6h.
     const hoje = todayISO();
     const ym = hoje.slice(0, 7);
     const noPeriodo = (data) => (periodoSaidas === 'hoje' ? data === hoje : data.slice(0, 7) === ym);
@@ -130,16 +141,16 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     if (!novo.nome.trim() || busy) return;
     setBusy(true);
     if (editId) {
-      await onAcao({ acao: 'edit', id: editId, campos: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid } });
+      await onAcao({ acao: 'edit', id: editId, campos: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid, validade: novo.validade } });
     } else {
-      await onAcao({ acao: 'add', item: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', saldo: num(novo.saldo), minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid } });
+      await onAcao({ acao: 'add', item: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', saldo: num(novo.saldo), minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid, validade: novo.validade } });
     }
     setNovo(itemVazio()); setEditId(null); setBusy(false);
   };
 
   const editar = (it) => {
     setEditId(it.id);
-    setNovo({ nome: it.nome || '', categoria: it.categoria || '', unidade: it.unidade || 'un', saldo: '', minimo: String(it.minimo ?? ''), custo: String(it.custo ?? ''), conteudo: String(it.conteudo ?? ''), conteudoUnid: it.conteudoUnid || '' });
+    setNovo({ nome: it.nome || '', categoria: it.categoria || '', unidade: it.unidade || 'un', saldo: '', minimo: String(it.minimo ?? ''), custo: String(it.custo ?? ''), conteudo: String(it.conteudo ?? ''), conteudoUnid: it.conteudoUnid || '', validade: it.validade || '' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const cancelar = () => { setNovo(itemVazio()); setEditId(null); };
@@ -167,14 +178,14 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     if (j && j.novoId) abrirAcao(j.novoId, 'contagem');
   };
 
-  const abrirAcao = (id, tipo) => { setAcao({ id, tipo }); setAcaoQtd(''); setAcaoMotivo(MOTIVOS_SAIDA[0]); };
-  const fecharAcao = () => { setAcao(null); setAcaoQtd(''); };
+  const abrirAcao = (id, tipo, motivo) => { setAcao({ id, tipo }); setAcaoQtd(''); setAcaoMotivo(motivo || MOTIVOS_SAIDA[0]); setAcaoVal(''); };
+  const fecharAcao = () => { setAcao(null); setAcaoQtd(''); setAcaoVal(''); };
   const confirmarAcao = async () => {
     if (String(acaoQtd).trim() === '' || busy) return;
     const q = numQtd(acaoQtd);
     if (acao.tipo !== 'contagem' && !(q > 0)) return;
     setBusy(true);
-    await onAcao({ acao: 'mov', id: acao.id, tipo: acao.tipo, qtd: q, motivo: acao.tipo === 'saida' ? acaoMotivo : undefined });
+    await onAcao({ acao: 'mov', id: acao.id, tipo: acao.tipo, qtd: q, motivo: acao.tipo === 'saida' ? acaoMotivo : undefined, validade: acao.tipo === 'entrada' ? acaoVal : undefined });
     setBusy(false); fecharAcao();
   };
 
@@ -269,6 +280,26 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
         )}
       </Card>
 
+      {vencendo.length > 0 && (
+        <Card style={{ marginBottom: 14, borderColor: CORES_VAL[vencendo[0].nivel] }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: CORES_VAL[vencendo[0].nivel], marginBottom: 8 }}>
+            Vencendo ({vencendo.length})
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>
+            Usa, encaixa num prato ou faz promoção — o que vence é dinheiro que tu já pagou.
+          </div>
+          {vencendo.map(({ item, dias, nivel }) => (
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, borderTop: `1px solid ${C.hair}`, padding: '7px 0', fontSize: 14 }}>
+              <span style={{ minWidth: 0 }}>{item.nome}</span>
+              <span style={{ flexShrink: 0, textAlign: 'right' }}>
+                <span style={{ color: CORES_VAL[nivel], fontWeight: 800 }}>{textoValidade(dias)}</span>
+                <span style={{ color: C.faint, fontSize: 12 }}> · {fmtQtd(item.saldo)} {item.unidade}</span>
+              </span>
+            </div>
+          ))}
+        </Card>
+      )}
+
       {abaixoDoMin.length > 0 && (
         <Card style={{ marginBottom: 14, borderColor: C.red }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -315,6 +346,15 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
           <Field label="Estoque mínimo"><NumInput value={novo.minimo} onChange={set('minimo')} /></Field>
           <Field label="Custo un. (R$)"><NumInput value={novo.custo} onChange={set('custo')} /></Field>
         </div>
+        {/* Validade: opcional. Item sem data nunca entra nos avisos — cachaça
+            e descartável não estragam. */}
+        <Field label="Vence em (opcional)">
+          <input type="date" value={novo.validade} onChange={(e) => set('validade')(e.target.value)} style={{ ...inputStyle, width: '100%' }} />
+        </Field>
+        <div style={{ fontSize: 11, color: C.faint, margin: '-6px 0 12px', lineHeight: 1.4 }}>
+          Só pra o que estraga. Tendo dois lotes com datas diferentes, põe <b>a mais próxima</b> — é a que vai vencer primeiro.
+        </div>
+
         {/* Conteúdo por unidade: pra diluir garrafa em doses/taças. */}
         <Field label="Conteúdo por unidade (opcional)">
           <div style={{ display: 'flex', gap: 8 }}>
@@ -354,8 +394,12 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
             const baixo = minimo > 0 && saldo <= minimo;
             const aberto = verMov === it.id;
             const conteudoTxt = num(it.conteudo) > 0 && it.conteudoUnid ? ` · ${num(it.conteudo)} ${it.conteudoUnid}/${it.unidade}` : '';
+            // Validade só conta se ainda tem o produto: o que zerou não estraga.
+            const dias = saldo > 0 ? diasParaVencer(it, hoje) : null;
+            const nvVal = nivelValidade(dias);
+            const corVal = CORES_VAL[nvVal] || '';
             return (
-              <Card key={it.id} style={{ marginBottom: 8, padding: 14, borderColor: baixo ? C.red : C.cardBorder }}>
+              <Card key={it.id} style={{ marginBottom: 8, padding: 14, borderColor: corVal || (baixo ? C.red : C.cardBorder) }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{it.nome}</div>
@@ -363,6 +407,14 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                       {custo > 0 ? `${brl(custo)}/${it.unidade} · em estoque ${brl(saldo * custo)}` : `unidade: ${it.unidade}`}
                       {minimo > 0 ? ` · mín. ${fmtQtd(minimo)}` : ''}{conteudoTxt}
                     </div>
+                    {corVal ? (
+                      <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, background: `color-mix(in srgb, ${corVal} 18%, transparent)`, border: `1px solid ${corVal}`, borderRadius: 999, padding: '3px 10px' }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 800, color: corVal }}>
+                          {nvVal === 'vencido' ? '⚠ ' : ''}{textoValidade(dias)}
+                        </span>
+                        <span style={{ fontSize: 11, color: C.faint }}>{fmtDate(it.validade)}</span>
+                      </div>
+                    ) : null}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 22, fontWeight: 800, color: baixo ? C.red : C.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{fmtQtd(saldo)}</div>
@@ -378,6 +430,14 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <div style={{ width: 170 }}><QtdInput value={acaoQtd} onChange={setAcaoQtd} placeholder={acao.tipo === 'contagem' ? String(saldo) : '0'} /></div>
                       {acao.tipo === 'saida' && <div style={{ flex: 1, minWidth: 150 }}><Select value={acaoMotivo} onChange={setAcaoMotivo} options={MOTIVOS_SAIDA} /></div>}
+                      {/* Abastecendo: a hora certa de anotar a validade é essa,
+                          com a embalagem na mão. */}
+                      {acao.tipo === 'entrada' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                          <span style={{ fontSize: 12.5, color: C.faint }}>vence em</span>
+                          <input type="date" value={acaoVal} onChange={(e) => setAcaoVal(e.target.value)} style={{ ...inputStyle, width: 165, padding: '9px 10px', fontSize: 13 }} />
+                        </div>
+                      )}
                     </div>
                     {/* Prévia do que o sistema entendeu. Digitar "12.992" pensando
                         em 12 kg e 992 g virava doze mil — agora dá pra ver antes. */}
@@ -405,6 +465,9 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                     <Btn kind="danger" small onClick={() => abrirAcao(it.id, 'saida')}>− Saída</Btn>
                     <Btn kind="ghost" small onClick={() => abrirAcao(it.id, 'contagem')}>Contar</Btn>
                     <Btn kind="ghost" small onClick={() => editar(it)}>Editar</Btn>
+                    {nvVal === 'vencido' && (
+                      <Btn kind="danger" small onClick={() => abrirAcao(it.id, 'saida', 'Vencido')}>jogar fora</Btn>
+                    )}
                     {(it.movimentos || []).length > 0 && (
                       <button onClick={() => setVerMov(aberto ? null : it.id)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '7px 6px' }}>{aberto ? 'ocultar' : 'histórico'}</button>
                     )}
