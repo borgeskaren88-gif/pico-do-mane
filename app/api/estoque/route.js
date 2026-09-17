@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, fundirItens, comprasPendentesDeEstoque, igualNome } from '../../../lib/estoque';
+import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, fundirItens, repontarFichas, repontarCompras, comprasPendentesDeEstoque, igualNome } from '../../../lib/estoque';
 import { limparNome, num, todayISO } from '../../../lib/util';
 import { notificarEstoqueCritico, notificarSaidaSemVenda } from '../../../lib/push';
 
@@ -31,7 +31,12 @@ async function gravarEstoque(sb, blob, patch) {
   // cardápio/combos quando a sincronização do estoque rodava ao mesmo tempo.
   const { data: atual } = await sb.from('pdm_dados').select('valor').eq('chave', PAINEL).maybeSingle();
   const base = (atual?.valor && typeof atual.valor === 'object') ? atual.valor : (blob || {});
-  const novo = { ...base, ...patch };
+  // `patch` pode ser uma FUNÇÃO, e aí ela é aplicada sobre o blob FRESCO.
+  // Isso é obrigatório pra quem reescreve uma lista inteira (compras, fichas):
+  // montar a lista a partir da cópia lida no começo do request apagaria o que
+  // foi salvo em paralelo por /api/data entre as duas leituras — uma compra
+  // registrada nesse intervalo sumia das Contas a Pagar.
+  const novo = { ...base, ...(typeof patch === 'function' ? patch(base) : patch) };
   const { error } = await sb.from('pdm_dados').upsert(
     { chave: PAINEL, valor: novo, atualizado_em: new Date().toISOString() },
     { onConflict: 'chave' }
@@ -209,8 +214,12 @@ export async function POST(request) {
       if (!pendentes.length) return NextResponse.json({ ok: true, itens, lancadas: 0 });
       const novoEstoque = aplicarEntradasEstoque(itens, pendentes.map((x) => x.compra));
       const marcadas = new Set(pendentes.map((x) => String(x.compra.id)));
-      const novasCompras = todas.map((c) => (c && marcadas.has(String(c.id)) ? { ...c, estoqueEm: todayISO() } : c));
-      const novo = await gravarEstoque(sb, blob, { estoque: novoEstoque, compras: novasCompras });
+      // Carimba sobre a lista FRESCA: uma compra registrada enquanto isto rodava
+      // não pode sumir porque a nossa cópia é de segundos atrás.
+      const novo = await gravarEstoque(sb, blob, (base) => ({
+        estoque: novoEstoque,
+        compras: arr(base.compras).map((c) => (c && marcadas.has(String(c.id)) ? { ...c, estoqueEm: todayISO() } : c)),
+      }));
       return NextResponse.json({
         ok: true, itens: arr(novo.estoque), compras: arr(novo.compras),
         lancadas: pendentes.length,
@@ -226,14 +235,13 @@ export async function POST(request) {
       if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 403 });
       const ids = new Set(arr(body?.ids).map(String));
       if (!ids.size) return NextResponse.json({ ok: true, itens, dispensadas: 0 });
-      let n = 0;
-      const novasCompras = arr(blob.compras).map((c) => {
-        if (!c || c.estoqueEm || !ids.has(String(c.id))) return c;
-        n += 1;
-        return { ...c, estoqueEm: todayISO(), estoqueDispensada: true };
-      });
-      if (!n) return NextResponse.json({ ok: true, itens, dispensadas: 0 });
-      const novo = await gravarEstoque(sb, blob, { compras: novasCompras });
+      const alvo = arr(blob.compras).filter((c) => c && !c.estoqueEm && ids.has(String(c.id))).map((c) => String(c.id));
+      if (!alvo.length) return NextResponse.json({ ok: true, itens, dispensadas: 0 });
+      const marcar = new Set(alvo);
+      const novo = await gravarEstoque(sb, blob, (base) => ({
+        compras: arr(base.compras).map((c) => (c && marcar.has(String(c.id)) ? { ...c, estoqueEm: todayISO(), estoqueDispensada: true } : c)),
+      }));
+      const n = alvo.length;
       return NextResponse.json({ ok: true, itens, compras: arr(novo.compras), dispensadas: n });
     }
 
@@ -245,7 +253,12 @@ export async function POST(request) {
       const absorvidos = arr(body?.absorvidos).map(String);
       const r = fundirItens(itens, arr(blob.fichas), arr(blob.compras), principalId, absorvidos);
       if (!r.fundidos) return NextResponse.json({ ok: true, itens, fundidos: 0, naoDeu: r.naoDeu });
-      const novo = await gravarEstoque(sb, blob, { estoque: r.estoque, fichas: r.fichas, compras: r.compras });
+      // Refaz o reaponte sobre as listas FRESCAS (ver gravarEstoque).
+      const novo = await gravarEstoque(sb, blob, (base) => ({
+        estoque: r.estoque,
+        fichas: repontarFichas(arr(base.fichas), r.absorvidos, principalId),
+        compras: repontarCompras(arr(base.compras), r.absorvidos, principalId),
+      }));
       return NextResponse.json({ ok: true, itens: arr(novo.estoque), fichas: arr(novo.fichas), compras: arr(novo.compras), fundidos: r.fundidos, naoDeu: r.naoDeu });
     }
 
