@@ -393,6 +393,10 @@ export async function POST(request) {
         nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens, caixaId: caixaAberto ? caixaAberto.id : null,
         // Só fica "não pago" (na lista de fiados) o que ficou no fiado.
         pago: fiado <= 0.005, fechadaEm: new Date().toISOString(), fechadaPor: p,
+        // A hora em que a mesa ABRIU é o que diz a que horas o bar enche — a
+        // hora de fechar só diz quando a conta saiu. Guardar as duas deixa o
+        // movimento por horário honesto daqui pra frente.
+        abertaEm: c.abertaEm || '',
       };
       const { error: eV } = await sb.from('pdm_dados').upsert(
         { chave: 'venda:' + venda.id, valor: venda, atualizado_em: new Date().toISOString() },
