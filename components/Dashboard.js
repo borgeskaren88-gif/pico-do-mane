@@ -32,6 +32,7 @@ import Fiados from './Fiados';
 import Clientes from './Clientes';
 import Estoque from './Estoque';
 import Margem from './Margem';
+import Fornecedores from './Fornecedores';
 import FichasTecnicas from './FichasTecnicas';
 import ConferenciaEstoque from './ConferenciaEstoque';
 import Auditoria from './Auditoria';
@@ -691,7 +692,7 @@ export default function Dashboard() {
         {tab === 'abastecimento' && (
           <>
             <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-              {[['estoque', 'Estoque'], ['margem', 'Margem'], ['lista', 'Lista de Compras'], ['compras', 'Compras'], ['cotacoes', 'Cotações']].map(([v, rot]) => (
+              {[['estoque', 'Estoque'], ['margem', 'Margem'], ['lista', 'Lista de Compras'], ['compras', 'Compras'], ['fornecedores', 'Fornecedores'], ['cotacoes', 'Cotações']].map(([v, rot]) => (
                 <button key={v} onClick={() => setSubAbast(v)} style={{
                   flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
                   background: subAbast === v ? C.accent : 'transparent', color: subAbast === v ? '#06101F' : C.muted, whiteSpace: 'nowrap',
@@ -744,6 +745,7 @@ export default function Dashboard() {
 
             {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} estoque={estoque} onChange={upd.compras} onRegistrar={aplicarCompra} />}
             {subAbast === 'margem' && <Margem cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} />}
+            {subAbast === 'fornecedores' && <Fornecedores compras={compras} />}
             {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} estoque={estoque} compras={compras} />}
           </>
         )}
