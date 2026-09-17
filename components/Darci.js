@@ -4,7 +4,7 @@ import { C, Card, Btn, inputStyle } from './ui';
 import MicBtn from './MicBtn';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, temperar, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS } from '../lib/darci';
-import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, baixarPrefs, lerVozNome, vozEscolhidaFalta, testarVoz } from '../lib/darciVoz';
+import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes, vozPadrao, lerTom, salvarTom, salvarVoz, lerNome, salvarNome, NOME_PADRAO, lerSotaque, salvarSotaque, falarTexto, pararFala, lerMotorVoz, salvarMotorVoz, vozExclusivaDisponivel, destravarAudio, prepararVoz, baixarPrefs, lerVozNome, vozEscolhidaFalta, testarVoz } from '../lib/darciVoz';
 import useReservas from '../lib/useReservas';
 import { resolverDarci, testarIA } from '../lib/perguntarDarci';
 import CamposPedido, { podeGravarPedido } from './CamposPedido';
@@ -77,6 +77,7 @@ export default function Darci({ onAnotar, ...dados }) {
     setNome(lerNome());
     setSotaque(lerSotaque());
     setMotorVoz(lerMotorVoz());
+    prepararVoz(); // destrava o som no primeiro toque, seja qual for
     vozExclusivaDisponivel().then(setVozNuvemOk).catch(() => setVozNuvemOk(false));
     // Os ajustes ficam guardados no servidor: o que ela regulou no notebook
     // vale também no celular e no iPad, sem precisar refazer em cada um.
