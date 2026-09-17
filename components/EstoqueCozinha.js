@@ -1,7 +1,12 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { C, Card, Btn, TextInput, QtdInput, Empty, SecTitle, PageTitle } from './ui';
-import { num, fmtDate, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
+import { num, fmtDate, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
+import { diasParaVencer, nivelValidade, textoValidade, itensVencendo } from '../lib/estoque';
+
+// Quem mexe na geladeira e no freezer é a cozinha — então o aviso de validade
+// tem que estar aqui também, não só na tela da dona.
+const CORES_VAL = { vencido: '#FF5A5A', urgente: '#FF5A5A', atencao: '#F5A524' };
 
 // Estoque na visão da COZINHA: ver o que tem e fazer as ações físicas que são
 // dela (deu entrada de mercadoria, quebrou/perdeu, contou). O cadastro dos itens,
@@ -16,6 +21,8 @@ export default function EstoqueCozinha() {
   const [busca, setBusca] = useState('');
   const [catAberta, setCatAberta] = useState({}); // { [categoria]: true } — categoria expandida
   const toggleCat = (cat) => setCatAberta((m) => ({ ...m, [cat]: !m[cat] }));
+  const hoje = diaOperacional(); // mesmo 'hoje' do Darci: a madrugada conta como ontem
+  const vencendo = useMemo(() => itensVencendo(itens, hoje, 7), [itens, hoje]);
 
   const carregar = useCallback(async () => {
     try {
@@ -67,6 +74,23 @@ export default function EstoqueCozinha() {
         <TextInput value={busca} onChange={setBusca} placeholder="Buscar item (ex.: Aperol)" />
       </div>
 
+      {vencendo.length > 0 && (
+        <Card style={{ marginBottom: 14, borderColor: CORES_VAL[vencendo[0].nivel] }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: CORES_VAL[vencendo[0].nivel], marginBottom: 6 }}>
+            Vencendo ({vencendo.length})
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>
+            Usa primeiro o que está no fim. O que venceu, dá saída e avisa a Karen.
+          </div>
+          {vencendo.map(({ item, dias, nivel }) => (
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, borderTop: `1px solid ${C.hair}`, padding: '7px 0', fontSize: 14 }}>
+              <span style={{ minWidth: 0 }}>{item.nome}</span>
+              <span style={{ flexShrink: 0, color: CORES_VAL[nivel], fontWeight: 800 }}>{textoValidade(dias)}</span>
+            </div>
+          ))}
+        </Card>
+      )}
+
       <SecTitle>Itens ({itens.length})</SecTitle>
       {!carregado ? <Empty>Carregando…</Empty> : itens.length === 0 ? (
         <Empty>A dona ainda não cadastrou itens no estoque.</Empty>
@@ -86,12 +110,19 @@ export default function EstoqueCozinha() {
           {g.itens.map((it) => {
             const saldo = num(it.saldo);
             const aberto = verMov === it.id;
+            const dias = saldo > 0 ? diasParaVencer(it, hoje) : null;
+            const corVal = CORES_VAL[nivelValidade(dias)] || '';
             return (
-              <Card key={it.id} style={{ marginBottom: 8, padding: 14 }}>
+              <Card key={it.id} style={{ marginBottom: 8, padding: 14, borderColor: corVal || undefined }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{it.nome}</div>
                     <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>unidade: {it.unidade}</div>
+                    {corVal ? (
+                      <div style={{ marginTop: 6, display: 'inline-block', background: `color-mix(in srgb, ${corVal} 18%, transparent)`, border: `1px solid ${corVal}`, borderRadius: 999, padding: '3px 10px', fontSize: 11.5, fontWeight: 800, color: corVal }}>
+                        {textoValidade(dias)}
+                      </div>
+                    ) : null}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 22, fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{saldo}</div>

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '../../../../lib/supabase';
-import { montarResumoDiario, enviarPush, jaMandouResumoHoje, marcarResumoEnviado, notificarAgenda, notificarReservasAmanha } from '../../../../lib/push';
+import { montarResumoDiario, enviarPush, jaMandouResumoHoje, marcarResumoEnviado, notificarAgenda, notificarReservasAmanha , notificarValidade } from '../../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,6 +28,7 @@ export async function GET(request) {
     try { await notificarAgenda(sb); } catch { /* agenda nunca quebra o resumo */ }
     // E lembra a Mari de confirmar as mesas de amanhã.
     try { await notificarReservasAmanha(sb); } catch { /* idem */ }
+    try { await notificarValidade(sb); } catch { /* idem */ }
     if (await jaMandouResumoHoje(sb)) return NextResponse.json({ ok: true, enviado: false, motivo: 'já enviado hoje' });
     const resumo = await montarResumoDiario(sb);
     if (!resumo) { await marcarResumoEnviado(sb); return NextResponse.json({ ok: true, enviado: false, motivo: 'nada a avisar' }); }
