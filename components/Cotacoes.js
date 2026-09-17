@@ -3,9 +3,12 @@ import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle, Sugestoes } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, limparNome, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import MicBtn from './MicBtn';
+import { EMBALAGENS, melhorCompra, precoUnitario, descreveEmbalagem } from '../lib/cotacao';
 
 export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }) {
-  const vazio = { data: todayISO(), produto: '', fornecedor: '', preco: '', categoria: '' };
+  // Embalagem + quantas unidades vêm: sem isso, "caixa de 12 a R$ 95" parece
+  // mais cara que "unidade a R$ 8,50" — quando é o contrário.
+  const vazio = { data: todayISO(), produto: '', fornecedor: '', preco: '', categoria: '', embalagem: 'un', conteudo: '', prazoPag: '', minPedido: '' };
   const [form, setForm] = useState(vazio);
   const sugestoesProdutos = useMemo(() => [
     ...estoque.map((e) => e && e.nome),
@@ -27,7 +30,11 @@ export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }
     }
   };
   const editar = (d) => {
-    setForm({ data: d.data || todayISO(), produto: d.produto || '', fornecedor: d.fornecedor || '', preco: d.preco || '', categoria: d.categoria || '' });
+    setForm({
+      data: d.data || todayISO(), produto: d.produto || '', fornecedor: d.fornecedor || '', preco: d.preco || '',
+      categoria: d.categoria || '', embalagem: d.embalagem || 'un', conteudo: String(d.conteudo ?? ''),
+      prazoPag: String(d.prazoPag ?? ''), minPedido: String(d.minPedido ?? ''),
+    });
     setEditId(d.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -42,11 +49,14 @@ export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }
       g[key].registros.push(d);
     });
     return Object.values(g).map((grp) => {
-      const precos = grp.registros.map((r) => num(r.preco));
-      const menor = Math.min(...precos), maior = Math.max(...precos);
-      const melhor = grp.registros.find((r) => num(r.preco) === menor);
+      // Compara por PREÇO POR UNIDADE, não pelo preço da embalagem.
+      const precos = grp.registros.map(precoUnitario).filter((p) => p > 0);
+      const menor = precos.length ? Math.min(...precos) : 0;
+      const maior = precos.length ? Math.max(...precos) : 0;
+      const melhor = grp.registros.find((r) => precoUnitario(r) === menor);
       const variacao = menor ? ((maior - menor) / menor) * 100 : 0;
-      return { ...grp, menor, maior, variacao, melhorFornecedor: limparNome(melhor?.fornecedor) };
+      const veredito = melhorCompra(dados, grp.nome);
+      return { ...grp, menor, maior, variacao, melhorFornecedor: limparNome(melhor?.fornecedor), veredito };
     }).filter((grp) => grp.nome.toLowerCase().includes(busca.toLowerCase())).sort((a, b) => b.variacao - a.variacao);
   }, [dados, busca]);
 
@@ -80,6 +90,25 @@ export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }
           </Field>
           <Field label="Data"><TextInput type="date" value={form.data} onChange={set('data')} /></Field>
         </div>
+        {/* Sem a embalagem não dá pra comparar: o preço de uma caixa de 12 não
+            se compara com o de uma unidade. */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Embalagem"><Select value={form.embalagem} onChange={set('embalagem')} options={EMBALAGENS} /></Field>
+          <Field label="Vêm quantas unidades?"><NumInput value={form.conteudo} onChange={set('conteudo')} placeholder="caixa de 12 → 12" /></Field>
+        </div>
+        <div style={{ fontSize: 11, color: C.faint, margin: '-6px 0 12px', lineHeight: 1.45 }}>
+          Esse preço é de <b>quantas unidades</b>? Unidade avulsa pode deixar em branco. É o que faz a comparação ser honesta: caixa de 12 a R$ 95 sai a <b>R$ 7,92</b> a unidade.
+        </div>
+
+        {/* Do FORNECEDOR, não do produto: digita uma vez e vale pras próximas. */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Prazo pra pagar (dias)"><NumInput value={form.prazoPag} onChange={set('prazoPag')} placeholder="0 = à vista" /></Field>
+          <Field label="Pedido mínimo (R$)"><NumInput value={form.minPedido} onChange={set('minPedido')} placeholder="em branco = sem mínimo" /></Field>
+        </div>
+        <div style={{ fontSize: 11, color: C.faint, margin: '-6px 0 12px', lineHeight: 1.45 }}>
+          Esses dois são do <b>fornecedor</b>, não do produto — preenche uma vez e passa a valer pras próximas cotações dele.
+        </div>
+
         <Field label="Categoria"><Select value={form.categoria} onChange={set('categoria')} options={CATEGORIAS_PRODUTO} /></Field>
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvar}>{editId ? 'Salvar alteração' : 'Adicionar preço'}</Btn>
@@ -98,16 +127,32 @@ export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }
               {grp.variacao > 0 && <div style={{ fontSize: 12, color: grp.variacao > 10 ? C.red : C.amber, fontWeight: 700 }}>▲ {grp.variacao.toFixed(1)}%</div>}
             </div>
             <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap', fontVariantNumeric: 'tabular-nums' }}>
-              <div><div style={{ fontSize: 11, color: C.muted }}>Menor</div><div style={{ color: C.green, fontWeight: 700 }}>{brl(grp.menor)}</div></div>
-              <div><div style={{ fontSize: 11, color: C.muted }}>Maior</div><div style={{ color: C.red, fontWeight: 700 }}>{brl(grp.maior)}</div></div>
+              <div><div style={{ fontSize: 11, color: C.muted }}>Menor por unidade</div><div style={{ color: C.green, fontWeight: 700 }}>{brl(grp.menor)}</div></div>
+              <div><div style={{ fontSize: 11, color: C.muted }}>Maior por unidade</div><div style={{ color: C.red, fontWeight: 700 }}>{brl(grp.maior)}</div></div>
               <div><div style={{ fontSize: 11, color: C.muted }}>Melhor fornecedor</div><div style={{ color: C.accent, fontWeight: 700 }}>{grp.melhorFornecedor}</div></div>
             </div>
+
+            {/* O veredito: o que fazer com esses números. */}
+            {grp.veredito && (
+              <div style={{
+                marginTop: 10, borderRadius: 12, padding: '10px 12px', lineHeight: 1.5, fontSize: 12.5,
+                background: `color-mix(in srgb, ${grp.veredito.nivel === 'destaque' ? C.green : C.accent} 12%, transparent)`,
+                border: `1px solid color-mix(in srgb, ${grp.veredito.nivel === 'destaque' ? C.green : C.accent} 40%, transparent)`,
+                color: C.text,
+              }}>
+                <b style={{ color: grp.veredito.nivel === 'destaque' ? C.green : C.accent }}>Melhor compra: </b>
+                {grp.veredito.texto}
+              </div>
+            )}
             <div style={{ marginTop: 10, borderTop: `1px solid ${C.line}`, paddingTop: 8 }}>
-              {grp.registros.sort((a, b) => num(a.preco) - num(b.preco)).map((r) => (
-                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '3px 0', color: C.muted }}>
-                  <span>{limparNome(r.fornecedor)} <span style={{ color: C.faint }}>· {fmtDate(r.data)}</span></span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <b style={{ color: num(r.preco) === grp.menor ? C.green : C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(num(r.preco))}</b>
+              {grp.registros.sort((a, b) => precoUnitario(a) - precoUnitario(b)).map((r) => (
+                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13, padding: '4px 0', color: C.muted }}>
+                  <span style={{ minWidth: 0 }}>
+                    {limparNome(r.fornecedor)} <span style={{ color: C.faint }}>· {fmtDate(r.data)}</span>
+                    <span style={{ display: 'block', fontSize: 11, color: C.faint }}>{descreveEmbalagem(r)}{num(r.prazoPag) > 0 ? ` · ${num(r.prazoPag)} dias pra pagar` : ''}{num(r.minPedido) > 0 ? ` · mín. ${brl(num(r.minPedido))}` : ''}</span>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <b style={{ color: precoUnitario(r) === grp.menor ? C.green : C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(precoUnitario(r))}<span style={{ fontSize: 10.5, color: C.faint, fontWeight: 400 }}>/un</span></b>
                     <button onClick={() => editar(r)} style={{ background: editId === r.id ? C.accent : 'transparent', color: editId === r.id ? '#06101F' : C.accent, border: `1px solid ${C.accent}`, borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '4px 10px' }}>Editar</button>
                     <button onClick={() => excluir(r.id)} title="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}>×</button>
                   </span>
