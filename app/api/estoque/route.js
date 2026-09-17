@@ -2,8 +2,8 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, fundirItens, igualNome } from '../../../lib/estoque';
-import { limparNome, num } from '../../../lib/util';
+import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, fundirItens, comprasPendentesDeEstoque, igualNome } from '../../../lib/estoque';
+import { limparNome, num, todayISO } from '../../../lib/util';
 import { notificarEstoqueCritico, notificarSaidaSemVenda } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -194,6 +194,28 @@ export async function POST(request) {
       )];
       if (novoEstoque !== itens) { const novo = await gravarEstoque(sb, blob, { estoque: novoEstoque }); return NextResponse.json({ ok: true, itens: arr(novo.estoque), naoEntraram }); }
       return NextResponse.json({ ok: true, itens, naoEntraram });
+    }
+
+    // Lança no estoque compras que já estão registradas mas nunca viraram
+    // saldo. Ela aperta um botão em vez de digitar a nota de novo.
+    if (acao === 'lancarCompras') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 403 });
+      const ids = new Set(arr(body?.ids).map(String));
+      const todas = arr(blob.compras);
+      // Recalcula as pendentes AQUI, no servidor, com o estoque de agora. Se a
+      // tela estiver um passo atrás (ou ela tocar duas vezes), o que já entrou
+      // não entra de novo.
+      const pendentes = comprasPendentesDeEstoque(todas, itens).filter((x) => ids.has(String(x.compra.id)));
+      if (!pendentes.length) return NextResponse.json({ ok: true, itens, lancadas: 0 });
+      const novoEstoque = aplicarEntradasEstoque(itens, pendentes.map((x) => x.compra));
+      const marcadas = new Set(pendentes.map((x) => String(x.compra.id)));
+      const novasCompras = todas.map((c) => (c && marcadas.has(String(c.id)) ? { ...c, estoqueEm: todayISO() } : c));
+      const novo = await gravarEstoque(sb, blob, { estoque: novoEstoque, compras: novasCompras });
+      return NextResponse.json({
+        ok: true, itens: arr(novo.estoque), compras: arr(novo.compras),
+        lancadas: pendentes.length,
+        resumo: pendentes.map((x) => ({ produto: limparNome(x.compra.produto), item: x.item.nome, qtd: x.entrada.qtd, unidade: x.item.unidade || 'un' })),
+      });
     }
 
     // Pente fino: junta itens repetidos num só. Mexe em receita e em compra,
