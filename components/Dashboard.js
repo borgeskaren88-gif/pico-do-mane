@@ -338,8 +338,8 @@ export default function Dashboard() {
           if (j?.ok && Array.isArray(j.itens)) setEstoque(j.itens);
           // Avisa se algum produto comprado não achou item no estoque (não entrou sozinho).
           if (j?.ok && Array.isArray(j.naoEntraram) && j.naoEntraram.length) {
-            setAvisoBaixa(`Compra registrada. Só que ${j.naoEntraram.length > 1 ? 'estes não estão no estoque' : 'este não está no estoque'}: ${j.naoEntraram.join(', ')}. Cadastre com esse nome (Abastecimento → Estoque) pra entrar automático nas próximas.`);
-            setTimeout(() => setAvisoBaixa(''), 12000);
+            setAvisoBaixa(`Compra registrada — mas ${j.naoEntraram.length > 1 ? 'estes produtos não somaram saldo' : 'este produto não somou saldo'} no estoque: ${j.naoEntraram.join(', ')}. Cadastra em Abastecimento → Estoque, ou liga a um item que já existe pelo seletor que aparece embaixo do produto na hora de comprar.`);
+            setTimeout(() => setAvisoBaixa(''), 30000);
           }
         }).catch(() => {});
     }

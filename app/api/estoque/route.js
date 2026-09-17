@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, igualNome } from '../../../lib/estoque';
+import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, igualNome } from '../../../lib/estoque';
 import { limparNome, num } from '../../../lib/util';
 import { notificarEstoqueCritico, notificarSaidaSemVenda } from '../../../lib/push';
 
@@ -184,7 +184,7 @@ export async function POST(request) {
       // (por isso não entraram sozinhos). Serve pra avisar a dona.
       const naoEntraram = [...new Set(
         comprasNovas
-          .filter((c) => num(c.quantidade) > 0 && !itens.some((it) => igualNome(c.produto, it.nome)))
+          .filter((c) => num(c.quantidade) > 0 && !resolverCompraNoEstoque(c, itens))
           .map((c) => limparNome(c.produto)).filter(Boolean)
       )];
       if (novoEstoque !== itens) { const novo = await gravarEstoque(sb, blob, { estoque: novoEstoque }); return NextResponse.json({ ok: true, itens: arr(novo.estoque), naoEntraram }); }
