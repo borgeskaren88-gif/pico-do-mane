@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, igualNome } from '../../../lib/estoque';
+import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, fundirItens, igualNome } from '../../../lib/estoque';
 import { limparNome, num } from '../../../lib/util';
 import { notificarEstoqueCritico, notificarSaidaSemVenda } from '../../../lib/push';
 
@@ -49,7 +49,12 @@ export async function GET() {
     const sb = supabaseServer();
     const blob = await lerPainel(sb);
     // As fichas só interessam à dona; a cozinha recebe só os itens.
-    return NextResponse.json({ ok: true, itens: arr(blob.estoque), fichas: p === 'dona' ? arr(blob.fichas) : [] });
+    return NextResponse.json({
+      ok: true,
+      itens: arr(blob.estoque),
+      fichas: p === 'dona' ? arr(blob.fichas) : [],
+      duplicadosIgnorados: p === 'dona' ? arr(blob.duplicadosIgnorados) : [],
+    });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar o estoque.' }, { status: 500 });
   }
@@ -189,6 +194,29 @@ export async function POST(request) {
       )];
       if (novoEstoque !== itens) { const novo = await gravarEstoque(sb, blob, { estoque: novoEstoque }); return NextResponse.json({ ok: true, itens: arr(novo.estoque), naoEntraram }); }
       return NextResponse.json({ ok: true, itens, naoEntraram });
+    }
+
+    // Pente fino: junta itens repetidos num só. Mexe em receita e em compra,
+    // então é só da dona.
+    if (acao === 'fundir') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona pode juntar itens.' }, { status: 403 });
+      const principalId = String(body?.principalId || '');
+      const absorvidos = arr(body?.absorvidos).map(String);
+      const r = fundirItens(itens, arr(blob.fichas), arr(blob.compras), principalId, absorvidos);
+      if (!r.fundidos) return NextResponse.json({ ok: true, itens, fundidos: 0, naoDeu: r.naoDeu });
+      const novo = await gravarEstoque(sb, blob, { estoque: r.estoque, fichas: r.fichas, compras: r.compras });
+      return NextResponse.json({ ok: true, itens: arr(novo.estoque), fichas: arr(novo.fichas), compras: arr(novo.compras), fundidos: r.fundidos, naoDeu: r.naoDeu });
+    }
+
+    // "Esses dois são parecidos mas não são a mesma coisa" — pra o aviso não
+    // voltar toda vez que ela abrir a tela.
+    if (acao === 'ignorarDuplicado') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 403 });
+      const chave = String(body?.chave || '');
+      if (!chave) return NextResponse.json({ ok: false, erro: 'Grupo inválido.' }, { status: 400 });
+      const atuais = arr(blob.duplicadosIgnorados).map(String);
+      const novo = await gravarEstoque(sb, blob, { duplicadosIgnorados: [...new Set([...atuais, chave])] });
+      return NextResponse.json({ ok: true, itens, duplicadosIgnorados: arr(novo.duplicadosIgnorados) });
     }
 
     if (acao === 'fichas') {

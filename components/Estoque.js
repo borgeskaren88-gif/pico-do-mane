@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
-import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo } from '../lib/estoque';
+import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre } from '../lib/estoque';
 
 const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '', validade: '' });
 
@@ -18,7 +18,75 @@ const fmtQtd = (v) => Number(num(v).toFixed(3)).toLocaleString('pt-BR', { maximu
 // unidade" (pra diluir garrafa em doses). Toda mudança de saldo passa por ações
 // atômicas na API (/api/estoque), pra ficar em sincronia com a baixa feita ao
 // fechar as comandas — nada é sobrescrito.
-export default function Estoque({ itens = [], carregado = true, onAcao, compras = [], onRepor }) {
+// Pente fino: o mesmo produto cadastrado duas vezes com nomes diferentes.
+// Só aponta — juntar é decisão dela, porque "Coca Cola" e "Coca Cola Zero"
+// são parecidos e não são a mesma coisa.
+function PenteFino({ grupos, onJuntar, onIgnorar, ocupado }) {
+  const [escolha, setEscolha] = useState({}); // { [chave]: principalId }
+  if (!grupos.length) return null;
+  const certos = grupos.filter((g) => g.nivel === 'certo').length;
+  return (
+    <Card style={{ marginBottom: 14, borderColor: C.amber }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: C.amber, marginBottom: 4 }}>
+        Produtos repetidos ({grupos.length})
+      </div>
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
+        O mesmo produto cadastrado mais de uma vez racha o saldo: a receita baixa de um e a compra soma no outro, e
+        nenhum dos dois diz a verdade. {certos > 0 && <>{certos} {certos > 1 ? 'são nomes iguais' : 'é nome igual'} — esses podem juntar sem medo. </>}
+        Escolha qual nome fica e junte. Nada se perde: o saldo soma, o histórico vem junto e as receitas passam a apontar pro que ficou.
+      </div>
+      {grupos.map((g) => {
+        const principalId = escolha[g.chave] || g.principalId;
+        const principal = g.itens.find((x) => x.id === principalId) || g.itens[0];
+        const somaria = g.itens.reduce((s, it) => {
+          const f = it.unidade === principal.unidade ? 1 : fatorEntre(it.unidade, principal.unidade);
+          return f == null ? s : s + num(it.saldo) * f;
+        }, 0);
+        const travados = g.itens.filter((it) => it.id !== principalId && it.unidade !== principal.unidade && fatorEntre(it.unidade, principal.unidade) == null);
+        const podeJuntar = g.itens.some((it) => it.id !== principalId && !travados.includes(it));
+        return (
+          <div key={g.chave} style={{ borderTop: `1px solid ${C.hair}`, paddingTop: 10, marginTop: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', color: g.nivel === 'certo' ? C.red : C.amber, marginBottom: 6 }}>
+              {g.nivel === 'certo' ? 'MESMO NOME' : 'NOMES PARECIDOS — CONFERE'}
+            </div>
+            {g.itens.map((it) => (
+              <label key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', cursor: 'pointer' }}>
+                <input
+                  type="radio" name={`dup-${g.chave}`} checked={it.id === principalId}
+                  onChange={() => setEscolha((m) => ({ ...m, [g.chave]: it.id }))}
+                  style={{ width: 15, height: 15, accentColor: C.accent, flexShrink: 0 }}
+                />
+                <span style={{ fontSize: 13.5, color: it.id === principalId ? C.text : C.muted, fontWeight: it.id === principalId ? 700 : 400, minWidth: 0 }}>
+                  {it.nome}
+                  <span style={{ color: C.faint, fontWeight: 400 }}>
+                    {' · '}{fmtQtd(it.saldo)} {it.unidade || 'un'}{num(it.custo) > 0 ? ` · ${brl(num(it.custo))}` : ''}
+                  </span>
+                </span>
+              </label>
+            ))}
+            <div style={{ fontSize: 12, color: C.muted, margin: '6px 0 8px', lineHeight: 1.5 }}>
+              Fica <b style={{ color: C.text }}>{principal.nome}</b> com <b style={{ color: C.text }}>{fmtQtd(somaria)} {principal.unidade || 'un'}</b>.
+              {travados.length > 0 && (
+                <span style={{ color: C.amber }}>
+                  {' '}{travados.map((t) => t.nome).join(', ')} fica{travados.length > 1 ? 'm' : ''} de fora: está em {travados.map((t) => t.unidade || 'un').join('/')} e não dá pra somar com {principal.unidade || 'un'}.
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Btn small onClick={() => onJuntar(g, principalId)} kind={podeJuntar ? 'primary' : 'ghost'}>
+                Juntar em {principal.nome}
+              </Btn>
+              <Btn small kind="ghost" onClick={() => onIgnorar(g)}>Não são iguais</Btn>
+            </div>
+          </div>
+        );
+      })}
+      {ocupado && <div style={{ fontSize: 12, color: C.muted, marginTop: 10 }}>Juntando…</div>}
+    </Card>
+  );
+}
+
+export default function Estoque({ itens = [], carregado = true, onAcao, compras = [], fichas = [], duplicadosIgnorados = [], onRepor }) {
   const [novo, setNovo] = useState(itemVazio());
   const [editId, setEditId] = useState(null);
   const [acao, setAcao] = useState(null);   // { id, tipo: 'entrada'|'saida'|'contagem' }
@@ -56,6 +124,40 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     }
     return { valor, baixo };
   }, [itens]);
+
+  // Pente fino dos repetidos. Roda sobre o catálogo inteiro (não sobre o
+  // filtro da busca): produto repetido não se acha procurando, se acha olhando.
+  const [msgDup, setMsgDup] = useState('');
+  const [fundindo, setFundindo] = useState(false);
+  const duplicados = useMemo(
+    () => gruposDuplicados(itens, fichas, duplicadosIgnorados),
+    [itens, fichas, duplicadosIgnorados],
+  );
+
+  const juntarGrupo = async (g, principalId) => {
+    if (fundindo) return;
+    const principal = g.itens.find((x) => x.id === principalId) || g.itens[0];
+    const outros = g.itens.filter((x) => x.id !== principalId);
+    if (!outros.length) return;
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Juntar ${outros.map((o) => o.nome).join(', ')} dentro de "${principal.nome}"?\n\n`
+      + 'O saldo soma, o histórico vem junto e as receitas passam a apontar pro item que fica. Isso não tem desfazer.',
+    )) return;
+    setFundindo(true); setMsgDup('');
+    const j = await onAcao({ acao: 'fundir', principalId, absorvidos: outros.map((o) => o.id) });
+    setFundindo(false);
+    if (j && j.ok) {
+      const sobrou = (j.naoDeu || []).map((x) => `${x.nome} (${x.motivo})`).join('; ');
+      setMsgDup(j.fundidos
+        ? `Pronto: ${j.fundidos} item(ns) juntado(s) em "${principal.nome}".${sobrou ? ` Ficou de fora: ${sobrou}.` : ''}`
+        : `Não juntei nada.${sobrou ? ` Motivo: ${sobrou}.` : ''}`);
+    } else setMsgDup('Não consegui juntar agora. Tenta de novo.');
+    setTimeout(() => setMsgDup(''), 12000);
+  };
+
+  const ignorarGrupo = async (g) => {
+    await onAcao({ acao: 'ignorarDuplicado', chave: g.chave });
+  };
 
   const abaixoDoMin = useMemo(() => itens.filter((it) => num(it.minimo) > 0 && num(it.saldo) <= num(it.minimo)), [itens]);
   // O que está pra vencer nos próximos 7 dias (e o que já venceu).
@@ -279,6 +381,11 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
           </div>
         )}
       </Card>
+
+      {msgDup && (
+        <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginBottom: 12, lineHeight: 1.5 }}>{msgDup}</div>
+      )}
+      <PenteFino grupos={duplicados} onJuntar={juntarGrupo} onIgnorar={ignorarGrupo} ocupado={fundindo} />
 
       {vencendo.length > 0 && (
         <Card style={{ marginBottom: 14, borderColor: CORES_VAL[vencendo[0].nivel] }}>
