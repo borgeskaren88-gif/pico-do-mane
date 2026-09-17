@@ -2,14 +2,16 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
 import { brl, num, numQtd, todayISO, ymOf, fmtDate, addDays, uid, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
-import { resolverCompraNoEstoque } from '../lib/estoque';
+import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, UNIDADES } from '../lib/estoque';
 
 // Dados compartilhados da compra (valem pra todos os itens do carrinho).
 const compraVazia = () => ({ data: todayISO(), fornecedor: '', formaPagto: 'À vista', pago: 'Sim', vencimento: '', nota: '' });
 // Item que está sendo digitado antes de entrar no carrinho.
 // estoqueId: em qual item do estoque esta compra vai somar. Vazio = o sistema
 // descobre pelo nome; 'nenhum' = ela disse que não controla isso no estoque.
-const itemVazio = () => ({ produto: '', categoria: '', quantidade: '', valorUnit: '', estoqueId: '' });
+// conteudo/conteudoUnid: o que vem DENTRO de cada um. "3 × Polenta 2kg" são 3
+// na nota e 6 kg na prateleira. Vazio = 1 comprado vira 1 no estoque.
+const itemVazio = () => ({ produto: '', categoria: '', quantidade: '', valorUnit: '', estoqueId: '', conteudo: '', conteudoUnid: '' });
 
 // Mostra, ANTES de registrar, onde a compra vai cair no estoque.
 //
@@ -17,12 +19,14 @@ const itemVazio = () => ({ produto: '', categoria: '', quantidade: '', valorUnit
 // o saldo do estoque só subia se o nome batesse com um item cadastrado. Quando
 // não batia, não acontecia nada e nada dizia nada. Agora o destino aparece na
 // tela enquanto ela digita, e dá pra corrigir ali mesmo.
-function DestinoEstoque({ produto, estoqueId, quantidade, estoque, onLigar, compacto }) {
+function DestinoEstoque({ item: linha, estoque, onLigar, compacto }) {
+  const { produto, estoqueId } = linha;
   if (!produto) return null;
-  const alvo = resolverCompraNoEstoque({ produto, estoqueId }, estoque);
-  const q = numQtd(quantidade) || 0;
+  const alvo = resolverCompraNoEstoque(linha, estoque);
+  const entrada = alvo ? entradaDaCompra(linha, alvo.item) : null;
+  const q = entrada ? entrada.qtd : (numQtd(linha.quantidade) || 0);
   const desligado = estoqueId === 'nenhum';
-  const cor = alvo ? C.green : desligado ? C.faint : C.amber;
+  const cor = alvo ? (entrada && entrada.erro ? C.amber : C.green) : desligado ? C.faint : C.amber;
   const base = { fontSize: compacto ? 11.5 : 12.5, color: cor, lineHeight: 1.45 };
   if (compacto) {
     const somaria = q > 0 ? ` (+${[q, alvo && alvo.item.unidade].filter(Boolean).join(' ')})` : '';
@@ -40,7 +44,11 @@ function DestinoEstoque({ produto, estoqueId, quantidade, estoque, onLigar, comp
           <>
             Vai somar no estoque em <b style={{ color: C.text }}>{alvo.item.nome}</b>
             {q > 0 && <> — <b style={{ color: C.text }}>+{q} {alvo.item.unidade || ''}</b></>}
+            {entrada && entrada.convertido && entrada.custo > 0 && (
+              <span style={{ color: C.muted }}> · custo {brl(entrada.custo)} por {alvo.item.unidade || 'un'}</span>
+            )}
             {alvo.como === 'parecido' && <span style={{ color: C.muted }}> (casou pelo nome parecido — confere)</span>}
+            {entrada && entrada.erro && <div style={{ color: C.amber, marginTop: 4 }}>⚠️ {entrada.erro} — vai entrar como {q} {alvo.item.unidade || 'un'}.</div>}
           </>
         ) : desligado ? (
           'Este produto não entra no estoque. Vai só pra despesa e pras contas.'
@@ -61,7 +69,41 @@ function DestinoEstoque({ produto, estoqueId, quantidade, estoque, onLigar, comp
   );
 }
 
-export default function Compras({ dados, cotacoes, despesas = [], estoque = [], onChange, onRegistrar }) {
+// Compras já registradas que nunca viraram saldo. Em vez de mandar ela digitar
+// a nota de novo, lança com um toque — a conta já existe, falta só a prateleira.
+function FaltouNoEstoque({ pendentes, onLancar, ocupado }) {
+  if (!pendentes.length) return null;
+  return (
+    <Card style={{ marginBottom: 16, borderColor: C.amber }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: C.amber, marginBottom: 4 }}>
+        Faltou entrar no estoque ({pendentes.length})
+      </div>
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
+        Estas compras já estão lançadas no financeiro, mas não somaram saldo. Não precisa digitar de novo — confere a
+        quantidade e manda entrar.
+      </div>
+      {pendentes.map(({ compra: c, item, entrada }) => (
+        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.hair}` }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, color: C.text }}>{limparNome(c.produto)}</div>
+            <div style={{ fontSize: 11.5, color: C.faint }}>
+              {fmtDate(c.data)} · vira <b style={{ color: C.green }}>+{entrada.qtd} {item.unidade || 'un'}</b> em {item.nome}
+              {entrada.convertido && entrada.custo > 0 ? ` · ${brl(entrada.custo)}/${item.unidade || 'un'}` : ''}
+            </div>
+          </div>
+          <Btn small onClick={() => onLancar([c.id])}>Entrar</Btn>
+        </div>
+      ))}
+      <div style={{ marginTop: 12 }}>
+        <Btn onClick={() => onLancar(pendentes.map((x) => x.compra.id))}>
+          {ocupado ? 'Lançando…' : `Lançar todas (${pendentes.length})`}
+        </Btn>
+      </div>
+    </Card>
+  );
+}
+
+export default function Compras({ dados, cotacoes, despesas = [], estoque = [], onChange, onRegistrar, onEstoque }) {
   // Sugestões de produto: os itens do ESTOQUE primeiro (esses fazem a compra
   // entrar automático), mais o que já foi comprado/cotado. Digitar e escolher a
   // sugestão garante o nome IGUAL — sem precisar decorar.
@@ -77,6 +119,28 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   const [editId, setEditId] = useState(null);
   const [filtroMes, setFiltroMes] = useState(ymOf(todayISO()));
   const [busca, setBusca] = useState('');
+  const [lancando, setLancando] = useState(false);
+  const [msgLanc, setMsgLanc] = useState('');
+
+  // Compras registradas que não viraram saldo. O servidor refaz esta conta antes
+  // de gravar, então tocar duas vezes não soma duas vezes.
+  const pendentes = useMemo(
+    () => (onEstoque ? comprasPendentesDeEstoque(dados, estoque) : []),
+    [dados, estoque, onEstoque],
+  );
+
+  const lancarNoEstoque = async (ids) => {
+    if (lancando || !onEstoque) return;
+    setLancando(true); setMsgLanc('');
+    const j = await onEstoque({ acao: 'lancarCompras', ids });
+    setLancando(false);
+    if (j && j.ok) {
+      setMsgLanc(j.lancadas
+        ? `${j.lancadas} compra(s) no estoque: ${(j.resumo || []).map((r) => `${r.item} +${r.qtd} ${r.unidade}`).join(', ')}.`
+        : 'Essas já estavam no estoque — não somei de novo.');
+    } else setMsgLanc('Não consegui lançar agora. Tenta de novo.');
+    setTimeout(() => setMsgLanc(''), 12000);
+  };
 
   const setC = (k) => (v) => setCompra((f) => ({ ...f, [k]: v }));
   const setI = (k) => (v) => setItem((f) => ({ ...f, [k]: v }));
@@ -135,6 +199,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
       // Onde isto soma no estoque. Fica gravado na linha da compra pra que
       // conferir depois (e reaplicar) use a mesma ligação que ela viu na tela.
       estoqueId: it.estoqueId || '',
+      conteudo: it.conteudo || '', conteudoUnid: it.conteudoUnid || '',
     }));
 
     let cotacoesNovas = null;
@@ -157,7 +222,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   const editar = (d) => {
     setEditId(d.id);
     setCompra({ data: d.data || todayISO(), fornecedor: d.fornecedor || '', formaPagto: d.formaPagto || 'À vista', pago: d.pago || 'Não', vencimento: d.vencimento || '', nota: d.nota || '' });
-    setItem({ produto: d.produto || '', categoria: d.categoria || '', quantidade: d.quantidade || '', valorUnit: d.valorUnit || '', estoqueId: d.estoqueId || '' });
+    setItem({ produto: d.produto || '', categoria: d.categoria || '', quantidade: d.quantidade || '', valorUnit: d.valorUnit || '', estoqueId: d.estoqueId || '', conteudo: d.conteudo || '', conteudoUnid: d.conteudoUnid || '' });
     setCarrinho([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -170,6 +235,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
       formaPagto: compra.formaPagto, vencimento: venc, pago: compra.pago,
       dataPagamento: compra.pago === 'Sim' ? (d.dataPagamento || compra.data) : '', nota: compra.nota,
       estoqueId: item.estoqueId || '',
+      conteudo: item.conteudo || '', conteudoUnid: item.conteudoUnid || '',
     } : d));
     cancelarEdicao();
   };
@@ -193,6 +259,9 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
         { t: 'Total gasto', v: brl(gastoGeral), c: C.red },
         { t: 'Em aberto', v: emAberto, c: emAberto ? C.amber : C.faint },
       ]} />
+
+      {msgLanc && <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginBottom: 12, lineHeight: 1.5 }}>{msgLanc}</div>}
+      <FaltouNoEstoque pendentes={pendentes} onLancar={lancarNoEstoque} ocupado={lancando} />
 
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar compra' : 'Nova compra'}</div>
@@ -227,10 +296,18 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
           <Field label="Qtd"><NumInput value={item.quantidade} onChange={setI('quantidade')} /></Field>
           <Field label="Valor un. (R$)"><NumInput value={item.valorUnit} onChange={setI('valorUnit')} /></Field>
         </div>
-        <DestinoEstoque
-          produto={item.produto} estoqueId={item.estoqueId} quantidade={item.quantidade}
-          estoque={estoque} onLigar={setI('estoqueId')}
-        />
+        <DestinoEstoque item={item} estoque={estoque} onLigar={setI('estoqueId')} />
+        {/* O que vem DENTRO de cada um. Sem isso, "3 x Polenta 2kg" soma 3 no
+            estoque em vez de 6 kg, e grava o custo do pacote como se fosse o do
+            quilo — o dobro em cada prato que usa polenta. */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <Field label="Cada um tem (opcional)"><NumInput value={item.conteudo} onChange={setI('conteudo')} placeholder="ex: 2" /></Field>
+          <Field label="De quê"><Select value={item.conteudoUnid} onChange={setI('conteudoUnid')} options={UNIDADES} placeholder="kg, g, L, ml…" /></Field>
+        </div>
+        <div style={{ fontSize: 11.5, color: C.faint, margin: '-4px 0 10px', lineHeight: 1.45 }}>
+          Só preenche quando a embalagem tem mais de uma unidade de uso dentro: pacote de 2 kg, fardo de 12, garrafa de 1 L.
+          Aí o estoque soma o conteúdo, e não o número de pacotes.
+        </div>
         {totalItem > 0 && <div style={{ fontSize: 13, color: C.text, margin: '-4px 0 8px' }}>Subtotal do item: <b>{brl(totalItem)}</b></div>}
         {menorCot && num(item.valorUnit) > 0 && (
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, marginBottom: 12, fontSize: 13 }}>
@@ -261,7 +338,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, color: C.text }}>{it.produto}</div>
                       <div style={{ fontSize: 12, color: C.faint }}>{num(it.quantidade) || 1} × {brl(num(it.valorUnit))}{it.categoria ? ` · ${it.categoria}` : ''}</div>
-                      <DestinoEstoque compacto produto={it.produto} estoqueId={it.estoqueId} quantidade={it.quantidade} estoque={estoque} onLigar={() => {}} />
+                      <DestinoEstoque compacto item={it} estoque={estoque} onLigar={() => {}} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                       <b style={{ fontVariantNumeric: 'tabular-nums' }}>{brl(num(it.quantidade) * num(it.valorUnit))}</b>
