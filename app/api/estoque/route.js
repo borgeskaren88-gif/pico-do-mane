@@ -218,6 +218,25 @@ export async function POST(request) {
       });
     }
 
+    // Dispensar: marca a compra como resolvida SEM tocar no saldo. É pra compra
+    // antiga que ela já deu entrada na mão — o aviso some e o estoque fica como
+    // está. Guarda o motivo, pra depois dar pra saber por que aquela linha não
+    // tem movimento correspondente.
+    if (acao === 'dispensarCompras') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 403 });
+      const ids = new Set(arr(body?.ids).map(String));
+      if (!ids.size) return NextResponse.json({ ok: true, itens, dispensadas: 0 });
+      let n = 0;
+      const novasCompras = arr(blob.compras).map((c) => {
+        if (!c || c.estoqueEm || !ids.has(String(c.id))) return c;
+        n += 1;
+        return { ...c, estoqueEm: todayISO(), estoqueDispensada: true };
+      });
+      if (!n) return NextResponse.json({ ok: true, itens, dispensadas: 0 });
+      const novo = await gravarEstoque(sb, blob, { compras: novasCompras });
+      return NextResponse.json({ ok: true, itens, compras: arr(novo.compras), dispensadas: n });
+    }
+
     // Pente fino: junta itens repetidos num só. Mexe em receita e em compra,
     // então é só da dona.
     if (acao === 'fundir') {
