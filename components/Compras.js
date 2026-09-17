@@ -71,33 +71,59 @@ function DestinoEstoque({ item: linha, estoque, onLigar, compacto }) {
 
 // Compras já registradas que nunca viraram saldo. Em vez de mandar ela digitar
 // a nota de novo, lança com um toque — a conta já existe, falta só a prateleira.
-function FaltouNoEstoque({ pendentes, onLancar, ocupado }) {
+// Fechado por padrão: é um aviso, não o assunto da tela. Aberto, vira a lista
+// com os botões. Uma parede de 20 linhas com botão azul em cada uma estava
+// tapando a tela de Compras, que é onde ela vem pra trabalhar.
+function FaltouNoEstoque({ pendentes, onLancar, onDispensar, ocupado }) {
+  const [aberto, setAberto] = useState(false);
   if (!pendentes.length) return null;
+  const ids = pendentes.map((x) => x.compra.id);
+
+  if (!aberto) {
+    return (
+      <button
+        onClick={() => setAberto(true)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+          background: 'transparent', border: `1px solid ${C.amber}55`, borderRadius: 10,
+          padding: '9px 12px', marginBottom: 14, cursor: 'pointer', textAlign: 'left',
+        }}
+      >
+        <span style={{ fontSize: 12.5, color: C.amber, lineHeight: 1.4 }}>
+          {pendentes.length} compra{pendentes.length > 1 ? 's' : ''} não somou saldo no estoque
+        </span>
+        <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>ver</span>
+      </button>
+    );
+  }
+
   return (
-    <Card style={{ marginBottom: 16, borderColor: C.amber }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: C.amber, marginBottom: 4 }}>
-        Faltou entrar no estoque ({pendentes.length})
+    <Card style={{ marginBottom: 14, borderColor: `${C.amber}55` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: C.amber }}>Não somou no estoque ({pendentes.length})</div>
+        <button onClick={() => setAberto(false)} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 12, cursor: 'pointer', padding: 2 }}>fechar</button>
       </div>
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
-        Estas compras já estão lançadas no financeiro, mas não somaram saldo. Não precisa digitar de novo — confere a
-        quantidade e manda entrar.
+      <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 10px', lineHeight: 1.5 }}>
+        Já estão no financeiro, só não somaram saldo. Se tu já deu entrada na mão lá atrás, usa <b>Dispensar</b> — senão
+        entra duas vezes.
       </div>
-      {pendentes.map(({ compra: c, item, entrada }) => (
-        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.hair}` }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, color: C.text }}>{limparNome(c.produto)}</div>
-            <div style={{ fontSize: 11.5, color: C.faint }}>
-              {fmtDate(c.data)} · vira <b style={{ color: C.green }}>+{entrada.qtd} {item.unidade || 'un'}</b> em {item.nome}
-              {entrada.convertido && entrada.custo > 0 ? ` · ${brl(entrada.custo)}/${item.unidade || 'un'}` : ''}
+      <div style={{ maxHeight: 260, overflowY: 'auto', margin: '0 -4px', padding: '0 4px' }}>
+        {pendentes.map(({ compra: c, item, entrada }) => (
+          <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: `1px solid ${C.hair}` }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, color: C.text }}>{limparNome(c.produto)}</div>
+              <div style={{ fontSize: 11.5, color: C.faint }}>
+                {fmtDate(c.data)} · <b style={{ color: C.green }}>+{entrada.qtd} {item.unidade || 'un'}</b> em {item.nome}
+                {entrada.convertido && entrada.custo > 0 ? ` · ${brl(entrada.custo)}/${item.unidade || 'un'}` : ''}
+              </div>
             </div>
+            <Btn small kind="ghost" onClick={() => onLancar([c.id])}>Entrar</Btn>
           </div>
-          <Btn small onClick={() => onLancar([c.id])}>Entrar</Btn>
-        </div>
-      ))}
-      <div style={{ marginTop: 12 }}>
-        <Btn onClick={() => onLancar(pendentes.map((x) => x.compra.id))}>
-          {ocupado ? 'Lançando…' : `Lançar todas (${pendentes.length})`}
-        </Btn>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <Btn small onClick={() => onLancar(ids)}>{ocupado ? 'Lançando…' : `Lançar todas (${pendentes.length})`}</Btn>
+        <Btn small kind="ghost" onClick={() => onDispensar(ids)}>Dispensar todas</Btn>
       </div>
     </Card>
   );
@@ -140,6 +166,20 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
         : 'Essas já estavam no estoque — não somei de novo.');
     } else setMsgLanc('Não consegui lançar agora. Tenta de novo.');
     setTimeout(() => setMsgLanc(''), 12000);
+  };
+
+  // Dispensar: marca como resolvida SEM mexer no saldo. É pra compra velha que
+  // ela já deu entrada na mão — o aviso some e o estoque não é tocado.
+  const dispensar = async (ids) => {
+    if (lancando || !onEstoque) return;
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Dispensar ${ids.length} compra(s)?\n\nO aviso some e o estoque NÃO muda. Usa isso quando tu já deu entrada nelas na mão.`,
+    )) return;
+    setLancando(true); setMsgLanc('');
+    const j = await onEstoque({ acao: 'dispensarCompras', ids });
+    setLancando(false);
+    setMsgLanc(j && j.ok ? `${j.dispensadas} compra(s) dispensada(s). O estoque não mudou.` : 'Não consegui agora. Tenta de novo.');
+    setTimeout(() => setMsgLanc(''), 10000);
   };
 
   const setC = (k) => (v) => setCompra((f) => ({ ...f, [k]: v }));
@@ -261,7 +301,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
       ]} />
 
       {msgLanc && <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginBottom: 12, lineHeight: 1.5 }}>{msgLanc}</div>}
-      <FaltouNoEstoque pendentes={pendentes} onLancar={lancarNoEstoque} ocupado={lancando} />
+      <FaltouNoEstoque pendentes={pendentes} onLancar={lancarNoEstoque} onDispensar={dispensar} ocupado={lancando} />
 
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar compra' : 'Nova compra'}</div>
