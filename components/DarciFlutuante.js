@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { C, inputStyle } from './ui';
 import OndaDarci from './OndaDarci';
 import { analisarBar, responder, listaNovidades, interpretarComando, faz, lerVisto, marcarVisto, alertas, ATALHOS, NAO_ENTENDI } from '../lib/darci';
-import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome, destravarAudio, baixarPrefs } from '../lib/darciVoz';
+import { falarTexto, pararFala, podeOuvir, ReconhecimentoFala, lerSotaque, lerEscuta, salvarEscuta, chamadoPeloNome, destravarAudio, baixarPrefs, prepararVoz } from '../lib/darciVoz';
 import useReservas from '../lib/useReservas';
 import { resolverDarci } from '../lib/perguntarDarci';
 import CamposPedido, { podeGravarPedido } from './CamposPedido';
@@ -75,6 +75,10 @@ export default function DarciFlutuante({ onAbrir, onAnotar, ...dados }) {
   const [vigiaAtivo, setVigiaAtivo] = useState(false); // o ouvido pegou mesmo?
   useEffect(() => {
     setOuvirOk(podeOuvir()); sotaqueRef.current = lerSotaque(); setEscuta(lerEscuta());
+    // Descobre AGORA se existe voz na nuvem. Se deixar pra descobrir na hora de
+    // falar, a ida na rede gasta o toque da dona e o navegador bloqueia o som —
+    // o Darci respondia escrito e ficava mudo.
+    prepararVoz();
     // Puxa os ajustes do servidor: o jeito de falar regulado no notebook vale
     // aqui no celular também.
     baixarPrefs().then((mudou) => { if (mudou) sotaqueRef.current = lerSotaque(); }).catch(() => { /* fica o do aparelho */ });
