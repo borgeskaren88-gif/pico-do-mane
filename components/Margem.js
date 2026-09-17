@@ -1,15 +1,40 @@
 'use client';
 import React, { useMemo, useState } from 'react';
 import { C, Card, KPI, Empty, PageTitle, TextInput } from './ui';
-import { brl, num } from '../lib/util';
+import { brl, num, addDays, diaOperacional } from '../lib/util';
+import { norm } from '../lib/darci';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
 import { CATEGORIAS_CARDAPIO } from './Cardapio';
 
 // Margem por produto: cruza o CUSTO da ficha técnica (+ fruta do sabor) com o
 // PREÇO do cardápio, pra mostrar quanto cada item dá de lucro. Agrupado por
 // categoria; com busca por nome. Só leitura, não muda nada.
-export default function Margem({ cardapio = [], fichas = [], estoque = [] }) {
+export default function Margem({ cardapio = [], fichas = [], estoque = [], vendas = [] }) {
   const [busca, setBusca] = useState('');
+  // Por onde olhar a lista. Margem % e lucro em R$ contam histórias
+  // diferentes: a polenta tem 79% e dá R$ 13; o camarão tem 67% e dá R$ 70.
+  // E o que paga as contas mesmo é lucro × quanto sai.
+  const [ordem, setOrdem] = useState('margem'); // 'margem' | 'lucro' | 'mes'
+
+  // Quantas unidades de cada produto saíram nos últimos 30 dias, pelo nome do
+  // item na comanda. É aproximado — casa pelo nome, que é o que a venda guarda.
+  const vendido = useMemo(() => {
+    const hoje = diaOperacional();
+    const desde = addDays(hoje, -30);
+    const m = new Map();
+    for (const v of (vendas || [])) {
+      const d = (v && v.data) || '';
+      if (d < desde || d > hoje) continue;
+      for (const it of ((v && v.itens) || [])) {
+        const q = num(it.qtd);
+        if (q <= 0) continue;
+        const k = norm(it.nome || '');
+        if (!k) continue;
+        m.set(k, (m.get(k) || 0) + q);
+      }
+    }
+    return m;
+  }, [vendas]);
   const fichaPorId = useMemo(
     () => new Map(fichas.filter((f) => f && f.cardapioId).map((f) => [f.cardapioId, Array.isArray(f.itens) ? f.itens : []])),
     [fichas],
@@ -28,19 +53,29 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [] }) {
       const custo = Math.round((base.custo + sab.medio) * 100) / 100;
       const lucro = Math.round((preco - custo) * 100) / 100;
       const margem = preco > 0 ? (lucro / preco) * 100 : 0;
-      arr.push({ id: c.id, nome: c.nome, categoria, preco, custo, lucro, margem, completo: base.completo, temSabores: sab.n > 0, sabMin: base.custo + sab.min, sabMax: base.custo + sab.max });
+      const qtd30 = vendido.get(norm(c.nome || '')) || 0;
+      arr.push({
+        id: c.id, nome: c.nome, categoria, preco, custo, lucro, margem, completo: base.completo,
+        temSabores: sab.n > 0, sabMin: base.custo + sab.min, sabMax: base.custo + sab.max,
+        qtd30, lucroMes: Math.round(lucro * qtd30 * 100) / 100,
+      });
     }
     return arr.sort((a, b) => {
       if (a.semFicha !== b.semFicha) return a.semFicha ? 1 : -1;
       if (a.semFicha) return (a.nome || '').localeCompare(b.nome || '');
-      return a.margem - b.margem; // piores primeiro
+      if (ordem === 'lucro') return b.lucro - a.lucro;     // quem dá mais por unidade
+      if (ordem === 'mes') return b.lucroMes - a.lucroMes; // quem mais pôs dinheiro no bolso
+      return a.margem - b.margem;                          // piores primeiro
     });
-  }, [cardapio, fichaPorId, estoque]);
+  }, [cardapio, fichaPorId, estoque, vendido, ordem]);
 
   const comFicha = linhas.filter((l) => !l.semFicha);
   const noPrejuizo = comFicha.filter((l) => l.lucro < -0.005).length;
   const semFicha = linhas.filter((l) => l.semFicha).length;
   const margemMedia = comFicha.length ? comFicha.reduce((s, l) => s + l.margem, 0) / comFicha.length : 0;
+  // O que o cardápio realmente pôs no bolso nos últimos 30 dias.
+  const lucroMes = comFicha.reduce((s, l) => s + l.lucroMes, 0);
+  const temVendas = comFicha.some((l) => l.qtd30 > 0);
 
   const filtro = busca.trim().toLowerCase();
   const lista = filtro ? linhas.filter((l) => (l.nome || '').toLowerCase().includes(filtro)) : [];
@@ -78,6 +113,11 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [] }) {
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: corMargem(l.margem), lineHeight: 1 }}>{l.margem.toFixed(0)}%</div>
             <div style={{ fontSize: 12, fontWeight: 700, color: l.lucro >= 0 ? C.green : C.red, marginTop: 2 }}>{l.lucro >= 0 ? 'lucro ' : 'prejuízo '}{brl(Math.abs(l.lucro))}</div>
+            {l.qtd30 > 0 ? (
+              <div style={{ fontSize: 11, color: C.faint, marginTop: 3, whiteSpace: 'nowrap' }}>
+                saiu {l.qtd30} · deu <b style={{ color: l.lucroMes >= 0 ? C.green : C.red }}>{brl(Math.abs(l.lucroMes))}</b> no mês
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -94,9 +134,27 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [] }) {
         </div>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
         <KPI titulo="Margem média" valor={comFicha.length ? margemMedia.toFixed(0) + '%' : '—'} cor={corMargem(margemMedia)} sub={`${comFicha.length} item(ns) com ficha`} />
+        <KPI titulo="Lucro em 30 dias" valor={temVendas ? brl(lucroMes) : '—'} cor={lucroMes >= 0 ? C.green : C.red} sub={temVendas ? 'o que o cardápio te deu' : 'sem venda de comanda ainda'} />
         <KPI titulo="No prejuízo" valor={String(noPrejuizo)} cor={noPrejuizo > 0 ? C.red : C.green} sub={noPrejuizo > 0 ? 'custam mais que vendem' : 'nenhum item no vermelho'} />
+      </div>
+
+      {/* Por onde olhar. Cada ordem responde uma pergunta diferente. */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        {[['margem', 'pior margem'], ['lucro', 'maior lucro por unidade'], ['mes', 'quem mais deu no mês']].map(([v, rot]) => (
+          <button key={v} onClick={() => setOrdem(v)} style={{
+            borderRadius: 999, padding: '7px 13px', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+            border: `1px solid ${ordem === v ? C.accent : C.line}`,
+            background: ordem === v ? C.accent : 'transparent',
+            color: ordem === v ? '#06101F' : C.muted,
+          }}>{rot}</button>
+        ))}
+      </div>
+      <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 12, lineHeight: 1.5 }}>
+        {ordem === 'margem' ? 'Os que mais comem margem primeiro — é onde tem preço ou ficha pra rever.'
+          : ordem === 'lucro' ? 'Quanto sobra em cada unidade vendida. Margem alta em produto barato rende pouco.'
+            : 'Lucro × quantas unidades saíram nos últimos 30 dias. É o que realmente pagou as contas.'}
       </div>
 
       {semFicha > 0 && (

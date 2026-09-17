@@ -743,7 +743,7 @@ export default function Dashboard() {
             )}
 
             {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} estoque={estoque} onChange={upd.compras} onRegistrar={aplicarCompra} />}
-            {subAbast === 'margem' && <Margem cardapio={cardapio} fichas={fichas} estoque={estoque} />}
+            {subAbast === 'margem' && <Margem cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} />}
             {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} estoque={estoque} compras={compras} />}
           </>
         )}
