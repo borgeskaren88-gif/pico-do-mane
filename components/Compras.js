@@ -1,7 +1,7 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
-import { brl, num, numQtd, todayISO, ymOf, fmtDate, addDays, uid, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
+import { brl, num, numQtd, todayISO, ymOf, fmtDate, addDays, uid, limparNome, montarParcelas, ratearParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
 import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, UNIDADES } from '../lib/estoque';
 
 // Dados compartilhados da compra (valem pra todos os itens do carrinho).
@@ -145,6 +145,9 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   const [editId, setEditId] = useState(null);
   const [filtroMes, setFiltroMes] = useState(ymOf(todayISO()));
   const [busca, setBusca] = useState('');
+  // Boleto parcelado: uma linha por vencimento, com o valor de cada uma.
+  const [nParcelas, setNParcelas] = useState('1');
+  const [parcelas, setParcelas] = useState([]);
   const [lancando, setLancando] = useState(false);
   const [msgLanc, setMsgLanc] = useState('');
 
@@ -201,6 +204,26 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   const difVsCot = menorCot ? (num(item.valorUnit) - menorCot.menor) : 0;
   const totalCarrinho = carrinho.reduce((s, it) => s + num(it.quantidade) * num(it.valorUnit), 0);
 
+  // Parcelar só faz sentido em compra a prazo. Ao mudar o nº de parcelas (ou o
+  // carrinho), as linhas são remontadas a partir do total — e ela ainda pode
+  // ajustar data e valor de cada uma, porque boleto real raramente é redondo.
+  const parcelado = compra.formaPagto === 'Prazo' && parcelas.length > 1;
+  const setNumParcelas = (v) => {
+    setNParcelas(v);
+    const n = Math.max(1, Math.min(36, parseInt(v, 10) || 1));
+    setParcelas(n <= 1 ? [] : montarParcelas(n, totalCarrinho, compra.vencimento || compra.data, parcelas));
+  };
+  const setParcelaCampo = (i, campo) => (v) =>
+    setParcelas((prev) => prev.map((p, idx) => (idx === i ? { ...p, [campo]: v } : p)));
+  // Mexeu no carrinho depois de escolher as parcelas: refaz os valores, senão
+  // ela registra com a soma velha e o total da compra sai errado.
+  useEffect(() => {
+    if (parcelas.length > 1) setParcelas((prev) => montarParcelas(prev.length, totalCarrinho, compra.vencimento || compra.data, prev.map((p) => ({ vencimento: p.vencimento }))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalCarrinho]);
+  const somaParcelas = parcelas.reduce((s, p) => s + num(p.valor), 0);
+  const parcelasBatem = !parcelado || Math.abs(somaParcelas - totalCarrinho) < 0.005;
+
   const addItem = () => {
     if (!item.produto || !item.valorUnit) return;
     setCarrinho((c) => [...c, { ...item, id: uid() }]);
@@ -213,6 +236,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   // vez, pra você digitar só aqui e os dados aparecerem nos três lugares.
   const registrar = () => {
     if (!compra.fornecedor || !carrinho.length) return;
+    if (!parcelasBatem) return; // a soma das parcelas tem que dar o total da nota
     const venc = compra.formaPagto === 'À vista' ? compra.data : (compra.vencimento || '');
     const pago = compra.pago === 'Sim' ? 'Sim' : 'Não';
     const forn = limparNome(compra.fornecedor);
@@ -230,17 +254,47 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
       };
     }
 
-    const novasCompras = carrinho.map((it) => ({
-      id: uid(), data: compra.data, produto: limparNome(it.produto), fornecedor: forn,
-      categoria: it.categoria, quantidade: it.quantidade || '1', valorUnit: it.valorUnit || '0',
-      formaPagto: compra.formaPagto, prazoDias: '', vencimento: venc, pago,
-      dataPagamento: pago === 'Sim' ? compra.data : '', obs: '', nota: compra.nota,
-      despesaId: despId || undefined,
-      // Onde isto soma no estoque. Fica gravado na linha da compra pra que
-      // conferir depois (e reaplicar) use a mesma ligação que ela viu na tela.
-      estoqueId: it.estoqueId || '',
-      conteudo: it.conteudo || '', conteudoUnid: it.conteudoUnid || '',
-    }));
+    // Boleto parcelado vira uma linha POR ITEM E POR PARCELA, e cada linha leva
+    // só a fatia de dinheiro da sua parcela. Com isso todas as somas que já
+    // existem (fornecedor, DRE, previsão, contas a pagar) continuam batendo
+    // sozinhas, e cada vencimento aparece como um boleto separado.
+    //
+    // Duas coisas ficam SÓ na primeira parcela, pra não acontecerem três vezes:
+    // a entrada no estoque e o conteúdo da embalagem. E o preço inteiro do
+    // produto vai em `precoCheio`, porque o CUSTO do ingrediente é o preço
+    // cheio — não um terço dele.
+    const plano = parcelado ? parcelas : [{ vencimento: venc, valor: String(totalCarrinho) }];
+    const nP = plano.length;
+    const totaisItem = carrinho.map((it) => num(it.quantidade) * num(it.valorUnit));
+    const rateio = ratearParcelas(totaisItem, plano.map((p) => p.valor));
+    const novasCompras = [];
+    plano.forEach((p, iP) => {
+      carrinho.forEach((it, iI) => {
+        const dinheiro = rateio[iP][iI];
+        novasCompras.push({
+          id: uid(), data: compra.data, produto: limparNome(it.produto), fornecedor: forn,
+          categoria: it.categoria,
+          // Na parcelada a linha é uma LINHA DE PAGAMENTO: 1 × o valor da
+          // fatia. Isso mantém o dinheiro exato em centavos — dividir o preço
+          // unitário por 3 deixaria sobra de arredondamento em toda soma.
+          // A quantidade de verdade viaja em qtdCompra, que é quem o estoque lê.
+          quantidade: nP > 1 ? '1' : (it.quantidade || '1'),
+          valorUnit: nP > 1 ? String(dinheiro) : (it.valorUnit || '0'),
+          qtdCompra: nP > 1 ? String(it.quantidade || '1') : '',
+          precoCheio: nP > 1 ? (it.valorUnit || '0') : '',
+          formaPagto: compra.formaPagto, prazoDias: '', vencimento: p.vencimento || venc, pago,
+          dataPagamento: pago === 'Sim' ? compra.data : '',
+          obs: nP > 1 ? `Parcela ${iP + 1}/${nP}` : '', nota: compra.nota,
+          despesaId: despId || undefined,
+          parcela: nP > 1 ? `${iP + 1}/${nP}` : '',
+          // Onde isto soma no estoque. Fica gravado na linha da compra pra que
+          // conferir depois (e reaplicar) use a mesma ligação que ela viu na tela.
+          estoqueId: iP === 0 ? (it.estoqueId || '') : 'nenhum',
+          conteudo: iP === 0 ? (it.conteudo || '') : '',
+          conteudoUnid: iP === 0 ? (it.conteudoUnid || '') : '',
+        });
+      });
+    });
 
     let cotacoesNovas = null;
     if (gerarCotacao) {
@@ -256,6 +310,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     // nunca apaga a despesa/compra da anterior.
     onRegistrar({ comprasNovas: novasCompras, despesaNova, cotacoesNovas });
     setCompra(compraVazia()); setItem(itemVazio()); setCarrinho([]);
+    setNParcelas('1'); setParcelas([]);
   };
 
   // Edição de uma linha existente (uma por vez, sem gerar cotação/despesa nova).
@@ -319,7 +374,34 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
           <Field label="Já foi paga?"><Select value={compra.pago} onChange={setC('pago')} options={['Sim', 'Não']} /></Field>
         </div>
         {compra.formaPagto === 'Prazo' && (
-          <Field label="Vencimento (opcional)"><TextInput type="date" value={compra.vencimento} onChange={setC('vencimento')} /></Field>
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label={parcelado ? 'Vencimento da 1ª' : 'Vencimento (opcional)'}>
+                <TextInput type="date" value={compra.vencimento} onChange={setC('vencimento')} />
+              </Field>
+              <Field label="Parcelas"><NumInput value={nParcelas} onChange={setNumParcelas} placeholder="1" /></Field>
+            </div>
+            {parcelado && (
+              <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, marginBottom: 12 }}>
+                <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>
+                  Cada parcela vira um boleto separado em Contas a Pagar, com seu vencimento. Os produtos entram no
+                  estoque <b style={{ color: C.text }}>uma vez só</b> — eles chegaram todos agora.
+                </div>
+                {parcelas.map((p, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '24px 1fr 1fr', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, color: C.faint, fontWeight: 700 }}>{i + 1}ª</span>
+                    <TextInput type="date" value={p.vencimento} onChange={setParcelaCampo(i, 'vencimento')} />
+                    <NumInput value={p.valor} onChange={setParcelaCampo(i, 'valor')} />
+                  </div>
+                ))}
+                <div style={{ fontSize: 12, marginTop: 8, color: parcelasBatem ? C.muted : C.amber, lineHeight: 1.45 }}>
+                  Soma das parcelas: <b style={{ color: parcelasBatem ? C.text : C.amber }}>{brl(somaParcelas)}</b>
+                  {' '}· carrinho: <b style={{ color: C.text }}>{brl(totalCarrinho)}</b>
+                  {!parcelasBatem && <> — <b>não bate</b>. Ajusta uma parcela, senão o total da compra fica errado.</>}
+                </div>
+              </div>
+            )}
+          </>
         )}
         <Field label="Nota / boleto (opcional)"><TextInput value={compra.nota} onChange={setC('nota')} placeholder="ex: NF 4567" /></Field>
 
@@ -400,7 +482,9 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
                     ? 'Compra paga: será lançada em Despesas automaticamente.'
                     : 'Compra em aberto: vai para Contas a Pagar; vira despesa quando você marcar como paga.'}
                 </div>
-                <Btn onClick={registrar}>Registrar compra ({brl(totalCarrinho)})</Btn>
+                <Btn onClick={registrar} kind={parcelasBatem ? 'primary' : 'ghost'}>
+                  {parcelasBatem ? `Registrar compra (${brl(totalCarrinho)})` : 'Ajusta as parcelas pra registrar'}
+                </Btn>
               </div>
             )}
           </>
@@ -427,7 +511,9 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
                   <div style={{ fontWeight: 700, fontSize: 15 }}>{d.produto}</div>
                   <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{limparNome(d.fornecedor)} · {fmtDate(d.data)}</div>
                   <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
-                    {num(d.quantidade)} × {brl(num(d.valorUnit))} · {d.formaPagto}
+                    {d.parcela
+                      ? <>{numQtd(d.qtdCompra || d.quantidade)} × {brl(num(d.precoCheio))} · <b style={{ color: C.amber }}>parcela {d.parcela}</b></>
+                      : <>{num(d.quantidade)} × {brl(num(d.valorUnit))}</>} · {d.formaPagto}
                     {d.vencimento && d.formaPagto === 'Prazo' ? ` · vence ${fmtDate(d.vencimento)}` : ''}
                     {aberto ? <span style={{ color: C.amber }}> · em aberto</span> : <span style={{ color: C.green }}> · pago</span>}
                   </div>
