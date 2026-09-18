@@ -157,6 +157,8 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     () => (onEstoque ? comprasPendentesDeEstoque(dados, estoque) : []),
     [dados, estoque, onEstoque],
   );
+  // Pra marcar a linha certa no histórico sem refazer a conta por linha.
+  const pendentePorId = useMemo(() => new Map(pendentes.map((x) => [x.compra.id, x])), [pendentes]);
 
   const lancarNoEstoque = async (ids) => {
     if (lancando || !onEstoque) return;
@@ -518,9 +520,19 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
                     {aberto ? <span style={{ color: C.amber }}> · em aberto</span> : <span style={{ color: C.green }}> · pago</span>}
                   </div>
                   {(d.nota || d.obs) && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{[d.nota && `Nota: ${d.nota}`, d.obs].filter(Boolean).join(' · ')}</div>}
-                  {/* Sem item de estoque com esse nome, esta linha nunca somou
-                      saldo nenhum — e antes isso não aparecia em lugar nenhum. */}
-                  {estoque.length > 0 && d.estoqueId !== 'nenhum' && !resolverCompraNoEstoque(d, estoque) && (
+                  {/* Duas situações diferentes, e o aviso antigo confundia as
+                      duas. Se ela cadastrou o produto DEPOIS de lançar a
+                      compra, a linha passa a achar um item — e o aviso sumia,
+                      como se tivesse entrado. Só que não entrou: quem sabe
+                      disso é o extrato do item, não o nome. */}
+                  {pendentePorId.get(d.id) ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11.5, color: C.amber, lineHeight: 1.4 }}>
+                        ⚠️ Não somou saldo — vira <b>+{pendentePorId.get(d.id).entrada.qtd} {pendentePorId.get(d.id).item.unidade || 'un'}</b> em {pendentePorId.get(d.id).item.nome}
+                      </span>
+                      <Btn small kind="ghost" onClick={() => lancarNoEstoque([d.id])}>Entrar no estoque</Btn>
+                    </div>
+                  ) : estoque.length > 0 && d.estoqueId !== 'nenhum' && !resolverCompraNoEstoque(d, estoque) && (
                     <div style={{ fontSize: 11.5, color: C.amber, marginTop: 3, lineHeight: 1.4 }}>
                       ⚠️ Sem item no estoque com esse nome — esta compra não somou saldo.
                     </div>
