@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, usuarioDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { CORES_HABITO, num } from '../../../lib/util';
+import { enviarPushUsuario } from '../../../lib/pushServer';
+
+// Quem é avisado da tarefa, conforme a coluna. Aurora avisa as duas.
+const ALVO_TAREFA = { karen: ['u1'], mariele: ['u2'], aurora: ['u1', 'u2'] };
 
 // Escolhe uma cor válida: usa a pedida se estiver na paleta; senão, a primeira
 // cor ainda não usada pela pessoa (pra hábitos saírem com cores diferentes).
@@ -273,6 +277,11 @@ export async function POST(request) {
       const hora = /^\d{2}:\d{2}$/.test(body?.hora) ? body.hora : '';
       casa.tarefas = [{ id: uid(), pessoa, titulo, meta, feitos: 0, data, hora, notificado: false, criadoPor: usuario.nome, criadoEm: Date.now() }, ...casa.tarefas];
       await gravarCasa(sb, casa);
+      // Avisa no celular a pessoa da tarefa (menos quem criou).
+      const alvos = (ALVO_TAREFA[pessoa] || []).filter((aid) => aid !== usuario.id);
+      await Promise.all(alvos.map((aid) => enviarPushUsuario(sb, aid, {
+        titulo: 'Nova tarefa 📝', corpo: `${usuario.nome} te passou: ${titulo}`, url: '/?aba=tarefas', tag: 'tarefa-nova',
+      })));
       return NextResponse.json({ ok: true, ...casa });
     }
     if (acao === 'tarefaQuando') {

@@ -1,7 +1,8 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, Icone, LogoMark, pageBg } from './ui';
+import { todayISO } from '../lib/util';
 import Financas from './Financas';
 import Habitos from './Habitos';
 import ListaCompras from './ListaCompras';
@@ -22,6 +23,27 @@ export default function Painel({ usuario }) {
   const router = useRouter();
   const [aba, setAba] = useState('inicio');
   const [tema, setTema] = useState('claro');
+  const [badges, setBadges] = useState({ lista: 0, tarefas: 0, caderno: 0 });
+
+  // Conta o que está pendente pra mostrar as bolinhas de aviso na barra.
+  const carregarBadges = useCallback(async () => {
+    try {
+      const [rc, rl] = await Promise.all([
+        fetch('/api/casa', { cache: 'no-store' }).then((r) => r.json()).catch(() => null),
+        fetch('/api/caderno', { cache: 'no-store' }).then((r) => r.json()).catch(() => null),
+      ]);
+      const hoje = todayISO();
+      let lista = 0, tarefas = 0, caderno = 0;
+      if (rc && rc.ok) {
+        lista = (rc.lista || []).filter((i) => !i.comprado).length;
+        tarefas = (rc.tarefas || []).filter((t) => (Number(t.feitos) || 0) < t.meta).length;
+      }
+      if (rl && rl.ok) caderno = (rl.lembretes || []).filter((l) => !l.feito && l.data && l.data <= hoje).length;
+      setBadges({ lista, tarefas, caderno });
+    } catch {}
+  }, []);
+  useEffect(() => { carregarBadges(); }, [carregarBadges, aba]);
+  useEffect(() => { const t = setInterval(carregarBadges, 60000); return () => clearInterval(t); }, [carregarBadges]);
 
   useEffect(() => {
     try {
@@ -85,10 +107,16 @@ export default function Painel({ usuario }) {
         <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', gap: 3 }}>
           {ABAS.map(([id, rot, ico]) => {
             const ativo = aba === id;
+            const n = badges[id] || 0;
             return (
               <button key={id} onClick={() => { setAba(id); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }}
                 style={{ flex: 1, minWidth: 0, border: 'none', cursor: 'pointer', borderRadius: 12, padding: '7px 1px', background: ativo ? C.accent : 'transparent', color: ativo ? C.onAccent : C.muted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                <Icone name={ico} size={19} />
+                <span style={{ position: 'relative', display: 'flex' }}>
+                  <Icone name={ico} size={19} />
+                  {n > 0 && (
+                    <span style={{ position: 'absolute', top: -7, right: -10, minWidth: 15, height: 15, padding: '0 3px', borderRadius: 999, background: '#D4694A', color: '#fff', fontSize: 9.5, fontWeight: 800, lineHeight: '15px', textAlign: 'center', boxShadow: `0 0 0 1.5px ${C.barBg}` }}>{n > 9 ? '9+' : n}</span>
+                  )}
+                </span>
                 <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '-.02em' }}>{rot}</span>
               </button>
             );
