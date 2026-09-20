@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, KPI, Field, NumInput, Empty, SecTitle, PageTitle } from './ui';
 import { brl, num, uid, fmtDate } from '../lib/util';
+import ConferenciaFechamento from './ConferenciaFechamento';
 
 const METODOS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
 const hora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
@@ -11,7 +12,10 @@ const diaBR = (iso) => { if (!iso) return ''; try { return new Intl.DateTimeForm
 const dataHora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
 const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? 'Karen' : '');
 
-export default function Caixa({ papel = 'dona', receitas = null, onReceitas = null }) {
+// estoque/fichas/cardapio/vendas chegam só pra dona: é com eles que o
+// fechamento confere se saiu produto sem ser cobrado. O atendimento fecha o
+// caixa do mesmo jeito, sem ver essa parte.
+export default function Caixa({ papel = 'dona', receitas = null, onReceitas = null, estoque = [], fichas = [], cardapio = [], vendas = [] }) {
   const [dados, setDados] = useState(null);
   const [carregado, setCarregado] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -23,6 +27,7 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
   const [histAberto, setHistAberto] = useState(''); // id do caixa fechado com o detalhe aberto
   const [editSaldo, setEditSaldo] = useState(false);
   const [saldoEdit, setSaldoEdit] = useState('');
+  const [conferencia, setConferencia] = useState(null); // resultado da conferência de estoque
 
   const carregar = useCallback(async () => {
     try {
@@ -53,8 +58,17 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
   const abrir = async () => { const j = await acao({ acao: 'abrir', saldoInicial: saldoInput }); if (j) setSaldoInput(''); };
   const fechar = async () => {
     if (typeof window !== 'undefined' && !window.confirm('Fechar o caixa do turno? Isso encerra o caixa atual.')) return;
-    const j = await acao({ acao: 'fechar', id: dados.aberto.id, contado });
-    if (j) { setContado(''); setFechando(false); }
+    // Só o resumo da conferência viaja: os números que ela viu na tela, pra
+    // ficarem gravados no caixa e pro aviso no celular saber o que dizer.
+    const conf = conferencia && conferencia.totais.conferidos > 0 ? {
+      totais: conferencia.totais,
+      faltas: conferencia.linhas
+        .filter((l) => l.nivel === 'certo' || l.nivel === 'duvidoso')
+        .map((l) => ({ nome: l.nome, falta: l.falta, unidade: l.unidade, nivel: l.nivel, receitaPerdida: l.receitaPerdida, custoPerdido: l.custoPerdido })),
+      veredito: conferencia.veredito,
+    } : null;
+    const j = await acao({ acao: 'fechar', id: dados.aberto.id, contado, conferencia: conf });
+    if (j) { setContado(''); setFechando(false); setConferencia(null); }
   };
   const salvarSaldo = async () => { const j = await acao({ acao: 'ajustar', id: dados.aberto.id, saldoInicial: saldoEdit }); if (j) setEditSaldo(false); };
   // Puxa pro caixa as vendas de hoje que foram fechadas com o caixa fechado.
@@ -184,6 +198,13 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
               <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Fechar caixa</div>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Confira: o esperado na gaveta é <b style={{ color: C.green }}>{brl(dados.dinheiroFinal)}</b>. Conte o dinheiro (opcional) pra ver se bate.</div>
               <Field label="Dinheiro contado na gaveta (R$) — opcional"><NumInput value={contado} onChange={setContado} /></Field>
+              {papel === 'dona' && (
+                <ConferenciaFechamento
+                  estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas}
+                  dinheiroFinal={dados.dinheiroFinal} contado={contado}
+                  onResultado={setConferencia}
+                />
+              )}
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                 <Btn kind="danger" onClick={fechar} disabled={busy}>Confirmar fechamento</Btn>
                 <Btn kind="ghost" onClick={() => { setFechando(false); setContado(''); }}>Voltar</Btn>

@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { notificarCaixa } from '../../../lib/push';
+import { notificarCaixa, notificarConferencia } from '../../../lib/push';
 import { diaOperacional } from '../../../lib/util';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +19,32 @@ function papel() {
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 // Aceita número ou texto em formato brasileiro ("1.234,50") e arredonda em 2 casas.
+// Só o que a tela mandou, podado e com os números conferidos. Nada disso vira
+// decisão automática — é registro e aviso —, mas o que é gravado tem que ser
+// previsível.
+function conferenciaSegura(c) {
+  if (!c || typeof c !== 'object' || !c.totais) return null;
+  const n = (x) => (Number.isFinite(Number(x)) ? Math.round(Number(x) * 100) / 100 : 0);
+  const faltas = (Array.isArray(c.faltas) ? c.faltas : []).slice(0, 30).map((x) => ({
+    nome: String(x?.nome || '').slice(0, 60),
+    falta: Number.isFinite(Number(x?.falta)) ? Math.round(Number(x.falta) * 1000) / 1000 : 0,
+    unidade: String(x?.unidade || 'un').slice(0, 10),
+    nivel: x?.nivel === 'certo' ? 'certo' : 'duvidoso',
+    receitaPerdida: n(x?.receitaPerdida), custoPerdido: n(x?.custoPerdido),
+  }));
+  return {
+    totais: {
+      conferidos: Math.max(0, parseInt(c.totais.conferidos, 10) || 0),
+      comFalta: Math.max(0, parseInt(c.totais.comFalta, 10) || 0),
+      custoPerdido: n(c.totais.custoPerdido), receitaPerdida: n(c.totais.receitaPerdida),
+      receitaPerdidaCerta: n(c.totais.receitaPerdidaCerta),
+      saidasNaMao: n(c.totais.saidasNaMao), faltaNoCaixa: n(c.totais.faltaNoCaixa),
+    },
+    faltas,
+    veredito: { nivel: String(c.veredito?.nivel || '').slice(0, 20), texto: String(c.veredito?.texto || '').slice(0, 600) },
+  };
+}
+
 const n2 = (n) => {
   const v = typeof n === 'string' ? parseFloat(n.replace(/\./g, '').replace(',', '.')) : Number(n);
   return Math.round((Number.isFinite(v) ? v : 0) * 100) / 100;
@@ -169,10 +195,15 @@ export async function POST(request) {
         ...caixa, aberto: false, fechadoEm: new Date().toISOString(), fechadoPor: p,
         entradas, fiadoRecebido, recebido: r.recebido, dinheiroFinal: r.dinheiroFinal, fiado: r.fiado, servico,
         qtdVendas, contado, diferenca: contado != null ? n2(contado - r.dinheiroFinal) : null,
+        // Resultado da conferência de estoque feita na tela do fechamento.
+        // Vem pronto do cliente porque quem contou a prateleira foi ela — o
+        // servidor não tem como refazer essa parte.
+        conferencia: conferenciaSegura(body?.conferencia),
       };
       const { error } = await sb.from('pdm_dados').upsert({ chave: CX + caixa.id, valor: fechado, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
       try { await notificarCaixa(sb, fechado, 'fechar'); } catch (e) { /* push nunca quebra o fechamento */ }
+      try { await notificarConferencia(sb, fechado); } catch (e) { /* idem */ }
       return NextResponse.json({ ok: true, caixa: fechado });
     }
 
