@@ -772,7 +772,7 @@ export default function Dashboard() {
               ))}
             </div>
             {subSalao === 'comandas' && <Comandas papel="dona" />}
-            {subSalao === 'caixa' && <Caixa receitas={receitas} onReceitas={upd.receitas} />}
+            {subSalao === 'caixa' && <Caixa receitas={receitas} onReceitas={upd.receitas} estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} />}
             {subSalao === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} estoque={estoque} />}
             {subSalao === 'fiados' && <Fiados onMudou={carregarVendas} clientes={clientes} receitas={receitas} onReceitas={upd.receitas} />}
             {subSalao === 'clientes' && <Clientes dados={clientes} onChange={upd.clientes} vendas={vendas} />}
