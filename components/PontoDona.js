@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, Empty, SecTitle, PageTitle, KPI } from './ui';
 import RelogioPonto from './RelogioPonto';
-import { fmtDate, todayISO, mesLabel } from '../lib/util';
-import { saldoDaPessoa, saldoAcumulado, horasJornada as horasJornadaLib, horasDoTurno, fmtHoras, recadoDoSaldo } from '../lib/ponto';
+import { fmtDate, todayISO, mesLabel, brl } from '../lib/util';
+import { saldoDaPessoa, saldoAcumulado, emReais, horasJornada as horasJornadaLib, horasDoTurno, fmtHoras, recadoDoSaldo } from '../lib/ponto';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch { return ''; } };
@@ -50,7 +50,9 @@ export default function PontoDona() {
   // ---- Config da jornada ----
   const abrirConfig = () => {
     const base = {};
-    for (const [k] of SETORES) base[k] = jornadas[k] ? { nome: jornadas[k].nome || '', dias: [...(jornadas[k].dias || [])], entrada: jornadas[k].entrada || '16:00', saida: jornadas[k].saida || '00:00' } : { nome: '', dias: [], entrada: '16:00', saida: '00:00' };
+    for (const [k] of SETORES) base[k] = jornadas[k]
+      ? { nome: jornadas[k].nome || '', dias: [...(jornadas[k].dias || [])], entrada: jornadas[k].entrada || '16:00', saida: jornadas[k].saida || '00:00', valorHora: jornadas[k].valorHora ? String(jornadas[k].valorHora).replace('.', ',') : '' }
+      : { nome: '', dias: [], entrada: '16:00', saida: '00:00', valorHora: '' };
     setForm(base); setMsg(''); setConfigAberto(true);
   };
   const toggleDia = (setor, d) => setForm((f) => {
@@ -143,7 +145,14 @@ export default function PontoDona() {
   const rotuloSaldo = (v) => (Math.abs(v) < 0.05 ? 'em dia' : v > 0 ? `+${fmtHoras(v)} em haver` : `−${fmtHoras(v)} devendo`);
   const corSaldo = (v) => (Math.abs(v) < 0.05 ? C.muted : v > 0 ? C.green : C.red);
 
-  const Saldo = ({ s, banco }) => {
+  // O saldo em dinheiro. Só aparece quando o setor tem valor da hora
+  // configurado — sem ele, mostrar R$ 0,00 seria pior que não mostrar nada.
+  const emDinheiro = (horas, papel) => {
+    const v = emReais(horas, jornadas[papel]);
+    return v == null ? '' : ` · ${v < 0 ? '−' : v > 0 ? '+' : ''}${brl(Math.abs(v))}`;
+  };
+
+  const Saldo = ({ s, banco, papel }) => {
     if (!s || !s.temEscala) return <span style={{ fontSize: 11, color: C.faint, display: 'block' }}>sem escala configurada — não dá pra dizer saldo</span>;
     const recado = recadoDoSaldo(s);
     // O acumulado vem PRIMEIRO e em destaque: é ele que diz se a pessoa deve ou
@@ -153,11 +162,11 @@ export default function PontoDona() {
       <>
         {temBanco && (
           <span style={{ fontSize: 12, fontWeight: 900, color: corSaldo(banco.saldo), display: 'block' }}>
-            {rotuloSaldo(banco.saldo)} <span style={{ color: C.faint, fontWeight: 600 }}>· no total</span>
+            {rotuloSaldo(banco.saldo)}{emDinheiro(banco.saldo, papel)} <span style={{ color: C.faint, fontWeight: 600 }}>· no total</span>
           </span>
         )}
         <span style={{ fontSize: 11, fontWeight: 800, color: corSaldo(s.saldo), display: 'block' }}>
-          {rotuloSaldo(s.saldo)} <span style={{ color: C.faint, fontWeight: 500 }}>{temBanco ? `· em ${mesLabel(ym)}` : `· esperado ${fmtHoras(s.esperado)}`}</span>
+          {rotuloSaldo(s.saldo)}{emDinheiro(s.saldo, papel)} <span style={{ color: C.faint, fontWeight: 500 }}>{temBanco ? `· em ${mesLabel(ym)}` : `· esperado ${fmtHoras(s.esperado)}`}</span>
         </span>
         {recado && <span style={{ fontSize: 10.5, color: C.amber, display: 'block', lineHeight: 1.4, marginTop: 2 }}>{recado}</span>}
       </>
@@ -202,6 +211,16 @@ export default function PontoDona() {
                     <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 4 }}>Nome do funcionário</div>
                     <input value={j.nome || ''} onChange={(e) => setForm((f) => ({ ...f, [k]: { ...(f[k] || { dias: [], entrada: '16:00', saida: '00:00' }), nome: e.target.value } }))} placeholder="Ex.: Francine" style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 8, padding: '9px 10px', fontSize: 14, width: '100%', boxSizing: 'border-box' }} />
                     <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>A tela de Ponto dela já vem com esse nome — ela só toca em Entrada/Saída.</div>
+                    <div style={{ marginTop: 10 }}>
+                      <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, display: 'block', marginBottom: 4 }}>Valor da hora (R$)</span>
+                      <input value={j.valorHora || ''} inputMode="decimal"
+                        onChange={(e) => setForm((f) => ({ ...f, [k]: { ...(f[k] || { dias: [], entrada: '16:00', saida: '00:00' }), valorHora: e.target.value } }))}
+                        placeholder="Ex.: 12,50"
+                        style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 8, padding: '9px 10px', fontSize: 14, width: '100%', boxSizing: 'border-box' }} />
+                      <div style={{ fontSize: 11, color: C.faint, marginTop: 4, lineHeight: 1.45 }}>
+                        Só pra traduzir o saldo de horas em dinheiro. Deixa em branco se não quiser ver valor — aí a tela mostra só as horas.
+                      </div>
+                    </div>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                     {DIAS.map(([d, dr]) => {
@@ -317,9 +336,14 @@ export default function PontoDona() {
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ fontSize: 15, fontWeight: 800 }}>{p.nome}{rotuloSetor(p.papel) ? <span style={{ color: C.faint, fontWeight: 500, fontSize: 12 }}> · {rotuloSetor(p.papel)}</span> : null}</span>
                 <span style={{ fontSize: 12, color: C.faint, display: 'block' }}>{p.turnos.length} turno(s)</span>
-                <Saldo s={p.s} banco={p.banco} />
+                <Saldo s={p.s} banco={p.banco} papel={p.papel} />
               </span>
-              <span style={{ fontSize: 16, fontWeight: 800, color: C.accent, flexShrink: 0 }}>{fmtHoras(p.horas)}</span>
+              <span style={{ flexShrink: 0, textAlign: 'right' }}>
+                <span style={{ display: 'block', fontSize: 16, fontWeight: 800, color: C.accent }}>{fmtHoras(p.horas)}</span>
+                {emReais(p.horas, jornadas[p.papel]) != null && (
+                  <span style={{ display: 'block', fontSize: 11, color: C.faint, fontWeight: 700 }}>{brl(emReais(p.horas, jornadas[p.papel]))}</span>
+                )}
+              </span>
             </button>
             {ab && (
               <div style={{ marginTop: 8 }}>

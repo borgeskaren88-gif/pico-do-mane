@@ -98,10 +98,18 @@ export async function POST(request) {
         const nome = nomeCanonico(txt(j.nome, 60));
         const dias = Array.isArray(j.dias) ? [...new Set(j.dias.map(Number).filter((d) => d >= 0 && d <= 6))].sort((a, b) => a - b) : [];
         const entrada = hhmm(j.entrada), saida = hhmm(j.saida);
+        // Valor da hora do setor, pra traduzir o banco de horas em dinheiro.
+        // Aceita "35" e "35,50"; zero (ou vazio) significa "não informado", e aí
+        // a tela mostra só as horas em vez de fingir um valor.
+        const vh = (() => {
+          const v = parseFloat(String(j.valorHora == null ? '' : j.valorHora).replace(/\./g, '').replace(',', '.'));
+          return Number.isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : 0;
+        })();
         const temJornada = dias.length && entrada && saida;
-        if (!nome && !temJornada) continue;
+        if (!nome && !temJornada && !vh) continue;
         limpo[key] = {};
         if (nome) limpo[key].nome = nome;
+        if (vh) limpo[key].valorHora = vh;
         if (temJornada) { limpo[key].dias = dias; limpo[key].entrada = entrada; limpo[key].saida = saida; }
       }
       const { error } = await sb.from('pdm_dados').upsert({ chave: 'jornadas', valor: limpo, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
