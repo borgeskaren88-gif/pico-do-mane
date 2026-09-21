@@ -4,11 +4,13 @@ import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { notificarCaixa, notificarConferencia } from '../../../lib/push';
 import { diaOperacional } from '../../../lib/util';
+import { conferirFechamento, movimentoDoDia } from '../../../lib/fechamento';
 
 export const dynamic = 'force-dynamic';
 
 const CX = 'caixa:';
 const VD = 'venda:';
+const arr = (v) => (Array.isArray(v) ? v : []);
 const FORMAS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Fiado'];
 
 // Dona e garçom operam o caixa (é o dinheiro do turno). A cozinha não.
@@ -19,9 +21,65 @@ function papel() {
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 // Aceita número ou texto em formato brasileiro ("1.234,50") e arredonda em 2 casas.
-// Só o que a tela mandou, podado e com os números conferidos. Nada disso vira
-// decisão automática — é registro e aviso —, mas o que é gravado tem que ser
-// previsível.
+// Os produtos que vale a pena contar no fechamento: os que mexeram hoje, do
+// que girou mais valor pro que girou menos.
+//
+// Vai com NOME e UNIDADE só. O atendimento não enxerga o estoque no PicoOS, e
+// não é pra enxergar agora: se ele visse "o sistema diz 6", digitaria 6 e a
+// conferência viraria teatro. Ele conta às cegas; a conta é da dona.
+async function itensParaContar(sb, limite = 12) {
+  const { data } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
+  const blob = (data?.valor && typeof data.valor === 'object') ? data.valor : {};
+  const hoje = diaOperacional();
+  return arr(blob.estoque)
+    .filter((it) => it && it.id)
+    .map((it) => {
+      const m = movimentoDoDia(it, hoje);
+      const girou = m.venda + m.entrou + m.perda + m.cortesia + m.consumo + m.outras;
+      // Ordena pelo dinheiro que girou; sem custo cadastrado, vale a quantidade,
+      // pra o item não sumir da lista só por faltar o preço.
+      return { id: it.id, nome: it.nome, unidade: it.unidade || 'un', girou, peso: girou * (Number(it.custo) || 0) };
+    })
+    .filter((x) => x.girou > 0)
+    .sort((a, b) => b.peso - a.peso || b.girou - a.girou)
+    .slice(0, limite)
+    .map(({ id, nome, unidade }) => ({ id, nome, unidade }));
+}
+
+// A CONFERÊNCIA É CALCULADA AQUI, no servidor, e não na tela.
+//
+// Quem fecha o caixa no fim da noite é o atendimento, não a dona. Se a conta
+// dependesse da tela da dona, ela simplesmente nunca rodaria — foi o que
+// aconteceu na primeira versão. Aqui o cliente manda só o que foi CONTADO na
+// prateleira; o resto (estoque, fichas, cardápio, vendas do dia) o servidor já
+// tem, e ninguém precisa estar olhando pra conta sair.
+async function conferirNoServidor(sb, contagens, caixaResumo) {
+  const limpas = {};
+  for (const [k, v] of Object.entries(contagens || {})) {
+    if (typeof k !== 'string' || !k || k.length > 40) continue;
+    if (v == null || v === '') continue;
+    limpas[k] = String(v).slice(0, 20);
+  }
+  if (!Object.keys(limpas).length) return null;
+
+  const { data: prow } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
+  const blob = (prow?.valor && typeof prow.valor === 'object') ? prow.valor : {};
+  const hoje = diaOperacional();
+  const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', VD + '%');
+  const vendas = (vrows || []).map((r) => r.valor).filter((v) => v && v.data === hoje);
+
+  const r = conferirFechamento({
+    estoque: arr(blob.estoque), fichas: arr(blob.fichas), cardapio: arr(blob.cardapio),
+    vendas, contagens: limpas, caixa: caixaResumo, hoje,
+  });
+  return conferenciaSegura({
+    totais: r.totais,
+    faltas: r.linhas.filter((l) => l.nivel !== 'ok'),
+    veredito: r.veredito,
+  });
+}
+
+// Poda o que vai ser gravado: o que fica guardado tem que ser previsível.
 function conferenciaSegura(c) {
   if (!c || typeof c !== 'object' || !c.totais) return null;
   const n = (x) => (Number.isFinite(Number(x)) ? Math.round(Number(x) * 100) / 100 : 0);
@@ -29,7 +87,9 @@ function conferenciaSegura(c) {
     nome: String(x?.nome || '').slice(0, 60),
     falta: Number.isFinite(Number(x?.falta)) ? Math.round(Number(x.falta) * 1000) / 1000 : 0,
     unidade: String(x?.unidade || 'un').slice(0, 10),
-    nivel: x?.nivel === 'certo' ? 'certo' : 'duvidoso',
+    nivel: ['certo', 'duvidoso', 'sobra'].includes(x?.nivel) ? x.nivel : 'duvidoso',
+    sistema: Number.isFinite(Number(x?.sistema)) ? Math.round(Number(x.sistema) * 1000) / 1000 : 0,
+    contado: Number.isFinite(Number(x?.contado)) ? Math.round(Number(x.contado) * 1000) / 1000 : 0,
     receitaPerdida: n(x?.receitaPerdida), custoPerdido: n(x?.custoPerdido),
   }));
   return {
@@ -116,8 +176,10 @@ export async function GET() {
     // contada aqui pra tela poder oferecer o resgate.
     const soltas = await vendasSoltasDoDia(sb);
     const historico = caixas.filter((c) => !c.aberto).sort((a, b) => (b.fechadoEm || '').localeCompare(a.fechadoEm || '')).slice(0, 15);
+    // Só quem não enxerga o estoque precisa da lista pronta pra contar.
+    const paraContar = (aberto && p === 'garcom') ? await itensParaContar(sb) : null;
     return NextResponse.json({
-      ok: true, aberto, entradas, servico, fiadoRecebido, ...(extra || {}), qtdVendas, historico,
+      ok: true, aberto, entradas, servico, fiadoRecebido, ...(extra || {}), qtdVendas, historico, paraContar,
       soltas: { qtd: soltas.length, total: n2(soltas.reduce((t, v) => t + (Number(v.total) || 0), 0)) },
     });
   } catch (e) {
@@ -198,7 +260,8 @@ export async function POST(request) {
         // Resultado da conferência de estoque feita na tela do fechamento.
         // Vem pronto do cliente porque quem contou a prateleira foi ela — o
         // servidor não tem como refazer essa parte.
-        conferencia: conferenciaSegura(body?.conferencia),
+        conferencia: await conferirNoServidor(sb, body?.contagens, { dinheiroFinal: r.dinheiroFinal, contado }),
+        conferidoPor: body?.contagens && Object.keys(body.contagens).length ? p : null,
       };
       const { error } = await sb.from('pdm_dados').upsert({ chave: CX + caixa.id, valor: fechado, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
