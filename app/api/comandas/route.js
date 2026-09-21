@@ -70,6 +70,13 @@ function totalDe(c) {
   return (c.itens || []).reduce((s, it) => s + (Number(it.qtd) || 0) * (Number(it.preco) || 0), 0);
 }
 
+// Pagamentos parciais: quem foi embora mais cedo e pagou a parte dele.
+const arrP = (v) => (Array.isArray(v) ? v : []);
+function somaParciais(c) {
+  return Math.round(arrP(c && c.parciais).reduce((s, x) => s + (Number(x && x.valor) || 0), 0) * 100) / 100;
+}
+const brlS = (n) => 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
+
 export async function GET() {
   if (!papel()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
@@ -336,6 +343,54 @@ export async function POST(request) {
     // venda:<id>) e libera a mesa. A venda é somada como receita no financeiro
     // da dona, sem entrar na lista que ela digita à mão (não tem risco de um
     // salvamento apagar o outro).
+    // PAGAMENTO PARCIAL numa comanda que continua aberta.
+    //
+    // Mesa de cinco, uma pessoa vai embora mais cedo e paga a parte dela. Antes
+    // só dava pra fechar a conta inteira — e aí ou a mesa toda ia embora, ou o
+    // dinheiro dela ficava fora do sistema até o fim da noite.
+    //
+    // O parcial é dinheiro que já entrou: fica guardado na comanda e, quando
+    // ela fechar, entra na venda junto com o resto. Assim o caixa soma tudo uma
+    // vez só e nada aparece em dobro.
+    if (acao === 'parcial') {
+      const valor = Math.round((Number(body?.valor) || 0) * 100) / 100;
+      if (!(valor > 0)) return NextResponse.json({ ok: false, erro: 'Informe quanto essa pessoa pagou.' }, { status: 400 });
+      const forma = txt(body?.forma, 20) || 'Dinheiro';
+      // Fiado não é pagamento parcial: fiado é dívida, e o caminho dela é o
+      // fechamento com nome, limite e tudo mais. Deixar entrar aqui furaria
+      // essas travas pela porta dos fundos.
+      if (forma === 'Fiado') return NextResponse.json({ ok: false, erro: 'Fiado não entra como pagamento parcial — isso se resolve no fechamento da conta.' }, { status: 400 });
+
+      const subtotal = totalDe(c);
+      const servicoOn = c.servico !== false;
+      const servicoVal = servicoOn ? Math.round(subtotal * 0.10 * 100) / 100 : 0;
+      const totalBruto = Math.round((subtotal + servicoVal) * 100) / 100;
+      const jaPago = somaParciais(c);
+      if (jaPago + valor > totalBruto + 0.05) {
+        return NextResponse.json({ ok: false, erro: `A conta está em ${brlS(totalBruto)} e já foi pago ${brlS(jaPago)}. Não dá pra receber mais ${brlS(valor)}.` }, { status: 400 });
+      }
+
+      const parcial = {
+        id: uid(), forma, valor,
+        quem: txt(body?.quem, 40) || '',
+        em: new Date().toISOString(), por: p,
+      };
+      const atualizada = { ...c, parciais: [...arrP(c.parciais), parcial] };
+      await gravarComanda(sb, atualizada);
+      return NextResponse.json({ ok: true, comanda: atualizada, jaPago: Math.round((jaPago + valor) * 100) / 100 });
+    }
+
+    // Desfaz um pagamento parcial lançado errado.
+    if (acao === 'desfazerParcial') {
+      const parcialId = txt(body?.parcialId, 40);
+      const antes = arrP(c.parciais);
+      const depois = antes.filter((x) => x && x.id !== parcialId);
+      if (depois.length === antes.length) return NextResponse.json({ ok: false, erro: 'Pagamento não encontrado.' }, { status: 404 });
+      const atualizada = { ...c, parciais: depois };
+      await gravarComanda(sb, atualizada);
+      return NextResponse.json({ ok: true, comanda: atualizada, jaPago: somaParciais(atualizada) });
+    }
+
     if (acao === 'fechar') {
       const subtotal = totalDe(c);
       if (subtotal <= 0) return NextResponse.json({ ok: false, erro: 'Comanda sem consumo. Use cancelar.' }, { status: 400 });
@@ -349,18 +404,33 @@ export async function POST(request) {
       const desconto = Math.round(totalBruto * descontoPct / 100 * 100) / 100;
       const total = Math.round((totalBruto - desconto) * 100) / 100;
       const pessoas = Math.max(1, Math.floor(Number(body?.pessoas) || 1));
+
+      // Quem já pagou a parte dele durante a noite. Esse dinheiro não é cobrado
+      // de novo: o que falta receber agora é o total menos ele.
+      const parciais = arrP(c.parciais);
+      const jaPago = somaParciais(c);
+      if (jaPago > total + 0.05) {
+        return NextResponse.json({ ok: false, erro: `Já foi pago ${brlS(jaPago)} e a conta com desconto ficou em ${brlS(total)}. Diminui o desconto ou devolve a diferença por fora.` }, { status: 400 });
+      }
+      const aReceber = Math.round((total - jaPago) * 100) / 100;
+
       // Pagamento pode ser dividido em várias formas (novo) ou uma só (compat).
       let pags = [];
       if (Array.isArray(body?.pagamentos)) {
         pags = body.pagamentos
           .map((x) => ({ forma: txt(x?.forma, 20), valor: Math.round((Number(x?.valor) || 0) * 100) / 100 }))
           .filter((x) => x.forma && x.valor > 0);
-      } else {
-        pags = [{ forma: txt(body?.pagamento, 20) || 'Dinheiro', valor: total }];
+      } else if (aReceber > 0.005) {
+        pags = [{ forma: txt(body?.pagamento, 20) || 'Dinheiro', valor: aReceber }];
       }
-      if (!pags.length) return NextResponse.json({ ok: false, erro: 'Informe como foi pago.' }, { status: 400 });
+      // Conta já quitada pelos parciais fecha sem cobrar mais nada.
+      if (!pags.length && aReceber > 0.005) return NextResponse.json({ ok: false, erro: 'Informe como foi pago.' }, { status: 400 });
       const soma = Math.round(pags.reduce((s, x) => s + x.valor, 0) * 100) / 100;
-      if (Math.abs(soma - total) > 0.05) return NextResponse.json({ ok: false, erro: 'A soma das formas de pagamento não bate com o total.' }, { status: 400 });
+      if (Math.abs(soma - aReceber) > 0.05) {
+        return NextResponse.json({ ok: false, erro: jaPago > 0.005
+          ? `Faltam ${brlS(aReceber)} pra fechar (${brlS(jaPago)} já foi pago durante a noite), e as formas somam ${brlS(soma)}.`
+          : 'A soma das formas de pagamento não bate com o total.' }, { status: 400 });
+      }
       const fiado = Math.round(pags.filter((x) => x.forma === 'Fiado').reduce((s, x) => s + x.valor, 0) * 100) / 100;
       const nomeCli = txt(body?.nome, 60) || c.nome || '';
       // Trava: fiado SEM nome não pode — senão a dívida vira uma "Mesa X" sem dono.
@@ -389,7 +459,12 @@ export async function POST(request) {
       const caixaAberto = (caixaRows || []).map((r) => r.valor).find((x) => x && x.aberto);
       const venda = {
         id: uid(), data: diaOperacional(), mesa: c.mesa, total, subtotal, servico, desconto, descontoPct, pessoas,
-        pagamentos: pags, pagamento: pags.length === 1 ? pags[0].forma : 'Dividido', fiado,
+        // Os parciais entram na venda como pagamento normal: foi dinheiro que
+        // entrou nesta conta, só que mais cedo. O caixa soma daqui.
+        pagamentos: [...parciais.map((x) => ({ forma: x.forma, valor: x.valor, parcial: true, quem: x.quem || '' })), ...pags],
+        pagamento: (parciais.length + pags.length) === 1 ? (pags[0]?.forma || parciais[0]?.forma) : 'Dividido',
+        fiado,
+        jaPagoAntes: jaPago > 0.005 ? jaPago : undefined,
         nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens, caixaId: caixaAberto ? caixaAberto.id : null,
         // Só fica "não pago" (na lista de fiados) o que ficou no fiado.
         pago: fiado <= 0.005, fechadaEm: new Date().toISOString(), fechadaPor: p,

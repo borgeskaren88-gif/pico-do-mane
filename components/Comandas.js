@@ -5,6 +5,13 @@ import { brl, num } from '../lib/util';
 
 const CATS = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Combos', 'Outros'];
 const FORMAS_PAG = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Fiado'];
+// Formas aceitas num pagamento parcial. Fiado fica de fora de propósito: fiado
+// é dívida, e ela tem nome, limite e lista própria — o caminho dela é o
+// fechamento da conta.
+const FORMAS_PARCIAL = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
+// Quanto da mesa já foi pago por quem saiu mais cedo.
+const somaParciais = (c) => Math.round((Array.isArray(c && c.parciais) ? c.parciais : [])
+  .reduce((s, x) => s + (Number(x && x.valor) || 0), 0) * 100) / 100;
 
 export default function Comandas({ papel = 'dona' }) {
   const [comandas, setComandas] = useState([]);
@@ -114,6 +121,25 @@ export default function Comandas({ papel = 'dona' }) {
     await acao({ acao: 'cancelar', comandaId: id }, { manterSel: false });
     setSelId(null);
   };
+  // Pagamento parcial: alguém da mesa vai embora mais cedo e paga a parte dele.
+  // A comanda continua aberta com o que falta.
+  const [parcialForm, setParcialForm] = useState(null); // { valor, forma, quem }
+  const lancarParcial = async () => {
+    if (!parcialForm || busy) return;
+    const valor = num(parcialForm.valor);
+    if (!(valor > 0)) { setErro('Quanto essa pessoa pagou?'); return; }
+    setErro('');
+    const j = await acao({
+      acao: 'parcial', comandaId: selId,
+      valor, forma: parcialForm.forma || 'Dinheiro', quem: (parcialForm.quem || '').trim(),
+    }, { manterSel: true });
+    if (j?.ok) setParcialForm(null);
+  };
+  const desfazerParcial = async (parcialId) => {
+    if (typeof window !== 'undefined' && !window.confirm('Desfazer este pagamento? O valor volta pra conta da mesa.')) return;
+    await acao({ acao: 'desfazerParcial', comandaId: selId, parcialId }, { manterSel: true });
+  };
+
   const confirmarFechar = async () => {
     if (fechando) return; // já está fechando: ignora toque duplo
     setFechando(true);
@@ -437,13 +463,68 @@ export default function Comandas({ papel = 'dona' }) {
           <Btn onClick={() => { setBusca(''); setCatSel(null); setPicker(true); }}>+ Adicionar produtos</Btn>
         </div>
 
+        {/* ---- Alguém da mesa pagando a parte dele ---- */}
+        {total > 0 && !fecharForm && (() => {
+          const jaPago = somaParciais(sel);
+          const falta = Math.round((total - jaPago) * 100) / 100;
+          return (
+            <Card style={{ marginBottom: 14, padding: 14, borderColor: jaPago > 0.005 ? C.green : C.line }}>
+              {jaPago > 0.005 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: C.green, marginBottom: 6 }}>
+                    Já pago: {brl(jaPago)} · falta {brl(falta)}
+                  </div>
+                  {(sel.parciais || []).map((x) => (
+                    <div key={x.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 12.5, color: C.muted, padding: '3px 0' }}>
+                      <span style={{ minWidth: 0 }}>{x.quem ? <b style={{ color: C.text }}>{x.quem}</b> : 'Alguém'} · {x.forma} · {horaAbertura(x.em)}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        <b style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(x.valor)}</b>
+                        <button onClick={() => desfazerParcial(x.id)} title="Desfazer" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!parcialForm ? (
+                <Btn kind="ghost" small onClick={() => setParcialForm({ valor: '', forma: 'Dinheiro', quem: '' })}>
+                  Alguém vai pagar a parte dele
+                </Btn>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 2 }}>Pagar uma parte</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>
+                    A mesa continua aberta com o que falta. Dividido por {Math.max(1, sel.pessoas || 1)} dá {brl(Math.round((falta / Math.max(1, sel.pessoas || 1)) * 100) / 100)} por pessoa.
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <Field label="Quanto"><NumInput value={parcialForm.valor} onChange={(v) => setParcialForm((f) => ({ ...f, valor: v }))} /></Field>
+                    <Field label="Quem (opcional)"><TextInput value={parcialForm.quem} onChange={(v) => setParcialForm((f) => ({ ...f, quem: v }))} placeholder="ex: Ana" /></Field>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                    {FORMAS_PARCIAL.map((f) => (
+                      <button key={f} onClick={() => setParcialForm((x) => ({ ...x, forma: f }))} style={{ border: `1px solid ${parcialForm.forma === f ? C.accent : C.line}`, background: parcialForm.forma === f ? C.accent : 'transparent', color: parcialForm.forma === f ? '#06101F' : C.muted, borderRadius: 999, padding: '7px 13px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{f}</button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <Btn kind="ok" small onClick={lancarParcial} disabled={busy}>Recebi {num(parcialForm.valor) > 0 ? brl(num(parcialForm.valor)) : ''}</Btn>
+                    <Btn kind="ghost" small onClick={() => setParcialForm(null)}>Voltar</Btn>
+                  </div>
+                </div>
+              )}
+            </Card>
+          );
+        })()}
+
         {total > 0 && (
           fecharForm ? (() => {
             const descontoPct = Math.max(0, Math.min(100, num(fecharForm.descontoPct || 0)));
             const desconto = Math.round(total * descontoPct / 100 * 100) / 100;
             const totalFinal = Math.round((total - desconto) * 100) / 100;
+            // O que já foi pago durante a noite não se cobra de novo.
+            const jaPago = somaParciais(sel);
+            const aReceber = Math.round((totalFinal - jaPago) * 100) / 100;
             const soma = FORMAS_PAG.reduce((s, f) => s + num(fecharForm.valores[f] || ''), 0);
-            const falta = Math.round((totalFinal - soma) * 100) / 100;
+            const falta = Math.round((aReceber - soma) * 100) / 100;
             const fiadoVal = num(fecharForm.valores['Fiado'] || '');
             const confere = Math.abs(falta) <= 0.005;
             // Fiado SEM nome não pode: senão vira "Mesa X" e você não sabe quem deve.
@@ -452,12 +533,19 @@ export default function Comandas({ papel = 'dona' }) {
             const setDesc = (p) => setFecharForm((s) => ({ ...s, descontoPct: p, valores: {} }));
             const preencherResto = (f) => {
               const outros = FORMAS_PAG.filter((x) => x !== f).reduce((s, x) => s + num(fecharForm.valores[x] || ''), 0);
-              const resto = Math.round((totalFinal - outros) * 100) / 100;
+              const resto = Math.round((aReceber - outros) * 100) / 100;
               setFecharForm((s) => ({ ...s, valores: { ...s.valores, [f]: resto > 0 ? resto.toFixed(2).replace('.', ',') : '' } }));
             };
             return (
               <Card style={{ marginBottom: 14, padding: 14, borderColor: C.green }}>
-                <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Fechar conta — {brl(total)}</div>
+                <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>
+                  Fechar conta — {jaPago > 0.005 ? <>falta {brl(aReceber)}</> : brl(total)}
+                </div>
+                {jaPago > 0.005 && (
+                  <div style={{ fontSize: 12.5, color: C.green, marginBottom: 6 }}>
+                    Conta de {brl(totalFinal)} · <b>{brl(jaPago)} já pago</b> durante a noite.
+                  </div>
+                )}
                 <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Quanto entrou em cada forma? Dá pra dividir. Use “resto” pra completar.</div>
 
                 {/* Sem caixa aberto a venda fica solta: não entra no fechamento
@@ -535,7 +623,7 @@ export default function Comandas({ papel = 'dona' }) {
             );
           })() : (
             <div style={{ marginBottom: 14 }}>
-              <Btn kind="ok" onClick={() => { setOutroCliente(!!(sel.nome && !clientes.includes(sel.nome))); setDividirPor(sel.pessoas > 0 ? sel.pessoas : 2); setFecharForm({ valores: {}, nome: sel.nome || '', pessoas: sel.pessoas > 0 ? sel.pessoas : 1 }); }}>Fechar conta · {brl(total)}</Btn>
+              <Btn kind="ok" onClick={() => { setOutroCliente(!!(sel.nome && !clientes.includes(sel.nome))); setDividirPor(sel.pessoas > 0 ? sel.pessoas : 2); setFecharForm({ valores: {}, nome: sel.nome || '', pessoas: sel.pessoas > 0 ? sel.pessoas : 1 }); }}>Fechar conta · {brl(Math.round((total - somaParciais(sel)) * 100) / 100)}</Btn>
             </div>
           )
         )}
