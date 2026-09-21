@@ -24,9 +24,11 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 // Os produtos que vale a pena contar no fechamento: os que mexeram hoje, do
 // que girou mais valor pro que girou menos.
 //
-// Vai com NOME e UNIDADE só. O atendimento não enxerga o estoque no PicoOS, e
-// não é pra enxergar agora: se ele visse "o sistema diz 6", digitaria 6 e a
-// conferência viraria teatro. Ele conta às cegas; a conta é da dona.
+// Vai com NOME e UNIDADE só, pra qualquer um que esteja fechando. Quem vê "o
+// sistema diz 6" digita 6 — não por má fé, é o que a cabeça faz com um número
+// pronto na frente. E como tem noite que quem fecha é a dona e tem noite que é
+// o atendimento, a tela tem que ser a mesma nas duas, senão as noites não são
+// comparáveis entre si.
 async function itensParaContar(sb, limite = 12) {
   const { data } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
   const blob = (data?.valor && typeof data.valor === 'object') ? data.valor : {};
@@ -176,8 +178,10 @@ export async function GET() {
     // contada aqui pra tela poder oferecer o resgate.
     const soltas = await vendasSoltasDoDia(sb);
     const historico = caixas.filter((c) => !c.aberto).sort((a, b) => (b.fechadoEm || '').localeCompare(a.fechadoEm || '')).slice(0, 15);
-    // Só quem não enxerga o estoque precisa da lista pronta pra contar.
-    const paraContar = (aberto && p === 'garcom') ? await itensParaContar(sb) : null;
+    // A lista vale pros dois papéis: a contagem é às cegas pra quem estiver
+    // fechando, inclusive pra dona. Ver o saldo esperado enquanto conta faz a
+    // pessoa digitar o esperado — e aí a conferência não mede nada.
+    const paraContar = aberto ? await itensParaContar(sb) : null;
     return NextResponse.json({
       ok: true, aberto, entradas, servico, fiadoRecebido, ...(extra || {}), qtdVendas, historico, paraContar,
       soltas: { qtd: soltas.length, total: n2(soltas.reduce((t, v) => t + (Number(v.total) || 0), 0)) },

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, KPI, Field, NumInput, Empty, SecTitle, PageTitle } from './ui';
 import { brl, num, uid, fmtDate } from '../lib/util';
-import ConferenciaFechamento from './ConferenciaFechamento';
+import { ContarNoFechamento, ResultadoConferencia } from './ConferenciaFechamento';
 
 const METODOS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
 const hora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
@@ -12,10 +12,11 @@ const diaBR = (iso) => { if (!iso) return ''; try { return new Intl.DateTimeForm
 const dataHora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
 const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? 'Karen' : '');
 
-// estoque/fichas/cardapio/vendas chegam só pra dona: é com eles que o
-// fechamento confere se saiu produto sem ser cobrado. O atendimento fecha o
-// caixa do mesmo jeito, sem ver essa parte.
-export default function Caixa({ papel = 'dona', receitas = null, onReceitas = null, estoque = [], fichas = [], cardapio = [], vendas = [] }) {
+// A conferência de estoque não depende mais de nada vindo daqui: quem cruza
+// vendas, fichas e estoque é o servidor, e a lista do que contar vem pronta
+// dele. Assim a noite em que quem fecha é o atendimento dá exatamente o mesmo
+// resultado da noite em que quem fecha é a Karen.
+export default function Caixa({ papel = 'dona', receitas = null, onReceitas = null }) {
   const [dados, setDados] = useState(null);
   const [carregado, setCarregado] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -28,6 +29,7 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
   const [editSaldo, setEditSaldo] = useState(false);
   const [saldoEdit, setSaldoEdit] = useState('');
   const [contagens, setContagens] = useState({}); // o que foi contado na prateleira, pro servidor conferir
+  const [fechadoAgora, setFechadoAgora] = useState(null); // o caixa que acabou de fechar, pra mostrar o resultado
 
   const carregar = useCallback(async () => {
     try {
@@ -62,7 +64,13 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
     // servidor — assim a conferência acontece mesmo quando quem fecha o caixa
     // é o atendimento, que era o caso real e por isso não aparecia nada.
     const j = await acao({ acao: 'fechar', id: dados.aberto.id, contado, contagens });
-    if (j) { setContado(''); setFechando(false); setContagens({}); }
+    if (j) {
+      setContado(''); setFechando(false); setContagens({});
+      // O resultado da conferência aparece AGORA, logo depois de fechar — é o
+      // mesmo lugar tanto faz quem fechou, e é quando ainda dá pra perguntar
+      // pro salão o que aconteceu.
+      setFechadoAgora(j.caixa || null);
+    }
   };
   const salvarSaldo = async () => { const j = await acao({ acao: 'ajustar', id: dados.aberto.id, saldoInicial: saldoEdit }); if (j) setEditSaldo(false); };
   // Puxa pro caixa as vendas de hoje que foram fechadas com o caixa fechado.
@@ -192,13 +200,7 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
               <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Fechar caixa</div>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Confira: o esperado na gaveta é <b style={{ color: C.green }}>{brl(dados.dinheiroFinal)}</b>. Conte o dinheiro (opcional) pra ver se bate.</div>
               <Field label="Dinheiro contado na gaveta (R$) — opcional"><NumInput value={contado} onChange={setContado} /></Field>
-              <ConferenciaFechamento
-                papel={papel}
-                estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas}
-                dinheiroFinal={dados.dinheiroFinal} contado={contado}
-                paraContar={dados.paraContar}
-                onContagens={setContagens}
-              />
+              <ContarNoFechamento itens={dados.paraContar || []} contagens={contagens} onContagens={setContagens} />
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                 <Btn kind="danger" onClick={fechar} disabled={busy}>Confirmar fechamento</Btn>
                 <Btn kind="ghost" onClick={() => { setFechando(false); setContado(''); }}>Voltar</Btn>
@@ -206,6 +208,15 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
             </Card>
           )}
         </>
+      )}
+
+      {papel === 'dona' && fechadoAgora && fechadoAgora.conferencia && (
+        <div style={{ marginTop: 14 }}>
+          <ResultadoConferencia conferencia={fechadoAgora.conferencia} conferidoPor={fechadoAgora.conferidoPor} />
+          <button onClick={() => setFechadoAgora(null)} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 12, cursor: 'pointer', padding: '8px 0 0' }}>
+            ok, entendi
+          </button>
+        </div>
       )}
 
       {historico.length > 0 && (
@@ -238,24 +249,7 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
                       )}
                     </div>
                   </button>
-                  {ab && conf && (
-                    <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
-                      <div style={{ fontSize: 11, color: C.faint, fontWeight: 800, letterSpacing: '.06em', marginBottom: 6 }}>
-                        CONFERÊNCIA DO ESTOQUE{c.conferidoPor === 'garcom' ? ' · contado pelo atendimento' : ''}
-                      </div>
-                      <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.55, marginBottom: 8 }}>{conf.veredito?.texto}</div>
-                      {(conf.faltas || []).map((fl, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, padding: '3px 0' }}>
-                          <span style={{ color: fl.nivel === 'certo' ? C.red : fl.nivel === 'sobra' ? C.accent : C.amber }}>
-                            {fl.nome} · contou {fl.contado}, sistema {fl.sistema} {fl.unidade}
-                          </span>
-                          <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                            {fl.nivel === 'sobra' ? 'sobrando' : fl.receitaPerdida > 0 ? brl(fl.receitaPerdida) : brl(fl.custoPerdido)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {ab && conf && <ResultadoConferencia conferencia={conf} conferidoPor={c.conferidoPor} compacto />}
                   {ab && temDetalhe && (
                     <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
                       {METODOS.map((m) => (
