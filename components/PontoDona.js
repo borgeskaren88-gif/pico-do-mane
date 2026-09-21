@@ -3,18 +3,16 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, Empty, SecTitle, PageTitle, KPI } from './ui';
 import RelogioPonto from './RelogioPonto';
 import { fmtDate, todayISO } from '../lib/util';
+import { saldoDaPessoa, horasJornada as horasJornadaLib, horasDoTurno, fmtHoras, recadoDoSaldo } from '../lib/ponto';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch { return ''; } };
-const horasDe = (r) => (r.entrada && r.saida ? Math.max(0, (new Date(r.saida) - new Date(r.entrada)) / 3600000) : 0);
-const fmtHoras = (h) => { const t = Math.round(Math.abs(h) * 60); const hh = Math.floor(t / 60), mm = t % 60; return `${hh}h${mm > 0 ? ` ${mm}min` : ''}`; };
+const horasDe = horasDoTurno;
 
 // Setores que batem ponto e têm jornada esperada. 'garcom' aparece como Atendimento.
 const SETORES = [['cozinha', 'Cozinha'], ['garcom', 'Atendimento']];
 const DIAS = [[0, 'Dom'], [1, 'Seg'], [2, 'Ter'], [3, 'Qua'], [4, 'Qui'], [5, 'Sex'], [6, 'Sáb']];
-const parseHHMM = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ''); return m ? (+m[1] + (+m[2]) / 60) : null; };
-// Horas de um turno da jornada (16:00 → 00:00 = 8h; vira a meia-noite soma 24).
-const horasJornada = (j) => { const e = parseHHMM(j?.entrada), s = parseHHMM(j?.saida); if (e == null || s == null) return 0; let d = s - e; if (d <= 0) d += 24; return d; };
+const horasJornada = horasJornadaLib;
 
 // Ponto na visão da DONA: horas trabalhadas por pessoa no mês + saldo (em haver /
 // devendo) contra a jornada esperada do setor. A dona configura a jornada aqui.
@@ -93,22 +91,6 @@ export default function PontoDona() {
   };
 
   const ym = todayISO().slice(0, 7);
-  // Horas esperadas do setor no mês, contando só os dias JÁ PASSADOS (antes de
-  // hoje), pra não marcar "devendo" por um turno que ainda nem aconteceu.
-  const esperadoDoPapel = useCallback((papel) => {
-    const j = jornadas[papel];
-    if (!j || !Array.isArray(j.dias) || !j.dias.length) return null;
-    const hd = horasJornada(j);
-    const hojeISO = todayISO();
-    const [yy, mm] = hojeISO.split('-').map(Number);
-    const diaHoje = Number(hojeISO.slice(8, 10));
-    let total = 0;
-    for (let d = 1; d < diaHoje; d++) {
-      const wd = new Date(yy, mm - 1, d).getDay();
-      if (j.dias.includes(wd)) total += hd;
-    }
-    return total;
-  }, [jornadas]);
 
   const pessoas = useMemo(() => {
     const doMes = registros.filter((r) => (r.data || '').slice(0, 7) === ym);
@@ -121,9 +103,16 @@ export default function PontoDona() {
       g.horas += horasDe(r);
       g.turnos.push(r);
     }
-    for (const g of map.values()) g.turnos.sort((a, b) => (b.entrada || '').localeCompare(a.entrada || ''));
+    // O saldo sai TURNO A TURNO (ver lib/ponto.js): somar o mês inteiro contra a
+    // escala inteira deixava um turno extra tapar o buraco de vários turnos
+    // curtos, e o saldo aparecia positivo com a pessoa nunca fechando o turno.
+    const hojeISO = todayISO();
+    for (const g of map.values()) {
+      g.turnos.sort((a, b) => (b.entrada || '').localeCompare(a.entrada || ''));
+      g.s = saldoDaPessoa(g.turnos, jornadas[g.papel], hojeISO);
+    }
     return [...map.values()].sort((a, b) => b.horas - a.horas);
-  }, [registros, ym]);
+  }, [registros, ym, jornadas]);
 
   const totalHoras = pessoas.reduce((s, p) => s + p.horas, 0);
   // Soma da equipe pro relógio grande: só entra quem tem jornada configurada,
@@ -131,24 +120,27 @@ export default function PontoDona() {
   const equipe = useMemo(() => {
     let horas = 0, esperado = 0, quantos = 0;
     for (const p of pessoas) {
-      const esp = esperadoDoPapel(p.papel);
-      if (esp == null) continue;
-      horas += p.horas; esperado += esp; quantos += 1;
+      if (!p.s || !p.s.temEscala) continue;
+      horas += p.horas; esperado += p.s.esperado; quantos += 1;
     }
     return { horas, esperado: quantos ? esperado : null, quantos };
-  }, [pessoas, esperadoDoPapel]);
+  }, [pessoas]);
   const trabalhandoAgora = registros.filter((r) => !r.saida);
   const rotuloSetor = (papel) => (SETORES.find(([k]) => k === papel)?.[1] || '');
 
   // Etiqueta de saldo (em haver / devendo / em dia) pra uma pessoa.
-  const Saldo = ({ papel, horas }) => {
-    const esp = esperadoDoPapel(papel);
-    if (esp == null) return null; // sem jornada configurada pra esse setor
-    const saldo = horas - esp;
-    const emDia = Math.abs(saldo) < 0.05;
-    const cor = emDia ? C.muted : saldo > 0 ? C.green : C.red;
-    const rot = emDia ? 'em dia' : saldo > 0 ? `+${fmtHoras(saldo)} em haver` : `−${fmtHoras(saldo)} devendo`;
-    return <span style={{ fontSize: 11, fontWeight: 800, color: cor, display: 'block' }}>{rot} <span style={{ color: C.faint, fontWeight: 500 }}>· esperado {fmtHoras(esp)}</span></span>;
+  const Saldo = ({ s }) => {
+    if (!s || !s.temEscala) return <span style={{ fontSize: 11, color: C.faint, display: 'block' }}>sem escala configurada — não dá pra dizer saldo</span>;
+    const emDia = Math.abs(s.saldo) < 0.05;
+    const cor = emDia ? C.muted : s.saldo > 0 ? C.green : C.red;
+    const rot = emDia ? 'em dia' : s.saldo > 0 ? `+${fmtHoras(s.saldo)} em haver` : `−${fmtHoras(s.saldo)} devendo`;
+    const recado = recadoDoSaldo(s);
+    return (
+      <>
+        <span style={{ fontSize: 11, fontWeight: 800, color: cor, display: 'block' }}>{rot} <span style={{ color: C.faint, fontWeight: 500 }}>· esperado {fmtHoras(s.esperado)}</span></span>
+        {recado && <span style={{ fontSize: 10.5, color: C.amber, display: 'block', lineHeight: 1.4, marginTop: 2 }}>{recado}</span>}
+      </>
+    );
   };
 
   return (
@@ -290,7 +282,7 @@ export default function PontoDona() {
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ fontSize: 15, fontWeight: 800 }}>{p.nome}{rotuloSetor(p.papel) ? <span style={{ color: C.faint, fontWeight: 500, fontSize: 12 }}> · {rotuloSetor(p.papel)}</span> : null}</span>
                 <span style={{ fontSize: 12, color: C.faint, display: 'block' }}>{p.turnos.length} turno(s)</span>
-                <Saldo papel={p.papel} horas={p.horas} />
+                <Saldo s={p.s} />
               </span>
               <span style={{ fontSize: 16, fontWeight: 800, color: C.accent, flexShrink: 0 }}>{fmtHoras(p.horas)}</span>
             </button>
@@ -298,13 +290,28 @@ export default function PontoDona() {
               <div style={{ marginTop: 8 }}>
                 {/* O relógio da pessoa: quanto ela já bateu do que era esperado. */}
                 <Card style={{ marginBottom: 8, padding: '16px 14px 14px' }}>
-                  <RelogioPonto horas={p.horas} esperado={esperadoDoPapel(p.papel)} tamanho={168} nome={p.nome} />
+                  <RelogioPonto horas={p.horas} esperado={p.s?.temEscala ? p.s.esperado : null} tamanho={168} nome={p.nome} />
                 </Card>
-                {p.turnos.map((r) => (
+                {p.turnos.map((r) => {
+                  const t = (p.s?.porTurno || []).find((x) => x.id === r.id);
+                  // O que este turno ficou devendo (ou passou). É aqui que
+                  // "saiu 2h antes, toda vez" aparece — no total do mês isso
+                  // sumia dentro da soma.
+                  const dif = t && t.esperado != null && !t.aberto ? t.diff : null;
+                  return (
                   <Card key={r.id} style={{ marginBottom: 6, padding: '10px 14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 13 }}>
                         <b>{fmtDate(r.data)}</b> · {horaBR(r.entrada)} → {r.saida ? horaBR(r.saida) : 'em trabalho'}
+                        {dif != null && Math.abs(dif) >= 0.02 && (
+                          <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: dif < 0 ? C.red : C.green, marginTop: 2 }}>
+                            {dif < 0 ? `saiu ${fmtHoras(dif)} antes` : `${fmtHoras(dif)} a mais`}
+                            <span style={{ color: C.faint, fontWeight: 500 }}> · esperado {fmtHoras(t.esperado)}</span>
+                          </span>
+                        )}
+                        {t && t.extra && (
+                          <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.accent, marginTop: 2 }}>dia fora da escala — contou tudo como extra</span>
+                        )}
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                         <b style={{ fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{r.saida ? fmtHoras(horasDe(r)) : '—'}</b>
@@ -312,7 +319,18 @@ export default function PontoDona() {
                       </span>
                     </div>
                   </Card>
-                ))}
+                  );
+                })}
+                {p.s?.faltas?.length > 0 && (
+                  <Card style={{ marginBottom: 6, padding: '10px 14px', borderColor: C.amber }}>
+                    <div style={{ fontSize: 12.5, color: C.amber, fontWeight: 700 }}>
+                      {p.s.faltas.length} dia(s) de escala sem ponto batido
+                    </div>
+                    <div style={{ fontSize: 11.5, color: C.faint, marginTop: 3, lineHeight: 1.45 }}>
+                      {p.s.faltas.map((d) => fmtDate(d)).join(', ')} — cada um conta {fmtHoras(p.s.horasDia)} em falta. Se foi folga combinada, ajusta a escala em Configurar jornada.
+                    </div>
+                  </Card>
+                )}
               </div>
             )}
           </div>
