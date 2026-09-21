@@ -101,14 +101,17 @@ export async function POST(request) {
         // Valor da hora do setor, pra traduzir o banco de horas em dinheiro.
         // Aceita "35" e "35,50"; zero (ou vazio) significa "não informado", e aí
         // a tela mostra só as horas em vez de fingir um valor.
-        const vh = (() => {
-          const v = parseFloat(String(j.valorHora == null ? '' : j.valorHora).replace(/\./g, '').replace(',', '.'));
-          return Number.isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : 0;
-        })();
+        const dinheiro = (v) => {
+          const n = parseFloat(String(v == null ? '' : v).replace(/\./g, '').replace(',', '.'));
+          return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+        };
+        const salarioMes = dinheiro(j.salarioMes);
+        const vh = dinheiro(j.valorHora);
         const temJornada = dias.length && entrada && saida;
-        if (!nome && !temJornada && !vh) continue;
+        if (!nome && !temJornada && !vh && !salarioMes) continue;
         limpo[key] = {};
         if (nome) limpo[key].nome = nome;
+        if (salarioMes) limpo[key].salarioMes = salarioMes;
         if (vh) limpo[key].valorHora = vh;
         if (temJornada) { limpo[key].dias = dias; limpo[key].entrada = entrada; limpo[key].saida = saida; }
       }
