@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../../lib/auth';
 import { supabaseServer } from '../../../../lib/supabase';
-import { notificarAgenda, notificarReservasAmanha , notificarValidade } from '../../../../lib/push';
+import { notificarAgenda, notificarReservasAmanha, notificarPreparoAmanha, notificarValidade } from '../../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs'; // web-push precisa do Node (crypto), não do Edge.
@@ -22,6 +22,7 @@ export async function POST() {
     // Na mesma batida, o lembrete de confirmar as mesas de amanhã.
     let reservas = null;
     try { reservas = await notificarReservasAmanha(sb); } catch { /* nunca derruba a agenda */ }
+    try { await notificarPreparoAmanha(sb); } catch { /* idem */ }
     try { await notificarValidade(sb); } catch { /* idem */ }
     return NextResponse.json({ ok: true, ...r, reservas });
   } catch (e) {

@@ -154,6 +154,19 @@ export default function Reservas() {
   }, [reservas]);
   const diasComReserva = useMemo(() => new Set(porDia.keys()), [porDia]);
 
+  // Veio de um aviso no celular (?reserva=<id>): pula pro dia dela e já abre o
+  // detalhe. Sem isso, o aviso joga a Mari na tela inicial e ela tem que
+  // procurar a reserva — e aí o aviso vira só barulho.
+  useEffect(() => {
+    if (!carregado || typeof window === 'undefined') return;
+    const alvo = new URLSearchParams(window.location.search).get('reserva');
+    if (!alvo) return;
+    const r = reservas.find((x) => x && x.id === alvo);
+    if (r) { setDiaSel(r.data); setAbertaId(r.id); }
+    // Limpa o endereço pra não reabrir a mesma reserva a cada recarregada.
+    try { window.history.replaceState(null, '', window.location.pathname); } catch { /* ignora */ }
+  }, [carregado, reservas]);
+
   const mes = ymOf(diaSel);
   const semana = useMemo(() => semanaDe(diaSel), [diaSel]);
   const cabMes = (() => { const [y, m] = diaSel.split('-'); return `${MESES_LONGOS[Number(m) - 1]}, ${y}`; })();
