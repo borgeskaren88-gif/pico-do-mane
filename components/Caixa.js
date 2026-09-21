@@ -27,7 +27,7 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
   const [histAberto, setHistAberto] = useState(''); // id do caixa fechado com o detalhe aberto
   const [editSaldo, setEditSaldo] = useState(false);
   const [saldoEdit, setSaldoEdit] = useState('');
-  const [conferencia, setConferencia] = useState(null); // resultado da conferência de estoque
+  const [contagens, setContagens] = useState({}); // o que foi contado na prateleira, pro servidor conferir
 
   const carregar = useCallback(async () => {
     try {
@@ -58,17 +58,11 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
   const abrir = async () => { const j = await acao({ acao: 'abrir', saldoInicial: saldoInput }); if (j) setSaldoInput(''); };
   const fechar = async () => {
     if (typeof window !== 'undefined' && !window.confirm('Fechar o caixa do turno? Isso encerra o caixa atual.')) return;
-    // Só o resumo da conferência viaja: os números que ela viu na tela, pra
-    // ficarem gravados no caixa e pro aviso no celular saber o que dizer.
-    const conf = conferencia && conferencia.totais.conferidos > 0 ? {
-      totais: conferencia.totais,
-      faltas: conferencia.linhas
-        .filter((l) => l.nivel === 'certo' || l.nivel === 'duvidoso')
-        .map((l) => ({ nome: l.nome, falta: l.falta, unidade: l.unidade, nivel: l.nivel, receitaPerdida: l.receitaPerdida, custoPerdido: l.custoPerdido })),
-      veredito: conferencia.veredito,
-    } : null;
-    const j = await acao({ acao: 'fechar', id: dados.aberto.id, contado, conferencia: conf });
-    if (j) { setContado(''); setFechando(false); setConferencia(null); }
+    // Viajam só as CONTAGENS. Quem cruza com vendas, fichas e estoque é o
+    // servidor — assim a conferência acontece mesmo quando quem fecha o caixa
+    // é o atendimento, que era o caso real e por isso não aparecia nada.
+    const j = await acao({ acao: 'fechar', id: dados.aberto.id, contado, contagens });
+    if (j) { setContado(''); setFechando(false); setContagens({}); }
   };
   const salvarSaldo = async () => { const j = await acao({ acao: 'ajustar', id: dados.aberto.id, saldoInicial: saldoEdit }); if (j) setEditSaldo(false); };
   // Puxa pro caixa as vendas de hoje que foram fechadas com o caixa fechado.
@@ -198,13 +192,13 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
               <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Fechar caixa</div>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Confira: o esperado na gaveta é <b style={{ color: C.green }}>{brl(dados.dinheiroFinal)}</b>. Conte o dinheiro (opcional) pra ver se bate.</div>
               <Field label="Dinheiro contado na gaveta (R$) — opcional"><NumInput value={contado} onChange={setContado} /></Field>
-              {papel === 'dona' && (
-                <ConferenciaFechamento
-                  estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas}
-                  dinheiroFinal={dados.dinheiroFinal} contado={contado}
-                  onResultado={setConferencia}
-                />
-              )}
+              <ConferenciaFechamento
+                papel={papel}
+                estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas}
+                dinheiroFinal={dados.dinheiroFinal} contado={contado}
+                paraContar={dados.paraContar}
+                onContagens={setContagens}
+              />
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                 <Btn kind="danger" onClick={fechar} disabled={busy}>Confirmar fechamento</Btn>
                 <Btn kind="ghost" onClick={() => { setFechando(false); setContado(''); }}>Voltar</Btn>
@@ -224,7 +218,10 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
               {historico.map((c) => {
                 const ab = histAberto === c.id;
                 const ent = c.entradas || {};
-                const temDetalhe = METODOS.some((m) => (ent[m] || 0) > 0) || (c.fiadoRecebido?.total || 0) > 0;
+                // A conferência do estoque só a dona vê — e é ela que torna o
+                // caixa fechado "abrível" mesmo sem entrada nenhuma.
+                const conf = papel === 'dona' ? c.conferencia : null;
+                const temDetalhe = METODOS.some((m) => (ent[m] || 0) > 0) || (c.fiadoRecebido?.total || 0) > 0 || !!conf;
                 return (
                 <Card key={c.id} style={{ marginBottom: 8, padding: '12px 14px' }}>
                   <button onClick={() => { if (temDetalhe) setHistAberto(ab ? '' : c.id); }} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: temDetalhe ? 'pointer' : 'default', textAlign: 'left', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
@@ -232,10 +229,33 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
                       <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{temDetalhe ? (ab ? '▾ ' : '▸ ') : ''}{fmtDate(diaBR(c.abertoEm || c.fechadoEm))} · {hora(c.abertoEm)}–{hora(c.fechadoEm)}</div>
                       <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Recebido {brl(c.recebido)} · gaveta {brl(c.dinheiroFinal)}{papel !== 'garcom' && (c.servico || 0) > 0 ? ` · serviço ${brl(c.servico)}` : ''}{c.contado != null ? ` · contado ${brl(c.contado)}` : ''}</div>
                     </div>
-                    {c.diferenca != null && Math.abs(c.diferenca) > 0.005 && (
-                      <div style={{ fontSize: 12, fontWeight: 800, color: c.diferenca < 0 ? C.red : C.amber, flexShrink: 0 }}>{c.diferenca > 0 ? '+' : ''}{brl(c.diferenca)}</div>
-                    )}
+                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                      {c.diferenca != null && Math.abs(c.diferenca) > 0.005 && (
+                        <div style={{ fontSize: 12, fontWeight: 800, color: c.diferenca < 0 ? C.red : C.amber }}>{c.diferenca > 0 ? '+' : ''}{brl(c.diferenca)}</div>
+                      )}
+                      {conf && conf.totais?.receitaPerdidaCerta > 0 && (
+                        <div style={{ fontSize: 11, fontWeight: 800, color: C.red, marginTop: 2 }}>−{brl(conf.totais.receitaPerdidaCerta)} no estoque</div>
+                      )}
+                    </div>
                   </button>
+                  {ab && conf && (
+                    <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
+                      <div style={{ fontSize: 11, color: C.faint, fontWeight: 800, letterSpacing: '.06em', marginBottom: 6 }}>
+                        CONFERÊNCIA DO ESTOQUE{c.conferidoPor === 'garcom' ? ' · contado pelo atendimento' : ''}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.55, marginBottom: 8 }}>{conf.veredito?.texto}</div>
+                      {(conf.faltas || []).map((fl, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, padding: '3px 0' }}>
+                          <span style={{ color: fl.nivel === 'certo' ? C.red : fl.nivel === 'sobra' ? C.accent : C.amber }}>
+                            {fl.nome} · contou {fl.contado}, sistema {fl.sistema} {fl.unidade}
+                          </span>
+                          <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                            {fl.nivel === 'sobra' ? 'sobrando' : fl.receitaPerdida > 0 ? brl(fl.receitaPerdida) : brl(fl.custoPerdido)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {ab && temDetalhe && (
                     <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
                       {METODOS.map((m) => (
