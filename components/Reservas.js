@@ -11,13 +11,24 @@ import EstiloShell from './EstiloShell';
 import BotaoAtualizar from './BotaoAtualizar';
 import VersaoApp from './VersaoApp';
 import { todayISO, addDays, fmtDate, weekday, ymOf } from '../lib/util';
+import { OCASIOES, LOCAIS, etiquetasDaReserva } from '../lib/reservas';
 
 const MESES_LONGOS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const LETRAS_SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const SEM_CURTO = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 const diaDaSemana = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).getDay(); };
 const semanaDe = (iso) => { const ini = addDays(iso, -diaDaSemana(iso)); return Array.from({ length: 7 }, (_, i) => addDays(ini, i)); };
-const vazio = (dia) => ({ id: '', nome: '', data: dia, hora: '20:00', pessoas: '2', obs: '', telefone: '' });
+const vazio = (dia) => ({
+  id: '', nome: '', data: dia, hora: '20:00', pessoas: '2', obs: '', telefone: '',
+  ocasiao: 'Normal', aniversariante: '', bolo: false, local: 'Tanto faz', restricoes: '',
+});
+// Cores das etiquetas: festa chama atenção, aviso é o que pode dar problema se
+// ninguém ler, neutro é só informação.
+const TOM = { festa: '#F5A524', aviso: '#FF5A5A', neutro: '' };
+const fmtDataHora = (iso) => {
+  try { return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+  catch { return ''; }
+};
 
 // Link do WhatsApp com a mensagem pronta — mesma ideia da cobrança do fiado.
 // Telefone brasileiro sem o 55 ganha o 55 na frente; sem telefone não dá link
@@ -52,6 +63,39 @@ const msgConfirmacao = (r, hoje) => {
 // Nada de dinheiro, nada de comanda. Ao salvar uma reserva nova, todo mundo
 // (dona, cozinha e atendimento) recebe o aviso no celular — e o dia da reserva
 // aparece no login de cada um.
+function Chips({ opcoes, valor, onEscolher }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {opcoes.map((o) => (
+        <button key={o} type="button" onClick={() => onEscolher(o)} style={{
+          border: `1px solid ${valor === o ? C.accent : C.line}`,
+          background: valor === o ? C.accent : 'transparent',
+          color: valor === o ? '#06101F' : C.muted,
+          borderRadius: 999, padding: '7px 13px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+        }}>{o}</button>
+      ))}
+    </div>
+  );
+}
+
+export function Etiquetas({ reserva, tamanho = 11.5 }) {
+  const etq = etiquetasDaReserva(reserva);
+  if (!etq.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
+      {etq.map((e, i) => (
+        <span key={i} style={{
+          fontSize: tamanho, fontWeight: 700, lineHeight: 1.3,
+          color: TOM[e.tom] || C.muted,
+          border: `1px solid ${TOM[e.tom] || C.line}55`,
+          background: TOM[e.tom] ? `color-mix(in srgb, ${TOM[e.tom]} 12%, transparent)` : 'transparent',
+          borderRadius: 8, padding: '3px 8px',
+        }}>{e.texto}</span>
+      ))}
+    </div>
+  );
+}
+
 export default function Reservas() {
   const hoje = todayISO();
   const [reservas, setReservas] = useState([]);
@@ -59,6 +103,7 @@ export default function Reservas() {
   const [diaSel, setDiaSel] = useState(hoje);
   const [mesAberto, setMesAberto] = useState(false);
   const [form, setForm] = useState(null); // null = formulário fechado
+  const [abertaId, setAbertaId] = useState(''); // reserva com o detalhe aberto
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState('');
   const [recado, setRecado] = useState('');
@@ -131,7 +176,7 @@ export default function Reservas() {
     try {
       const r = await fetch('/api/reservas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ acao: 'salvar', ...form, pessoas: Number(form.pessoas) || 1 }),
+        body: JSON.stringify({ acao: 'salvar', ...form, pessoas: Number(form.pessoas) || 1, bolo: !!form.bolo }),
       });
       const j = await r.json();
       if (!j.ok) { setErro(j.erro || 'Não consegui salvar.'); return; }
@@ -345,10 +390,40 @@ export default function Reservas() {
                     {Number(r.pessoas) || 1} {(Number(r.pessoas) || 1) === 1 ? 'pessoa' : 'pessoas'}
                     {r.telefone ? ` · ${r.telefone}` : ''}
                   </div>
-                  {r.obs ? <div style={{ fontSize: 12.5, color: C.faint, marginTop: 4, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{r.obs}</div> : null}
+                  {/* As etiquetas ficam SEMPRE à vista: aniversário e alergia
+                      são o tipo de coisa que, se estiver escondida atrás de um
+                      clique, alguém descobre quando a mesa já chegou. */}
+                  <Etiquetas reserva={r} />
                   {r.confirmada && (
                     <div style={{ fontSize: 11.5, fontWeight: 800, color: C.green, marginTop: 5 }}>✓ confirmada com o cliente</div>
                   )}
+
+                  {abertaId !== r.id ? (
+                    <button onClick={() => setAbertaId(r.id)} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12, fontWeight: 700, padding: '6px 0 0', cursor: 'pointer' }}>
+                      ver detalhes
+                    </button>
+                  ) : (
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.hair}` }}>
+                      {r.obs ? (
+                        <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: 6 }}>{r.obs}</div>
+                      ) : (
+                        <div style={{ fontSize: 12.5, color: C.faint, marginBottom: 6 }}>Sem recado extra.</div>
+                      )}
+                      <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
+                        <div>Ocasião: {r.ocasiao || 'Normal'}{r.bolo ? ' · vão trazer bolo' : ''}</div>
+                        <div>Lugar: {r.local || 'Tanto faz'}</div>
+                        {r.restricoes && <div>Restrição: {r.restricoes}</div>}
+                        {r.telefone && <div>Telefone: {r.telefone}</div>}
+                        <div>
+                          Anotada por {r.criadoPor === 'dona' ? 'Karen' : r.criadoPor === 'reservas' ? 'Mari' : (r.criadoPor || '—')}
+                          {r.criadoEm ? ` em ${fmtDataHora(r.criadoEm)}` : ''}
+                        </div>
+                        {r.confirmadaEm && <div>Confirmada em {fmtDataHora(r.confirmadaEm)}</div>}
+                      </div>
+                      <button onClick={() => setAbertaId('')} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 12, padding: '6px 0 0', cursor: 'pointer' }}>fechar</button>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                     <button onClick={() => chamarNoZap(r)} style={{ ...acaoBtn, color: C.accent, borderColor: C.accent }}>confirmar no WhatsApp</button>
                     <button onClick={() => confirmar(r, !r.confirmada)} disabled={busy} style={{ ...acaoBtn, color: r.confirmada ? C.faint : C.green, borderColor: r.confirmada ? C.line : C.green }}>
@@ -394,10 +469,39 @@ export default function Reservas() {
                       <input type="tel" value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} placeholder="(48) 9…" style={inp} />
                     </label>
                   </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <span style={rot}>É uma ocasião especial?</span>
+                    <Chips opcoes={OCASIOES} valor={form.ocasiao || 'Normal'} onEscolher={(v) => setForm((f) => ({ ...f, ocasiao: v, ...(v === 'Normal' ? { aniversariante: '', bolo: false } : {}) }))} />
+                  </div>
+
+                  {form.ocasiao === 'Aniversário' && (
+                    <label style={{ display: 'block', marginBottom: 12 }}>
+                      <span style={rot}>Quem faz aniversário? (opcional)</span>
+                      <input value={form.aniversariante || ''} onChange={(e) => setForm((f) => ({ ...f, aniversariante: e.target.value }))} placeholder="Ex.: a Júlia" style={inp} />
+                    </label>
+                  )}
+
+                  {(form.ocasiao || 'Normal') !== 'Normal' && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 13.5, color: C.text, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={!!form.bolo} onChange={(e) => setForm((f) => ({ ...f, bolo: e.target.checked }))} style={{ width: 17, height: 17, accentColor: C.accent }} />
+                      Vão trazer bolo ou doce
+                    </label>
+                  )}
+
+                  <div style={{ marginBottom: 12 }}>
+                    <span style={rot}>Onde preferem sentar</span>
+                    <Chips opcoes={LOCAIS} valor={form.local || 'Tanto faz'} onEscolher={(v) => setForm((f) => ({ ...f, local: v }))} />
+                  </div>
+
+                  <label style={{ display: 'block', marginBottom: 12 }}>
+                    <span style={rot}>Alergia ou restrição (opcional)</span>
+                    <input value={form.restricoes || ''} onChange={(e) => setForm((f) => ({ ...f, restricoes: e.target.value }))} placeholder="Ex.: uma pessoa é vegetariana" style={inp} />
+                  </label>
+
                   <label style={{ display: 'block' }}>
-                    <span style={rot}>Observação (opcional)</span>
+                    <span style={rot}>Mais alguma coisa (opcional)</span>
                     <textarea value={form.obs} onChange={(e) => setForm((f) => ({ ...f, obs: e.target.value }))} rows={3}
-                      placeholder="Ex.: aniversário, querem mesa na varanda, uma pessoa é vegetariana" style={{ ...inp, resize: 'vertical', lineHeight: 1.45, fontSize: 14 }} />
+                      placeholder="Ex.: chegam um pouco depois, querem a mesa perto da música" style={{ ...inp, resize: 'vertical', lineHeight: 1.45, fontSize: 14 }} />
                   </label>
                 </div>
                 <div style={{ fontSize: 11.5, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>

@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Empty } from './ui';
+import { Etiquetas } from './Reservas';
 import { todayISO, addDays, fmtDate, weekday } from '../lib/util';
 
 // A tela de reservas de quem trabalha no salão e na cozinha: só leitura, do
@@ -76,6 +77,10 @@ export default function ReservasLista({ titulo = 'Mesas reservadas', sub = 'O qu
                   <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2 }}>
                     {Number(r.pessoas) || 1} {(Number(r.pessoas) || 1) === 1 ? 'pessoa' : 'pessoas'}
                   </span>
+                  {/* Aniversário, bolo, alergia e mesa preferida: é o que
+                      muda o atendimento da mesa, então fica à vista de quem
+                      está no salão, não escondido no recado. */}
+                  <Etiquetas reserva={r} tamanho={12} />
                   {r.obs ? (
                     <span style={{ display: 'block', fontSize: 13, color: C.amber, marginTop: 5, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{r.obs}</span>
                   ) : null}

@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
+import { OCASIOES, LOCAIS, umDe } from '../../../lib/reservas';
 import { supabaseServer } from '../../../lib/supabase';
 import { notificarReservaNova } from '../../../lib/push';
 import { criarEvento, atualizarEvento, apagarEvento } from '../../../lib/google';
@@ -15,9 +16,12 @@ export const runtime = 'nodejs'; // o aviso usa web-push, que precisa do Node.
 const PREFIXO = 'reserva:';
 
 // Como a reserva aparece na agenda: "Reserva: Ana Paula · 8 pessoas".
+// Aniversário entra no título porque é o que muda o atendimento — quem lê a
+// agenda no celular precisa ver isso sem abrir.
 const tituloDaAgenda = (r) => {
   const q = Number(r.pessoas) || 1;
-  return `Reserva: ${r.nome} · ${q} ${q === 1 ? 'pessoa' : 'pessoas'}`;
+  const marca = r.ocasiao === 'Aniversário' ? '🎂 ' : '';
+  return `${marca}Reserva: ${r.nome} · ${q} ${q === 1 ? 'pessoa' : 'pessoas'}`;
 };
 
 const txt = (v, max) => String(v == null ? '' : v).slice(0, max).trim();
@@ -97,6 +101,13 @@ export async function POST(request) {
     const pessoas = Math.max(1, Math.min(999, Math.round(Number(body?.pessoas) || 0) || 1));
     const obs = txt(body?.obs, 400);
     const telefone = txt(body?.telefone, 30);
+    const ocasiao = umDe(body?.ocasiao, OCASIOES, 'Normal');
+    // Só faz sentido guardar o aniversariante quando é aniversário — senão o
+    // nome fica pendurado numa reserva que mudou de motivo.
+    const aniversariante = ocasiao === 'Aniversário' ? txt(body?.aniversariante, 60) : '';
+    const bolo = ocasiao === 'Normal' ? false : !!body?.bolo;
+    const local = umDe(body?.local, LOCAIS, 'Tanto faz');
+    const restricoes = txt(body?.restricoes, 200);
     if (!nome) return NextResponse.json({ ok: false, erro: 'Diz o nome de quem reservou.' }, { status: 400 });
     if (!ehData(data)) return NextResponse.json({ ok: false, erro: 'Escolhe o dia da reserva.' }, { status: 400 });
     if (hora && !ehHora(hora)) return NextResponse.json({ ok: false, erro: 'Hora inválida.' }, { status: 400 });
@@ -105,6 +116,7 @@ export async function POST(request) {
     const nova = !antes?.valor;
     const reserva = {
       id, nome, data, hora, pessoas, obs, telefone,
+      ocasiao, aniversariante, bolo, local, restricoes,
       googleId: antes?.valor?.googleId || '',
       confirmada: !!antes?.valor?.confirmada,
       confirmadaEm: antes?.valor?.confirmadaEm || '',
