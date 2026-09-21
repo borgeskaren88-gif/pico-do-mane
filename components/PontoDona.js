@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, Empty, SecTitle, PageTitle, KPI } from './ui';
 import RelogioPonto from './RelogioPonto';
-import { fmtDate, todayISO } from '../lib/util';
-import { saldoDaPessoa, horasJornada as horasJornadaLib, horasDoTurno, fmtHoras, recadoDoSaldo } from '../lib/ponto';
+import { fmtDate, todayISO, mesLabel } from '../lib/util';
+import { saldoDaPessoa, saldoAcumulado, horasJornada as horasJornadaLib, horasDoTurno, fmtHoras, recadoDoSaldo } from '../lib/ponto';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch { return ''; } };
@@ -90,7 +90,15 @@ export default function PontoDona() {
     finally { setBusy(false); }
   };
 
-  const ym = todayISO().slice(0, 7);
+  // O mês que está sendo olhado. O saldo do mês é uma foto; o que decide se
+  // alguém deve ou tem a receber é o ACUMULADO, porque hora se compensa no mês
+  // seguinte (entrando mais cedo, ou cobrindo um turno que a dona precisar).
+  const [ym, setYm] = useState(() => todayISO().slice(0, 7));
+  const mesesDisp = useMemo(() => {
+    const set = new Set(registros.map((r) => (r.data || '').slice(0, 7)).filter(Boolean));
+    set.add(todayISO().slice(0, 7));
+    return [...set].sort().reverse().slice(0, 12);
+  }, [registros]);
 
   const pessoas = useMemo(() => {
     const doMes = registros.filter((r) => (r.data || '').slice(0, 7) === ym);
@@ -109,7 +117,10 @@ export default function PontoDona() {
     const hojeISO = todayISO();
     for (const g of map.values()) {
       g.turnos.sort((a, b) => (b.entrada || '').localeCompare(a.entrada || ''));
-      g.s = saldoDaPessoa(g.turnos, jornadas[g.papel], hojeISO);
+      g.s = saldoDaPessoa(g.turnos, jornadas[g.papel], ym, hojeISO);
+      // O banco de horas roda sobre TODOS os registros da pessoa, não só os do
+      // mês aberto — é isso que sobrevive à virada do mês.
+      g.banco = saldoAcumulado(registros.filter((r) => norm(r.nome) === norm(g.nome)), jornadas[g.papel], hojeISO);
     }
     return [...map.values()].sort((a, b) => b.horas - a.horas);
   }, [registros, ym, jornadas]);
@@ -129,15 +140,25 @@ export default function PontoDona() {
   const rotuloSetor = (papel) => (SETORES.find(([k]) => k === papel)?.[1] || '');
 
   // Etiqueta de saldo (em haver / devendo / em dia) pra uma pessoa.
-  const Saldo = ({ s }) => {
+  const rotuloSaldo = (v) => (Math.abs(v) < 0.05 ? 'em dia' : v > 0 ? `+${fmtHoras(v)} em haver` : `−${fmtHoras(v)} devendo`);
+  const corSaldo = (v) => (Math.abs(v) < 0.05 ? C.muted : v > 0 ? C.green : C.red);
+
+  const Saldo = ({ s, banco }) => {
     if (!s || !s.temEscala) return <span style={{ fontSize: 11, color: C.faint, display: 'block' }}>sem escala configurada — não dá pra dizer saldo</span>;
-    const emDia = Math.abs(s.saldo) < 0.05;
-    const cor = emDia ? C.muted : s.saldo > 0 ? C.green : C.red;
-    const rot = emDia ? 'em dia' : s.saldo > 0 ? `+${fmtHoras(s.saldo)} em haver` : `−${fmtHoras(s.saldo)} devendo`;
     const recado = recadoDoSaldo(s);
+    // O acumulado vem PRIMEIRO e em destaque: é ele que diz se a pessoa deve ou
+    // tem a receber. O do mês é o detalhe de como chegou até aqui.
+    const temBanco = banco && banco.temEscala && banco.meses.length > 1;
     return (
       <>
-        <span style={{ fontSize: 11, fontWeight: 800, color: cor, display: 'block' }}>{rot} <span style={{ color: C.faint, fontWeight: 500 }}>· esperado {fmtHoras(s.esperado)}</span></span>
+        {temBanco && (
+          <span style={{ fontSize: 12, fontWeight: 900, color: corSaldo(banco.saldo), display: 'block' }}>
+            {rotuloSaldo(banco.saldo)} <span style={{ color: C.faint, fontWeight: 600 }}>· no total</span>
+          </span>
+        )}
+        <span style={{ fontSize: 11, fontWeight: 800, color: corSaldo(s.saldo), display: 'block' }}>
+          {rotuloSaldo(s.saldo)} <span style={{ color: C.faint, fontWeight: 500 }}>{temBanco ? `· em ${mesLabel(ym)}` : `· esperado ${fmtHoras(s.esperado)}`}</span>
+        </span>
         {recado && <span style={{ fontSize: 10.5, color: C.amber, display: 'block', lineHeight: 1.4, marginTop: 2 }}>{recado}</span>}
       </>
     );
@@ -270,9 +291,23 @@ export default function PontoDona() {
         </Card>
       )}
 
-      <SecTitle>Por pessoa (este mês)</SecTitle>
+      <SecTitle>Por pessoa</SecTitle>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+        {mesesDisp.map((m) => (
+          <button key={m} onClick={() => setYm(m)} style={{
+            border: `1px solid ${ym === m ? C.accent : C.line}`,
+            background: ym === m ? C.accent : 'transparent',
+            color: ym === m ? '#06101F' : C.muted,
+            borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+          }}>{mesLabel(m)}</button>
+        ))}
+      </div>
+      <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 12, lineHeight: 1.5 }}>
+        O saldo <b>no total</b> é o banco de horas: soma todos os meses, porque hora se compensa depois —
+        entrando mais cedo, ou cobrindo um turno que tu precisar. O de baixo é só {mesLabel(ym)}.
+      </div>
       {!carregado ? <Empty>Carregando…</Empty> : pessoas.length === 0 ? (
-        <Empty>Nenhum ponto batido este mês.<br />A equipe registra na aba Ponto do login dela.</Empty>
+        <Empty>Nenhum ponto batido neste mês.<br />A equipe registra na aba Ponto do login dela.</Empty>
       ) : pessoas.map((p) => {
         const ab = aberto === norm(p.nome);
         return (
@@ -282,7 +317,7 @@ export default function PontoDona() {
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ fontSize: 15, fontWeight: 800 }}>{p.nome}{rotuloSetor(p.papel) ? <span style={{ color: C.faint, fontWeight: 500, fontSize: 12 }}> · {rotuloSetor(p.papel)}</span> : null}</span>
                 <span style={{ fontSize: 12, color: C.faint, display: 'block' }}>{p.turnos.length} turno(s)</span>
-                <Saldo s={p.s} />
+                <Saldo s={p.s} banco={p.banco} />
               </span>
               <span style={{ fontSize: 16, fontWeight: 800, color: C.accent, flexShrink: 0 }}>{fmtHoras(p.horas)}</span>
             </button>
