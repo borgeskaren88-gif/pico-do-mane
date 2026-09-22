@@ -6,6 +6,7 @@ import { norm } from '../lib/darci';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
 import { cmvDoMes, lerCMV, estoqueNoMes } from '../lib/cmv';
 import { CATEGORIAS_CARDAPIO } from './Cardapio';
+import EngenhariaCardapio from './EngenhariaCardapio';
 
 // Margem por produto: cruza o CUSTO da ficha técnica (+ fruta do sabor) com o
 // PREÇO do cardápio, pra mostrar quanto cada item dá de lucro. Agrupado por
@@ -96,6 +97,14 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [], venda
   );
   const corCMV = { bom: C.green, atencao: C.amber, ruim: C.red, 'sem-base': C.amber, 'sem-dados': C.faint }[lerCMV(cmv).nivel];
 
+  // Engenharia de cardápio: os mesmos itens desta tela, com a margem unitária
+  // e quantas saíram no mês. Produto sem ficha não entra — sem saber o custo
+  // não dá pra dizer se ele dá lucro.
+  const paraMatriz = useMemo(
+    () => comFicha.map((l) => ({ id: l.id, nome: l.nome, categoria: l.categoria || 'Sem categoria', lucro: l.lucro, qtd: l.qtdMes })),
+    [comFicha],
+  );
+
   const filtro = busca.trim().toLowerCase();
   const lista = filtro ? linhas.filter((l) => (l.nome || '').toLowerCase().includes(filtro)) : [];
 
@@ -166,6 +175,8 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [], venda
           sub={cmv.pct == null ? 'sem venda com ficha' : `${brl(cmv.cmv)} de ingrediente`}
         />
       </div>
+
+      <EngenhariaCardapio linhas={paraMatriz} mes={mes} />
 
       {/* Por onde olhar. Cada ordem responde uma pergunta diferente. */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
