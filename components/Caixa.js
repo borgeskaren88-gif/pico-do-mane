@@ -1,8 +1,9 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, NumInput, Empty, SecTitle, PageTitle } from './ui';
 import { brl, num, uid, fmtDate } from '../lib/util';
-import { ContarNoFechamento, ResultadoConferencia } from './ConferenciaFechamento';
+import { padraoDasConferencias } from '../lib/fechamento';
+import { ContarNoFechamento, ResultadoConferencia, PadraoConferencias } from './ConferenciaFechamento';
 
 const METODOS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
 const hora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
@@ -79,6 +80,9 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
   const aberto = dados?.aberto || null;
   const entradas = dados?.entradas || {};
   const historico = dados?.historico || [];
+  // O padrão das últimas noites. Só a dona vê — é a mesma regra da conferência
+  // de cada caixa.
+  const padrao = useMemo(() => (papel === 'dona' ? padraoDasConferencias(historico) : null), [papel, historico]);
   const soltas = dados?.soltas || { qtd: 0, total: 0 };
   // Há quanto tempo o caixa está aberto (pra avisar se passou de 24h).
   const horasAberto = aberto?.abertoEm ? (Date.now() - new Date(aberto.abertoEm).getTime()) / 3600000 : 0;
@@ -217,6 +221,10 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
             ok, entendi
           </button>
         </div>
+      )}
+
+      {padrao && !padrao.poucasNoites && padrao.itens.length > 0 && (
+        <PadraoConferencias padrao={padrao} />
       )}
 
       {historico.length > 0 && (
