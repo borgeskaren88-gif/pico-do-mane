@@ -3,14 +3,14 @@ import React, { useMemo, useState } from 'react';
 import { C, Card, KPI, Empty, PageTitle, Select } from './ui';
 import { brl, num, ymOf, todayISO, mesLabel, FONTES_NAO_OPERACIONAL, DESPESA_NAO_OPERACIONAL } from '../lib/util';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
-import { cmvDoMes, lerCMV } from '../lib/cmv';
+import { cmvDoMes, lerCMV, estoqueNoMes } from '../lib/cmv';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
 // Raio-X do mês: resultado financeiro + saúde do cardápio (margem) + o que saiu
 // sem vender (perdas/cortesias) + pontos de atenção. Só leitura — junta o que já
 // existe pra a dona ver, num lugar só, onde está perdendo dinheiro.
-export default function RaioX({ receitas = [], despesas = [], cardapio = [], fichas = [], estoque = [], vendas = [] }) {
+export default function RaioX({ receitas = [], despesas = [], cardapio = [], fichas = [], estoque = [], vendas = [], compras = [] }) {
   const [mes, setMes] = useState(ymOf(todayISO()));
   const meses = useMemo(() => {
     const s = new Set([ymOf(todayISO())]);
@@ -79,7 +79,12 @@ export default function RaioX({ receitas = [], despesas = [], cardapio = [], fic
   // CMV do mês: o custo do ingrediente do que foi vendido. Fica aqui em cima
   // porque é a pergunta de dinheiro mais direta que essa tela responde — e
   // porque ninguém acha um número desses no meio de uma página longa.
-  const cmv = useMemo(() => cmvDoMes({ vendas, fichas, estoque, mes }), [vendas, fichas, estoque, mes]);
+  // Mesmo custo-da-epoca que Relatorios usa. Sem isto, a mesma tela e o mesmo
+  // mes dariam dois CMV diferentes, e ela nao saberia em qual acreditar.
+  const cmv = useMemo(
+    () => cmvDoMes({ vendas, fichas, estoque: estoqueNoMes(estoque, compras, mes).estoque, cardapio, mes }),
+    [vendas, fichas, estoque, compras, cardapio, mes],
+  );
   const lidoCMV = useMemo(() => lerCMV(cmv), [cmv]);
   const corCMV = { bom: C.green, atencao: C.amber, ruim: C.red, 'sem-base': C.amber, 'sem-dados': C.faint }[lidoCMV.nivel];
   if (cmv.pct != null && lidoCMV.nivel !== 'bom') alertas.push({ cor: corCMV, txt: `CMV em ${cmv.pct.toFixed(0)}%: ${lidoCMV.texto}` });
