@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
-import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre } from '../lib/estoque';
+import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias } from '../lib/estoque';
+import { prazoDeEntregaDoProduto } from '../lib/cotacao';
 
 const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '', validade: '' });
 
@@ -86,7 +87,7 @@ function PenteFino({ grupos, onJuntar, onIgnorar, ocupado }) {
   );
 }
 
-export default function Estoque({ itens = [], carregado = true, onAcao, compras = [], fichas = [], duplicadosIgnorados = [], onRepor }) {
+export default function Estoque({ itens = [], carregado = true, onAcao, compras = [], cotacoes = [], fichas = [], duplicadosIgnorados = [], onRepor }) {
   const [novo, setNovo] = useState(itemVazio());
   const [editId, setEditId] = useState(null);
   const [acao, setAcao] = useState(null);   // { id, tipo: 'entrada'|'saida'|'contagem' }
@@ -157,6 +158,24 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
 
   const ignorarGrupo = async (g) => {
     await onAcao({ acao: 'ignorarDuplicado', chave: g.chave });
+  };
+
+  // ---- Onde o dinheiro está, e quando repor ----
+  const [verDinheiro, setVerDinheiro] = useState(false);
+  const abc = useMemo(() => curvaABC(itens, hoje), [itens, hoje]);
+  // Mínimos que não batem com o consumo real. Só entram os que têm cotação com
+  // prazo de entrega — sem saber quanto o fornecedor demora, o sugerido seria
+  // chute com cara de conta.
+  const reposicao = useMemo(() => itens.map((it) => {
+    const prazo = prazoDeEntregaDoProduto(cotacoes, it.nome);
+    if (!(prazo > 0)) return null;
+    const l = leituraDeReposicao(it, prazo, hoje);
+    return (l.estado === 'baixo' || l.estado === 'sem-minimo' || l.estado === 'alto') ? { it, prazo, ...l } : null;
+  }).filter(Boolean).sort((a, b) => (a.cobertura ?? 999) - (b.cobertura ?? 999)), [itens, cotacoes, hoje]);
+
+  const aplicarSugerido = async (r) => {
+    if (busy) return;
+    await onAcao({ acao: 'edit', id: r.it.id, campos: { nome: r.it.nome, categoria: r.it.categoria, unidade: r.it.unidade, minimo: r.sugerido, custo: num(r.it.custo), conteudo: num(r.it.conteudo), conteudoUnid: r.it.conteudoUnid, validade: r.it.validade } });
   };
 
   const abaixoDoMin = useMemo(() => itens.filter((it) => num(it.minimo) > 0 && num(it.saldo) <= num(it.minimo)), [itens]);
@@ -387,6 +406,84 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
       )}
       <PenteFino grupos={duplicados} onJuntar={juntarGrupo} onIgnorar={ignorarGrupo} ocupado={fundindo} />
 
+      {/* ---- Quando repor: o mínimo contra o consumo de verdade ---- */}
+      {reposicao.length > 0 && (
+        <Card style={{ marginBottom: 14, borderColor: C.accent }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: C.accent, marginBottom: 4 }}>Mínimo fora do lugar ({reposicao.length})</div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
+            O ponto de repor não é um número redondo — é <b style={{ color: C.text }}>quanto sai por dia × quanto o fornecedor demora</b>, com folga pro
+            atraso e pro fim de semana. Só aparecem aqui os produtos que têm cotação com prazo de entrega.
+          </div>
+          {reposicao.slice(0, 8).map((r) => (
+            <div key={r.it.id} style={{ borderTop: `1px solid ${C.hair}`, padding: '8px 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 700 }}>{r.it.nome}</span>
+                <span style={{ fontSize: 12, color: r.cobertura != null && r.cobertura <= r.prazo ? C.red : C.muted, flexShrink: 0 }}>
+                  {r.cobertura != null ? `dura ${r.cobertura} dia(s)` : ''}
+                </span>
+              </div>
+              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 2, lineHeight: 1.45 }}>
+                sai {fmtQtd(r.porDia)} {r.it.unidade || 'un'}/dia · entrega em {r.prazo} dia(s) ·
+                {r.estado === 'sem-minimo' ? ' sem mínimo cadastrado' : ` mínimo hoje ${fmtQtd(r.atual)}`}
+                {r.estado === 'alto' && ' — alto demais, é dinheiro parado'}
+                {r.estado === 'baixo' && ' — baixo demais, vai faltar'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12.5, color: C.text }}>sugerido: <b style={{ color: C.accent }}>{fmtQtd(r.sugerido)} {r.it.unidade || 'un'}</b></span>
+                <Btn small kind="ghost" onClick={() => aplicarSugerido(r)} disabled={busy}>usar esse</Btn>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      {/* ---- Curva ABC: onde o dinheiro está ---- */}
+      {abc.linhas.length > 0 && (
+        <Card style={{ marginBottom: 14 }}>
+          <button onClick={() => setVerDinheiro((x) => !x)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: C.text }}>{verDinheiro ? '▾' : '▸'} Onde teu dinheiro está</span>
+            <span style={{ fontSize: 12, color: C.muted }}>{abc.porClasse[0].itens} produto(s) são {abc.total > 0 ? Math.round((abc.porClasse[0].valor / abc.total) * 100) : 0}% do consumo</span>
+          </button>
+          {verDinheiro && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
+                Classificado pelo que cada produto <b style={{ color: C.text }}>consome de dinheiro</b> em {abc.janela} dias — não pelo que é caro.
+                Os <b style={{ color: C.red }}>A</b> mandam no teu caixa: é neles que vale negociar preço e contar o estoque.
+              </div>
+              {abc.porClasse.filter((c) => c.itens > 0).map((c) => (
+                <div key={c.classe} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12.5, padding: '3px 0', color: C.muted }}>
+                  <span><b style={{ color: c.classe === 'A' ? C.red : c.classe === 'B' ? C.amber : C.faint }}>{c.classe}</b> · {c.itens} produto(s)</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{brl(c.valor)} em {abc.janela} dias</span>
+                </div>
+              ))}
+              <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.hair}` }}>
+                {abc.linhas.slice(0, 10).map((l) => (
+                  <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12.5, padding: '3px 0' }}>
+                    <span style={{ minWidth: 0 }}>
+                      <b style={{ color: l.classe === 'A' ? C.red : l.classe === 'B' ? C.amber : C.faint, fontSize: 11 }}>{l.classe}</b>{' '}
+                      <span style={{ color: C.text }}>{l.nome}</span>
+                      <span style={{ color: C.faint }}>{l.cobertura != null ? ` · dura ${l.cobertura}d` : ''}</span>
+                    </span>
+                    <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(l.consumoValor)}</span>
+                  </div>
+                ))}
+              </div>
+              {abc.parados.length > 0 && (
+                <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.hair}` }}>
+                  <div style={{ fontSize: 12.5, color: C.amber, fontWeight: 700 }}>
+                    Parado: {brl(abc.paradoTotal)} em {abc.parados.length} produto(s)
+                  </div>
+                  <div style={{ fontSize: 11.5, color: C.faint, marginTop: 3, lineHeight: 1.45 }}>
+                    Não saiu nada em {abc.janela} dias: {abc.parados.slice(0, 5).map((p) => `${p.nome} (${brl(p.parado)})`).join(', ')}.
+                    Isso é dinheiro teu na prateleira — vale promoção ou parar de comprar.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+
       {vencendo.length > 0 && (
         <Card style={{ marginBottom: 14, borderColor: CORES_VAL[vencendo[0].nivel] }}>
           <div style={{ fontSize: 14, fontWeight: 800, color: CORES_VAL[vencendo[0].nivel], marginBottom: 8 }}>
@@ -395,9 +492,26 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>
             Usa, encaixa num prato ou faz promoção — o que vence é dinheiro que tu já pagou.
           </div>
+          {/* Quando o produto tem mais de um lote, mostra os dois: "vence
+              amanhã" numa lata de 14 é alarme falso se 12 vencem só em
+              dezembro — e alarme falso repetido faz ela parar de olhar. */}
           {vencendo.map(({ item, dias, nivel }) => (
             <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, borderTop: `1px solid ${C.hair}`, padding: '7px 0', fontSize: 14 }}>
-              <span style={{ minWidth: 0 }}>{item.nome}</span>
+              <span style={{ minWidth: 0 }}>
+                {item.nome}
+                {(() => {
+                  // Quantas unidades vencem NESTA data — e não o saldo inteiro.
+                  const lotes = ordenarLotes(item.lotes);
+                  if (lotes.length < 2) return null;
+                  const oLote = lotes[0];
+                  const resto = lotes.slice(1).reduce((t, l) => t + numQtd(l.qtd), 0);
+                  return (
+                    <span style={{ display: 'block', fontSize: 11.5, color: C.faint, lineHeight: 1.4 }}>
+                      só {fmtQtd(oLote.qtd)} {item.unidade} deste lote — as outras {fmtQtd(resto)} vencem depois
+                    </span>
+                  );
+                })()}
+              </span>
               <span style={{ flexShrink: 0, textAlign: 'right' }}>
                 <span style={{ color: CORES_VAL[nivel], fontWeight: 800 }}>{textoValidade(dias)}</span>
                 <span style={{ color: C.faint, fontSize: 12 }}> · {fmtQtd(item.saldo)} {item.unidade}</span>
