@@ -58,9 +58,11 @@ function Delta({ atual, anterior, boaSubida = true }) {
   );
 }
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, FONTES_NAO_OPERACIONAL, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import { cmvDoMes, lerCMV } from '../lib/cmv';
 
-export default function Relatorios({ diario, receitas, despesas, mes, setMes, vendas = [], compras = [], estoque = [] }) {
+export default function Relatorios({ diario, receitas, despesas, mes, setMes, vendas = [], compras = [], estoque = [], fichas = [] }) {
   const [verDias, setVerDias] = useState(false); // abre o dia a dia da previsão
+  const [verCMV, setVerCMV] = useState(false);   // abre a lista de produtos do CMV
   const mesesDisp = [...new Set([...receitas, ...despesas].map((d) => ymOf(d.data)))].sort().reverse();
   const opts = mesesDisp.length ? mesesDisp : [ymOf(todayISO())];
   const recMes = receitas.filter((r) => ymOf(r.data) === mes);
@@ -85,6 +87,13 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   // entrou de aporte/empréstimo − o que saiu de investimento e pagamento de dívida.
   const resultadoFinal = Math.round((lucro + entradaNaoOp - investimento - dividaPaga) * 100) / 100;
   const margem = totalRec ? (lucro / totalRec) * 100 : 0;
+
+  // CMV: quanto de ingrediente saiu pra produzir o que foi vendido no mês.
+  // Fica num card separado, FORA da cascata do DRE, de propósito — veja a nota
+  // grande no card, mais abaixo.
+  const cmv = useMemo(() => cmvDoMes({ vendas, fichas, estoque, mes }), [vendas, fichas, estoque, mes]);
+  const lidoCMV = useMemo(() => lerCMV(cmv), [cmv]);
+  const corCMV = { bom: C.green, atencao: C.amber, ruim: C.red, 'sem-base': C.amber, 'sem-dados': C.faint }[lidoCMV.nivel];
 
   const evolucao = useMemo(() => {
     const map = {};
@@ -276,6 +285,109 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
         </div>
       </Card>
 
+      {/* CMV — CUSTO DA MERCADORIA VENDIDA
+          Card separado do DRE de propósito. O DRE daqui é de CAIXA: soma o que
+          ela pagou no mês, e o lucro lá embaixo tem que continuar batendo com
+          o banco. O CMV é de COMPETÊNCIA: o ingrediente do que foi vendido,
+          tenha sido pago quando for. Trocar um pelo outro na mesma cascata
+          daria dois números chamados "lucro" que discordam — e ela toma
+          decisão de dinheiro em cima disso. Então ficam lado a lado, com a
+          diferença explicada. */}
+      <Card style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.accent, fontWeight: 700, marginBottom: 4 }}>CMV — {mesLabel(mes)}</div>
+        <div style={{ fontSize: 12, color: C.faint, marginBottom: 12, lineHeight: 1.45 }}>
+          O <b style={{ color: C.text }}>custo do ingrediente do que tu vendeu</b> neste mês. É o número que diz se o preço está certo.
+        </div>
+
+        {cmv.pct == null ? (
+          <Empty>{lidoCMV.texto}</Empty>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, background: C.panel2, borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 800, color: corCMV, fontSize: 14 }}>{lidoCMV.titulo}</div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>{lidoCMV.texto}</div>
+              </div>
+              <div style={{ fontSize: 30, fontWeight: 900, color: corCMV, lineHeight: 1, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{cmv.pct.toFixed(0)}%</div>
+            </div>
+
+            {[['Receita dos produtos', cmv.receitaCoberta, C.green, false],
+              ['(–) CMV', cmv.cmv, C.amber, false],
+              ['(=) Margem bruta', cmv.margemBruta, cmv.margemBruta >= 0 ? C.accent : C.red, true]].map(([nome, val, cor, bold]) => (
+              <div key={nome} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderTop: bold ? `1px solid ${C.line}` : 'none' }}>
+                <span style={{ fontWeight: bold ? 800 : 500, color: bold ? C.text : C.muted }}>{nome}</span>
+                <span style={{ fontWeight: bold ? 800 : 600, color: cor, fontVariantNumeric: 'tabular-nums' }}>{brl(val)}</span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 10, borderTop: `1px solid ${C.line}` }}>
+              <span style={{ color: C.muted }}>Margem bruta</span>
+              <span style={{ fontWeight: 800, color: cmv.margemBrutaPct >= 0 ? C.accent : C.red }}>{cmv.margemBrutaPct.toFixed(1)}%</span>
+            </div>
+
+            {/* Por que esse número não é o "Custo variável" do DRE. */}
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
+                <span style={{ color: C.muted }}>CMV (o que tu <b style={{ color: C.text }}>vendeu</b>)</span>
+                <span style={{ fontWeight: 700, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{brl(cmv.cmv)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
+                <span style={{ color: C.muted }}>Custo variável (o que tu <b style={{ color: C.text }}>pagou</b>)</span>
+                <span style={{ fontWeight: 700, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{brl(custoVar)}</span>
+              </div>
+              <div style={{ fontSize: 11, color: C.faint, marginTop: 8, lineHeight: 1.5 }}>
+                {custoVar - cmv.cmv > 0.005
+                  ? <>Tu <b style={{ color: C.text }}>pagou {brl(custoVar - cmv.cmv)} a mais</b> do que consumiu vendendo: esse dinheiro virou estoque, ainda está na prateleira.</>
+                  : cmv.cmv - custoVar > 0.005
+                    ? <>Tu <b style={{ color: C.text }}>consumiu {brl(cmv.cmv - custoVar)} a mais</b> do que comprou: saiu estoque velho sem repor. Em algum mês isso volta como compra grande.</>
+                    : <>Comprou e consumiu quase o mesmo neste mês.</>}
+              </div>
+            </div>
+
+            {/* Os dois buracos que fazem o CMV mentir pra melhor. */}
+            {(cmv.semFicha.length > 0 || cmv.insumosSemCusto.length > 0) && (
+              <div style={{ marginTop: 12, background: C.panel2, borderRadius: 12, padding: '11px 14px' }}>
+                {cmv.semFicha.length > 0 && (
+                  <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+                    <b style={{ color: C.amber }}>Ficou de fora:</b> {cmv.semFicha.length} produto(s) sem ficha técnica, {brl(cmv.receitaSemFicha)} vendidos ({cmv.cobertura.toFixed(0)}% do que saiu entrou na conta). Maiores: {cmv.semFicha.slice(0, 4).map((s) => s.nome).join(', ')}.
+                  </div>
+                )}
+                {cmv.insumosSemCusto.length > 0 && (
+                  <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginTop: cmv.semFicha.length > 0 ? 8 : 0 }}>
+                    <b style={{ color: C.amber }}>Sem custo cadastrado:</b> {cmv.insumosSemCusto.slice(0, 6).join(', ')}. Enquanto esses ficarem sem preço, o CMV sai <b style={{ color: C.text }}>menor do que é de verdade</b>.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {cmv.produtos.length > 0 && (
+              <>
+                <div style={{ marginTop: 12 }}>
+                  <Btn kind="ghost" small onClick={() => setVerCMV((v) => !v)}>{verCMV ? 'Esconder os produtos' : `Ver produto por produto (${cmv.produtos.length})`}</Btn>
+                </div>
+                {verCMV && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 11, color: C.faint, marginBottom: 8, lineHeight: 1.45 }}>
+                      Os <b style={{ color: C.text }}>piores primeiro</b> — quem come mais percentual da própria venda. A coluna em reais é o que ele pesou no teu CMV do mês.
+                    </div>
+                    {cmv.produtos.slice(0, 20).map((p) => (
+                      <div key={p.nome} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.line}` }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</div>
+                          <div style={{ fontSize: 11, color: C.faint }}>saiu {p.qtd} · custou {brl(p.custo)}</div>
+                        </div>
+                        <span style={{ fontSize: 15, fontWeight: 800, flexShrink: 0, fontVariantNumeric: 'tabular-nums', color: p.pct == null ? C.faint : p.pct >= 45 ? C.red : p.pct >= 35 ? C.amber : C.green }}>
+                          {p.pct == null ? '—' : `${p.pct.toFixed(0)}%`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </Card>
+
       <Card style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.accent, fontWeight: 700, marginBottom: 12 }}>DRE — {mesLabel(mes)}</div>
         {[['Receita bruta', totalRec, C.green, false], ['(–) Custo variável', custoVar, C.amber, false], ['(–) Despesas operacionais', despOp, C.amber, false], ...(despOutras > 0.005 ? [['(–) Outras despesas', despOutras, C.amber, false]] : []), ['(=) Lucro operacional', lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, val, cor, bold]) => (
@@ -287,6 +399,9 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 10, borderTop: `1px solid ${C.line}` }}>
           <span style={{ color: C.muted }}>Margem operacional</span>
           <span style={{ fontWeight: 800, color: margem >= 0 ? C.accent : C.red }}>{margem.toFixed(1)}%</span>
+        </div>
+        <div style={{ fontSize: 11, color: C.faint, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}`, lineHeight: 1.5 }}>
+          Aqui é <b style={{ color: C.text }}>dinheiro que saiu</b>: o custo variável é o que tu pagou de mercadoria no mês, tenha vendido ou não. Pra saber se o <b style={{ color: C.text }}>preço</b> está certo, olha o CMV no card acima.
         </div>
       </Card>
 
