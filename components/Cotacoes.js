@@ -91,13 +91,21 @@ export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }
           <Field label="Data"><TextInput type="date" value={form.data} onChange={set('data')} /></Field>
         </div>
         {/* Sem a embalagem não dá pra comparar: o preço de uma caixa de 12 não
-            se compara com o de uma unidade. */}
+            se compara com o de uma unidade.
+
+            MESMA pergunta, MESMA ordem e MESMO exemplo da tela de Compras. O
+            campo sempre foi o mesmo (conteudo); só o rótulo divergia — aqui
+            perguntava "vêm quantas unidades" (o total) e lá "cada um tem" (o
+            de dentro). Parecem opostos, e ela respondeu 30 nos dois lugares
+            quando um deles queria 1 barril. Duas perguntas diferentes pra um
+            campo só é pedir pra errar. */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Embalagem"><Select value={form.embalagem} onChange={set('embalagem')} options={EMBALAGENS} /></Field>
-          <Field label="Vêm quantas unidades?"><NumInput value={form.conteudo} onChange={set('conteudo')} placeholder="caixa de 12 → 12" /></Field>
+          <Field label="Cada um tem"><NumInput value={form.conteudo} onChange={set('conteudo')} placeholder="ex: 30" /></Field>
+          <Field label="De quê"><Select value={form.embalagem} onChange={set('embalagem')} options={EMBALAGENS} /></Field>
         </div>
         <div style={{ fontSize: 11, color: C.faint, margin: '-6px 0 12px', lineHeight: 1.45 }}>
-          Esse preço é de <b>quantas unidades</b>? Unidade avulsa pode deixar em branco. É o que faz a comparação ser honesta: caixa de 12 a R$ 95 sai a <b>R$ 7,92</b> a unidade.
+          O que vem <b>dentro</b> de cada embalagem: barril de <b>30 L</b>, caixa de <b>12 un</b>, pacote de <b>2 kg</b>.
+          Unidade avulsa pode deixar em branco. É o que faz a comparação ser honesta: caixa de 12 a R$ 95 sai a <b>R$ 7,92</b> a unidade.
         </div>
 
         {/* Do FORNECEDOR, não do produto: digita uma vez e vale pras próximas. */}

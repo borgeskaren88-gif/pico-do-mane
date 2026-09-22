@@ -425,12 +425,17 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
             estoque em vez de 6 kg, e grava o custo do pacote como se fosse o do
             quilo — o dobro em cada prato que usa polenta. */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <Field label="Cada um tem (opcional)"><NumInput value={item.conteudo} onChange={setI('conteudo')} placeholder="ex: 2" /></Field>
+          <Field label="Cada um tem"><NumInput value={item.conteudo} onChange={setI('conteudo')} placeholder="ex: 30" /></Field>
           <Field label="De quê"><Select value={item.conteudoUnid} onChange={setI('conteudoUnid')} options={UNIDADES} placeholder="kg, g, L, ml…" /></Field>
         </div>
+        {/* Mesma pergunta e mesmo exemplo da tela de Cotações — veja a nota lá. */}
         <div style={{ fontSize: 11.5, color: C.faint, margin: '-4px 0 10px', lineHeight: 1.45 }}>
-          Só preenche quando a embalagem tem mais de uma unidade de uso dentro: pacote de 2 kg, fardo de 12, garrafa de 1 L.
-          Aí o estoque soma o conteúdo, e não o número de pacotes.
+          O que vem <b>dentro</b> de cada embalagem: barril de <b>30 L</b>, caixa de <b>12 un</b>, pacote de <b>2 kg</b>.
+          Unidade avulsa pode deixar em branco. Aí o estoque soma o conteúdo, e não o número de pacotes.
+        </div>
+        <div style={{ fontSize: 11.5, color: C.faint, margin: '-4px 0 10px', lineHeight: 1.45 }}>
+          Em <b style={{ color: C.muted }}>Quantidade</b>, aí em cima, vai o que tu <b style={{ color: C.muted }}>carregou pra dentro do bar</b>:
+          um barril é <b>1</b>, mesmo tendo 30 litros dentro.
         </div>
         {totalItem > 0 && <div style={{ fontSize: 13, color: C.text, margin: '-4px 0 8px' }}>Subtotal do item: <b>{brl(totalItem)}</b></div>}
         {menorCot && num(item.valorUnit) > 0 && (
