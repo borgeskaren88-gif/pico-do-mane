@@ -3,13 +3,14 @@ import React, { useMemo, useState } from 'react';
 import { C, Card, KPI, Empty, PageTitle, Select } from './ui';
 import { brl, num, ymOf, todayISO, mesLabel, FONTES_NAO_OPERACIONAL, DESPESA_NAO_OPERACIONAL } from '../lib/util';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
+import { cmvDoMes, lerCMV } from '../lib/cmv';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
 // Raio-X do mês: resultado financeiro + saúde do cardápio (margem) + o que saiu
 // sem vender (perdas/cortesias) + pontos de atenção. Só leitura — junta o que já
 // existe pra a dona ver, num lugar só, onde está perdendo dinheiro.
-export default function RaioX({ receitas = [], despesas = [], cardapio = [], fichas = [], estoque = [] }) {
+export default function RaioX({ receitas = [], despesas = [], cardapio = [], fichas = [], estoque = [], vendas = [] }) {
   const [mes, setMes] = useState(ymOf(todayISO()));
   const meses = useMemo(() => {
     const s = new Set([ymOf(todayISO())]);
@@ -75,6 +76,14 @@ export default function RaioX({ receitas = [], despesas = [], cardapio = [], fic
   if (receita > 0 && outfl.perda > receita * 0.03) alertas.push({ cor: C.amber, txt: `Perdas/desperdício de ${brl(outfl.perda)} (${((outfl.perda / receita) * 100).toFixed(1)}% da receita) — vale investigar.` });
   if (receita > 0 && (outfl.cortesia + outfl.consumo) > receita * 0.05) alertas.push({ cor: C.amber, txt: `Cortesias + consumo da casa somam ${brl(outfl.cortesia + outfl.consumo)} este mês.` });
 
+  // CMV do mês: o custo do ingrediente do que foi vendido. Fica aqui em cima
+  // porque é a pergunta de dinheiro mais direta que essa tela responde — e
+  // porque ninguém acha um número desses no meio de uma página longa.
+  const cmv = useMemo(() => cmvDoMes({ vendas, fichas, estoque, mes }), [vendas, fichas, estoque, mes]);
+  const lidoCMV = useMemo(() => lerCMV(cmv), [cmv]);
+  const corCMV = { bom: C.green, atencao: C.amber, ruim: C.red, 'sem-base': C.amber, 'sem-dados': C.faint }[lidoCMV.nivel];
+  if (cmv.pct != null && lidoCMV.nivel !== 'bom') alertas.push({ cor: corCMV, txt: `CMV em ${cmv.pct.toFixed(0)}%: ${lidoCMV.texto}` });
+
   const temDados = receita > 0 || despesa > 0 || margens.length > 0;
 
   return (
@@ -94,6 +103,26 @@ export default function RaioX({ receitas = [], despesas = [], cardapio = [], fic
             <KPI titulo="Lucro operacional" valor={brl(lucro)} cor={lucro >= 0 ? C.accent : C.red} />
             <KPI titulo="Saldo final" valor={brl(saldoFinal)} cor={saldoFinal >= 0 ? C.accent : C.red} sub="depois de invest./dívida" />
           </div>
+
+          <Card style={{ marginBottom: 12, padding: 14 }}>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 10 }}>CMV — custo do que foi vendido</div>
+            {cmv.pct == null ? (
+              <div style={{ fontSize: 13, color: C.faint, lineHeight: 1.45 }}>{lidoCMV.texto}</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, color: corCMV, fontSize: 14 }}>{lidoCMV.titulo}</div>
+                    <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>{brl(cmv.cmv)} de ingrediente em {brl(cmv.receitaCoberta)} vendidos</div>
+                  </div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: corCMV, lineHeight: 1, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{cmv.pct.toFixed(0)}%</div>
+                </div>
+                <div style={{ fontSize: 11, color: C.faint, marginTop: 8, lineHeight: 1.45 }}>
+                  É o custo do ingrediente do que tu <b style={{ color: C.text }}>vendeu</b> — não o que tu pagou de mercadoria. Saudável em bar: até 35%. A conta detalhada fica em <b style={{ color: C.text }}>Finanças → Relatórios</b>.
+                </div>
+              </>
+            )}
+          </Card>
 
           <Card style={{ marginBottom: 12, padding: 14 }}>
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 10 }}>Saúde do cardápio</div>

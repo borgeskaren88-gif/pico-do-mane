@@ -693,7 +693,7 @@ export default function Dashboard() {
             {subFinancas === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
             {subFinancas === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
             {subFinancas === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarPagamento} />}
-            {subFinancas === 'raiox' && <RaioX receitas={receitas} despesas={despesas} cardapio={cardapio} fichas={fichas} estoque={estoque} />}
+            {subFinancas === 'raiox' && <RaioX receitas={receitas} despesas={despesas} cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} />}
             {subFinancas === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} vendas={vendas} compras={compras} estoque={estoque} fichas={fichas} />}
           </>
         )}
