@@ -725,7 +725,7 @@ export default function Dashboard() {
                     }}>{rot}</button>
                   ))}
                 </div>
-                {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} cotacoes={cotacoes} fichas={fichas} duplicadosIgnorados={dupIgnorados} onRepor={reporLista} />}
+                {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} cotacoes={cotacoes} fichas={fichas} cardapio={cardapio} duplicadosIgnorados={dupIgnorados} onRepor={reporLista} />}
                 {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={estoqueAcao} />}
                 {subEstoque === 'conferencia' && <ConferenciaEstoque estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} onAcao={estoqueAcao} carregado={estCarregado} />}
                 {subEstoque === 'cortesia' && <CortesiaConsumo onFeito={() => carregarEstoque({})} />}
