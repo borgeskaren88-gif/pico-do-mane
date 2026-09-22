@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
-import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta } from '../lib/estoque';
+import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz } from '../lib/estoque';
 import { prazoDeEntregaDoProduto } from '../lib/cotacao';
 import EntradaPorVoz from './EntradaPorVoz';
 
@@ -311,6 +311,13 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     setBusy(false); fecharAcao();
   };
 
+  // Conteúdo que briga com a própria unidade do item, conferido enquanto ela
+  // digita — o campo é opcional e errá-lo não dá erro nenhum na hora.
+  const contradiz = useMemo(() => {
+    const r = conteudoContradiz({ unidade: novo.unidade, conteudo: numQtd(novo.conteudo), conteudoUnid: novo.conteudoUnid });
+    return r ? { ...r, conteudo: numQtd(novo.conteudo) } : null;
+  }, [novo.unidade, novo.conteudo, novo.conteudoUnid]);
+
   // Insumos cujo cálculo de custo está saindo por chute de unidade.
   const unidadeSolta = useMemo(() => insumosComUnidadeSolta(fichas, itens, cardapio), [fichas, itens, cardapio]);
 
@@ -357,11 +364,17 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
             return (
               <div key={p.estoqueId} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 10, marginTop: 10 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{limparNome(p.nome)}</div>
+                {/* O conselho TEM que ser específico. "Preenche o conteúdo"
+                    é conselho errado quando a receita pede em grama e o item
+                    está em litro: peso e volume não se convertem, e nenhum
+                    conteúdo em ml resolve isso. */}
                 <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 6px', lineHeight: 1.5 }}>
                   A receita pede em <b style={{ color: C.text }}>{p.unidadeReceita}</b> e o item está em <b style={{ color: C.text }}>{p.unidadeItem}</b>.
-                  {p.temConteudo
-                    ? ' O conteúdo está preenchido, mas numa medida que não casa com a da receita.'
-                    : ` Preenche "quanto vem em cada ${p.unidadeItem}" e o cálculo se ajeita sozinho.`}
+                  {p.temConteudo && ` O conteúdo está em ${p.conteudoUnid}, que não é o que a receita pede.`}
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, margin: '0 0 6px', lineHeight: 1.5 }}>
+                  Dois caminhos, escolhe um: cadastrar o item <b style={{ color: C.text }}>em {p.unidadeReceita}</b> (com o custo por {p.unidadeReceita}),
+                  ou preencher o conteúdo de cada {p.unidadeItem} <b style={{ color: C.text }}>em {p.unidadeReceita}</b> — tem que ser nessa medida, que é a que a receita usa.
                 </div>
                 <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 8, lineHeight: 1.45 }}>
                   Está inflando <b style={{ color: C.red }}>{brl(p.custoGerado)}</b> em {p.produtos.length} produto(s): {p.produtos.slice(0, 4).join(', ')}{p.produtos.length > 4 ? '…' : ''}.
@@ -630,6 +643,16 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
         <div style={{ fontSize: 11, color: C.faint, margin: '-6px 0 12px', lineHeight: 1.4 }}>
           Pra quem vende em fração ou usa parte da embalagem: garrafa de <b>1000 ml</b> → a ficha da taça usa <b>ml</b>; pacote de <b>50 un</b> (alumínio) → a ficha usa <b>1 un</b> e o estoque baixa o pacote certinho.
         </div>
+        {/* "1 litro contém 5000 ml" é impossível, e ficava guardado em
+            silêncio. O conteúdo só serve pra dizer o que tem DENTRO de uma
+            embalagem — quando ele está na mesma grandeza da unidade, dá pra
+            conferir a conta na hora. */}
+        {contradiz && (
+          <div style={{ fontSize: 12, color: C.red, background: C.panel2, borderRadius: 10, padding: '9px 12px', margin: '-6px 0 12px', lineHeight: 1.5, fontWeight: 600 }}>
+            Isso diz que <b>1 {contradiz.unidade} tem {fmtQtd(contradiz.conteudo)} {contradiz.conteudoUnid}</b> — mas 1 {contradiz.unidade} são {fmtQtd(contradiz.certo)} {contradiz.conteudoUnid}.
+            {' '}Se o que tu quer é dizer o tamanho da embalagem, a unidade do item tem que ser a embalagem (pote, pacote), não {contradiz.unidade}.
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvarItem}>{editId ? 'Salvar item' : 'Adicionar ao estoque'}</Btn>
           {editId && <Btn kind="ghost" onClick={cancelar}>Cancelar</Btn>}
