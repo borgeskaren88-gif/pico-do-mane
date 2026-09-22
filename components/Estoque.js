@@ -4,6 +4,7 @@ import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTit
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
 import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias } from '../lib/estoque';
 import { prazoDeEntregaDoProduto } from '../lib/cotacao';
+import EntradaPorVoz from './EntradaPorVoz';
 
 const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '', validade: '' });
 
@@ -310,6 +311,9 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     setBusy(false); fecharAcao();
   };
 
+  // Abastecer falando: todas as linhas conferidas entram numa gravação só.
+  const lancarLote = (entradas) => onAcao({ acao: 'movLote', entradas, motivo: 'Entrada por voz' });
+
   const reporNaLista = (lista) => {
     if (!onRepor) return;
     const add = onRepor(lista.map((it) => ({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), nome: it.nome, quantidade: '', categoria: it.categoria || '', comprado: false, criadoEm: Date.now() })));
@@ -330,6 +334,8 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
       <PageTitle sub="Quanto você tem, o que está acabando e quanto está parado em mercadoria">Estoque</PageTitle>
 
       {reposto && <Card style={{ marginBottom: 12, borderColor: C.green }}><div style={{ fontSize: 14, color: C.green, fontWeight: 700 }}>{reposto}</div></Card>}
+
+      <EntradaPorVoz itens={itens} onLote={lancarLote} />
 
       <Card style={{ marginBottom: 12, background: C.panel2 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
