@@ -101,7 +101,7 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [], venda
   // e quantas saíram no mês. Produto sem ficha não entra — sem saber o custo
   // não dá pra dizer se ele dá lucro.
   const paraMatriz = useMemo(
-    () => comFicha.map((l) => ({ id: l.id, nome: l.nome, categoria: l.categoria || 'Sem categoria', lucro: l.lucro, qtd: l.qtdMes })),
+    () => comFicha.map((l) => ({ id: l.id, nome: l.nome, categoria: l.categoria || 'Sem categoria', lucro: l.lucro, qtd: l.qtdMes, preco: l.preco, custo: l.custo })),
     [comFicha],
   );
 
