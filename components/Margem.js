@@ -4,6 +4,7 @@ import { C, Card, KPI, Empty, PageTitle, TextInput } from './ui';
 import { brl, num, diaOperacional, ymOf, mesLabel } from '../lib/util';
 import { norm } from '../lib/darci';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
+import { cmvDoMes, lerCMV } from '../lib/cmv';
 import { CATEGORIAS_CARDAPIO } from './Cardapio';
 
 // Margem por produto: cruza o CUSTO da ficha técnica (+ fruta do sabor) com o
@@ -87,6 +88,11 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [], venda
   const lucroMes = comFicha.reduce((s, l) => s + l.lucroMes, 0);
   const temVendas = comFicha.some((l) => l.qtdMes > 0);
 
+  // O CMV do mesmo mês. Sai pelo caminho da venda (ficha + o sabor escolhido),
+  // não pela média desta tela — por isso vem da lib e não do `lucroMes` acima.
+  const cmv = useMemo(() => cmvDoMes({ vendas, fichas, estoque, mes }), [vendas, fichas, estoque, mes]);
+  const corCMV = { bom: C.green, atencao: C.amber, ruim: C.red, 'sem-base': C.amber, 'sem-dados': C.faint }[lerCMV(cmv).nivel];
+
   const filtro = busca.trim().toLowerCase();
   const lista = filtro ? linhas.filter((l) => (l.nome || '').toLowerCase().includes(filtro)) : [];
 
@@ -148,6 +154,14 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [], venda
         <KPI titulo="Margem média" valor={comFicha.length ? margemMedia.toFixed(0) + '%' : '—'} cor={corMargem(margemMedia)} sub={`${comFicha.length} item(ns) com ficha`} />
         <KPI titulo={`Lucro em ${mesLabel(mes)}`} valor={temVendas ? brl(lucroMes) : '—'} cor={lucroMes >= 0 ? C.green : C.red} sub={temVendas ? 'o que o cardápio te deu' : 'sem venda de comanda ainda'} />
         <KPI titulo="No prejuízo" valor={String(noPrejuizo)} cor={noPrejuizo > 0 ? C.red : C.green} sub={noPrejuizo > 0 ? 'custam mais que vendem' : 'nenhum item no vermelho'} />
+        {/* O mesmo mês, visto por cima: quanto do que entrou foi embora em
+            ingrediente. A conta detalhada fica em Finanças → Relatórios. */}
+        <KPI
+          titulo={`CMV em ${mesLabel(mes)}`}
+          valor={cmv.pct == null ? '—' : `${cmv.pct.toFixed(0)}%`}
+          cor={corCMV}
+          sub={cmv.pct == null ? 'sem venda com ficha' : `${brl(cmv.cmv)} de ingrediente`}
+        />
       </div>
 
       {/* Por onde olhar. Cada ordem responde uma pergunta diferente. */}
