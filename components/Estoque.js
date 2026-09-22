@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
-import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz } from '../lib/estoque';
+import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz, comprasComCustoEstranho } from '../lib/estoque';
 import { prazoDeEntregaDoProduto } from '../lib/cotacao';
 import EntradaPorVoz from './EntradaPorVoz';
 
@@ -318,6 +318,10 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     return r ? { ...r, conteudo: numQtd(novo.conteudo) } : null;
   }, [novo.unidade, novo.conteudo, novo.conteudoUnid]);
 
+  // Itens onde a NOTA diz um custo e o item diz outro. O CMV usa o da nota, e
+  // esse segundo custo não aparecia em tela nenhuma.
+  const custoEstranho = useMemo(() => comprasComCustoEstranho(itens, compras), [itens, compras]);
+
   // Insumos cujo cálculo de custo está saindo por chute de unidade.
   const unidadeSolta = useMemo(() => insumosComUnidadeSolta(fichas, itens, cardapio), [fichas, itens, cardapio]);
 
@@ -383,6 +387,40 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
               </div>
             );
           })}
+        </Card>
+      )}
+
+      {/* A NOTA BRIGANDO COM O ITEM. Vem antes do resto porque envergava o CMV
+          inteiro sem aparecer em lugar nenhum: o item mostrava um custo e o
+          CMV calculava com outro, reconstruído das notas. */}
+      {custoEstranho.length > 0 && (
+        <Card style={{ marginBottom: 12, borderColor: C.red }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: C.red, marginBottom: 4 }}>
+            A nota discorda do item ({custoEstranho.length})
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
+            O CMV não usa o custo que tu cadastrou aqui — ele refaz o custo de cada mês <b style={{ color: C.text }}>pelas notas de compra daquele mês</b>, pra cada mês sair com o preço da época.
+            Quando os dois brigam muito, quase sempre é a <b style={{ color: C.text }}>embalagem faltando na nota</b>.
+          </div>
+          {custoEstranho.map((p) => (
+            <div key={p.estoqueId} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 10, marginTop: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{limparNome(p.nome)}</div>
+              <div style={{ fontSize: 12, color: C.muted, margin: '5px 0 6px', lineHeight: 1.5 }}>
+                Aqui está <b style={{ color: C.text }}>{brl(p.custoItem)}</b> por {p.unidade} · a nota diz <b style={{ color: C.red }}>{brl(p.custoCompras)}</b> por {p.unidade}
+                {' '}— <b style={{ color: C.text }}>{p.vezes}×</b> {p.notaMaisCara ? 'mais caro' : 'mais barato'}. O CMV está usando o da nota.
+              </div>
+              {p.semEmbalagem > 0 ? (
+                <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.45 }}>
+                  {p.semEmbalagem} de {p.totalNotas} nota(s) deste produto estão <b style={{ color: C.muted }}>sem dizer o que vem na embalagem</b>.
+                  {' '}Vai em <b style={{ color: C.muted }}>Compras</b> e preenche “Cada um tem” nelas — barril de 30 L, caixa de 12 un.
+                </div>
+              ) : (
+                <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.45 }}>
+                  As notas têm embalagem preenchida, então o preço mudou mesmo. Confere o custo cadastrado aqui — ou roda “Corrigir custos”.
+                </div>
+              )}
+            </div>
+          ))}
         </Card>
       )}
 
