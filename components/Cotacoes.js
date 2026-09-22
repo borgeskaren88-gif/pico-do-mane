@@ -8,7 +8,7 @@ import { EMBALAGENS, melhorCompra, precoUnitario, descreveEmbalagem } from '../l
 export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }) {
   // Embalagem + quantas unidades vêm: sem isso, "caixa de 12 a R$ 95" parece
   // mais cara que "unidade a R$ 8,50" — quando é o contrário.
-  const vazio = { data: todayISO(), produto: '', fornecedor: '', preco: '', categoria: '', embalagem: 'un', conteudo: '', prazoPag: '', minPedido: '' };
+  const vazio = { data: todayISO(), produto: '', fornecedor: '', preco: '', categoria: '', embalagem: 'un', conteudo: '', prazoPag: '', minPedido: '', prazoEntrega: '' };
   const [form, setForm] = useState(vazio);
   const sugestoesProdutos = useMemo(() => [
     ...estoque.map((e) => e && e.nome),
@@ -33,7 +33,7 @@ export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }
     setForm({
       data: d.data || todayISO(), produto: d.produto || '', fornecedor: d.fornecedor || '', preco: d.preco || '',
       categoria: d.categoria || '', embalagem: d.embalagem || 'un', conteudo: String(d.conteudo ?? ''),
-      prazoPag: String(d.prazoPag ?? ''), minPedido: String(d.minPedido ?? ''),
+      prazoPag: String(d.prazoPag ?? ''), minPedido: String(d.minPedido ?? ''), prazoEntrega: String(d.prazoEntrega ?? ''),
     });
     setEditId(d.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -103,6 +103,9 @@ export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }
         {/* Do FORNECEDOR, não do produto: digita uma vez e vale pras próximas. */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Prazo pra pagar (dias)"><NumInput value={form.prazoPag} onChange={set('prazoPag')} placeholder="0 = à vista" /></Field>
+          {/* Prazo de ENTREGA: é ele que decide quando repor. Pedir com 1 dia
+              de antecedência pra quem leva 5 é o mesmo que não pedir. */}
+          <Field label="Demora quantos dias pra entregar"><NumInput value={form.prazoEntrega} onChange={set('prazoEntrega')} placeholder="ex: 3" /></Field>
           <Field label="Pedido mínimo (R$)"><NumInput value={form.minPedido} onChange={set('minPedido')} placeholder="em branco = sem mínimo" /></Field>
         </div>
         <div style={{ fontSize: 11, color: C.faint, margin: '-6px 0 12px', lineHeight: 1.45 }}>
@@ -149,7 +152,7 @@ export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }
                 <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13, padding: '4px 0', color: C.muted }}>
                   <span style={{ minWidth: 0 }}>
                     {limparNome(r.fornecedor)} <span style={{ color: C.faint }}>· {fmtDate(r.data)}</span>
-                    <span style={{ display: 'block', fontSize: 11, color: C.faint }}>{descreveEmbalagem(r)}{num(r.prazoPag) > 0 ? ` · ${num(r.prazoPag)} dias pra pagar` : ''}{num(r.minPedido) > 0 ? ` · mín. ${brl(num(r.minPedido))}` : ''}</span>
+                    <span style={{ display: 'block', fontSize: 11, color: C.faint }}>{descreveEmbalagem(r)}{num(r.prazoPag) > 0 ? ` · ${num(r.prazoPag)} dias pra pagar` : ''}{num(r.minPedido) > 0 ? ` · mín. ${brl(num(r.minPedido))}` : ''}{num(r.prazoEntrega) > 0 ? ` · entrega em ${num(r.prazoEntrega)}d` : ''}</span>
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     <b style={{ color: precoUnitario(r) === grp.menor ? C.green : C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(precoUnitario(r))}<span style={{ fontSize: 10.5, color: C.faint, fontWeight: 400 }}>/un</span></b>
