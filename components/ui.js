@@ -134,7 +134,7 @@ export function Area({ value, onChange, placeholder, rows = 2 }) {
   );
 }
 
-export function Btn({ children, onClick, kind = 'primary', small, type = 'button' }) {
+export function Btn({ children, onClick, kind = 'primary', small, type = 'button', disabled = false, style }) {
   const styles = {
     primary: { background: C.accent, color: '#06101F', border: 'none' },
     ghost: { background: 'transparent', color: C.text, border: `1px solid ${C.line}` },
@@ -142,9 +142,14 @@ export function Btn({ children, onClick, kind = 'primary', small, type = 'button
     ok: { background: C.green, color: '#052014', border: 'none' },
   }[kind];
   return (
-    <button type={type} onClick={onClick} style={{
+    <button type={type} onClick={onClick} disabled={disabled} style={{
       ...styles, borderRadius: 10, padding: small ? '7px 12px' : '11px 18px',
-      fontSize: small ? 13 : 15, fontWeight: 700, cursor: 'pointer',
+      fontSize: small ? 13 : 15, fontWeight: 700,
+      // Desligado tem que PARECER desligado: sem isso o botão fica vivo na tela
+      // e ela toca nele achando que travou.
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      opacity: disabled ? 0.45 : 1,
+      ...style,
     }}>{children}</button>
   );
 }

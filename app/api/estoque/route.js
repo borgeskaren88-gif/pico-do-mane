@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, fundirItens, repontarFichas, repontarCompras, comprasPendentesDeEstoque, igualNome } from '../../../lib/estoque';
-import { limparNome, num, todayISO } from '../../../lib/util';
+import { limparNome, num, numQtd, todayISO } from '../../../lib/util';
 import { notificarEstoqueCritico, notificarSaidaSemVenda } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -106,6 +106,44 @@ export async function POST(request) {
         } catch (e) { /* push nunca quebra o movimento */ }
       }
       return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
+    }
+
+    // VÁRIAS ENTRADAS DE UMA VEZ (é o que a entrada por voz usa).
+    //
+    // Uma chamada por linha faria N gravações do painel inteiro, e duas delas
+    // se atropelando perderiam a primeira. Aqui tudo entra numa gravação só.
+    if (acao === 'movLote') {
+      const entradas = arr(body?.entradas)
+        .map((e) => ({ id: String(e?.id || ''), qtd: numQtd(e?.qtd), validade: String(e?.validade || '') }))
+        .filter((e) => e.id && e.qtd > 0);
+      if (!entradas.length) return NextResponse.json({ ok: false, erro: 'Nenhuma entrada pra lançar.' }, { status: 400 });
+
+      const quem = p === 'cozinha' ? ' (cozinha)' : '';
+      const motivo = (String(body?.motivo || '').trim() || 'Entrada por voz') + quem;
+      const feitas = [];
+      // Aplica uma a uma, em ordem: duas linhas do MESMO item viram dois
+      // movimentos somando, e não uma sobrescrevendo a outra.
+      for (const e of entradas) {
+        let achou = false;
+        itens = itens.map((it) => {
+          if (it.id !== e.id) return it;
+          achou = true;
+          return aplicarMovimentoItem(it, 'entrada', e.qtd, motivo, e.validade);
+        });
+        if (achou) feitas.push(e);
+      }
+      if (!feitas.length) return NextResponse.json({ ok: false, erro: 'Nenhum dos itens foi encontrado.' }, { status: 404 });
+
+      const novo = await gravarEstoque(sb, blob, { estoque: itens });
+      return NextResponse.json({
+        ok: true,
+        itens: arr(novo.estoque),
+        lancadas: feitas.length,
+        resumo: feitas.map((e) => {
+          const it = itens.find((x) => x.id === e.id);
+          return { nome: limparNome(it?.nome), qtd: e.qtd, unidade: it?.unidade || 'un', saldo: num(it?.saldo) };
+        }),
+      });
     }
 
     // A partir daqui, só a dona.
