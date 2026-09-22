@@ -2,7 +2,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
 import { brl, num, numQtd, todayISO, ymOf, fmtDate, addDays, uid, limparNome, montarParcelas, ratearParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
-import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, UNIDADES } from '../lib/estoque';
+import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, fatorEntre, UNIDADES } from '../lib/estoque';
+import { precoNaUnidadeDoItem } from '../lib/cotacao';
 
 // Dados compartilhados da compra (valem pra todos os itens do carrinho).
 const compraVazia = () => ({ data: todayISO(), fornecedor: '', formaPagto: 'À vista', pago: 'Sim', vencimento: '', nota: '' });
@@ -193,17 +194,39 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   // à vista costuma já estar paga; a prazo vai pro A Pagar (não paga ainda).
   const setForma = (v) => setCompra((f) => ({ ...f, formaPagto: v, pago: v === 'À vista' ? 'Sim' : 'Não' }));
 
-  // Menor cotação já registrada pro produto que está sendo digitado.
+  // Menor cotação já registrada pro produto que está sendo digitado, NA MESMA
+  // unidade em que a nota está entrando no estoque.
+  //
+  // Antes comparava o valor unitário digitado com o preço BRUTO da cotação.
+  // A cotação do chopp é "R$ 345 o barril, 30 L dentro"; a nota está em litro.
+  // Comparar 11,50 com 345 dizia "abaixo da menor cotação" quando ela estava
+  // pagando exatamente o cotado — e diria o mesmo com R$ 20 o litro, que é
+  // quase o dobro. O erro apontava sempre pro lado de "tá barato".
+  //
+  // Agora os dois lados viram custo por unidade DO ITEM DE ESTOQUE, que é a
+  // única régua que não depende de como ela digitou a linha.
+  const alvoItem = useMemo(() => resolverCompraNoEstoque(item, estoque), [item, estoque]);
+  const custoNaNota = useMemo(() => {
+    const e = alvoItem ? entradaDaCompra(item, alvoItem.item) : null;
+    return e && e.custo > 0 ? e.custo : 0;
+  }, [item, alvoItem]);
+
   const menorCot = useMemo(() => {
-    if (!item.produto) return null;
+    if (!item.produto || !alvoItem) return null;
     const regs = cotacoes.filter((c) => limparNome(c.produto).toLowerCase() === limparNome(item.produto).toLowerCase());
     if (!regs.length) return null;
-    const menor = Math.min(...regs.map((r) => num(r.preco)));
-    return { menor, forn: limparNome(regs.find((r) => num(r.preco) === menor)?.fornecedor) };
-  }, [item.produto, cotacoes]);
+    const comPreco = regs
+      .map((c) => ({ c, unit: precoNaUnidadeDoItem(c, alvoItem.item, fatorEntre) }))
+      .filter((x) => x.unit != null && x.unit > 0);
+    // Cotação que não dá pra trazer pra unidade do item fica de fora: melhor
+    // não comparar do que comparar errado.
+    if (!comPreco.length) return null;
+    const melhor = comPreco.reduce((a, b) => (b.unit < a.unit ? b : a));
+    return { menor: melhor.unit, forn: limparNome(melhor.c.fornecedor), unidade: alvoItem.item.unidade || 'un' };
+  }, [item, alvoItem, cotacoes]);
 
   const totalItem = num(item.quantidade) * num(item.valorUnit);
-  const difVsCot = menorCot ? (num(item.valorUnit) - menorCot.menor) : 0;
+  const difVsCot = menorCot && custoNaNota > 0 ? Math.round((custoNaNota - menorCot.menor) * 100) / 100 : 0;
   const totalCarrinho = carrinho.reduce((s, it) => s + num(it.quantidade) * num(it.valorUnit), 0);
 
   // Parcelar só faz sentido em compra a prazo. Ao mudar o nº de parcelas (ou o
@@ -438,11 +461,18 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
           um barril é <b>1</b>, mesmo tendo 30 litros dentro.
         </div>
         {totalItem > 0 && <div style={{ fontSize: 13, color: C.text, margin: '-4px 0 8px' }}>Subtotal do item: <b>{brl(totalItem)}</b></div>}
-        {menorCot && num(item.valorUnit) > 0 && (
+        {menorCot && custoNaNota > 0 && (
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, marginBottom: 12, fontSize: 13 }}>
-            <div style={{ color: C.muted }}>Menor cotação: <b style={{ color: C.green }}>{brl(menorCot.menor)}</b>{menorCot.forn && ` (${menorCot.forn})`}</div>
+            <div style={{ color: C.muted }}>
+              Menor cotação: <b style={{ color: C.green }}>{brl(menorCot.menor)}</b> por {menorCot.unidade}{menorCot.forn && ` (${menorCot.forn})`}
+            </div>
+            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+              Nesta nota tu está pagando <b style={{ color: C.muted }}>{brl(custoNaNota)}</b> por {menorCot.unidade}
+            </div>
             <div style={{ marginTop: 3, color: difVsCot > 0 ? C.red : C.green, fontWeight: 700 }}>
-              {difVsCot > 0 ? `Pagando ${brl(difVsCot)} a mais por unidade` : difVsCot < 0 ? 'Abaixo da menor cotação' : 'No melhor preço'}
+              {difVsCot > 0 ? `Pagando ${brl(difVsCot)} a mais por ${menorCot.unidade}`
+                : difVsCot < 0 ? `Abaixo da menor cotação — ${brl(-difVsCot)} a menos por ${menorCot.unidade}`
+                  : 'No melhor preço'}
             </div>
           </div>
         )}
