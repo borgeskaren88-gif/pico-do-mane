@@ -354,6 +354,33 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
               </div>
             )}
 
+            {/* FICHA QUEBRADA — vem ANTES de tudo, porque enquanto existir é
+                a única coisa que importa: o número lá em cima saiu sem esses
+                produtos, e eles foram vendidos. */}
+            {cmv.impossiveis.length > 0 && (
+              <div style={{ marginTop: 14, border: `1px solid ${C.red}`, borderRadius: 12, padding: '11px 13px' }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: C.red }}>
+                  Ficha técnica com erro ({cmv.impossiveis.length})
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 5, lineHeight: 1.5 }}>
+                  O ingrediente destes custa <b style={{ color: C.text }}>muitas vezes o preço de venda</b> — isso não é prejuízo, é erro de cadastro.
+                  Ficaram <b style={{ color: C.text }}>fora do CMV acima</b>: com eles dentro, um produto só enverga o número do mês inteiro.
+                </div>
+                {cmv.impossiveis.slice(0, 6).map((p) => (
+                  <div key={p.nome} style={{ padding: '8px 0', borderTop: `1px solid ${C.line}`, marginTop: 8 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{p.nome}</div>
+                    <div style={{ fontSize: 11.5, color: C.faint, marginTop: 3 }}>
+                      saiu {p.qtd} · vendeu {brl(p.receita)} e a ficha diz que custou <b style={{ color: C.red }}>{brl(p.custo)}</b> ({p.pct.toFixed(0)}%)
+                    </div>
+                  </div>
+                ))}
+                <div style={{ fontSize: 11.5, color: C.faint, marginTop: 8, lineHeight: 1.5 }}>
+                  Abre a ficha técnica de cada um e confere a <b style={{ color: C.muted }}>quantidade e a unidade</b> de cada ingrediente.
+                  {' '}Vários produtos com o mesmo valor errado costumam compartilhar um ingrediente só — arruma um e os outros vêm junto.
+                </div>
+              </div>
+            )}
+
             {/* Os dois buracos que fazem o CMV mentir pra melhor. */}
             {(cmv.semFicha.length > 0 || cmv.insumosSemCusto.length > 0) && (
               <div style={{ marginTop: 12, background: C.panel2, borderRadius: 12, padding: '11px 14px' }}>

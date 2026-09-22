@@ -88,6 +88,14 @@ export default function RaioX({ receitas = [], despesas = [], cardapio = [], fic
   const lidoCMV = useMemo(() => lerCMV(cmv), [cmv]);
   const corCMV = { bom: C.green, atencao: C.amber, ruim: C.red, 'sem-base': C.amber, 'sem-dados': C.faint }[lidoCMV.nivel];
   if (cmv.pct != null && lidoCMV.nivel !== 'bom') alertas.push({ cor: corCMV, txt: `CMV em ${cmv.pct.toFixed(0)}%: ${lidoCMV.texto}` });
+  // Ficha quebrada vira alerta aqui também: o CMV acima já saiu sem esses
+  // produtos, e ela precisa saber que saiu.
+  if (cmv.impossiveis.length) {
+    alertas.push({
+      cor: C.red,
+      txt: `${cmv.impossiveis.length} produto(s) com ficha técnica errada ficaram de fora do CMV (${cmv.impossiveis.slice(0, 3).map((p) => p.nome).join(', ')}). O ingrediente deles custa muitas vezes o preço de venda — confere a unidade na ficha.`,
+    });
+  }
 
   const temDados = receita > 0 || despesa > 0 || margens.length > 0;
 
