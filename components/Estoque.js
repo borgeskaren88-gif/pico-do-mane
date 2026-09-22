@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
-import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias } from '../lib/estoque';
+import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta } from '../lib/estoque';
 import { prazoDeEntregaDoProduto } from '../lib/cotacao';
 import EntradaPorVoz from './EntradaPorVoz';
 
@@ -88,7 +88,7 @@ function PenteFino({ grupos, onJuntar, onIgnorar, ocupado }) {
   );
 }
 
-export default function Estoque({ itens = [], carregado = true, onAcao, compras = [], cotacoes = [], fichas = [], duplicadosIgnorados = [], onRepor }) {
+export default function Estoque({ itens = [], carregado = true, onAcao, compras = [], cotacoes = [], fichas = [], cardapio = [], duplicadosIgnorados = [], onRepor }) {
   const [novo, setNovo] = useState(itemVazio());
   const [editId, setEditId] = useState(null);
   const [acao, setAcao] = useState(null);   // { id, tipo: 'entrada'|'saida'|'contagem' }
@@ -311,6 +311,9 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     setBusy(false); fecharAcao();
   };
 
+  // Insumos cujo cálculo de custo está saindo por chute de unidade.
+  const unidadeSolta = useMemo(() => insumosComUnidadeSolta(fichas, itens, cardapio), [fichas, itens, cardapio]);
+
   // Abastecer falando: todas as linhas conferidas entram numa gravação só.
   const lancarLote = (entradas) => onAcao({ acao: 'movLote', entradas, motivo: 'Entrada por voz' });
 
@@ -334,6 +337,41 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
       <PageTitle sub="Quanto você tem, o que está acabando e quanto está parado em mercadoria">Estoque</PageTitle>
 
       {reposto && <Card style={{ marginBottom: 12, borderColor: C.green }}><div style={{ fontSize: 14, color: C.green, fontWeight: 700 }}>{reposto}</div></Card>}
+
+      {/* UNIDADE SOLTA — o erro mais caro que o sistema consegue cometer em
+          silêncio. A receita pede ml, o item está em pote, e ninguém disse
+          quantos ml tem o pote: aí 300 ml viram 300 POTES e um prato de R$ 30
+          passa a custar vinte e um mil reais. O conserto é no ITEM (preencher
+          o conteúdo), por isso o aviso mora aqui e não na tela das fichas. */}
+      {unidadeSolta.length > 0 && (
+        <Card style={{ marginBottom: 12, borderColor: C.red }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: C.red, marginBottom: 4 }}>
+            Falta dizer o conteúdo ({unidadeSolta.length})
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
+            A receita pede <b style={{ color: C.text }}>uma medida</b> (ml, g) e o item está cadastrado por <b style={{ color: C.text }}>embalagem</b> (pote, pacote).
+            Sem dizer quanto cabe na embalagem, o sistema conta cada mililitro como um pote inteiro — e o custo do prato estoura.
+          </div>
+          {unidadeSolta.map((p) => {
+            const it = itens.find((x) => x.id === p.estoqueId);
+            return (
+              <div key={p.estoqueId} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 10, marginTop: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{limparNome(p.nome)}</div>
+                <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 6px', lineHeight: 1.5 }}>
+                  A receita pede em <b style={{ color: C.text }}>{p.unidadeReceita}</b> e o item está em <b style={{ color: C.text }}>{p.unidadeItem}</b>.
+                  {p.temConteudo
+                    ? ' O conteúdo está preenchido, mas numa medida que não casa com a da receita.'
+                    : ` Preenche "quanto vem em cada ${p.unidadeItem}" e o cálculo se ajeita sozinho.`}
+                </div>
+                <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 8, lineHeight: 1.45 }}>
+                  Está inflando <b style={{ color: C.red }}>{brl(p.custoGerado)}</b> em {p.produtos.length} produto(s): {p.produtos.slice(0, 4).join(', ')}{p.produtos.length > 4 ? '…' : ''}.
+                </div>
+                {it && <Btn small onClick={() => editar(it)}>Arrumar {limparNome(p.nome)}</Btn>}
+              </div>
+            );
+          })}
+        </Card>
+      )}
 
       <EntradaPorVoz itens={itens} onLote={lancarLote} />
 
