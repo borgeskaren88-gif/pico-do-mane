@@ -4,13 +4,13 @@ import { C, Card, KPI, Empty, PageTitle, TextInput } from './ui';
 import { brl, num, diaOperacional, ymOf, mesLabel } from '../lib/util';
 import { norm } from '../lib/darci';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
-import { cmvDoMes, lerCMV } from '../lib/cmv';
+import { cmvDoMes, lerCMV, estoqueNoMes } from '../lib/cmv';
 import { CATEGORIAS_CARDAPIO } from './Cardapio';
 
 // Margem por produto: cruza o CUSTO da ficha técnica (+ fruta do sabor) com o
 // PREÇO do cardápio, pra mostrar quanto cada item dá de lucro. Agrupado por
 // categoria; com busca por nome. Só leitura, não muda nada.
-export default function Margem({ cardapio = [], fichas = [], estoque = [], vendas = [] }) {
+export default function Margem({ cardapio = [], fichas = [], estoque = [], vendas = [], compras = [] }) {
   const [busca, setBusca] = useState('');
   // Por onde olhar a lista. Margem % e lucro em R$ contam histórias
   // diferentes: a polenta tem 79% e dá R$ 13; o camarão tem 67% e dá R$ 70.
@@ -90,7 +90,10 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [], venda
 
   // O CMV do mesmo mês. Sai pelo caminho da venda (ficha + o sabor escolhido),
   // não pela média desta tela — por isso vem da lib e não do `lucroMes` acima.
-  const cmv = useMemo(() => cmvDoMes({ vendas, fichas, estoque, mes }), [vendas, fichas, estoque, mes]);
+  const cmv = useMemo(
+    () => cmvDoMes({ vendas, fichas, estoque: estoqueNoMes(estoque, compras, mes).estoque, cardapio, mes }),
+    [vendas, fichas, estoque, compras, cardapio, mes],
+  );
   const corCMV = { bom: C.green, atencao: C.amber, ruim: C.red, 'sem-base': C.amber, 'sem-dados': C.faint }[lerCMV(cmv).nivel];
 
   const filtro = busca.trim().toLowerCase();

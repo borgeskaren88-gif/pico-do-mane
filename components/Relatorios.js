@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import {
-  BarChart, Bar, AreaChart, Area as AreaRecharts, XAxis, YAxis, Tooltip,
+  BarChart, Bar, AreaChart, Area as AreaRecharts, LineChart, Line, Legend, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell,
 } from 'recharts';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle, Label } from './ui';
@@ -58,9 +58,9 @@ function Delta({ atual, anterior, boaSubida = true }) {
   );
 }
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, FONTES_NAO_OPERACIONAL, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
-import { cmvDoMes, lerCMV } from '../lib/cmv';
+import { cmvDoMes, lerCMV, evolucaoCMV, compararCMV, variacaoProdutos, estoqueNoMes } from '../lib/cmv';
 
-export default function Relatorios({ diario, receitas, despesas, mes, setMes, vendas = [], compras = [], estoque = [], fichas = [] }) {
+export default function Relatorios({ diario, receitas, despesas, mes, setMes, vendas = [], compras = [], estoque = [], fichas = [], cardapio = [] }) {
   const [verDias, setVerDias] = useState(false); // abre o dia a dia da previsão
   const [verCMV, setVerCMV] = useState(false);   // abre a lista de produtos do CMV
   const mesesDisp = [...new Set([...receitas, ...despesas].map((d) => ymOf(d.data)))].sort().reverse();
@@ -91,9 +91,37 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   // CMV: quanto de ingrediente saiu pra produzir o que foi vendido no mês.
   // Fica num card separado, FORA da cascata do DRE, de propósito — veja a nota
   // grande no próprio card, logo no começo da página.
-  const cmv = useMemo(() => cmvDoMes({ vendas, fichas, estoque, mes }), [vendas, fichas, estoque, mes]);
+  //
+  // O custo usado é o DA ÉPOCA, reconstruído pelas compras até o fim do mês
+  // escolhido. Com o custo de hoje, dois meses diferentes dariam o mesmo
+  // número e a evolução seria uma linha reta mentirosa.
+  const estMes = useMemo(() => estoqueNoMes(estoque, compras, mes), [estoque, compras, mes]);
+  const cmv = useMemo(() => cmvDoMes({ vendas, fichas, estoque: estMes.estoque, cardapio, mes }), [vendas, fichas, estMes, cardapio, mes]);
   const lidoCMV = useMemo(() => lerCMV(cmv), [cmv]);
   const corCMV = { bom: C.green, atencao: C.amber, ruim: C.red, 'sem-base': C.amber, 'sem-dados': C.faint }[lidoCMV.nivel];
+
+  // Os últimos 6 meses, cada um com o custo da sua época.
+  const evoCMV = useMemo(
+    () => evolucaoCMV({ vendas, fichas, estoque, compras, cardapio, ateMes: mes, meses: 6 }),
+    [vendas, fichas, estoque, compras, cardapio, mes],
+  );
+  const evoComDado = useMemo(() => evoCMV.filter((e) => e.pct != null), [evoCMV]);
+  const cmvAntes = useMemo(() => {
+    const i = evoCMV.findIndex((e) => e.mes === mes);
+    return i > 0 ? evoCMV[i - 1] : null;
+  }, [evoCMV, mes]);
+  const comp = useMemo(
+    () => compararCMV({ pct: cmv.pct, cmv: cmv.cmv, receita: cmv.receitaCoberta }, cmvAntes),
+    [cmv, cmvAntes],
+  );
+  // Comparação produto a produto precisa do mês anterior inteiro, com o custo
+  // DELE — por isso recalcula em vez de reaproveitar a evolução, que só guarda
+  // os totais.
+  const subiuCusto = useMemo(() => {
+    if (!cmvAntes || cmvAntes.pct == null) return [];
+    const antes = cmvDoMes({ vendas, fichas, estoque: estoqueNoMes(estoque, compras, cmvAntes.mes).estoque, cardapio, mes: cmvAntes.mes });
+    return variacaoProdutos(cmv, antes);
+  }, [cmv, cmvAntes, vendas, fichas, estoque, compras, cardapio]);
 
   const evolucao = useMemo(() => {
     const map = {};
@@ -183,6 +211,32 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
               <div style={{ fontSize: 30, fontWeight: 900, color: corCMV, lineHeight: 1, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{cmv.pct.toFixed(0)}%</div>
             </div>
 
+            {/* COMPARAÇÃO COM O MÊS ANTERIOR, em PONTOS percentuais.
+                O CMV em reais cai quando se vende menos, não quando se fica
+                mais eficiente: um mês fraco mostraria "−30%" e pareceria
+                vitória. Por isso o número grande aqui é em pontos, e os reais
+                vêm miúdos embaixo, como contexto. */}
+            {comp && (
+              <div style={{ background: C.panel2, borderRadius: 12, padding: '11px 14px', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <span style={{ fontSize: 13, color: C.muted }}>
+                    Contra {mesLabel(cmvAntes.mes)} <span style={{ color: C.faint }}>({cmvAntes.pct.toFixed(0)}%)</span>
+                  </span>
+                  <span style={{ fontSize: 15, fontWeight: 800, whiteSpace: 'nowrap', color: comp.piorou ? C.red : comp.melhorou ? C.green : C.faint }}>
+                    {comp.pontos > 0 ? '▲' : comp.pontos < 0 ? '▼' : '='} {Math.abs(comp.pontos).toFixed(1)} {Math.abs(comp.pontos) === 1 ? 'ponto' : 'pontos'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: C.faint, marginTop: 6, lineHeight: 1.5 }}>
+                  {comp.piorou ? <>Cada R$ 100 vendidos estão deixando <b style={{ color: C.text }}>R$ {Math.abs(comp.pontos).toFixed(1)} a menos</b> na tua mão.</>
+                    : comp.melhorou ? <>Cada R$ 100 vendidos estão deixando <b style={{ color: C.text }}>R$ {Math.abs(comp.pontos).toFixed(1)} a mais</b> na tua mão.</>
+                      : <>Praticamente igual ao mês passado.</>}
+                  {comp.varReais != null && (
+                    <> Em reais o CMV {comp.varReais >= 0 ? 'subiu' : 'caiu'} {Math.abs(comp.varReais).toFixed(0)}%, mas isso acompanha a venda ({comp.varReceita >= 0 ? '+' : '−'}{Math.abs(comp.varReceita || 0).toFixed(0)}%) — quem diz se melhorou são os pontos.</>
+                  )}
+                </div>
+              </div>
+            )}
+
             {[['Receita dos produtos', cmv.receitaCoberta, C.green, false],
               ['(–) CMV', cmv.cmv, C.amber, false],
               ['(=) Margem bruta', cmv.margemBruta, cmv.margemBruta >= 0 ? C.accent : C.red, true]].map(([nome, val, cor, bold]) => (
@@ -214,6 +268,91 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
                     : <>Comprou e consumiu quase o mesmo neste mês.</>}
               </div>
             </div>
+
+            {/* EVOLUÇÃO — dois gráficos, nunca um com dois eixos.
+                Reais e porcentagem têm escalas diferentes; empilhar as duas
+                num eixo só faz a linha de baixo virar um risco no chão e
+                deixa a comparação visual mentirosa. */}
+            {evoComDado.length >= 2 && (
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700 }}>Como vem mudando</div>
+                <div style={{ fontSize: 11.5, color: C.faint, margin: '4px 0 10px', lineHeight: 1.45 }}>
+                  Cada mês com o <b style={{ color: C.text }}>custo que os insumos tinham na época</b>, não com o de hoje. É o que faz dar pra comparar.
+                </div>
+
+                <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginBottom: 2 }}>CMV em %</div>
+                <div style={{ height: 150 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={evoComDado.map((e) => ({ mes: mesLabel(e.mes).split('/')[0], pct: e.pct }))} margin={{ top: 8, right: 10, left: -18, bottom: 0 }}>
+                      <CartesianGrid stroke={C.hair} vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} unit="%" />
+                      <Tooltip contentStyle={tooltipModerno} formatter={(v) => [`${Number(v).toFixed(1)}%`, 'CMV']} />
+                      <Line type="monotone" dataKey="pct" stroke={CHART_DESPESA} strokeWidth={2} dot={{ r: 4, fill: CHART_DESPESA, stroke: C.panel, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, margin: '10px 0 2px' }}>CMV e venda, em R$</div>
+                <div style={{ height: 160 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={evoComDado.map((e) => ({ mes: mesLabel(e.mes).split('/')[0], CMV: e.cmv, Venda: e.receita }))} margin={{ top: 8, right: 10, left: -4, bottom: 0 }}>
+                      <CartesianGrid stroke={C.hair} vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : v)} />
+                      <Tooltip contentStyle={tooltipModerno} formatter={(v, n) => [brl(v), n]} />
+                      <Legend wrapperStyle={{ fontSize: 11, color: C.faint }} iconType="plainline" />
+                      <Line type="monotone" dataKey="Venda" stroke={CHART_RECEITA} strokeWidth={2} dot={{ r: 4, fill: CHART_RECEITA, stroke: C.panel, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="CMV" stroke={CHART_DESPESA} strokeWidth={2} dot={{ r: 4, fill: CHART_DESPESA, stroke: C.panel, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* POR CATEGORIA — bebida e cozinha têm CMV muito diferente, e
+                somados viram uma média que esconde as duas pontas. */}
+            {cmv.categorias.length > 1 && (
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700 }}>Por categoria</div>
+                <div style={{ fontSize: 11.5, color: C.faint, margin: '4px 0 10px', lineHeight: 1.45 }}>
+                  Chopp e porção têm CMV bem diferente. Juntos, viram uma média que não serve pra decidir nada.
+                </div>
+                {cmv.categorias.map((g) => (
+                  <div key={g.categoria} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.line}` }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.categoria}</div>
+                      <div style={{ fontSize: 11, color: C.faint }}>{brl(g.custo)} de ingrediente em {brl(g.receita)}</div>
+                    </div>
+                    <span style={{ fontSize: 16, fontWeight: 800, flexShrink: 0, fontVariantNumeric: 'tabular-nums', color: g.pct == null ? C.faint : g.pct >= 45 ? C.red : g.pct >= 35 ? C.amber : C.green }}>
+                      {g.pct == null ? '—' : `${g.pct.toFixed(0)}%`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* O QUE ENCARECEU — custo de UMA unidade contra o mês passado.
+                É o que pega o fornecedor subindo o preço sem avisar. */}
+            {subiuCusto.length > 0 && (
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700 }}>Mudou de custo desde {mesLabel(cmvAntes.mes)}</div>
+                <div style={{ fontSize: 11.5, color: C.faint, margin: '4px 0 10px', lineHeight: 1.45 }}>
+                  Quanto custa fazer <b style={{ color: C.text }}>uma unidade</b> hoje contra o mês passado. Quem subiu está comendo tua margem calado.
+                </div>
+                {subiuCusto.slice(0, 8).map((p) => (
+                  <div key={p.nome} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.line}` }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</div>
+                      <div style={{ fontSize: 11, color: C.faint }}>{brl(p.custoUnitAntes)} → {brl(p.custoUnit)} por unidade · saiu {p.qtd}</div>
+                    </div>
+                    <span style={{ fontSize: 15, fontWeight: 800, flexShrink: 0, whiteSpace: 'nowrap', color: p.variacao > 0 ? C.red : C.green }}>
+                      {p.variacao > 0 ? '▲' : '▼'} {Math.abs(p.variacao).toFixed(0)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Os dois buracos que fazem o CMV mentir pra melhor. */}
             {(cmv.semFicha.length > 0 || cmv.insumosSemCusto.length > 0) && (
