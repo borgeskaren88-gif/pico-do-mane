@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { C, Card, QtdInput, Empty } from './ui';
 import { brl, limparNome } from '../lib/util';
 
@@ -90,6 +90,75 @@ export function ResultadoConferencia({ conferencia, conferidoPor, compacto }) {
 
   if (compacto) return <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>{corpo}</div>;
   return <Card style={{ padding: 12, marginTop: 12, borderColor: grave ? C.amber : C.green }}>{corpo}</Card>;
+}
+
+// O PADRÃO DAS ÚLTIMAS NOITES.
+//
+// Isto existe porque o conselho "abre o histórico e vê se tem item repetindo"
+// não é tarefa pra pessoa: seriam quinze caixas abertos um por um, guardando
+// nomes de cabeça. Uma falta é ocorrência; a mesma falta toda semana é padrão —
+// e o padrão é a única coisa que autoriza uma conversa com alguém.
+export function PadraoConferencias({ padrao }) {
+  const [aberto, setAberto] = useState(false);
+  if (!padrao || padrao.poucasNoites || !padrao.itens.length) return null;
+  const repetem = padrao.itens.filter((i) => i.repete);
+  const mostrar = aberto ? padrao.itens : padrao.itens.slice(0, 5);
+
+  return (
+    <Card style={{ marginTop: 20, borderColor: repetem.length ? C.amber : C.cardBorder }}>
+      <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700 }}>
+        Padrão das últimas {padrao.noites} noites
+      </div>
+      <div style={{ fontSize: 12.5, color: C.muted, margin: '5px 0 12px', lineHeight: 1.5 }}>
+        {repetem.length
+          ? <><b style={{ color: C.text }}>{repetem.length} produto(s) apareceram mais de uma vez.</b> Uma noite é azar; toda semana é outra coisa.</>
+          : <>Nenhum produto repetiu. As faltas que apareceram foram de uma noite só.</>}
+        {padrao.totalPerdido > 0 && <> Somando tudo: <b style={{ color: C.red }}>{brl(padrao.totalPerdido)}</b>.</>}
+      </div>
+
+      {mostrar.map((i) => (
+        <div key={i.nome} style={{ padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: i.repete ? 700 : 500, color: CORES[i.pior] || C.text, lineHeight: 1.3, overflowWrap: 'anywhere' }}>
+              {i.nome}
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 800, flexShrink: 0, fontVariantNumeric: 'tabular-nums', color: i.pior === 'sobra' ? C.muted : C.red }}>
+              {i.pior === 'sobra' ? 'sobrando' : brl(i.valor)}
+            </span>
+          </div>
+          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 3, lineHeight: 1.45 }}>
+            {i.pior === 'sobra' ? 'sobrou' : 'faltou'} <b style={{ color: C.muted }}>{i.falhas}</b> {i.falhas === 1 ? 'vez' : 'vezes'}
+            {' '}{padrao.base === 'contado' ? `em ${i.de} contagem(ns)` : `em ${i.de} noite(s)`}
+            {i.taxa != null && i.falhas > 1 ? ` · ${i.taxa}% das vezes` : ''}
+            {i.niveis.duvidoso > 0 && i.pior !== 'duvidoso' ? ` · ${i.niveis.duvidoso} delas em dúvida` : ''}
+          </div>
+          {/* Cada cor pede uma ação diferente, e é isso que o número sozinho
+              não diz. */}
+          {i.repete && (
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>
+              {i.pior === 'certo' ? 'Item contado no dedo e vendido direto. Repetindo assim, vale olhar de perto quem fecha nessas noites.'
+                : i.pior === 'sobra' ? 'Sobra repetida quase sempre é compra que não está sendo lançada — confere as notas desse fornecedor.'
+                  : 'Em dúvida: ou é produto sem ficha técnica no cardápio, ou é peso/volume. Monta a ficha e o número passa a valer.'}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {padrao.itens.length > 5 && (
+        <button type="button" onClick={() => setAberto((v) => !v)}
+          style={{ background: 'transparent', border: 'none', color: C.accent, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '8px 0 0' }}>
+          {aberto ? 'mostrar menos' : `ver os outros ${padrao.itens.length - 5}`}
+        </button>
+      )}
+
+      {padrao.base === 'noites' && (
+        <div style={{ fontSize: 11, color: C.faint, marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.line}`, lineHeight: 1.5 }}>
+          A conta está sobre o total de noites, não sobre as vezes em que cada item foi contado — tem caixa aqui de antes dessa parte existir.
+          Conforme essas noites forem saindo da lista, a conta fica mais justa sozinha.
+        </div>
+      )}
+    </Card>
+  );
 }
 
 export default ContarNoFechamento;

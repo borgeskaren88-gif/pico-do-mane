@@ -77,6 +77,11 @@ async function conferirNoServidor(sb, contagens, caixaResumo) {
   return conferenciaSegura({
     totais: r.totais,
     faltas: r.linhas.filter((l) => l.nivel !== 'ok'),
+    // Os NOMES de tudo que foi contado, inclusive o que bateu certo. Sem isso
+    // não dá pra dizer "faltou em 6 das 9 noites em que foi contado" — só as
+    // faltas ficavam guardadas, e uma falta sem o total de contagens não
+    // separa azar de padrão.
+    contados: r.linhas.map((l) => l.nome),
     veredito: r.veredito,
   });
 }
@@ -94,7 +99,10 @@ function conferenciaSegura(c) {
     contado: Number.isFinite(Number(x?.contado)) ? Math.round(Number(x.contado) * 1000) / 1000 : 0,
     receitaPerdida: n(x?.receitaPerdida), custoPerdido: n(x?.custoPerdido),
   }));
+  const contados = (Array.isArray(c.contados) ? c.contados : [])
+    .slice(0, 30).map((x) => String(x || '').slice(0, 60)).filter(Boolean);
   return {
+    contados,
     totais: {
       conferidos: Math.max(0, parseInt(c.totais.conferidos, 10) || 0),
       comFalta: Math.max(0, parseInt(c.totais.comFalta, 10) || 0),
