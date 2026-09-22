@@ -2,14 +2,11 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { C, Card, Btn, Field, TextInput, Empty, SecTitle, KPI } from './ui';
 import { mesLabel, fmtDate } from '../lib/util';
+import { saldoDaPessoa, recadoDoSaldo, horasDoTurno, fmtHoras } from '../lib/ponto';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch { return ''; } };
 const hojeBR = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-const horasDe = (r) => (r.entrada && r.saida ? Math.max(0, (new Date(r.saida) - new Date(r.entrada)) / 3600000) : 0);
-const fmtHoras = (h) => { const t = Math.round(Math.abs(h) * 60); const hh = Math.floor(t / 60), mm = t % 60; return `${hh}h${mm > 0 ? ` ${mm}min` : ''}`; };
-const parseHHMM = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ''); return m ? (+m[1] + (+m[2]) / 60) : null; };
-const horasJornada = (j) => { const e = parseHHMM(j?.entrada), s = parseHHMM(j?.saida); if (e == null || s == null) return 0; let d = s - e; if (d <= 0) d += 24; return d; };
 
 // Ponto da cozinha (por pessoa): escreve o nome, bate Entrada ao chegar e Saída
 // ao sair. A dona vê as horas no painel dela.
@@ -61,37 +58,55 @@ export default function PontoCozinha() {
     return [...vis.values()].slice(0, 6);
   }, [registros]);
 
-  // Folha do mês: horas por pessoa neste mês + saldo (em haver / devendo) contra
-  // a jornada do setor. A API já manda só o ponto deste setor.
+  // Folha do mês: horas por pessoa neste mês + saldo contra a jornada do setor.
+  // A API já manda só o ponto deste setor.
+  //
+  // O saldo sai da MESMA função da tela da dona (saldoDaPessoa), turno a
+  // turno. Aqui era outra conta: somava as horas do mês inteiro e comparava
+  // com o total de dias de escala. Com isso, quem sai cedo todo dia e trabalha
+  // um dia a mais aparecia POSITIVO — foi o caso da Taiane. Pior: a pessoa via
+  // um número na tela dela e a dona via outro pro mesmo mês, o que vira
+  // discussão no fim do mês em vez de conversa.
+  //
+  // Dinheiro NÃO entra aqui de propósito: quanto cada um ganha é assunto da
+  // dona, e a lib só devolve reais quando alguém pede (emReais), que esta tela
+  // nunca chama.
   const ym = hoje.slice(0, 7);
-  const esperadoMes = useMemo(() => {
-    const j = jornadas[papel];
-    if (!j || !Array.isArray(j.dias) || !j.dias.length) return null;
-    const hd = horasJornada(j);
-    const [yy, mm] = hoje.split('-').map(Number);
-    const diaHoje = Number(hoje.slice(8, 10));
-    let total = 0;
-    for (let d = 1; d < diaHoje; d++) { if (j.dias.includes(new Date(yy, mm - 1, d).getDay())) total += hd; }
-    return total;
-  }, [jornadas, papel, hoje]);
+  const jornada = jornadas[papel] || null;
   const pessoasMes = useMemo(() => {
     const map = new Map();
     for (const r of registros.filter((r) => (r.data || '').slice(0, 7) === ym)) {
       const k = norm(r.nome);
-      if (!map.has(k)) map.set(k, { nome: r.nome, horas: 0, turnos: [] });
-      const g = map.get(k); g.horas += horasDe(r); g.turnos.push(r);
+      if (!map.has(k)) map.set(k, { nome: r.nome, turnos: [] });
+      map.get(k).turnos.push(r);
     }
-    for (const g of map.values()) g.turnos.sort((a, b) => (b.entrada || '').localeCompare(a.entrada || ''));
-    return [...map.values()].sort((a, b) => b.horas - a.horas);
-  }, [registros, ym]);
+    const saida = [];
+    for (const g of map.values()) {
+      g.turnos.sort((a, b) => (b.entrada || '').localeCompare(a.entrada || ''));
+      const s = saldoDaPessoa(g.turnos, jornada, ym, hoje);
+      saida.push({ ...g, horas: s.trabalhado, s });
+    }
+    return saida.sort((a, b) => b.horas - a.horas);
+  }, [registros, ym, jornada, hoje]);
   const totalMes = pessoasMes.reduce((s, p) => s + p.horas, 0);
-  const Saldo = ({ horas }) => {
-    if (esperadoMes == null) return null;
-    const saldo = horas - esperadoMes;
-    const emDia = Math.abs(saldo) < 0.05;
-    const cor = emDia ? C.muted : saldo > 0 ? C.green : C.red;
-    const rot = emDia ? 'em dia' : saldo > 0 ? `+${fmtHoras(saldo)} em haver` : `−${fmtHoras(saldo)} devendo`;
-    return <div style={{ fontSize: 12, fontWeight: 800, color: cor, marginTop: 2 }}>{rot} <span style={{ color: C.faint, fontWeight: 500 }}>· esperado {fmtHoras(esperadoMes)}</span></div>;
+  const temEscala = pessoasMes.some((p) => p.s.temEscala);
+
+  const Saldo = ({ s }) => {
+    if (!s || !s.temEscala) return null;
+    const emDia = Math.abs(s.saldo) < 0.05;
+    const cor = emDia ? C.muted : s.saldo > 0 ? C.green : C.red;
+    const rot = emDia ? 'em dia' : s.saldo > 0 ? `+${fmtHoras(s.saldo)} em haver` : `−${fmtHoras(s.saldo)} devendo`;
+    const recado = recadoDoSaldo(s);
+    return (
+      <>
+        <div style={{ fontSize: 12, fontWeight: 800, color: cor, marginTop: 2 }}>
+          {rot} <span style={{ color: C.faint, fontWeight: 500 }}>· esperado {fmtHoras(s.esperado)}</span>
+        </div>
+        {/* O saldo sozinho esconde o porquê: 8h em dois turnos de 4 não é a
+            mesma coisa que 8h num turno só. */}
+        {recado && <div style={{ fontSize: 11, color: C.faint, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{recado}</div>}
+      </>
+    );
   };
 
   const bater = async (acao) => {
@@ -175,7 +190,7 @@ export default function PontoCozinha() {
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: 15, fontWeight: 800 }}>{p.nome}</span>
                     <span style={{ fontSize: 12, color: C.faint, display: 'block' }}>{p.turnos.length} turno(s)</span>
-                    <Saldo horas={p.horas} />
+                    <Saldo s={p.s} />
                   </span>
                   <span style={{ fontSize: 16, fontWeight: 800, color: C.accent, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{fmtHoras(p.horas)}</span>
                 </button>
@@ -185,7 +200,7 @@ export default function PontoCozinha() {
                       <Card key={r.id} style={{ marginBottom: 6, padding: '9px 14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13 }}>
                           <span><b>{fmtDate(r.data)}</b> · {horaBR(r.entrada)} → {r.saida ? horaBR(r.saida) : 'em trabalho'}</span>
-                          <b style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{r.saida ? fmtHoras(horasDe(r)) : '—'}</b>
+                          <b style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{r.saida ? fmtHoras(horasDoTurno(r)) : '—'}</b>
                         </div>
                       </Card>
                     ))}
@@ -194,7 +209,7 @@ export default function PontoCozinha() {
               </div>
             );
           })}
-          {esperadoMes == null && <div style={{ fontSize: 12, color: C.faint }}>A saldo (em haver/devendo) aparece quando a Karen configurar a jornada do setor.</div>}
+          {!temEscala && <div style={{ fontSize: 12, color: C.faint }}>A saldo (em haver/devendo) aparece quando a Karen configurar a jornada do setor.</div>}
         </div>
       )}
 
