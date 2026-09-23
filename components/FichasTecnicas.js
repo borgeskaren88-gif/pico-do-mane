@@ -181,7 +181,10 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
                 </div>
                 {prod && prod.gargalo && itens.length > 1 && (
                   <div style={{ fontSize: 12, color: rende > 0 ? C.amber : C.red, marginTop: 3, fontWeight: 600 }}>
-                    {rende > 0 ? '⚠️ trava no ' : '✗ falta '}<b>{prod.gargalo.nome}</b>{prod.gargalo.saldo != null ? ` (só dá pra ~${prod.gargalo.possivel}; tem ${num(prod.gargalo.saldo)} ${prod.gargalo.unidade || ''})` : ''}
+                    {rende > 0 ? '⚠️ trava no ' : '✗ falta '}<b>{prod.gargalo.nome}</b>
+                    {prod.gargalo.saldo != null && (prod.gargalo.aSeparar > 0
+                      ? ` (só dá pra ~${prod.gargalo.possivel}: ${prod.gargalo.prontos} prontos + ${prod.gargalo.aSeparar} pra separar)`
+                      : ` (só dá pra ~${prod.gargalo.possivel}; tem ${num(prod.gargalo.saldo)} ${prod.gargalo.unidade || ''})`)}
                   </div>
                 )}
               </div>
@@ -194,7 +197,12 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
                 {itens.map((x) => {
                   const lin = possivelPorId.get(x.estoqueId);
                   const ehGargalo = prod && prod.gargalo && prod.gargalo.estoqueId === x.estoqueId && itens.length > 1;
-                  const capacidade = lin && !lin.aGosto && lin.possivel !== Infinity ? `dá ~${lin.possivel}` : (lin && lin.aGosto ? 'a gosto' : null);
+                  // "dá ~22" é o teto. Quando parte dele ainda precisa ser
+                  // pesada e ensacada, isso vem junto — senão o número promete
+                  // ao salão uma comida que só existe depois de alguém trabalhar.
+                  const capacidade = lin && !lin.aGosto && lin.possivel !== Infinity
+                    ? `dá ~${lin.possivel}${lin.aSeparar > 0 ? ` (${lin.prontos} prontos)` : ''}`
+                    : (lin && lin.aGosto ? 'a gosto' : null);
                   return (
                   <div key={x.estoqueId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 14 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
