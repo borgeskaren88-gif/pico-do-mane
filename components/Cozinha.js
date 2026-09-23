@@ -10,6 +10,7 @@ import PullToRefresh from './PullToRefresh';
 import EstoqueCozinha from './EstoqueCozinha';
 import PontoCozinha from './PontoCozinha';
 import PorcoesCozinha from './PorcoesCozinha';
+import AvisoPorcoes from './AvisoPorcoes';
 import LembretePonto from './LembretePonto';
 import SinoNotificacoes from './SinoNotificacoes';
 
@@ -148,6 +149,7 @@ export default function Cozinha() {
         </div>
 
         {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
+        {aba !== 'porcoes' && <AvisoPorcoes onIr={() => setAba('porcoes')} />}
 
         {aba === 'compras' && (<>
         <PageTitle sub="Anote o que está faltando no bar">Lista de Compras</PageTitle>
