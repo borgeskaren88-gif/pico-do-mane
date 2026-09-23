@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { C, Card, Btn, TextInput, QtdInput, Empty, SecTitle, PageTitle } from './ui';
 import { num, fmtDate, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
-import { diasParaVencer, nivelValidade, textoValidade, itensVencendo } from '../lib/estoque';
+import { diasParaVencer, nivelValidade, textoValidade, itensVencendo, ehPorcionado } from '../lib/estoque';
 
 // Quem mexe na geladeira e no freezer é a cozinha — então o aviso de validade
 // tem que estar aqui também, não só na tela da dona.
@@ -153,9 +153,18 @@ export default function EstoqueCozinha() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-                    <Btn kind="ok" small onClick={() => abrirAcao(it.id, 'entrada')}>+ Entrada</Btn>
-                    <Btn kind="danger" small onClick={() => abrirAcao(it.id, 'saida')}>− Desperdício</Btn>
-                    <Btn kind="ghost" small onClick={() => abrirAcao(it.id, 'contagem')}>Contar</Btn>
+                    {/* Saco separado não se mexe por aqui: o saldo dele é a soma
+                        dos dois freezers, e uma contagem só do total deixaria os
+                        dois dizendo outra coisa. É na aba Porções. */}
+                    {ehPorcionado(it) ? (
+                      <div style={{ fontSize: 12, color: C.faint, padding: '6px 0', lineHeight: 1.45 }}>
+                        Esse é separado em sacos — mexe na aba <b style={{ color: C.text }}>Porções</b>.
+                      </div>
+                    ) : (<>
+                      <Btn kind="ok" small onClick={() => abrirAcao(it.id, 'entrada')}>+ Entrada</Btn>
+                      <Btn kind="danger" small onClick={() => abrirAcao(it.id, 'saida')}>− Desperdício</Btn>
+                      <Btn kind="ghost" small onClick={() => abrirAcao(it.id, 'contagem')}>Contar</Btn>
+                    </>)}
                     {(it.movimentos || []).length > 0 && (
                       <button onClick={() => setVerMov(aberto ? null : it.id)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '7px 6px', marginLeft: 'auto' }}>{aberto ? 'ocultar' : 'histórico'}</button>
                     )}

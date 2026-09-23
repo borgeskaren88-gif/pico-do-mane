@@ -9,12 +9,13 @@ import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 import EstoqueCozinha from './EstoqueCozinha';
 import PontoCozinha from './PontoCozinha';
+import PorcoesCozinha from './PorcoesCozinha';
 import LembretePonto from './LembretePonto';
 import SinoNotificacoes from './SinoNotificacoes';
 
 export default function Cozinha() {
   const router = useRouter();
-  const [aba, setAba] = useState('ponto'); // 'ponto' | 'compras' | 'estoque' | 'garrafas'
+  const [aba, setAba] = useState('ponto'); // 'ponto' | 'compras' | 'reservas' | 'porcoes' | 'estoque' | 'garrafas'
   const [itens, setItens] = useState([]);
   const [tarefas, setTarefas] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -138,7 +139,7 @@ export default function Cozinha() {
         {/* Mesa reservada hoje/amanhã: a primeira coisa que aparece ao entrar. */}
         <AvisoReservas />
         <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
-          {[['ponto', 'Ponto'], ['compras', 'Compras'], ['reservas', 'Reservas'], ['estoque', 'Estoque'], ['garrafas', 'Garrafas']].map(([v, rot]) => (
+          {[['ponto', 'Ponto'], ['compras', 'Compras'], ['reservas', 'Reservas'], ['porcoes', 'Porções'], ['estoque', 'Estoque'], ['garrafas', 'Garrafas']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
               flex: '1 0 auto', whiteSpace: 'nowrap', border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 12px', fontSize: 14, fontWeight: 700,
               background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
@@ -197,6 +198,8 @@ export default function Cozinha() {
         </>)}
 
         {aba === 'reservas' && <ReservasLista sub="O que já está marcado, pra cozinha se preparar. Quem anota é a Mari." />}
+
+        {aba === 'porcoes' && <PorcoesCozinha />}
 
         {aba === 'estoque' && <EstoqueCozinha />}
 
