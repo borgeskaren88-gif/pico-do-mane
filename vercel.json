@@ -1,5 +1,10 @@
 {
   "crons": [
     { "path": "/api/push/cron", "schedule": "0 10 * * *" }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "claude/picos-microentrepreneur-app-cqnla2": false
+    }
+  }
 }
