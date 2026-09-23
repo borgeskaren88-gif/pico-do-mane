@@ -151,6 +151,9 @@ export default function Dashboard() {
   const [estCarregado, setEstCarregado] = useState(false);
   const [subEstoque, setSubEstoque] = useState('itens'); // 'itens' | 'fichas'
   const [subAbast, setSubAbast] = useState('estoque'); // 'estoque' | 'lista' | 'compras' | 'cotacoes'
+  // Carrinho montado pela fala, a caminho da tela de Compras. Fica aqui porque
+  // as duas telas sao irmas e nao se enxergam.
+  const [carrinhoDaVoz, setCarrinhoDaVoz] = useState(null);
   const [subFinancas, setSubFinancas] = useState('receitas'); // 'receitas' | 'despesas' | 'relatorios'
   const [avisoBaixa, setAvisoBaixa] = useState(''); // resumo da última baixa automática
   const [vendas, setVendas] = useState([]); // vendas do salão (comandas fechadas)
@@ -497,6 +500,18 @@ export default function Dashboard() {
   // Navegação que entende os sub-destinos do setor Abastecimento: se pedirem
   // 'compras'/'estoque'/'lista'/'cotacoes', abre a aba Abastecimento já na
   // parte certa (usado pelos atalhos "Ver / + Compra" do Hoje).
+  // A fala entendeu produto, quantidade e preco — mas fornecedor e forma de
+  // pagamento ela nao tem como adivinhar, e sem os dois nao existe conta a
+  // pagar. Entao a voz leva o carrinho pronto ate as Compras, e o resto ela
+  // termina na tela que ja sabe lancar despesa, cotacao e estoque de uma vez.
+  const levarPraCompras = (itens) => {
+    if (!Array.isArray(itens) || !itens.length) return;
+    setCarrinhoDaVoz(itens);
+    setSubAbast('compras');
+    setTab('abastecimento');
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const irParaTab = (destino) => {
     if (['estoque', 'lista', 'compras', 'cotacoes'].includes(destino)) { setSubAbast(destino); setTab('abastecimento'); return; }
     if (['caixa', 'comandas', 'fiados', 'clientes', 'cardapio'].includes(destino)) { setSubSalao(destino); setTab('salao'); return; }
@@ -725,7 +740,7 @@ export default function Dashboard() {
                     }}>{rot}</button>
                   ))}
                 </div>
-                {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} cotacoes={cotacoes} fichas={fichas} cardapio={cardapio} duplicadosIgnorados={dupIgnorados} onRepor={reporLista} />}
+                {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} cotacoes={cotacoes} fichas={fichas} cardapio={cardapio} duplicadosIgnorados={dupIgnorados} onRepor={reporLista} onLevarPraCompras={levarPraCompras} />}
                 {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={estoqueAcao} />}
                 {subEstoque === 'conferencia' && <ConferenciaEstoque estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} onAcao={estoqueAcao} carregado={estCarregado} />}
                 {subEstoque === 'cortesia' && <CortesiaConsumo onFeito={() => carregarEstoque({})} />}
@@ -751,7 +766,7 @@ export default function Dashboard() {
               </>
             )}
 
-            {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} estoque={estoque} onChange={upd.compras} onRegistrar={aplicarCompra} onEstoque={estoqueAcao} />}
+            {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} estoque={estoque} onChange={upd.compras} onRegistrar={aplicarCompra} onEstoque={estoqueAcao} carrinhoInicial={carrinhoDaVoz} onCarrinhoUsado={() => setCarrinhoDaVoz(null)} />}
             {subAbast === 'margem' && <Margem cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} compras={compras} />}
             {subAbast === 'fornecedores' && <Fornecedores compras={compras} />}
             {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} estoque={estoque} compras={compras} />}

@@ -26,7 +26,7 @@ import MicBtn from './MicBtn';
 // O botão sabe em qual dos dois está e diz o que fazer — antes ele
 // simplesmente não existia no iPhone, e a tela virava um campo mudo sem
 // explicar que o microfone estava a um toque de distância, no teclado.
-export default function EntradaPorVoz({ itens = [], onLote }) {
+export default function EntradaPorVoz({ itens = [], onLote, onLevarPraCompras }) {
   const [aberto, setAberto] = useState(false);
   const [texto, setTexto] = useState('');
   const [linhas, setLinhas] = useState(null);   // null = ainda não interpretou
@@ -99,6 +99,28 @@ export default function EntradaPorVoz({ itens = [], onLote }) {
     const recado = nivel === 'ok' ? '' : l.recado;
     return { ...l, dinheiro, nivel, recado };
   }));
+
+  // Levar pra Compras em vez de abastecer direto.
+  //
+  // Os dois caminhos sao EXCLUDENTES de proposito: as Compras dao entrada no
+  // estoque quando a nota e salva, entao abastecer aqui e salvar la somaria a
+  // mesma mercadoria duas vezes. Quem falou preco quase sempre quer a nota; quem
+  // nao falou so quer acertar o saldo.
+  const paraCompras = () => {
+    if (!onLevarPraCompras) return;
+    const itensCompra = prontas.filter((l) => l.dinheiro && l.dinheiro.custoUnit > 0).map((l) => ({
+      produto: limparNome(l.item.nome),
+      categoria: l.item.categoria || '',
+      quantidade: String(l.qtd),
+      valorUnit: String(l.dinheiro.custoUnit),
+      estoqueId: l.item.id,
+      conteudo: '',
+      conteudoUnid: '',
+    }));
+    if (!itensCompra.length) return;
+    onLevarPraCompras(itensCompra);
+    setTexto(''); setLinhas(null); setSobra(''); setMsg('');
+  };
 
   if (!aberto) {
     return (
@@ -221,15 +243,31 @@ export default function EntradaPorVoz({ itens = [], onLote }) {
               nas Compras. Dizer isso aqui evita ela achar que o financeiro do
               mes ja esta fechado. */}
           {temDinheiro > 0 && (
-            <div style={{ fontSize: 12, color: C.amber, background: C.panel2, borderRadius: 10, padding: '9px 12px', margin: '2px 0 8px', lineHeight: 1.5, fontWeight: 600 }}>
-              Total falado: <b>{brl(temDinheiro)}</b>. Isso atualiza o <b>custo</b> dos itens, mas
-              {' '}<b>não lança a despesa</b> — pra ela entrar no financeiro, a nota tem que ser
-              {' '}registrada em <b>Compras</b>, com fornecedor e forma de pagamento.
+            <div style={{ fontSize: 12, color: C.muted, background: C.panel2, borderRadius: 10, padding: '10px 12px', margin: '2px 0 10px', lineHeight: 1.5 }}>
+              Total falado: <b style={{ color: C.text }}>{brl(temDinheiro)}</b>. Escolhe um dos dois:
+              <div style={{ marginTop: 6 }}>
+                <b style={{ color: C.text }}>Lançar como compra</b> — vai pra tela de Compras com tudo
+                {' '}preenchido. Tu escolhe fornecedor e forma de pagamento, e a nota entra no estoque,
+                {' '}no custo e na <b style={{ color: C.text }}>despesa</b> de uma vez.
+              </div>
+              <div style={{ marginTop: 4 }}>
+                <b style={{ color: C.text }}>Só abastecer</b> — sobe o saldo e o custo, <b>sem</b> lançar despesa.
+                {' '}É pro que não tem nota.
+              </div>
+              <div style={{ marginTop: 6, color: C.amber, fontWeight: 600 }}>
+                Um ou outro — fazer os dois soma a mesma mercadoria duas vezes.
+              </div>
             </div>
           )}
 
-          <Btn onClick={gravar} disabled={busy || !prontas.length} style={{ width: '100%', marginTop: 6 }}>
-            {busy ? 'Abastecendo…' : prontas.length ? `Abastecer ${prontas.length} ${prontas.length === 1 ? 'item' : 'itens'}` : 'Resolve as linhas acima'}
+          {temDinheiro > 0 && onLevarPraCompras && (
+            <Btn onClick={paraCompras} disabled={busy || !prontas.some((l) => l.dinheiro && l.dinheiro.custoUnit > 0)} style={{ width: '100%', marginBottom: 8 }}>
+              Lançar como compra
+            </Btn>
+          )}
+
+          <Btn kind={temDinheiro > 0 ? 'ghost' : 'primary'} onClick={gravar} disabled={busy || !prontas.length} style={{ width: '100%', marginTop: temDinheiro > 0 ? 0 : 6 }}>
+            {busy ? 'Abastecendo…' : prontas.length ? (temDinheiro > 0 ? `Só abastecer ${prontas.length} ${prontas.length === 1 ? 'item' : 'itens'}` : `Abastecer ${prontas.length} ${prontas.length === 1 ? 'item' : 'itens'}`) : 'Resolve as linhas acima'}
           </Btn>
         </div>
       )}
