@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, QtdInput, inputStyle } from './ui';
 import { brl, limparNome, numQtd } from '../lib/util';
 import { entendeEntradaFalada } from '../lib/estoqueFala';
+import MicBtn from './MicBtn';
 
 // ABASTECER FALANDO
 //
@@ -17,10 +18,14 @@ import { entendeEntradaFalada } from '../lib/estoqueFala';
 // descobriria dias depois sem saber de onde veio. Dois segundos de conferência
 // valem mais do que isso.
 //
-// POR QUE CAIXA DE TEXTO E NÃO BOTÃO DE MICROFONE. Ela usa iPhone, onde o
-// reconhecimento do navegador é irregular (às vezes o MicBtn nem aparece). O
-// microfone do teclado do próprio iPhone funciona sempre, em qualquer campo de
-// texto. Então o caminho é: toca na caixa, toca no microfone do teclado, fala.
+// O MICROFONE, E POR QUE SÃO DOIS CAMINHOS. No notebook (Chrome) o ditado do
+// navegador funciona e o botão aparece. No iPhone e no iPad o Safari não tem
+// ditado, e ali o caminho é o microfone do PRÓPRIO TECLADO, que funciona em
+// qualquer campo de texto.
+//
+// O botão sabe em qual dos dois está e diz o que fazer — antes ele
+// simplesmente não existia no iPhone, e a tela virava um campo mudo sem
+// explicar que o microfone estava a um toque de distância, no teclado.
 export default function EntradaPorVoz({ itens = [], onLote }) {
   const [aberto, setAberto] = useState(false);
   const [texto, setTexto] = useState('');
@@ -117,7 +122,8 @@ export default function EntradaPorVoz({ itens = [], onLote }) {
       </div>
 
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
-        Toca na caixa, toca no <b style={{ color: C.text }}>microfone do teclado</b> do teu celular e fala o que chegou. Depois confere as linhas e toca em abastecer.
+        Fala o que chegou, confere as linhas e toca em abastecer. Pode dizer o preço junto:
+        {' '}<i>&quot;5 red bull a 8 reais&quot;</i> ou <i>&quot;2 caixas por 120 reais&quot;</i>.
       </div>
 
       <textarea
@@ -131,6 +137,10 @@ export default function EntradaPorVoz({ itens = [], onLote }) {
           fontSize: 15, lineHeight: 1.45, resize: 'vertical', fontFamily: 'inherit',
         }}
       />
+
+      <div style={{ marginTop: 8 }}>
+        <MicBtn value={texto} onChange={setTexto} label="Ditar por voz" />
+      </div>
 
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <Btn small onClick={entender} disabled={!texto.trim()}>Entender</Btn>
