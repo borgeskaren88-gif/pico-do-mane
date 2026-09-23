@@ -790,6 +790,15 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                     {p.rendeDoBruto != null && <>{' · '}dá +{p.rendeDoBruto}</>}
                   </div>
                 </div>
+                {/* O fechado nunca deixou de ser contado — mas só aparecia
+                    traduzido em sacos ("dá +53"), e nessa forma ninguém
+                    reconhece o próprio estoque. Agora aparece também do jeito
+                    que ela conta na prateleira. */}
+                {p.brutoNome && (
+                  <div style={{ fontSize: 11.5, color: C.faint, marginTop: 2 }}>
+                    fechado: {p.brutoNome} · <b style={{ color: C.muted }}>{fmtQtd(p.brutoSaldo)} {p.brutoUnidade}</b>
+                  </div>
+                )}
                 {p.recado && <div style={{ fontSize: 12, color: cor, fontWeight: 600, marginTop: 4, lineHeight: 1.45 }}>{p.recado}</div>}
 
                 {!(pAcao && pAcao.id === p.id) ? (
