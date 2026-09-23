@@ -24,12 +24,13 @@ const ROTULOS = { vazio: 'ZEROU', critico: 'Falta na frente', atencao: 'Reserva 
 
 // Os números aparecem grandes e com nome de lugar, não de campo de banco de
 // dados: ela guarda no freezer, não numa tabela.
-function Coluna({ titulo, valor, min, cor }) {
+function Coluna({ titulo, valor, min, rodape, cor }) {
   return (
     <div style={{ flex: 1, minWidth: 92, textAlign: 'center', padding: '8px 4px', background: C.panel2, borderRadius: 10 }}>
       <div style={{ fontSize: 10.5, color: C.faint, textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>{titulo}</div>
       <div style={{ fontSize: 24, fontWeight: 900, color: cor || C.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1.15 }}>{valor}</div>
       {min != null && <div style={{ fontSize: 10.5, color: C.faint }}>mín. {min}</div>}
+      {rodape && <div style={{ fontSize: 10, color: C.faint, lineHeight: 1.3, marginTop: 1 }}>{rodape}</div>}
     </div>
   );
 }
@@ -111,9 +112,13 @@ export default function PorcoesCozinha() {
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               <Coluna titulo="Linha de frente" valor={fmtQtd(p.linha)} min={p.minLinha} cor={p.linha < p.minLinha ? C.red : C.text} />
               <Coluna titulo="Salva-vidas" valor={fmtQtd(p.salva)} min={p.minSalva} cor={p.salva < p.minSalva ? C.amber : C.text} />
+              {/* De onde esses sacos sairiam. Sem isto a coluna era um número
+                  sem origem — e quem vai pesar precisa saber o que tem fechado
+                  na prateleira, não só quantos sacos aquilo vira. */}
               <Coluna
                 titulo="Dá pra separar"
                 valor={p.rendeDoBruto == null ? '—' : p.rendeDoBruto}
+                rodape={p.brutoNome ? `${fmtQtd(p.brutoSaldo)} ${p.brutoUnidade} fechado` : null}
                 cor={p.rendeDoBruto === 0 ? C.red : C.muted}
               />
             </div>
