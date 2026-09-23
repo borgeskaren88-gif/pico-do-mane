@@ -334,6 +334,35 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   // esse segundo custo não aparecia em tela nenhuma.
   const custoEstranho = useMemo(() => comprasComCustoEstranho(itens, compras), [itens, compras]);
 
+  // Registrar movimento de porção na tela DELA. A cozinha tem a tela de fazer,
+  // mas quem monta o cadastro é ela — e no dia em que monta é ela que precisa
+  // dizer onde os sacos estão. Mandar a dona entrar como cozinha pra contar o
+  // próprio freezer seria pedir que ela finja ser outra pessoa.
+  const [pAcao, setPAcao] = useState(null); // { id, tipo: 'separar'|'abastecer'|'contar' }
+  const [pQtd, setPQtd] = useState('');
+  const [pQtd2, setPQtd2] = useState('');
+  const [pErro, setPErro] = useState('');
+
+  const abrirPorcao = (p, tipo) => {
+    setPErro('');
+    setPAcao({ id: p.id, tipo });
+    if (tipo === 'separar') setPQtd(String(p.precisaSeparar || ''));
+    else if (tipo === 'abastecer') setPQtd(String(p.podeAbastecer || ''));
+    else { setPQtd(fmtQtd(p.linha)); setPQtd2(fmtQtd(p.salva)); }
+  };
+  const fecharPorcao = () => { setPAcao(null); setPQtd(''); setPQtd2(''); setPErro(''); };
+  const confirmarPorcao = async () => {
+    if (busy || !pAcao) return;
+    const corpo = pAcao.tipo === 'contar'
+      ? { acao: 'porcaoContar', id: pAcao.id, linha: numQtd(pQtd), salva: numQtd(pQtd2) }
+      : { acao: pAcao.tipo === 'separar' ? 'porcaoSeparar' : 'porcaoAbastecer', id: pAcao.id, sacos: numQtd(pQtd) };
+    if (pAcao.tipo !== 'contar' && !(numQtd(pQtd) > 0)) return;
+    setBusy(true); setPErro('');
+    const j = await onAcao(corpo);
+    setBusy(false);
+    if (j && j.ok) fecharPorcao(); else setPErro((j && j.erro) || 'Não consegui registrar.');
+  };
+
   // O quadro das porções: onde estão os sacos e o que falta separar.
   const porcoes = useMemo(() => painelDasPorcoes(itens), [itens]);
 
@@ -728,6 +757,39 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                   </div>
                 </div>
                 {p.recado && <div style={{ fontSize: 12, color: cor, fontWeight: 600, marginTop: 4, lineHeight: 1.45 }}>{p.recado}</div>}
+
+                {!(pAcao && pAcao.id === p.id) ? (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                    <Btn kind="ghost" small onClick={() => abrirPorcao(p, 'separar')}>Separei</Btn>
+                    <Btn kind="ghost" small onClick={() => abrirPorcao(p, 'abastecer')}>Levei pra frente</Btn>
+                    <Btn kind="ghost" small onClick={() => abrirPorcao(p, 'contar')}>Contei</Btn>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 10, background: C.panel2, borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: C.accent, marginBottom: 8 }}>
+                      {pAcao.tipo === 'separar' ? 'Quantos sacos foram separados?'
+                        : pAcao.tipo === 'abastecer' ? 'Quantos foram do Salva-Vidas pra Linha de Frente?'
+                          : 'Quanto tem AGORA em cada freezer? Saco aberto pela metade conta como 0,5.'}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 8 }}>
+                      <div style={{ width: 130 }}>
+                        <QtdInput value={pQtd} onChange={setPQtd} placeholder="0" />
+                        {pAcao.tipo === 'contar' && <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>na Linha de Frente</div>}
+                      </div>
+                      {pAcao.tipo === 'contar' && (
+                        <div style={{ width: 130 }}>
+                          <QtdInput value={pQtd2} onChange={setPQtd2} placeholder="0" />
+                          <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>no Salva-Vidas</div>
+                        </div>
+                      )}
+                    </div>
+                    {pErro && <div style={{ fontSize: 12, color: C.red, fontWeight: 700, marginBottom: 8, lineHeight: 1.45 }}>{pErro}</div>}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Btn small onClick={confirmarPorcao} disabled={busy}>{busy ? 'Salvando…' : 'Confirmar'}</Btn>
+                      <Btn kind="ghost" small onClick={fecharPorcao}>Cancelar</Btn>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
