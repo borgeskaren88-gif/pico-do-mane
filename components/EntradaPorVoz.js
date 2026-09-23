@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, QtdInput, inputStyle } from './ui';
-import { limparNome, numQtd } from '../lib/util';
+import { brl, limparNome, numQtd } from '../lib/util';
 import { entendeEntradaFalada } from '../lib/estoqueFala';
 
 // ABASTECER FALANDO
@@ -55,12 +55,21 @@ export default function EntradaPorVoz({ itens = [], onLote }) {
   const tirar = (id) => setLinhas((ls) => ls.filter((l) => l.id !== id));
 
   const prontas = (linhas || []).filter((l) => l.item && numQtd(l.qtd) > 0);
+  // Quanto de dinheiro ela falou no total. Zero quando nao falou nenhum — e ai
+  // o aviso sobre a despesa nem aparece.
+  const temDinheiro = (linhas || []).reduce((t, l) => t + (l.dinheiro ? l.dinheiro.total : 0), 0);
 
   const gravar = async () => {
     if (busy || !prontas.length) return;
     setBusy(true); setMsg('');
     try {
-      const j = await onLote(prontas.map((l) => ({ id: l.item.id, qtd: l.qtd })));
+      const j = await onLote(prontas.map((l) => ({
+        id: l.item.id,
+        qtd: l.qtd,
+        // O custo so viaja quando ela DISSE o preco. Mandar zero aqui apagaria
+        // o custo que o item ja tem, e o CMV do mes sumiria junto.
+        custo: l.dinheiro && l.dinheiro.custoUnit > 0 ? l.dinheiro.custoUnit : undefined,
+      })));
       if (j && j.ok) {
         const n = j.lancadas || prontas.length;
         setMsg(`Pronto: ${n} ${n === 1 ? 'item abastecido' : 'itens abastecidos'}.`);
@@ -71,6 +80,20 @@ export default function EntradaPorVoz({ itens = [], onLote }) {
     }
     setBusy(false);
   };
+
+  // Ela disse um valor sem dizer de qual: o sistema supoe o total e deixa ela
+  // virar pro "cada" com um toque. Preco unitario trocado com total multiplica
+  // (ou divide) o custo pela quantidade — e isso entra calado no CMV.
+  const trocarTipoPreco = (id) => setLinhas((ls) => (ls || []).map((l) => {
+    if (l.id !== id || !l.dinheiro) return l;
+    const novoTipo = l.dinheiro.tipo === 'total' ? 'unit' : 'total';
+    const total = novoTipo === 'total' ? l.dinheiro.falado : Math.round(l.dinheiro.falado * l.qtdFalada * 100) / 100;
+    const custoUnit = l.qtd > 0 ? Math.round((total / l.qtd) * 10000) / 10000 : null;
+    const dinheiro = { ...l.dinheiro, tipo: novoTipo, total, custoUnit, suposto: false };
+    const nivel = l.nivel === 'confira' && l.item && l.qtd != null ? 'ok' : l.nivel;
+    const recado = nivel === 'ok' ? '' : l.recado;
+    return { ...l, dinheiro, nivel, recado };
+  }));
 
   if (!aberto) {
     return (
@@ -145,6 +168,25 @@ export default function EntradaPorVoz({ itens = [], onLote }) {
                     style={{ background: 'transparent', border: 'none', color: C.faint, fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: '0 2px', flexShrink: 0 }}>×</button>
                 </div>
 
+                {/* O DINHEIRO da linha. Aparece sempre que ela falou valor, e
+                    diz em letras grandes qual leitura o sistema fez — porque
+                    trocar "cada" por "total" multiplica o custo pela
+                    quantidade, e esse erro entra calado no CMV. */}
+                {l.dinheiro && (
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.line}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 12.5, color: C.muted, flex: 1, minWidth: 140, lineHeight: 1.45 }}>
+                      <b style={{ color: C.text }}>{brl(l.dinheiro.total)}</b> no total
+                      {l.dinheiro.custoUnit != null && (
+                        <> · <b style={{ color: C.text }}>{brl(l.dinheiro.custoUnit)}</b> por {l.unidade}</>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => trocarTipoPreco(l.id)}
+                      style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.accent, borderRadius: 999, padding: '5px 11px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                      {l.dinheiro.tipo === 'total' ? 'era o preço de cada' : 'era o total'}
+                    </button>
+                  </div>
+                )}
+
                 {l.nivel !== 'ok' && (
                   <>
                     <div style={{ fontSize: 12, color: l.nivel === 'confira' ? C.amber : C.red, marginBottom: 7, lineHeight: 1.4 }}>{l.recado}</div>
@@ -161,6 +203,18 @@ export default function EntradaPorVoz({ itens = [], onLote }) {
           {sobra && (
             <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, marginBottom: 8, lineHeight: 1.45 }}>
               Não usei isto da tua frase: "{sobra}"
+            </div>
+          )}
+
+          {/* Preco dito NAO vira despesa. O abastecimento por voz mexe no saldo
+              e no custo; fornecedor, forma de pagamento e contas a pagar moram
+              nas Compras. Dizer isso aqui evita ela achar que o financeiro do
+              mes ja esta fechado. */}
+          {temDinheiro > 0 && (
+            <div style={{ fontSize: 12, color: C.amber, background: C.panel2, borderRadius: 10, padding: '9px 12px', margin: '2px 0 8px', lineHeight: 1.5, fontWeight: 600 }}>
+              Total falado: <b>{brl(temDinheiro)}</b>. Isso atualiza o <b>custo</b> dos itens, mas
+              {' '}<b>não lança a despesa</b> — pra ela entrar no financeiro, a nota tem que ser
+              {' '}registrada em <b>Compras</b>, com fornecedor e forma de pagamento.
             </div>
           )}
 

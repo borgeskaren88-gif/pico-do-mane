@@ -123,7 +123,9 @@ export async function POST(request) {
     // se atropelando perderiam a primeira. Aqui tudo entra numa gravação só.
     if (acao === 'movLote') {
       const entradas = arr(body?.entradas)
-        .map((e) => ({ id: String(e?.id || ''), qtd: numQtd(e?.qtd), validade: String(e?.validade || '') }))
+        // `custo` vem quando ela falou o preco. Passa por num() como tudo que
+        // chega de fora: o que nao for numero vira 0 e e ignorado adiante.
+        .map((e) => ({ id: String(e?.id || ''), qtd: numQtd(e?.qtd), validade: String(e?.validade || ''), custo: num(e?.custo) }))
         .filter((e) => e.id && e.qtd > 0);
       if (!entradas.length) return NextResponse.json({ ok: false, erro: 'Nenhuma entrada pra lançar.' }, { status: 400 });
 
@@ -137,7 +139,12 @@ export async function POST(request) {
         itens = itens.map((it) => {
           if (it.id !== e.id) return it;
           achou = true;
-          return aplicarMovimentoItem(it, 'entrada', e.qtd, motivo, e.validade);
+          const movido = aplicarMovimentoItem(it, 'entrada', e.qtd, motivo, e.validade);
+          // Preco dito na fala vira o custo do item. So quando veio um numero
+          // de verdade: sem isso, uma entrada sem preco zeraria o custo e
+          // levaria o CMV do mes junto.
+          const custoFalado = num(e.custo);
+          return custoFalado > 0 ? { ...movido, custo: custoFalado } : movido;
         });
         if (achou) feitas.push(e);
       }
