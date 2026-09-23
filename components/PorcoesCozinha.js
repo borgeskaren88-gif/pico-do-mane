@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { C, Card, Btn, QtdInput, Empty, PageTitle } from './ui';
-import { numQtd } from '../lib/util';
+import { num, numQtd } from '../lib/util';
 import { painelDasPorcoes } from '../lib/porcoes';
 
 // PORÇÕES — a tela da cozinha.
@@ -13,6 +13,11 @@ import { painelDasPorcoes } from '../lib/porcoes';
 //
 // A ordem da lista é a da urgência: o que já parou a venda vem primeiro, o que
 // está só de reserva baixa vem depois, e o que está cheio fica no fim, quieto.
+
+// Meio saco existe de verdade — a Favorita usa 200 g de um saco de 400 g e os
+// outros 200 g voltam pro freezer. Então o número aparece como 4,5, com
+// vírgula, e não como 4.5 nem arredondado pra 5.
+const fmtQtd = (v) => Number(num(v).toFixed(3)).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
 const CORES = { vazio: C.red, critico: C.red, atencao: C.amber, ok: C.green };
 const ROTULOS = { vazio: 'ZEROU', critico: 'Falta na frente', atencao: 'Reserva baixa', ok: 'Cheio' };
@@ -57,7 +62,7 @@ export default function PorcoesCozinha() {
     // número certo é muito mais rápido — e menos errável — do que digitar um.
     if (tipo === 'separar') setQtd(String(p.precisaSeparar || ''));
     else if (tipo === 'abastecer') setQtd(String(p.podeAbastecer || ''));
-    else { setQtd(String(p.linha)); setQtd2(String(p.salva)); }
+    else { setQtd(fmtQtd(p.linha)); setQtd2(fmtQtd(p.salva)); }
   };
   const fechar = () => { setAcao(null); setQtd(''); setQtd2(''); setErro(''); };
 
@@ -104,8 +109,8 @@ export default function PorcoesCozinha() {
             </div>
 
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-              <Coluna titulo="Linha de frente" valor={p.linha} min={p.minLinha} cor={p.linha < p.minLinha ? C.red : C.text} />
-              <Coluna titulo="Salva-vidas" valor={p.salva} min={p.minSalva} cor={p.salva < p.minSalva ? C.amber : C.text} />
+              <Coluna titulo="Linha de frente" valor={fmtQtd(p.linha)} min={p.minLinha} cor={p.linha < p.minLinha ? C.red : C.text} />
+              <Coluna titulo="Salva-vidas" valor={fmtQtd(p.salva)} min={p.minSalva} cor={p.salva < p.minSalva ? C.amber : C.text} />
               <Coluna
                 titulo="Dá pra separar"
                 valor={p.rendeDoBruto == null ? '—' : p.rendeDoBruto}
@@ -145,7 +150,7 @@ export default function PorcoesCozinha() {
                 )}
                 {acao.tipo === 'contar' && (
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 8 }}>
-                    Conta os dois freezers e põe o que tem AGORA.
+                    Conta os dois freezers e põe o que tem AGORA. Saco aberto pela metade conta como 0,5.
                   </div>
                 )}
 
