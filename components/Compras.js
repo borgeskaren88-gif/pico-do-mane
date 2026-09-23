@@ -130,7 +130,7 @@ function FaltouNoEstoque({ pendentes, onLancar, onDispensar, ocupado }) {
   );
 }
 
-export default function Compras({ dados, cotacoes, despesas = [], estoque = [], onChange, onRegistrar, onEstoque }) {
+export default function Compras({ dados, cotacoes, despesas = [], estoque = [], onChange, onRegistrar, onEstoque, carrinhoInicial = null, onCarrinhoUsado }) {
   // Sugestões de produto: os itens do ESTOQUE primeiro (esses fazem a compra
   // entrar automático), mais o que já foi comprado/cotado. Digitar e escolher a
   // sugestão garante o nome IGUAL — sem precisar decorar.
@@ -248,6 +248,16 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   }, [totalCarrinho]);
   const somaParcelas = parcelas.reduce((s, p) => s + num(p.valor), 0);
   const parcelasBatem = !parcelado || Math.abs(somaParcelas - totalCarrinho) < 0.005;
+
+  // Carrinho que chegou pronto de fora — hoje, do abastecimento por voz. Entra
+  // uma vez e avisa quem mandou, pra nao entrar de novo a cada re-render nem
+  // voltar quando ela sair e reentrar na aba.
+  useEffect(() => {
+    if (!Array.isArray(carrinhoInicial) || !carrinhoInicial.length) return;
+    setCarrinho((c) => [...c, ...carrinhoInicial.map((it) => ({ ...it, id: uid() }))]);
+    if (onCarrinhoUsado) onCarrinhoUsado();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carrinhoInicial]);
 
   const addItem = () => {
     if (!item.produto || !item.valorUnit) return;

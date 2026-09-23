@@ -98,7 +98,7 @@ function PenteFino({ grupos, onJuntar, onIgnorar, ocupado }) {
   );
 }
 
-export default function Estoque({ itens = [], carregado = true, onAcao, compras = [], cotacoes = [], fichas = [], cardapio = [], duplicadosIgnorados = [], onRepor }) {
+export default function Estoque({ itens = [], carregado = true, onAcao, compras = [], cotacoes = [], fichas = [], cardapio = [], duplicadosIgnorados = [], onRepor, onLevarPraCompras }) {
   const [novo, setNovo] = useState(itemVazio());
   const [editId, setEditId] = useState(null);
   const [acao, setAcao] = useState(null);   // { id, tipo: 'entrada'|'saida'|'contagem' }
@@ -516,7 +516,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
         </Card>
       )}
 
-      <EntradaPorVoz itens={itens} onLote={lancarLote} />
+      <EntradaPorVoz itens={itens} onLote={lancarLote} onLevarPraCompras={onLevarPraCompras} />
 
       <Card style={{ marginBottom: 12, background: C.panel2 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
