@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
 import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz, comprasComCustoEstranho, conversaoDaReceita, ehPorcionado, linhaDe, salvaDe } from '../lib/estoque';
-import { painelDasPorcoes, consumoPorSaco, porcoesSemFicha } from '../lib/porcoes';
+import { painelDasPorcoes, consumoPorSaco, porcoesSemFicha, fichasComPacoteESaco } from '../lib/porcoes';
 import { prazoDeEntregaDoProduto } from '../lib/cotacao';
 import EntradaPorVoz from './EntradaPorVoz';
 
@@ -389,6 +389,10 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   // fechado, contando a mesma batata duas vezes.
   const semFichaPorcao = useMemo(() => porcoesSemFicha(itens, fichas), [itens, fichas]);
 
+  // O contrário: a ficha trocada, mas com a linha velha ainda lá. As duas
+  // juntas fazem a comida sair duas vezes, e nada acusa na hora.
+  const fichaDobrada = useMemo(() => fichasComPacoteESaco(fichas, itens, cardapio), [fichas, itens, cardapio]);
+
   // Só faz sentido sair de um item que NÃO é ele mesmo e que não é, ele
   // próprio, um saco já separado — senão o pacote viraria filho do saco.
   const opcoesBruto = useMemo(() => itens
@@ -758,6 +762,17 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                   {f.brutoEmUso
                     ? <> — e tem ficha usando <b>{f.brutoNome}</b> direto. Enquanto for assim, a venda come do pacote fechado <b>além</b> do que a cozinha ensacou, e a mesma comida é contada duas vezes.</>
                     : <>. Põe <b>1 saco</b> de {f.nome} na ficha da porção pra venda começar a baixar da Linha de Frente.</>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {fichaDobrada.length > 0 && (
+            <div style={{ fontSize: 12, color: C.red, background: C.panel2, borderRadius: 10, padding: '10px 12px', marginBottom: 12, lineHeight: 1.5, fontWeight: 600 }}>
+              {fichaDobrada.map((f, i) => (
+                <div key={`${f.cardapioId}-${i}`} style={{ marginBottom: 4 }}>
+                  A ficha de <b>{f.produto}</b> usa <b>{f.saco}</b> e <b>{f.bruto}</b> ao mesmo tempo.
+                  {' '}A comida sai duas vezes — uma ao ensacar e outra ao vender. Tira a linha de <b>{f.bruto}</b> dessa ficha.
                 </div>
               ))}
             </div>
