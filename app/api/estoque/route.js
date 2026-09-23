@@ -2,7 +2,8 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, fundirItens, repontarFichas, repontarCompras, comprasPendentesDeEstoque, igualNome } from '../../../lib/estoque';
+import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, fundirItens, repontarFichas, repontarCompras, comprasPendentesDeEstoque, igualNome, ehPorcionado } from '../../../lib/estoque';
+import { separarSacos, abastecerLinha, contarPorcao } from '../../../lib/porcoes';
 import { limparNome, num, numQtd, todayISO } from '../../../lib/util';
 import { notificarEstoqueCritico, notificarSaidaSemVenda } from '../../../lib/push';
 
@@ -81,6 +82,14 @@ export async function POST(request) {
       const id = String(body?.id || '');
       const tipo = ['entrada', 'saida', 'contagem'].includes(body?.tipo) ? body.tipo : null;
       if (!id || !tipo) return NextResponse.json({ ok: false, erro: 'Dados do movimento incompletos.' }, { status: 400 });
+      // Item porcionado mora em dois freezers, e o saldo dele é a SOMA dos
+      // dois. Uma entrada ou contagem por aqui mexeria só no total e deixaria
+      // os dois freezers dizendo outra coisa — o saldo discordaria de si mesmo,
+      // e todo aviso da cozinha nasceria errado a partir daí.
+      const alvoMov = itens.find((it) => it.id === id);
+      if (ehPorcionado(alvoMov)) {
+        return NextResponse.json({ ok: false, erro: 'Esse item é separado em sacos. Use Separei / Levei pra frente / Contei.' }, { status: 400 });
+      }
       let achou = false;
       const quem = p === 'cozinha' ? ' (cozinha)' : '';
       // Saída lançada pela COZINHA é sempre Desperdício, decidido aqui e não na
@@ -144,6 +153,43 @@ export async function POST(request) {
           return { nome: limparNome(it?.nome), qtd: e.qtd, unidade: it?.unidade || 'un', saldo: num(it?.saldo) };
         }),
       });
+    }
+
+    // OS TRÊS MOVIMENTOS DO PORCIONAMENTO — dona OU cozinha.
+    //
+    // Quem separa e quem abastece é a cozinha; a dona também mexe porque é ela
+    // que confere. Os três assinam quem fez: o pedido era "pra eu poder
+    // cobrar", e cobrar sem registro é memória contra memória.
+    if (acao === 'porcaoSeparar' || acao === 'porcaoAbastecer' || acao === 'porcaoContar') {
+      const id = String(body?.id || '');
+      const alvo = itens.find((it) => it.id === id);
+      if (!alvo) return NextResponse.json({ ok: false, erro: 'Item não encontrado.' }, { status: 404 });
+      if (!ehPorcionado(alvo)) return NextResponse.json({ ok: false, erro: 'Esse item não é separado em sacos.' }, { status: 400 });
+      const quem = p === 'cozinha' ? 'Cozinha' : 'Karen';
+
+      let r = null;
+      let brutoNovo = null;
+      if (acao === 'porcaoSeparar') {
+        const bruto = itens.find((it) => it.id === alvo.separar.brutoId);
+        if (!bruto) return NextResponse.json({ ok: false, erro: 'O pacote fechado desse item não está mais no estoque.' }, { status: 400 });
+        r = separarSacos(alvo, bruto, body?.sacos, quem);
+        if (r) brutoNovo = r.bruto;
+      } else if (acao === 'porcaoAbastecer') {
+        r = abastecerLinha(alvo, body?.sacos, quem);
+        if (!r) return NextResponse.json({ ok: false, erro: 'O Salva-Vidas está vazio — não tem o que levar pra frente.' }, { status: 400 });
+      } else {
+        r = contarPorcao(alvo, body?.linha, body?.salva, quem);
+      }
+      if (!r) return NextResponse.json({ ok: false, erro: 'Não consegui registrar. Confere a quantidade.' }, { status: 400 });
+
+      // Os dois itens trocam na MESMA gravação: separar tira do pacote e põe no
+      // freezer, e meio movimento gravado seria comida sumindo do sistema.
+      itens = itens.map((it) => (it.id === r.item.id ? r.item : (brutoNovo && it.id === brutoNovo.id ? brutoNovo : it)));
+      const novo = await gravarEstoque(sb, blob, { estoque: itens });
+      // Separar consome o pacote fechado: é a hora certa de avisar que ele
+      // cruzou o mínimo, porque é agora que dá tempo de comprar.
+      if (brutoNovo) { try { await notificarEstoqueCritico(sb, arr(blob.estoque), itens); } catch (e) { /* push nunca quebra o movimento */ } }
+      return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
     }
 
     // A partir daqui, só a dona.

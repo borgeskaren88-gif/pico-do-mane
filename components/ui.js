@@ -122,7 +122,14 @@ export function Select({ value, onChange, options, placeholder }) {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...inputStyle, appearance: 'none' }}>
       <option value="">{placeholder || 'Selecione…'}</option>
-      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      {/* Uma lista de textos simples cobre quase tudo (unidades, categorias).
+          Quando o que se escolhe é um ITEM, o texto na tela e o valor gravado
+          são coisas diferentes — aí a opção vem como { value, label }. */}
+      {options.map((o) => {
+        const v = (o && typeof o === 'object') ? o.value : o;
+        const rot = (o && typeof o === 'object') ? o.label : o;
+        return <option key={v} value={v}>{rot}</option>;
+      })}
     </select>
   );
 }

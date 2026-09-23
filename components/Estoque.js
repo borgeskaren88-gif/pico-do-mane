@@ -2,11 +2,21 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
-import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz, comprasComCustoEstranho } from '../lib/estoque';
+import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz, comprasComCustoEstranho, conversaoDaReceita, ehPorcionado, linhaDe, salvaDe } from '../lib/estoque';
+import { painelDasPorcoes, consumoPorSaco } from '../lib/porcoes';
 import { prazoDeEntregaDoProduto } from '../lib/cotacao';
 import EntradaPorVoz from './EntradaPorVoz';
 
-const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '', validade: '' });
+const itemVazio = () => ({ nome: '', categoria: '', unidade: 'un', saldo: '', minimo: '', custo: '', conteudo: '', conteudoUnid: '', validade: '',
+  // Porcionamento: o item que e separado em sacos (batata 400 g) aponta
+  // pro pacote fechado de onde ele sai, e diz quanto cada saco leva.
+  sepAtivo: false, sepBrutoId: '', sepGramas: '', sepUnidade: 'g', sepMinLinha: '5', sepMinSalva: '5' });
+
+// A regra de porcionamento montada a partir do formulario. `null` desliga — e e
+// o null que faz o item voltar a ser um item comum, sem freezer nenhum.
+const regraDeSeparar = (f) => ((f.sepAtivo && f.sepBrutoId && numQtd(f.sepGramas) > 0)
+  ? { brutoId: f.sepBrutoId, gramas: numQtd(f.sepGramas), unidade: f.sepUnidade || 'g', minLinha: num(f.sepMinLinha), minSalva: num(f.sepMinSalva) }
+  : null);
 
 // A cor de quem está pra vencer. Vermelho é "usa hoje ou perde"; amarelo ainda
 // dá pra encaixar num prato ou numa promoção.
@@ -263,16 +273,18 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     if (!novo.nome.trim() || busy) return;
     setBusy(true);
     if (editId) {
-      await onAcao({ acao: 'edit', id: editId, campos: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid, validade: novo.validade } });
+      await onAcao({ acao: 'edit', id: editId, campos: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid, validade: novo.validade, separar: regraDeSeparar(novo) } });
     } else {
-      await onAcao({ acao: 'add', item: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', saldo: num(novo.saldo), minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid, validade: novo.validade } });
+      await onAcao({ acao: 'add', item: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', saldo: num(novo.saldo), minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid, validade: novo.validade, separar: regraDeSeparar(novo), salva: num(novo.saldo) } });
     }
     setNovo(itemVazio()); setEditId(null); setBusy(false);
   };
 
   const editar = (it) => {
     setEditId(it.id);
-    setNovo({ nome: it.nome || '', categoria: it.categoria || '', unidade: it.unidade || 'un', saldo: '', minimo: String(it.minimo ?? ''), custo: String(it.custo ?? ''), conteudo: String(it.conteudo ?? ''), conteudoUnid: it.conteudoUnid || '', validade: it.validade || '' });
+    setNovo({ nome: it.nome || '', categoria: it.categoria || '', unidade: it.unidade || 'un', saldo: '', minimo: String(it.minimo ?? ''), custo: String(it.custo ?? ''), conteudo: String(it.conteudo ?? ''), conteudoUnid: it.conteudoUnid || '', validade: it.validade || '',
+      sepAtivo: !!(it.separar && it.separar.brutoId), sepBrutoId: it.separar?.brutoId || '', sepGramas: String(it.separar?.gramas ?? ''),
+      sepUnidade: it.separar?.unidade || 'g', sepMinLinha: String(it.separar?.minLinha ?? '5'), sepMinSalva: String(it.separar?.minSalva ?? '5') });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const cancelar = () => { setNovo(itemVazio()); setEditId(null); };
@@ -321,6 +333,30 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   // Itens onde a NOTA diz um custo e o item diz outro. O CMV usa o da nota, e
   // esse segundo custo não aparecia em tela nenhuma.
   const custoEstranho = useMemo(() => comprasComCustoEstranho(itens, compras), [itens, compras]);
+
+  // O quadro das porções: onde estão os sacos e o que falta separar.
+  const porcoes = useMemo(() => painelDasPorcoes(itens), [itens]);
+
+  // Só faz sentido sair de um item que NÃO é ele mesmo e que não é, ele
+  // próprio, um saco já separado — senão o pacote viraria filho do saco.
+  const opcoesBruto = useMemo(() => itens
+    .filter((it) => it.id !== editId && !ehPorcionado(it))
+    .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''))
+    .map((it) => ({ value: it.id, label: `${it.nome} (${it.unidade || 'un'})` })), [itens, editId]);
+
+  // A prévia do rendimento, conferida enquanto ela digita. É aqui que um erro
+  // de unidade aparece ANTES de virar custo errado: se o saco de 400 g sai de
+  // um item contado em `un`, não existe conversão e o sistema chutaria 1 por 1.
+  const previaSeparar = useMemo(() => {
+    if (!novo.sepAtivo || !novo.sepBrutoId || !(numQtd(novo.sepGramas) > 0)) return null;
+    const bruto = itens.find((i) => i.id === novo.sepBrutoId);
+    if (!bruto) return null;
+    const unidade = novo.sepUnidade || 'g';
+    const conv = conversaoDaReceita(unidade, bruto);
+    const porSaco = consumoPorSaco({ separar: { brutoId: bruto.id, gramas: numQtd(novo.sepGramas), unidade } }, bruto);
+    const rende = porSaco > 0 ? Math.floor(num(bruto.saldo) / porSaco) : 0;
+    return { bruto, porSaco, rende, chute: !conv.ok, unidade };
+  }, [novo.sepAtivo, novo.sepBrutoId, novo.sepGramas, novo.sepUnidade, itens]);
 
   // Insumos cujo cálculo de custo está saindo por chute de unidade.
   const unidadeSolta = useMemo(() => insumosComUnidadeSolta(fichas, itens, cardapio), [fichas, itens, cardapio]);
@@ -647,6 +683,40 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
         </Card>
       )}
 
+      {/* OS DOIS FREEZERS, na visão dela.
+          A cozinha tem a tela de fazer; esta é a de conferir. Mostra os mesmos
+          números que eles veem, com o recado idêntico — foi o pedido: "pra eu
+          poder cobrar". Cobrar por um número diferente do que a outra pessoa
+          está vendo não é cobrança, é briga. */}
+      {porcoes.lista.length > 0 && (
+        <Card style={{ marginBottom: 18, borderColor: porcoes.aFazer.length ? C.amber : C.cardBorder }}>
+          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>
+            Porções separadas ({porcoes.lista.length})
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.45 }}>
+            {porcoes.aFazer.length === 0
+              ? 'Os dois freezers estão nos mínimos. Nada pendente com a cozinha.'
+              : `${porcoes.aFazer.length} produto(s) abaixo do mínimo. A cozinha está vendo esta mesma lista, com o mesmo recado.`}
+          </div>
+          {porcoes.lista.map((p) => {
+            const cor = { vazio: C.red, critico: C.red, atencao: C.amber, ok: C.green }[p.nivel];
+            return (
+              <div key={p.id} style={{ borderTop: `1px solid ${C.hair}`, padding: '10px 0 2px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, minWidth: 0 }}>{p.nome}</div>
+                  <div style={{ fontSize: 12.5, color: C.faint, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                    frente <b style={{ color: p.linha < p.minLinha ? C.red : C.text }}>{fmtQtd(p.linha)}</b>
+                    {' · '}fundo <b style={{ color: p.salva < p.minSalva ? C.amber : C.text }}>{fmtQtd(p.salva)}</b>
+                    {p.rendeDoBruto != null && <>{' · '}dá +{p.rendeDoBruto}</>}
+                  </div>
+                </div>
+                {p.recado && <div style={{ fontSize: 12, color: cor, fontWeight: 600, marginTop: 4, lineHeight: 1.45 }}>{p.recado}</div>}
+              </div>
+            );
+          })}
+        </Card>
+      )}
+
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar item' : 'Novo item de estoque'}</div>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>
@@ -691,6 +761,59 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
             {' '}Se o que tu quer é dizer o tamanho da embalagem, a unidade do item tem que ser a embalagem (pote, pacote), não {contradiz.unidade}.
           </div>
         )}
+        {/* PORCIONAMENTO — o pacote fechado que vira saco pronto.
+            Fica no fim do formulário de propósito: é o campo mais raro, e quem
+            não separa nada não precisa nem saber que ele existe. */}
+        <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 12, marginBottom: 14 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!novo.sepAtivo} onChange={(e) => set('sepAtivo')(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--c-accent)' }} />
+            <span style={{ fontSize: 13.5, fontWeight: 700 }}>Esse item é separado em sacos</span>
+          </label>
+          <div style={{ fontSize: 11, color: C.faint, margin: '6px 0 0', lineHeight: 1.45 }}>
+            Pra quem compra fechado e separa antes do serviço: pacote de batata → sacos de 400 g.
+            O saco passa a morar em <b>dois freezers</b> (Linha de Frente e Salva-Vidas), e a cozinha
+            recebe sozinha o aviso de quando separar mais.
+          </div>
+
+          {novo.sepAtivo && (
+            <div style={{ marginTop: 12 }}>
+              <Field label="Sai de qual pacote fechado?">
+                <Select value={novo.sepBrutoId} onChange={set('sepBrutoId')} options={opcoesBruto} placeholder="Escolhe o item do estoque…" />
+              </Field>
+              <Field label="Cada saco leva quanto?">
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1 }}><NumInput value={novo.sepGramas} onChange={set('sepGramas')} placeholder="ex.: 400" /></div>
+                  <div style={{ width: 90 }}><Select value={novo.sepUnidade} onChange={set('sepUnidade')} options={UNIDADES_CONTEUDO} placeholder="g" /></div>
+                </div>
+              </Field>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <Field label="Mínimo na Linha de Frente"><NumInput value={novo.sepMinLinha} onChange={set('sepMinLinha')} /></Field>
+                <Field label="Mínimo no Salva-Vidas"><NumInput value={novo.sepMinSalva} onChange={set('sepMinSalva')} /></Field>
+              </div>
+
+              {/* A conta feita na frente dela, antes de salvar. Um erro de
+                  unidade aqui é o mesmo erro do açaí e do alumínio: silencioso,
+                  e só aparece semanas depois como custo estranho. */}
+              {previaSeparar && (
+                previaSeparar.chute ? (
+                  <div style={{ fontSize: 12, color: C.red, background: C.panel2, borderRadius: 10, padding: '9px 12px', lineHeight: 1.5, fontWeight: 600 }}>
+                    <b>{previaSeparar.bruto.nome}</b> é contado em <b>{previaSeparar.bruto.unidade}</b>, e não dá pra converter
+                    {' '}{previaSeparar.unidade} nisso. Cadastra o pacote em kg (ou em L), ou preenche o
+                    {' '}&quot;Conteúdo por unidade&quot; dele <b>em {previaSeparar.unidade}</b> — senão cada saco vai
+                    {' '}descontar um pacote inteiro.
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: C.muted, background: C.panel2, borderRadius: 10, padding: '9px 12px', lineHeight: 1.5 }}>
+                    Cada saco tira <b style={{ color: C.text }}>{fmtQtd(previaSeparar.porSaco)} {previaSeparar.bruto.unidade}</b> de {previaSeparar.bruto.nome}.
+                    {' '}O que tem hoje ({fmtQtd(num(previaSeparar.bruto.saldo))} {previaSeparar.bruto.unidade}) dá
+                    {' '}<b style={{ color: previaSeparar.rende > 0 ? C.text : C.red }}>{previaSeparar.rende} saco{previaSeparar.rende === 1 ? '' : 's'}</b>.
+                  </div>
+                )
+              )}
+            </div>
+          )}
+        </div>
+
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvarItem}>{editId ? 'Salvar item' : 'Adicionar ao estoque'}</Btn>
           {editId && <Btn kind="ghost" onClick={cancelar}>Cancelar</Btn>}
@@ -720,6 +843,9 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
             const baixo = minimo > 0 && saldo <= minimo;
             const aberto = verMov === it.id;
             const conteudoTxt = num(it.conteudo) > 0 && it.conteudoUnid ? ` · ${num(it.conteudo)} ${it.conteudoUnid}/${it.unidade}` : '';
+            // Saco separado: o saldo grande do lado é a soma, e sozinho ele
+            // não diz o que importa — se o que falta está na frente ou no fundo.
+            const freezerTxt = ehPorcionado(it) ? ` · ${fmtQtd(linhaDe(it))} na frente, ${fmtQtd(salvaDe(it))} no fundo` : '';
             // Validade só conta se ainda tem o produto: o que zerou não estraga.
             const dias = saldo > 0 ? diasParaVencer(it, hoje) : null;
             const nvVal = nivelValidade(dias);
@@ -731,7 +857,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{it.nome}</div>
                     <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
                       {custo > 0 ? `${brl(custo)}/${it.unidade} · em estoque ${brl(saldo * custo)}` : `unidade: ${it.unidade}`}
-                      {minimo > 0 ? ` · mín. ${fmtQtd(minimo)}` : ''}{conteudoTxt}
+                      {minimo > 0 ? ` · mín. ${fmtQtd(minimo)}` : ''}{conteudoTxt}{freezerTxt}
                     </div>
                     {corVal ? (
                       <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, background: `color-mix(in srgb, ${corVal} 18%, transparent)`, border: `1px solid ${corVal}`, borderRadius: 999, padding: '3px 10px' }}>
@@ -787,11 +913,17 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-                    <Btn kind="ok" small onClick={() => abrirAcao(it.id, 'entrada')}>+ Entrada</Btn>
-                    <Btn kind="danger" small onClick={() => abrirAcao(it.id, 'saida')}>− Saída</Btn>
-                    <Btn kind="ghost" small onClick={() => abrirAcao(it.id, 'contagem')}>Contar</Btn>
+                    {/* Item porcionado não tem entrada nem contagem por aqui: o
+                        saldo dele é a soma dos dois freezers, e mexer só no
+                        total faria o item discordar de si mesmo. Quem mexe é a
+                        cozinha, na tela de Porções. */}
+                    {!ehPorcionado(it) && <>
+                      <Btn kind="ok" small onClick={() => abrirAcao(it.id, 'entrada')}>+ Entrada</Btn>
+                      <Btn kind="danger" small onClick={() => abrirAcao(it.id, 'saida')}>− Saída</Btn>
+                      <Btn kind="ghost" small onClick={() => abrirAcao(it.id, 'contagem')}>Contar</Btn>
+                    </>}
                     <Btn kind="ghost" small onClick={() => editar(it)}>Editar</Btn>
-                    {nvVal === 'vencido' && (
+                    {nvVal === 'vencido' && !ehPorcionado(it) && (
                       <Btn kind="danger" small onClick={() => abrirAcao(it.id, 'saida', 'Vencido')}>jogar fora</Btn>
                     )}
                     {(it.movimentos || []).length > 0 && (
