@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
 import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz, comprasComCustoEstranho, conversaoDaReceita, ehPorcionado, linhaDe, salvaDe } from '../lib/estoque';
-import { painelDasPorcoes, consumoPorSaco } from '../lib/porcoes';
+import { painelDasPorcoes, consumoPorSaco, porcoesSemFicha } from '../lib/porcoes';
 import { prazoDeEntregaDoProduto } from '../lib/cotacao';
 import EntradaPorVoz from './EntradaPorVoz';
 
@@ -336,6 +336,10 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
 
   // O quadro das porções: onde estão os sacos e o que falta separar.
   const porcoes = useMemo(() => painelDasPorcoes(itens), [itens]);
+
+  // Porção que a ficha ainda não usa: e a venda continua comendo do pacote
+  // fechado, contando a mesma batata duas vezes.
+  const semFichaPorcao = useMemo(() => porcoesSemFicha(itens, fichas), [itens, fichas]);
 
   // Só faz sentido sair de um item que NÃO é ele mesmo e que não é, ele
   // próprio, um saco já separado — senão o pacote viraria filho do saco.
@@ -698,6 +702,19 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
               ? 'Os dois freezers estão nos mínimos. Nada pendente com a cozinha.'
               : `${porcoes.aFazer.length} produto(s) abaixo do mínimo. A cozinha está vendo esta mesma lista, com o mesmo recado.`}
           </div>
+          {semFichaPorcao.length > 0 && (
+            <div style={{ fontSize: 12, color: C.red, background: C.panel2, borderRadius: 10, padding: '10px 12px', marginBottom: 12, lineHeight: 1.5, fontWeight: 600 }}>
+              {semFichaPorcao.map((f) => (
+                <div key={f.id} style={{ marginBottom: 4 }}>
+                  Nenhuma ficha técnica usa <b>{f.nome}</b> ainda
+                  {f.brutoEmUso
+                    ? <> — e tem ficha usando <b>{f.brutoNome}</b> direto. Enquanto for assim, a venda come do pacote fechado <b>além</b> do que a cozinha ensacou, e a mesma comida é contada duas vezes.</>
+                    : <>. Põe <b>1 saco</b> de {f.nome} na ficha da porção pra venda começar a baixar da Linha de Frente.</>}
+                </div>
+              ))}
+            </div>
+          )}
+
           {porcoes.lista.map((p) => {
             const cor = { vazio: C.red, critico: C.red, atencao: C.amber, ok: C.green }[p.nivel];
             return (
