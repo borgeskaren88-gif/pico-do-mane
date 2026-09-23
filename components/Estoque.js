@@ -271,23 +271,41 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
 
   const salvarItem = async () => {
     if (!novo.nome.trim() || busy) return;
-    setBusy(true);
-    if (editId) {
-      await onAcao({ acao: 'edit', id: editId, campos: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid, validade: novo.validade, separar: regraDeSeparar(novo) } });
-    } else {
-      await onAcao({ acao: 'add', item: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', saldo: num(novo.saldo), minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid, validade: novo.validade, separar: regraDeSeparar(novo), salva: num(novo.saldo) } });
+    // Caixinha marcada com a regra pela metade. Gravar assim criaria um item
+    // COMUM: ele não apareceria no quadro das Porções, e nada diria por quê.
+    // É a mesma armadilha do `un` descartado — cadastro que parece ter dado
+    // certo, não deu, e a pessoa vai embora achando que fez.
+    if (novo.sepAtivo && !regraDeSeparar(novo)) {
+      setAvisoSalvar(!novo.sepBrutoId
+        ? 'Falta dizer de qual pacote fechado esse saco sai.'
+        : 'Falta dizer quanto cada saco leva (ex.: 400 g).');
+      return;
     }
-    setNovo(itemVazio()); setEditId(null); setBusy(false);
+    setBusy(true); setAvisoSalvar('');
+    const j = editId
+      ? await onAcao({ acao: 'edit', id: editId, campos: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid, validade: novo.validade, separar: regraDeSeparar(novo) } })
+      : await onAcao({ acao: 'add', item: { nome: novo.nome, categoria: novo.categoria, unidade: novo.unidade || 'un', saldo: num(novo.saldo), minimo: num(novo.minimo), custo: num(novo.custo), conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid, validade: novo.validade, separar: regraDeSeparar(novo), salva: num(novo.saldo) } });
+    setBusy(false);
+    // Nome repetido: o servidor devolve "ok" e não cria nada. Sem isto a tela
+    // limpava o formulário do mesmo jeito, e o item que nunca existiu parecia
+    // ter sido criado.
+    if (j && j.jaExistia) {
+      setAvisoSalvar(`Já existe um item chamado "${novo.nome.trim()}" — nada foi criado. Muda o nome, ou edita o que já existe.`);
+      return;
+    }
+    if (!j || !j.ok) { setAvisoSalvar('Não consegui salvar. Tenta de novo.'); return; }
+    setNovo(itemVazio()); setEditId(null);
   };
 
   const editar = (it) => {
+    setAvisoSalvar('');
     setEditId(it.id);
     setNovo({ nome: it.nome || '', categoria: it.categoria || '', unidade: it.unidade || 'un', saldo: '', minimo: String(it.minimo ?? ''), custo: String(it.custo ?? ''), conteudo: String(it.conteudo ?? ''), conteudoUnid: it.conteudoUnid || '', validade: it.validade || '',
       sepAtivo: !!(it.separar && it.separar.brutoId), sepBrutoId: it.separar?.brutoId || '', sepGramas: String(it.separar?.gramas ?? ''),
       sepUnidade: it.separar?.unidade || 'g', sepMinLinha: String(it.separar?.minLinha ?? '5'), sepMinSalva: String(it.separar?.minSalva ?? '5') });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const cancelar = () => { setNovo(itemVazio()); setEditId(null); };
+  const cancelar = () => { setNovo(itemVazio()); setEditId(null); setAvisoSalvar(''); };
   const excluir = async (id) => { if (!window.confirm('Excluir este item do estoque?')) return; if (id === editId) cancelar(); await onAcao({ acao: 'del', id }); };
   // "Desfazer": reverte o movimento no saldo (o que saiu volta; o que entrou
   // sai) E tira a linha. É o que usar quando o lançamento foi errado.
@@ -338,6 +356,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   // mas quem monta o cadastro é ela — e no dia em que monta é ela que precisa
   // dizer onde os sacos estão. Mandar a dona entrar como cozinha pra contar o
   // próprio freezer seria pedir que ela finja ser outra pessoa.
+  const [avisoSalvar, setAvisoSalvar] = useState('');
   const [pAcao, setPAcao] = useState(null); // { id, tipo: 'separar'|'abastecer'|'contar' }
   const [pQtd, setPQtd] = useState('');
   const [pQtd2, setPQtd2] = useState('');
@@ -893,6 +912,11 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
           )}
         </div>
 
+        {avisoSalvar && (
+          <div style={{ fontSize: 12.5, color: C.red, background: C.panel2, borderRadius: 10, padding: '9px 12px', marginBottom: 12, lineHeight: 1.5, fontWeight: 700 }}>
+            {avisoSalvar}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn onClick={salvarItem}>{editId ? 'Salvar item' : 'Adicionar ao estoque'}</Btn>
           {editId && <Btn kind="ghost" onClick={cancelar}>Cancelar</Btn>}
