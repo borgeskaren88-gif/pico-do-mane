@@ -33,6 +33,35 @@ const fmtQtd = (v) => Number(num(v).toFixed(3)).toLocaleString('pt-BR', { maximu
 // Pente fino: o mesmo produto cadastrado duas vezes com nomes diferentes.
 // Só aponta — juntar é decisão dela, porque "Coca Cola" e "Coca Cola Zero"
 // são parecidos e não são a mesma coisa.
+// Painel que abre e fecha no titulo.
+//
+// Uma lista de 17 itens come a tela inteira, e ela rola por cima dela toda vez
+// que quer chegar em qualquer outra coisa. Mas esconder por padrao tambem e
+// ruim: "Acabando (2)" cabe na tela e some se vier fechado.
+//
+// Entao quem decide e o TAMANHO: lista curta nasce aberta, lista longa nasce
+// fechada com o numero no titulo. O numero e a informacao que importa quando
+// esta fechado — 17 ja diz tudo que ela precisa pra decidir se vai abrir.
+function Dobravel({ titulo, cor, quantos, acao, children, limite = 6 }) {
+  const [aberto, setAberto] = useState(quantos <= limite);
+  return (
+    <Card style={{ marginBottom: 14, borderColor: cor || C.cardBorder }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          type="button" onClick={() => setAberto((v) => !v)}
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, color: cor || C.text, minWidth: 0 }}
+        >
+          <span style={{ fontSize: 11, transform: aberto ? 'rotate(90deg)' : 'none', transition: 'transform .12s', display: 'inline-block' }}>▶</span>
+          <span style={{ fontSize: 14, fontWeight: 800 }}>{titulo} ({quantos})</span>
+          <span style={{ fontSize: 11.5, color: C.faint, fontWeight: 600 }}>{aberto ? 'fechar' : 'ver'}</span>
+        </button>
+        {aberto && acao}
+      </div>
+      {aberto && <div style={{ marginTop: 8 }}>{children}</div>}
+    </Card>
+  );
+}
+
 function PenteFino({ grupos, onJuntar, onIgnorar, ocupado }) {
   const [escolha, setEscolha] = useState({}); // { [chave]: principalId }
   // Itens que ela tirou do grupo. O pente fino acha pelo NOME, e nome parecido
@@ -732,23 +761,21 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
       )}
 
       {abaixoDoMin.length > 0 && (
-        <Card style={{ marginBottom: 14, borderColor: C.red }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: C.red }}>Acabando ({abaixoDoMin.length})</div>
-            {onRepor && <Btn small onClick={() => reporNaLista(abaixoDoMin)}>Repor todos na lista</Btn>}
-          </div>
+        <Dobravel
+          titulo="Acabando" cor={C.red} quantos={abaixoDoMin.length}
+          acao={onRepor ? <Btn small onClick={() => reporNaLista(abaixoDoMin)}>Repor todos na lista</Btn> : null}
+        >
           {abaixoDoMin.map((it) => (
             <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, borderTop: `1px solid ${C.hair}`, padding: '7px 0', fontSize: 14 }}>
               <span>{it.nome}</span>
               <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmtQtd(it.saldo)} / mín. {fmtQtd(it.minimo)} {it.unidade}</span>
             </div>
           ))}
-        </Card>
+        </Dobravel>
       )}
 
       {sugestoes.length > 0 && (
-        <Card style={{ marginBottom: 14, background: C.panel2 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: C.accent, marginBottom: 4 }}>Começar a controlar ({sugestoes.length})</div>
+        <Dobravel titulo="Começar a controlar" cor={C.accent} quantos={sugestoes.length}>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.4 }}>
             Produtos que já apareceram nas Compras mas ainda não estão no estoque. Toque para começar a controlar (o app já pergunta quanto você tem hoje).
           </div>
@@ -759,7 +786,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
               </button>
             ))}
           </div>
-        </Card>
+        </Dobravel>
       )}
 
       {/* OS DOIS FREEZERS, na visão dela.
