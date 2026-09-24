@@ -297,19 +297,37 @@ export async function POST(request) {
     if (acao === 'lancarCompras') {
       if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 403 });
       const ids = new Set(arr(body?.ids).map(String));
-      const todas = arr(blob.compras);
+      // Vinculo escolhido na hora, quando a compra nao casava com item nenhum.
+      // Tem que ser aplicado AQUI: a tela grava o `estoqueId` por outro caminho
+      // e pode nao ter chegado ainda, e ai o servidor recalcularia sem ele e
+      // diria "nada pra lancar" — de novo.
+      const vinculos = (body?.vinculos && typeof body.vinculos === 'object') ? body.vinculos : {};
+      const todas = arr(blob.compras).map((c) => {
+        const alvo = c && vinculos[String(c.id)];
+        return alvo ? { ...c, estoqueId: String(alvo) } : c;
+      });
       // Recalcula as pendentes AQUI, no servidor, com o estoque de agora. Se a
       // tela estiver um passo atrás (ou ela tocar duas vezes), o que já entrou
       // não entra de novo.
-      const pendentes = comprasPendentesDeEstoque(todas, itens).filter((x) => ids.has(String(x.compra.id)));
+      // `semItem` nao tem pra onde ir: ela precisa ligar primeiro. Lancar aqui
+      // seria adivinhar o destino, que e exatamente o que deu errado antes.
+      const pendentes = comprasPendentesDeEstoque(todas, itens)
+        .filter((x) => !x.semItem && ids.has(String(x.compra.id)));
       if (!pendentes.length) return NextResponse.json({ ok: true, itens, lancadas: 0 });
       const novoEstoque = aplicarEntradasEstoque(itens, pendentes.map((x) => x.compra));
       const marcadas = new Set(pendentes.map((x) => String(x.compra.id)));
+      // O vinculo tambem fica gravado, senao a compra volta pra lista de orfas
+      // no proximo carregamento e ela teria que escolher o item de novo.
       // Carimba sobre a lista FRESCA: uma compra registrada enquanto isto rodava
       // não pode sumir porque a nossa cópia é de segundos atrás.
       const novo = await gravarEstoque(sb, blob, (base) => ({
         estoque: novoEstoque,
-        compras: arr(base.compras).map((c) => (c && marcadas.has(String(c.id)) ? { ...c, estoqueEm: todayISO() } : c)),
+        compras: arr(base.compras).map((c) => {
+          if (!c) return c;
+          const alvo = vinculos[String(c.id)];
+          const comVinculo = alvo ? { ...c, estoqueId: String(alvo) } : c;
+          return marcadas.has(String(c.id)) ? { ...comVinculo, estoqueEm: todayISO() } : comVinculo;
+        }),
       }));
       return NextResponse.json({
         ok: true, itens: arr(novo.estoque), compras: arr(novo.compras),
