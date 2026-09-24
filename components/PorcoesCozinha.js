@@ -123,6 +123,13 @@ export default function PorcoesCozinha() {
               />
             </div>
 
+            {p.desencontro !== 0 && (
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: C.red, background: C.panel2, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
+                A conta não bate: os dois freezers somam {fmtQtd(p.total)} e o sistema diz {fmtQtd(p.saldo)}.
+                {' '}Conta os dois e toca em <b>Contei</b>.
+              </div>
+            )}
+
             {p.recado && (
               <div style={{ fontSize: 13.5, fontWeight: 700, color: cor, background: C.panel2, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
                 {p.recado}

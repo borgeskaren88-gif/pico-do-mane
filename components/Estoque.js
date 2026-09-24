@@ -823,6 +823,15 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                   </div>
                 )}
                 {p.recado && <div style={{ fontSize: 12, color: cor, fontWeight: 600, marginTop: 4, lineHeight: 1.45 }}>{p.recado}</div>}
+                {/* Saldo discordando dos dois freezers: alguma saída antiga
+                    mexeu só no total. Uma contagem resolve — mas só se alguém
+                    souber que precisa contar. */}
+                {p.desencontro !== 0 && (
+                  <div style={{ fontSize: 12, color: C.red, fontWeight: 700, marginTop: 4, lineHeight: 1.45 }}>
+                    Os dois freezers somam {fmtQtd(p.total)}, mas o saldo do item diz {fmtQtd(p.saldo)}.
+                    {' '}Dá um <b>Contei</b> com o que tem de verdade pra acertar os dois.
+                  </div>
+                )}
 
                 {!(pAcao && pAcao.id === p.id) ? (
                   <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
