@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
 import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz, comprasComCustoEstranho, conversaoDaReceita, ehPorcionado, linhaDe, salvaDe } from '../lib/estoque';
@@ -24,6 +24,10 @@ const CORES_VAL = { vencido: '#FF5A5A', urgente: '#FF5A5A', atencao: '#F5A524' }
 
 // Mostra a quantidade no jeito brasileiro: vírgula no decimal e ponto no milhar.
 // Sem isso, um saldo fracionário (ex.: barril de chopp em 1.817) parecia "1817".
+// Unidade COM grandeza (peso ou volume). `grf`, `un`, `cx`, `pct` nao tem:
+// sao jeitos de contar, nao de medir.
+const ehMedida = (u) => ['g', 'kg', 'ml', 'l', 'L'].includes(String(u || ''));
+
 const fmtQtd = (v) => Number(num(v).toFixed(3)).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
 // Aba Estoque: catálogo de itens com saldo, mínimo, custo e "conteúdo por
@@ -355,7 +359,22 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     setNovo({ nome: it.nome || '', categoria: it.categoria || '', unidade: it.unidade || 'un', saldo: '', minimo: String(it.minimo ?? ''), custo: String(it.custo ?? ''), conteudo: String(it.conteudo ?? ''), conteudoUnid: it.conteudoUnid || '', validade: it.validade || '',
       sepAtivo: !!(it.separar && it.separar.brutoId), sepBrutoId: it.separar?.brutoId || '', sepGramas: String(it.separar?.gramas ?? ''),
       sepUnidade: it.separar?.unidade || 'g', sepMinLinha: String(it.separar?.minLinha ?? '5'), sepMinSalva: String(it.separar?.minSalva ?? '5') });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Leva ela ATE O FORMULARIO, nao pro topo da pagina.
+    //
+    // O formulario fica abaixo de todos os avisos, e `scrollTo(0)` subia pra
+    // cima dos KPIs — de onde ela quase sempre ja estava clicando. Entao o
+    // botao "Arrumar" parecia nao fazer nada: o item entrava em edicao
+    // silenciosamente, a meia tela de distancia, e ela ficava olhando pro
+    // mesmo aviso de antes.
+    if (typeof window !== 'undefined') {
+      const ir = () => {
+        if (formRef.current && formRef.current.scrollIntoView) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        else window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+      // Um quadro de espera: o formulario so existe com os campos novos depois
+      // do render que este mesmo clique dispara.
+      if (window.requestAnimationFrame) window.requestAnimationFrame(ir); else ir();
+    }
   };
   const cancelar = () => { setNovo(itemVazio()); setEditId(null); setAvisoSalvar(''); };
   const excluir = async (id) => { if (!window.confirm('Excluir este item do estoque?')) return; if (id === editId) cancelar(); await onAcao({ acao: 'del', id }); };
@@ -409,6 +428,9 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   // dizer onde os sacos estão. Mandar a dona entrar como cozinha pra contar o
   // próprio freezer seria pedir que ela finja ser outra pessoa.
   const [avisoSalvar, setAvisoSalvar] = useState('');
+  // Onde o formulario de item esta na pagina, pra "Editar" e "Arrumar" poderem
+  // levar ela ate la em vez de so mudar um estado que ela nao ve.
+  const formRef = useRef(null);
   const [pAcao, setPAcao] = useState(null); // { id, tipo: 'separar'|'abastecer'|'contar' }
   const [pQtd, setPQtd] = useState('');
   const [pQtd2, setPQtd2] = useState('');
@@ -520,10 +542,23 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                   A receita pede em <b style={{ color: C.text }}>{p.unidadeReceita}</b> e o item está em <b style={{ color: C.text }}>{p.unidadeItem}</b>.
                   {p.temConteudo && ` O conteúdo está em ${p.conteudoUnid}, que não é o que a receita pede.`}
                 </div>
-                <div style={{ fontSize: 12, color: C.muted, margin: '0 0 6px', lineHeight: 1.5 }}>
-                  Dois caminhos, escolhe um: cadastrar o item <b style={{ color: C.text }}>em {p.unidadeReceita}</b> (com o custo por {p.unidadeReceita}),
-                  ou preencher o conteúdo de cada {p.unidadeItem} <b style={{ color: C.text }}>em {p.unidadeReceita}</b> — tem que ser nessa medida, que é a que a receita usa.
-                </div>
+                {/* Quando as DUAS unidades são de contagem (grf e un, cx e
+                    pct), não existe conteúdo que resolva: o campo "conteúdo"
+                    só aceita ml, g e un. Mandar preencher "o conteúdo em grf"
+                    era mandar ela procurar uma opção que a tela não tem — e
+                    ficar procurando é pior do que não ter conselho nenhum. */}
+                {!ehMedida(p.unidadeReceita) && !ehMedida(p.unidadeItem) ? (
+                  <div style={{ fontSize: 12, color: C.muted, margin: '0 0 6px', lineHeight: 1.5 }}>
+                    <b style={{ color: C.text }}>{p.unidadeReceita}</b> e <b style={{ color: C.text }}>{p.unidadeItem}</b> são dois jeitos de contar a mesma coisa —
+                    {' '}não tem conteúdo que resolva. O caminho é deixar as duas iguais: troca a unidade do item
+                    {' '}para <b style={{ color: C.text }}>{p.unidadeReceita}</b>, ou muda a ficha para pedir em <b style={{ color: C.text }}>{p.unidadeItem}</b>.
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: C.muted, margin: '0 0 6px', lineHeight: 1.5 }}>
+                    Dois caminhos, escolhe um: cadastrar o item <b style={{ color: C.text }}>em {p.unidadeReceita}</b> (com o custo por {p.unidadeReceita}),
+                    ou preencher o conteúdo de cada {p.unidadeItem} <b style={{ color: C.text }}>em {p.unidadeReceita}</b> — tem que ser nessa medida, que é a que a receita usa.
+                  </div>
+                )}
                 <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 8, lineHeight: 1.45 }}>
                   Está inflando <b style={{ color: C.red }}>{brl(p.custoGerado)}</b> em {p.produtos.length} produto(s): {p.produtos.slice(0, 4).join(', ')}{p.produtos.length > 4 ? '…' : ''}.
                 </div>
@@ -898,6 +933,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
         </Card>
       )}
 
+      <div ref={formRef} style={{ scrollMarginTop: 12 }}>
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar item' : 'Novo item de estoque'}</div>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>
@@ -1005,6 +1041,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
           {editId && <Btn kind="ghost" onClick={cancelar}>Cancelar</Btn>}
         </div>
       </Card>
+      </div>
 
       <SecTitle>Meu estoque ({itens.length})</SecTitle>
       {itens.length > 6 && <div style={{ marginBottom: 12 }}><TextInput value={busca} onChange={setBusca} placeholder="Buscar item…" /></div>}
