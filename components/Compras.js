@@ -610,12 +610,20 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
                       compra, a linha passa a achar um item — e o aviso sumia,
                       como se tivesse entrado. Só que não entrou: quem sabe
                       disso é o extrato do item, não o nome. */}
-                  {pendentePorId.get(d.id) ? (
+                  {/* A pendente SEM item nao tem `entrada` nem `item` — ler
+                      `.entrada.qtd` aqui derrubava a tela inteira de Compras, e
+                      justo pra quem tinha uma compra orfa, que e quem mais
+                      precisa desta tela. */}
+                  {pendentePorId.get(d.id) && !pendentePorId.get(d.id).semItem ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 11.5, color: C.amber, lineHeight: 1.4 }}>
                         ⚠️ Não somou saldo — vira <b>+{pendentePorId.get(d.id).entrada.qtd} {pendentePorId.get(d.id).item.unidade || 'un'}</b> em {pendentePorId.get(d.id).item.nome}
                       </span>
                       <Btn small kind="ghost" onClick={() => lancarNoEstoque([d.id])}>Entrar no estoque</Btn>
+                    </div>
+                  ) : pendentePorId.get(d.id) ? (
+                    <div style={{ fontSize: 11.5, color: C.amber, marginTop: 3, lineHeight: 1.4 }}>
+                      ⚠️ Não achei esse produto no estoque — liga ele a um item no aviso lá em cima.
                     </div>
                   ) : estoque.length > 0 && d.estoqueId !== 'nenhum' && !resolverCompraNoEstoque(d, estoque) && (
                     <div style={{ fontSize: 11.5, color: C.amber, marginTop: 3, lineHeight: 1.4 }}>
