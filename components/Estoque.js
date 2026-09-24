@@ -35,6 +35,12 @@ const fmtQtd = (v) => Number(num(v).toFixed(3)).toLocaleString('pt-BR', { maximu
 // são parecidos e não são a mesma coisa.
 function PenteFino({ grupos, onJuntar, onIgnorar, ocupado }) {
   const [escolha, setEscolha] = useState({}); // { [chave]: principalId }
+  // Itens que ela tirou do grupo. O pente fino acha pelo NOME, e nome parecido
+  // nem sempre e o mesmo produto: "Coca Cola" atrai a "Coca Cola Zero" junto.
+  // Juntar tudo ou nada obrigava a desistir do grupo inteiro por causa de um.
+  const [fora, setFora] = useState({}); // { [chave]: { [id]: true } }
+  const estaFora = (chave, id) => !!(fora[chave] && fora[chave][id]);
+  const virar = (chave, id) => setFora((m) => ({ ...m, [chave]: { ...(m[chave] || {}), [id]: !estaFora(chave, id) } }));
   if (!grupos.length) return null;
   const certos = grupos.filter((g) => g.nivel === 'certo').length;
   return (
@@ -50,32 +56,45 @@ function PenteFino({ grupos, onJuntar, onIgnorar, ocupado }) {
       {grupos.map((g) => {
         const principalId = escolha[g.chave] || g.principalId;
         const principal = g.itens.find((x) => x.id === principalId) || g.itens[0];
-        const somaria = g.itens.reduce((s, it) => {
+        const entram = g.itens.filter((it) => it.id === principalId || !estaFora(g.chave, it.id));
+        const somaria = entram.reduce((s, it) => {
           const f = it.unidade === principal.unidade ? 1 : fatorEntre(it.unidade, principal.unidade);
           return f == null ? s : s + num(it.saldo) * f;
         }, 0);
-        const travados = g.itens.filter((it) => it.id !== principalId && it.unidade !== principal.unidade && fatorEntre(it.unidade, principal.unidade) == null);
-        const podeJuntar = g.itens.some((it) => it.id !== principalId && !travados.includes(it));
+        const travados = entram.filter((it) => it.id !== principalId && it.unidade !== principal.unidade && fatorEntre(it.unidade, principal.unidade) == null);
+        const absorvidos = entram.filter((it) => it.id !== principalId && !travados.includes(it));
+        const podeJuntar = absorvidos.length > 0;
         return (
           <div key={g.chave} style={{ borderTop: `1px solid ${C.hair}`, paddingTop: 10, marginTop: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', color: g.nivel === 'certo' ? C.red : C.amber, marginBottom: 6 }}>
               {g.nivel === 'certo' ? 'MESMO NOME' : 'NOMES PARECIDOS — CONFERE'}
             </div>
-            {g.itens.map((it) => (
-              <label key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', cursor: 'pointer' }}>
-                <input
-                  type="radio" name={`dup-${g.chave}`} checked={it.id === principalId}
-                  onChange={() => setEscolha((m) => ({ ...m, [g.chave]: it.id }))}
-                  style={{ width: 15, height: 15, accentColor: C.accent, flexShrink: 0 }}
-                />
-                <span style={{ fontSize: 13.5, color: it.id === principalId ? C.text : C.muted, fontWeight: it.id === principalId ? 700 : 400, minWidth: 0 }}>
-                  {it.nome}
-                  <span style={{ color: C.faint, fontWeight: 400 }}>
-                    {' · '}{fmtQtd(it.saldo)} {it.unidade || 'un'}{num(it.custo) > 0 ? ` · ${brl(num(it.custo))}` : ''}
-                  </span>
-                </span>
-              </label>
-            ))}
+            {g.itens.map((it) => {
+              const solto = it.id !== principalId && estaFora(g.chave, it.id);
+              return (
+                <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', minWidth: 0, flex: 1, opacity: solto ? 0.5 : 1 }}>
+                    <input
+                      type="radio" name={`dup-${g.chave}`} checked={it.id === principalId}
+                      onChange={() => setEscolha((m) => ({ ...m, [g.chave]: it.id }))}
+                      style={{ width: 15, height: 15, accentColor: C.accent, flexShrink: 0 }}
+                    />
+                    <span style={{ fontSize: 13.5, color: it.id === principalId ? C.text : C.muted, fontWeight: it.id === principalId ? 700 : 400, minWidth: 0, textDecoration: solto ? 'line-through' : 'none' }}>
+                      {it.nome}
+                      <span style={{ color: C.faint, fontWeight: 400 }}>
+                        {' · '}{fmtQtd(it.saldo)} {it.unidade || 'un'}{num(it.custo) > 0 ? ` · ${brl(num(it.custo))}` : ''}
+                      </span>
+                    </span>
+                  </label>
+                  {it.id !== principalId && (
+                    <button type="button" onClick={() => virar(g.chave, it.id)}
+                      style={{ background: 'transparent', border: `1px solid ${C.line}`, color: solto ? C.accent : C.faint, borderRadius: 999, padding: '3px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                      {solto ? 'juntar' : 'deixar de fora'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
             <div style={{ fontSize: 12, color: C.muted, margin: '6px 0 8px', lineHeight: 1.5 }}>
               Fica <b style={{ color: C.text }}>{principal.nome}</b> com <b style={{ color: C.text }}>{fmtQtd(somaria)} {principal.unidade || 'un'}</b>.
               {travados.length > 0 && (
@@ -85,8 +104,8 @@ function PenteFino({ grupos, onJuntar, onIgnorar, ocupado }) {
               )}
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Btn small onClick={() => onJuntar(g, principalId)} kind={podeJuntar ? 'primary' : 'ghost'}>
-                Juntar em {principal.nome}
+              <Btn small onClick={() => podeJuntar && onJuntar(g, principalId, absorvidos.map((x) => x.id))} kind={podeJuntar ? 'primary' : 'ghost'} disabled={!podeJuntar}>
+                {podeJuntar ? `Juntar ${absorvidos.length} em ${principal.nome}` : 'Nada pra juntar'}
               </Btn>
               <Btn small kind="ghost" onClick={() => onIgnorar(g)}>Não são iguais</Btn>
             </div>
@@ -146,10 +165,14 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     [itens, fichas, duplicadosIgnorados],
   );
 
-  const juntarGrupo = async (g, principalId) => {
+  const juntarGrupo = async (g, principalId, absorvidosIds) => {
     if (fundindo) return;
     const principal = g.itens.find((x) => x.id === principalId) || g.itens[0];
-    const outros = g.itens.filter((x) => x.id !== principalId);
+    // Só o que ela deixou marcado. Antes ia o grupo inteiro, e um nome parecido
+    // que não era o mesmo produto ("Coca Cola Zero" atraída por "Coca Cola")
+    // ia junto sem ter como tirar.
+    const permitidos = Array.isArray(absorvidosIds) ? new Set(absorvidosIds.map(String)) : null;
+    const outros = g.itens.filter((x) => x.id !== principalId && (!permitidos || permitidos.has(String(x.id))));
     if (!outros.length) return;
     if (typeof window !== 'undefined' && !window.confirm(
       `Juntar ${outros.map((o) => o.nome).join(', ')} dentro de "${principal.nome}"?\n\n`
