@@ -75,10 +75,14 @@ function DestinoEstoque({ item: linha, estoque, onLigar, compacto }) {
 // Fechado por padrão: é um aviso, não o assunto da tela. Aberto, vira a lista
 // com os botões. Uma parede de 20 linhas com botão azul em cada uma estava
 // tapando a tela de Compras, que é onde ela vem pra trabalhar.
-function FaltouNoEstoque({ pendentes, onLancar, onDispensar, ocupado }) {
+function FaltouNoEstoque({ pendentes, onLancar, onDispensar, onLigar, estoque = [], ocupado }) {
   const [aberto, setAberto] = useState(false);
   if (!pendentes.length) return null;
-  const ids = pendentes.map((x) => x.compra.id);
+  // So entra no "lancar todas" quem ja tem destino. As sem item precisam da
+  // ligacao antes, e ela e a unica que sabe qual item e.
+  const ids = pendentes.filter((x) => !x.semItem).map((x) => x.compra.id);
+  const semDestino = pendentes.filter((x) => x.semItem).length;
+  const opcoes = [...estoque].filter(Boolean).sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
 
   if (!aberto) {
     return (
@@ -92,6 +96,7 @@ function FaltouNoEstoque({ pendentes, onLancar, onDispensar, ocupado }) {
       >
         <span style={{ fontSize: 12.5, color: C.amber, lineHeight: 1.4 }}>
           {pendentes.length} compra{pendentes.length > 1 ? 's' : ''} não somou saldo no estoque
+          {semDestino > 0 && <b> · {semDestino} sem item ligado</b>}
         </span>
         <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>ver</span>
       </button>
@@ -109,21 +114,40 @@ function FaltouNoEstoque({ pendentes, onLancar, onDispensar, ocupado }) {
         entra duas vezes.
       </div>
       <div style={{ maxHeight: 260, overflowY: 'auto', margin: '0 -4px', padding: '0 4px' }}>
-        {pendentes.map(({ compra: c, item, entrada }) => (
-          <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: `1px solid ${C.hair}` }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, color: C.text }}>{limparNome(c.produto)}</div>
-              <div style={{ fontSize: 11.5, color: C.faint }}>
-                {fmtDate(c.data)} · <b style={{ color: C.green }}>+{entrada.qtd} {item.unidade || 'un'}</b> em {item.nome}
-                {entrada.convertido && entrada.custo > 0 ? ` · ${brl(entrada.custo)}/${item.unidade || 'un'}` : ''}
+        {pendentes.map(({ compra: c, item, entrada, semItem }) => (
+          <div key={c.id} style={{ padding: '6px 0', borderTop: `1px solid ${C.hair}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: C.text }}>{limparNome(c.produto)}</div>
+                <div style={{ fontSize: 11.5, color: semItem ? C.amber : C.faint }}>
+                  {fmtDate(c.data)}
+                  {semItem
+                    ? ` · ${numQtd(c.qtdCompra || c.quantidade)} ${c.embalagem || ''} — não achei esse produto no estoque`
+                    : <> · <b style={{ color: C.green }}>+{entrada.qtd} {item.unidade || 'un'}</b> em {item.nome}
+                        {entrada.convertido && entrada.custo > 0 ? ` · ${brl(entrada.custo)}/${item.unidade || 'un'}` : ''}</>}
+                </div>
               </div>
+              {!semItem && <Btn small kind="ghost" onClick={() => onLancar([c.id])}>Entrar</Btn>}
             </div>
-            <Btn small kind="ghost" onClick={() => onLancar([c.id])}>Entrar</Btn>
+            {/* Sem destino, o unico caminho honesto e perguntar. O nome que ela
+                digita na nota quase nunca e o nome do cadastro — "Coca Cola
+                310ml Zero" comprada, "Coca Cola lata ZERO 350ml" cadastrada. */}
+            {semItem && (
+              <select
+                value=""
+                onChange={(e) => e.target.value && onLigar(c.id, e.target.value)}
+                style={{ marginTop: 6, width: '100%', padding: '7px 9px', borderRadius: 9, fontSize: 12.5, background: C.panel, color: C.text, border: `1px solid ${C.line}` }}
+              >
+                <option value="">— ligar a um item do estoque —</option>
+                {opcoes.map((it) => <option key={it.id} value={it.id}>{limparNome(it.nome)} ({it.unidade || 'un'})</option>)}
+                <option value="nenhum">Não é item de estoque (só despesa)</option>
+              </select>
+            )}
           </div>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-        <Btn small onClick={() => onLancar(ids)}>{ocupado ? 'Lançando…' : `Lançar todas (${pendentes.length})`}</Btn>
+        {ids.length > 0 && <Btn small onClick={() => onLancar(ids)}>{ocupado ? 'Lançando…' : `Lançar todas (${ids.length})`}</Btn>}
         <Btn small kind="ghost" onClick={() => onDispensar(ids)}>Dispensar todas</Btn>
       </div>
     </Card>
@@ -176,6 +200,22 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
 
   // Dispensar: marca como resolvida SEM mexer no saldo. É pra compra velha que
   // ela já deu entrada na mão — o aviso some e o estoque não é tocado.
+  // Ligar uma compra orfa a um item do estoque. Grava o vinculo na propria
+  // compra (`estoqueId`) e, quando ha destino de verdade, ja manda somar o
+  // saldo — que e o que ela queria quando registrou a nota.
+  const ligarPendente = async (compraId, itemId) => {
+    if (!compraId || !itemId) return;
+    onChange(dados.map((d) => (d.id === compraId ? { ...d, estoqueId: itemId } : d)));
+    if (itemId === 'nenhum' || !onEstoque) return;
+    setLancando(true); setMsgLanc('');
+    const j = await onEstoque({ acao: 'lancarCompras', ids: [compraId], vinculos: { [compraId]: itemId } });
+    setLancando(false);
+    setMsgLanc(j && j.ok && j.lancadas
+      ? `Somei no estoque: ${(j.resumo || []).map((r) => `${r.item} +${r.qtd} ${r.unidade}`).join(', ')}.`
+      : 'Liguei o item. Se o saldo não subir, toca em Entrar na linha.');
+    setTimeout(() => setMsgLanc(''), 12000);
+  };
+
   const dispensar = async (ids) => {
     if (lancando || !onEstoque) return;
     if (typeof window !== 'undefined' && !window.confirm(
@@ -391,7 +431,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
       ]} />
 
       {msgLanc && <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginBottom: 12, lineHeight: 1.5 }}>{msgLanc}</div>}
-      <FaltouNoEstoque pendentes={pendentes} onLancar={lancarNoEstoque} onDispensar={dispensar} ocupado={lancando} />
+      <FaltouNoEstoque pendentes={pendentes} onLancar={lancarNoEstoque} onDispensar={dispensar} onLigar={ligarPendente} estoque={estoque} ocupado={lancando} />
 
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar compra' : 'Nova compra'}</div>
