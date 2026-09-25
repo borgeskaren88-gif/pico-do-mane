@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef } from 'react';
-import { VERSAO_BUILD, publicadaDaResposta } from '../lib/versao';
+import { VERSAO_BUILD, publicadaDaResposta, limparCopiaGuardada } from '../lib/versao';
 
 // Mantém o PicoOS na versão publicada sem ninguém precisar saber disso.
 //
@@ -57,6 +57,11 @@ export default function AtualizacaoAuto() {
       if (espera > 0) { remarcar(espera + 500); return; }
       if (digitando()) { remarcar(RETENTATIVA); return; }
       recarregou.current = true;
+      // Limpa ANTES de recarregar. Era aqui que a troca de versão virava tela
+      // preta: o aparelho recarregava e recebia de novo a página guardada da
+      // versão velha, que pede pedaços que já não existem. Meio programa velho
+      // e meio novo não roda — e o app inteiro cai com "Application error".
+      try { await limparCopiaGuardada(); } catch { /* segue pro recarregar */ }
       try { window.location.reload(); } catch { /* ignora */ }
     };
 

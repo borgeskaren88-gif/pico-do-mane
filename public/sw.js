@@ -3,7 +3,7 @@
 // "trava" numa versão antiga) e só cai no cache quando está offline / sem
 // internet. As chamadas de dados (/api/...) nunca são cacheadas, pra não
 // mostrar número velho nem atrapalhar o salvamento.
-const CACHE = 'picoos-v3';
+const CACHE = 'picoos-v4';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
@@ -24,6 +24,10 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== self.location.origin) return; // recursos externos: não intervém
   if (url.pathname.startsWith('/api/')) return; // dados: sempre rede, sem cache
 
+  // "É a abertura de uma página?" Só pra essas faz sentido devolver a página
+  // guardada quando a internet cai — é assim que o app abre offline.
+  const ehPagina = req.mode === 'navigate' || (req.destination === 'document');
+
   e.respondWith(
     fetch(req)
       .then((res) => {
@@ -33,7 +37,27 @@ self.addEventListener('fetch', (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(req).then((hit) => hit || caches.match('/')))
+      .catch(() => caches.match(req).then((hit) => {
+        if (hit) return hit;
+        // AQUI MORAVA UM DEFEITO CARO.
+        //
+        // Antes, qualquer coisa que faltasse caía em `caches.match('/')` — ou
+        // seja, a PÁGINA. Um pedaço do programa (/_next/static/...js) que
+        // falhasse na rede e ainda não estivesse guardado recebia HTML de
+        // volta, onde o navegador esperava JavaScript. Resultado: o app inteiro
+        // caía com "Application error: a client-side exception has occurred".
+        //
+        // E a hora exata em que isso acontece é a pior possível: no primeiro
+        // acesso DEPOIS de uma versão nova, quando os pedaços têm nomes novos
+        // que este aparelho nunca baixou. Internet de bar num sábado à noite
+        // basta pra disparar.
+        //
+        // Devolver a página só serve pra quem pediu uma página. Pro resto, a
+        // resposta honesta é "não consegui" — o navegador sabe lidar com isso,
+        // e tentar de novo funciona.
+        if (ehPagina) return caches.match('/').then((raiz) => raiz || Response.error());
+        return Response.error();
+      }))
   );
 });
 
