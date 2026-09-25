@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation';
 import { C, LogoMark, pageBg } from './ui';
 import { ymOf, todayISO, limparNome, fiadoDaVenda, uid, num, brl } from '../lib/util';
+import { comprasPendentesDeEstoque } from '../lib/estoque';
 import SEED_DATA from '../data/seed.json';
 
 import Brain from './Brain';
@@ -151,6 +152,16 @@ export default function Dashboard() {
   const [estCarregado, setEstCarregado] = useState(false);
   const [subEstoque, setSubEstoque] = useState('itens'); // 'itens' | 'fichas'
   const [subAbast, setSubAbast] = useState('estoque'); // 'estoque' | 'lista' | 'compras' | 'cotacoes'
+  // COMPRAS QUE NUNCA VIRARAM SALDO.
+  //
+  // A conta ja existia dentro da tela de Compras — e por isso so aparecia pra
+  // quem abrisse a tela de Compras. Ela estava na comanda tentando vender uma
+  // Original quando descobriu que a nota de ontem nao tinha entrado.
+  //
+  // Aqui em cima ela vale pro setor inteiro: qualquer aba do Abastecimento
+  // mostra que tem nota pendurada, e o aviso so sai quando o problema sai.
+  const comprasSemSaldo = useMemo(() => comprasPendentesDeEstoque(compras, estoque), [compras, estoque]);
+
   // Carrinho montado pela fala, a caminho da tela de Compras. Fica aqui porque
   // as duas telas sao irmas e nao se enxergam.
   const [carrinhoDaVoz, setCarrinhoDaVoz] = useState(null);
@@ -337,15 +348,31 @@ export default function Dashboard() {
     // já estão no catálogo têm o saldo somado. Fire-and-forget — não trava a
     // compra se o estoque falhar. Produtos não cadastrados viram sugestão.
     if (comprasNovas && comprasNovas.length) {
-      fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'entradaCompras', comprasNovas }) })
-        .then((r) => r.json()).then((j) => {
-          if (j?.ok && Array.isArray(j.itens)) setEstoque(j.itens);
-          // Avisa se algum produto comprado não achou item no estoque (não entrou sozinho).
-          if (j?.ok && Array.isArray(j.naoEntraram) && j.naoEntraram.length) {
-            setAvisoBaixa(`Compra registrada — mas ${j.naoEntraram.length > 1 ? 'estes produtos não somaram saldo' : 'este produto não somou saldo'} no estoque: ${j.naoEntraram.join(', ')}. Cadastra em Abastecimento → Estoque, ou liga a um item que já existe pelo seletor que aparece embaixo do produto na hora de comprar.`);
-            setTimeout(() => setAvisoBaixa(''), 30000);
+      // A ENTRADA NO ESTOQUE DEIXOU DE SER "MANDA E ESQUECE".
+      //
+      // Isto era fire-and-forget com `.catch(() => {})`: se a conexão caísse no
+      // meio do bar, ou o celular suspendesse, ou o servidor engasgasse, a
+      // compra ficava salva, o saldo não subia e NINGUÉM ficava sabendo. O
+      // único aviso que existia era pra nome que não casou, durava trinta
+      // segundos e só aparecia se ela estivesse na aba certa.
+      //
+      // Três vezes a mesma cara de erro em dois dias: a compra some da
+      // prateleira e ela descobre na hora de vender.
+      (async () => {
+        try {
+          const r = await fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'entradaCompras', comprasNovas }) });
+          const j = await r.json();
+          if (!j?.ok) throw new Error(j?.erro || 'falhou');
+          if (Array.isArray(j.itens)) setEstoque(j.itens);
+          if (Array.isArray(j.naoEntraram) && j.naoEntraram.length) {
+            // Sem timeout: isto não se resolve sozinho, e sumir da tela é o que
+            // fez os três casos passarem batido.
+            setAvisoBaixa(`Compra registrada — mas ${j.naoEntraram.length > 1 ? 'estes produtos não somaram saldo' : 'este produto não somou saldo'} no estoque: ${j.naoEntraram.join(', ')}. Abre Abastecimento → Compras e usa o painel "Não somou no estoque" pra ligar cada um ao item certo.`);
           }
-        }).catch(() => {});
+        } catch {
+          setAvisoBaixa('A compra foi salva, mas o estoque NÃO foi somado — a conexão falhou no meio. Abre Abastecimento → Compras: o painel "Não somou no estoque" tem o botão pra lançar sem digitar tudo de novo.');
+        }
+      })();
     }
     if (comprasNovas && comprasNovas.length) syncGoogle();
   };
@@ -724,8 +751,28 @@ export default function Dashboard() {
             </div>
 
             {avisoBaixa && (
-              <div style={{ background: C.panel2, border: `1px solid ${C.accent}`, color: C.text, borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 600, marginBottom: 12, lineHeight: 1.45 }}>{avisoBaixa}</div>
+              <div style={{ background: C.panel2, border: `1px solid ${C.accent}`, color: C.text, borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 600, marginBottom: 12, lineHeight: 1.45, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span style={{ flex: 1, minWidth: 0 }}>{avisoBaixa}</span>
+                <button onClick={() => setAvisoBaixa('')} aria-label="Fechar aviso" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
+              </div>
             )}
+            {/* Nota que entrou no financeiro e nao chegou na prateleira. Fica
+                visivel em qualquer aba do setor, e nao some sozinha: e a
+                unica coisa que separa "comprei" de "tenho". */}
+            {comprasSemSaldo.length > 0 && subAbast !== 'compras' && (
+              <button
+                onClick={() => setSubAbast('compras')}
+                style={{ width: '100%', textAlign: 'left', background: C.panel, border: `1px solid ${C.amber}`, borderRadius: 10, padding: '10px 13px', marginBottom: 12, cursor: 'pointer', color: C.text }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 800, color: C.amber, lineHeight: 1.45 }}>
+                  {comprasSemSaldo.length} compra{comprasSemSaldo.length > 1 ? 's' : ''} não somou saldo no estoque
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>
+                  Já está no financeiro, mas a mercadoria não entrou na prateleira. Toca pra resolver em Compras.
+                </div>
+              </button>
+            )}
+
             {subAbast === 'estoque' && (
               <>
                 {/* Estas abas somam mais largura do que cabe num celular. Com
