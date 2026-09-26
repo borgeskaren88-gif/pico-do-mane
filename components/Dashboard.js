@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { C, LogoMark, pageBg } from './ui';
 import { ymOf, todayISO, limparNome, fiadoDaVenda, uid, num, brl } from '../lib/util';
 import { comprasPendentesDeEstoque } from '../lib/estoque';
+import { limparCopiaGuardada } from '../lib/versao';
 import SEED_DATA from '../data/seed.json';
 
 import Brain from './Brain';
@@ -53,18 +54,37 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 // Carrega o painel com TENTATIVAS (rede/cold start falham às vezes). Devolve
 // { ok, dados }: ok=false quando NÃO conseguiu ler de jeito nenhum — nesse caso
 // o app NUNCA deve semear/salvar por cima, senão apaga os dados reais.
+//
+// QUANDO FALHA, AGORA DIZ POR QUÊ. Antes tudo virava a mesma tela — "pode ser a
+// internet" — mesmo quando a internet estava ótima e o problema era outro. Ela
+// tocava "Tentar de novo" e nada mudava, porque tentar de novo não era o
+// conserto. São três coisas diferentes, com saídas diferentes:
+//
+//   'sessao'   — o acesso venceu. Insistir aqui não resolve NUNCA; quem resolve
+//                é a tela de senha. Acontece quando a página que abriu veio da
+//                cópia guardada no aparelho, de um dia em que ela estava
+//                logada: a tela é de dentro, mas o crachá já não vale.
+//   'servidor' — o servidor respondeu, e respondeu com defeito (o banco não
+//                atendeu, por exemplo). Aí importa MOSTRAR o que ele disse.
+//   'rede'     — o pedido nem chegou. Esse sim é internet.
 async function apiCarregar() {
+  let motivo = 'rede';
+  let status = 0;
+  let detalhe = '';
   for (let tentativa = 0; tentativa < 4; tentativa++) {
     try {
       const res = await fetch('/api/data', { cache: 'no-store' });
-      if (res.ok) {
-        const json = await res.json();
-        if (json && json.ok) return { ok: true, dados: json.dados };
-      }
-    } catch { /* rede: tenta de novo */ }
+      status = res.status;
+      if (res.status === 401) return { ok: false, dados: null, motivo: 'sessao', status, detalhe: '' };
+      motivo = 'servidor';
+      let json = null;
+      try { json = await res.json(); } catch { /* resposta que não é JSON */ }
+      if (res.ok && json && json.ok) return { ok: true, dados: json.dados };
+      detalhe = (json && json.erro) ? String(json.erro).slice(0, 180) : '';
+    } catch { motivo = 'rede'; status = 0; detalhe = ''; }
     await new Promise((r) => setTimeout(r, 500 * (tentativa + 1)));
   }
-  return { ok: false, dados: null };
+  return { ok: false, dados: null, motivo, status, detalhe };
 }
 
 // Os salvamentos deste aparelho rodam UM DE CADA VEZ (fila). Como o servidor
@@ -123,7 +143,9 @@ export default function Dashboard() {
   const router = useRouter();
   const [tab, setTab] = useState('hoje');
   const [loaded, setLoaded] = useState(false);
-  const [erroLoad, setErroLoad] = useState(false);
+  // null enquanto está tudo bem; { motivo, status, detalhe } quando a leitura
+  // falhou — porque a tela de erro precisa DIZER qual dos três problemas é.
+  const [erroLoad, setErroLoad] = useState(null);
   const [salvarFalhou, setSalvarFalhou] = useState(false);
   // Trava de segurança: só permite SALVAR depois que os dados carregaram de
   // verdade. Sem isso, um salvamento com o estado ainda vazio apagava tudo.
@@ -179,7 +201,29 @@ export default function Dashboard() {
       // Falhou ao ler (rede/servidor): NÃO carrega seed e NÃO salva nada — assim
       // uma falha de rede nunca apaga os dados reais gravando por cima. Mostra a
       // tela de erro com "tentar de novo".
-      if (!r.ok) { setErroLoad(true); return; }
+      if (!r.ok) {
+        // ACESSO VENCIDO NUMA PÁGINA GUARDADA.
+        //
+        // A tela de dentro abriu porque veio da cópia no aparelho, mas o crachá
+        // já não vale — e aí "Tentar de novo" ficava pra sempre, porque o que
+        // faltava era a senha, não a internet. Joga fora a cópia e recarrega:
+        // o servidor manda a tela de senha, ela entra e volta ao trabalho.
+        //
+        // Uma vez só. Se depois de limpar ainda der acesso vencido, o problema é
+        // outro e ela precisa LER isso, não ficar num vai-e-volta.
+        if (r.motivo === 'sessao') {
+          let jaLimpou = true;
+          try { jaLimpou = sessionStorage.getItem('picoos:sessao-vencida') === '1'; } catch { jaLimpou = true; }
+          if (!jaLimpou) {
+            try { sessionStorage.setItem('picoos:sessao-vencida', '1'); } catch { /* ignora */ }
+            await limparCopiaGuardada();
+            try { window.location.reload(); return; } catch { /* segue pra tela de erro */ }
+          }
+        }
+        setErroLoad({ motivo: r.motivo || 'rede', status: r.status || 0, detalhe: r.detalhe || '' });
+        return;
+      }
+      try { sessionStorage.removeItem('picoos:sessao-vencida'); } catch { /* ignora */ }
       const salvo = r.dados;
       // Só é "primeira vez" quando o servidor está de fato vazio (sem linha /
       // objeto vazio) — aí semear é seguro. Se há dados, usa EXATAMENTE o que veio
@@ -566,11 +610,33 @@ export default function Dashboard() {
   // Falha ao carregar: mostra erro e botão de tentar de novo — NUNCA segue pro
   // app com dados vazios (senão qualquer edição salvaria por cima do que existe).
   if (erroLoad) return (
-    <div style={{ minHeight: '100vh', background: C.ink, color: C.text, display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', fontFamily: 'system-ui' }}>
+    <div style={{ minHeight: '100vh', background: C.ink, color: C.text, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', fontFamily: 'system-ui' }}>
       <div style={{ fontSize: 40 }}>📡</div>
       <div style={{ fontSize: 17, fontWeight: 800 }}>Não consegui carregar seus dados agora.</div>
-      <div style={{ fontSize: 14, color: C.muted, maxWidth: 320, lineHeight: 1.5 }}>Pode ser a internet. Seus dados estão salvos e seguros — só não consegui buscá-los. Toque pra tentar de novo.</div>
+      {/* "Pode ser a internet" era chute, e chute errado gasta o tempo dela no
+          lugar errado: ela vai olhar o wi-fi quando o problema está no servidor.
+          Cada motivo tem uma frase própria — e a saída de cada um é diferente. */}
+      <div style={{ fontSize: 14, color: C.muted, maxWidth: 330, lineHeight: 1.55 }}>
+        {erroLoad.motivo === 'servidor'
+          ? <>A internet está funcionando: <b style={{ color: C.text }}>quem não respondeu direito foi o servidor</b>. Não é nada do teu aparelho, e não adianta trocar de rede.</>
+          : erroLoad.motivo === 'sessao'
+            ? <>Teu acesso venceu. <b style={{ color: C.text }}>Não é a internet</b> — é só entrar com a senha de novo.</>
+            : <>O pedido não chegou a sair daqui. Dessa vez <b style={{ color: C.text }}>é a internet mesmo</b>.</>}
+      </div>
+      <div style={{ fontSize: 13.5, color: C.muted, maxWidth: 330, lineHeight: 1.55 }}>
+        Teus dados estão salvos e seguros — só não consegui buscá-los.
+      </div>
       <button onClick={() => { try { window.location.reload(); } catch { /* ignora */ } }} style={{ background: C.accent, color: '#06101F', border: 'none', borderRadius: 12, padding: '13px 22px', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}>Tentar de novo</button>
+      {/* O que o servidor respondeu, por escrito. É a única coisa que me diz
+          onde olhar — e sem ela eu fico adivinhando enquanto ela fica parada. */}
+      {(erroLoad.status > 0 || erroLoad.detalhe) && (
+        <div style={{ fontSize: 12, color: C.faint, maxWidth: 330, lineHeight: 1.5, marginTop: 4 }}>
+          <div style={{ fontWeight: 700, marginBottom: 3 }}>Manda isto pra mim:</div>
+          <div style={{ fontFamily: 'ui-monospace, Menlo, monospace', wordBreak: 'break-word' }}>
+            {erroLoad.motivo}{erroLoad.status > 0 ? ` ${erroLoad.status}` : ''}{erroLoad.detalhe ? ` — ${erroLoad.detalhe}` : ''}
+          </div>
+        </div>
+      )}
     </div>
   );
 
