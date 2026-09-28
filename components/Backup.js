@@ -1,7 +1,8 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, KPI, Area, PageTitle, inputStyle } from './ui';
 import { todayISO, fmtDate, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
+import { horasDoTurno, fmtHoras, aPagarNoMes } from '../lib/ponto';
 import SEED_DATA from '../data/seed.json';
 
 // Monta um relatório em texto (Markdown) para análise: um RESUMO com os
@@ -9,6 +10,7 @@ import SEED_DATA from '../data/seed.json';
 // útil pra analisar do que o JSON cru.
 function montarAnalise(all) {
   const L = [];
+  const arrOu = (v) => (Array.isArray(v) ? v : []);
   const pct = (n, d) => (d ? (n / d * 100).toFixed(1).replace('.', ',') + '%' : '—');
   const soma = (arr, campo = 'valor') => arr.reduce((s, x) => s + num(x[campo]), 0);
   const totalCompra = (c) => num(c.quantidade) * num(c.valorUnit);
@@ -87,6 +89,142 @@ function montarAnalise(all) {
   }
   L.push('');
 
+  // O SALÃO, O ESTOQUE E A FOLHA.
+  // ==========================================================================
+  // "Como eu faço pra tu teres acesso ao PicoOS, pra quando eu perguntar como
+  // está a minha empresa tu conseguires responder?"
+  //
+  // Este relatório é a ponte que já existia — e estava velha. Ele contava
+  // receita, despesa e compra, e parava aí: nada de estoque, nada das comandas,
+  // nada da folha. Ou seja, respondia sobre a parte do negócio que cabe numa
+  // planilha e calava sobre a parte que acontece no salão.
+  //
+  // Aqui vai o resto, em resumo. Resumo e não despejo: comanda por comanda com
+  // item por item daria dezenas de milhares de linhas, e o que responde "como
+  // está a empresa" é o padrão — quanto sai por dia, o que mais vende, quanto
+  // tem parado na prateleira, quanto a equipe custou.
+  const vendas = arrOu(all.vendas);
+  if (vendas.length) {
+    const totalV = vendas.reduce((s, v) => s + num(v.total), 0);
+    const fiadoV = vendas.reduce((s, v) => s + num(v.fiado), 0);
+    const pessoas = vendas.reduce((s, v) => s + num(v.pessoas), 0);
+    const dias = new Set(vendas.map((v) => v.data).filter(Boolean));
+    L.push('### Salão (comandas fechadas)', '');
+    L.push(`- Comandas: ${vendas.length} em ${dias.size} dia(s) de movimento`);
+    L.push(`- Vendido: ${brl(totalV)} · ticket médio por comanda ${brl(vendas.length ? totalV / vendas.length : 0)}`);
+    if (pessoas > 0) L.push(`- Pessoas atendidas: ${pessoas} · ${brl(totalV / pessoas)} por pessoa`);
+    L.push(`- Ficou no fiado: ${brl(fiadoV)} (${pct(fiadoV, totalV)} do vendido)`, '');
+
+    // Por mês, pra ver a curva — e por dia da semana, que é a decisão de
+    // escala que ela toma toda semana.
+    const porMes = new Map();
+    const porDia = new Map();
+    const porSemana = new Map();
+    for (const v of vendas) {
+      const m = ymOf(v.data); if (m) porMes.set(m, (porMes.get(m) || 0) + num(v.total));
+      if (v.data) porDia.set(v.data, (porDia.get(v.data) || 0) + num(v.total));
+      const w = weekday(v.data);
+      if (w) {
+        const cur = porSemana.get(w) || { total: 0, dias: new Set() };
+        cur.total += num(v.total); cur.dias.add(v.data); porSemana.set(w, cur);
+      }
+    }
+    if (porMes.size) {
+      L.push('| Mês | Vendido no salão |', '|---|---|');
+      for (const [m, v] of [...porMes.entries()].sort()) L.push(`| ${mesLabel(m)} | ${brl(v)} |`);
+      L.push('');
+    }
+    if (porSemana.size) {
+      L.push('#### Salão por dia da semana', '', '| Dia | Média por noite | Total |', '|---|---|---|');
+      for (const dia of DIAS) {
+        const x = porSemana.get(dia); if (!x) continue;
+        L.push(`| ${dia} | ${brl(x.total / (x.dias.size || 1))} | ${brl(x.total)} |`);
+      }
+      L.push('');
+    }
+    // Os últimos dias em cheio: é o que responde "e ontem, como foi?".
+    const ultimos = [...porDia.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 30);
+    if (ultimos.length) {
+      L.push('#### Últimos dias de movimento', '', '| Dia | Comandas | Vendido |', '|---|---|---|');
+      for (const [d, v] of ultimos) L.push(`| ${d} | ${vendas.filter((x) => x.data === d).length} | ${brl(v)} |`);
+      L.push('');
+    }
+    // O que efetivamente sai pela porta.
+    const prod = new Map();
+    for (const v of vendas) {
+      for (const it of arrOu(v.itens)) {
+        const q = num(it.qtd); if (!(q > 0)) continue;
+        const nome = it.nome || '—';
+        const cur = prod.get(nome) || { qtd: 0, total: 0 };
+        cur.qtd += q; cur.total += q * num(it.preco); prod.set(nome, cur);
+      }
+    }
+    if (prod.size) {
+      L.push('#### O que mais vende (todas as comandas)', '', '| Produto | Qtd | Receita |', '|---|---|---|');
+      for (const [nome, x] of [...prod.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 30)) {
+        L.push(`| ${nome} | ${x.qtd} | ${brl(x.total)} |`);
+      }
+      L.push('');
+    } else {
+      L.push('_As comandas não guardaram itens — só os totais._', '');
+    }
+  }
+
+  const estoque = arrOu(all.estoque);
+  if (estoque.length) {
+    const parado = estoque.reduce((s, it) => s + num(it.saldo) * num(it.custo), 0);
+    const semCusto = estoque.filter((it) => !(num(it.custo) > 0));
+    const acabando = estoque.filter((it) => num(it.minimo) > 0 && num(it.saldo) <= num(it.minimo));
+    L.push('### Estoque', '');
+    L.push(`- Itens controlados: ${estoque.length}`);
+    L.push(`- Dinheiro parado na prateleira: ${brl(parado)}`);
+    L.push(`- Abaixo do mínimo: ${acabando.length}`);
+    // Isto é qualidade do dado, e vale dizer: item sem custo estraga a margem e
+    // o CMV em silêncio, e é o tipo de coisa que só aparece quando alguém olha.
+    if (semCusto.length) L.push(`- **Sem custo cadastrado: ${semCusto.length}** (${semCusto.slice(0, 8).map((x) => x.nome).join(', ')}${semCusto.length > 8 ? '…' : ''}) — esses não entram na margem nem no CMV`);
+    L.push('');
+    if (acabando.length) {
+      L.push('| Acabando | Saldo | Mínimo |', '|---|---|---|');
+      for (const it of acabando.slice(0, 25)) L.push(`| ${it.nome} | ${num(it.saldo)} ${it.unidade || ''} | ${num(it.minimo)} |`);
+      L.push('');
+    }
+    const maiores = [...estoque].sort((a, b) => num(b.saldo) * num(b.custo) - num(a.saldo) * num(a.custo)).slice(0, 15);
+    L.push('| Onde o dinheiro está parado | Saldo | Custo unit. | Parado |', '|---|---|---|---|');
+    for (const it of maiores) {
+      const v = num(it.saldo) * num(it.custo);
+      if (!(v > 0)) continue;
+      L.push(`| ${it.nome} | ${num(it.saldo)} ${it.unidade || ''} | ${brl(num(it.custo))} | ${brl(v)} |`);
+    }
+    L.push('');
+  }
+
+  const ponto = arrOu(all.ponto);
+  if (ponto.length) {
+    L.push('### Folha (ponto batido)', '');
+    const porPessoa = new Map();
+    for (const r of ponto) {
+      const nome = r.nome || '—';
+      const cur = porPessoa.get(nome) || { horas: 0, turnos: 0, papel: r.papel || '' };
+      cur.horas += horasDoTurno(r); cur.turnos += 1;
+      if (!cur.papel && r.papel) cur.papel = r.papel;
+      porPessoa.set(nome, cur);
+    }
+    L.push('| Pessoa | Setor | Turnos | Horas |', '|---|---|---|---|');
+    for (const [nome, x] of porPessoa) L.push(`| ${nome} | ${x.papel || '—'} | ${x.turnos} | ${fmtHoras(x.horas)} |`);
+    L.push('');
+    // O mês corrente em dinheiro, que é a pergunta de quem paga.
+    const mesAtual = todayISO().slice(0, 7);
+    const jornadas = all.jornadas && typeof all.jornadas === 'object' ? all.jornadas : {};
+    const linhas = [];
+    for (const [nome, x] of porPessoa) {
+      const p = aPagarNoMes(ponto.filter((r) => (r.nome || '—') === nome), jornadas[x.papel], mesAtual);
+      if (p) linhas.push(`| ${nome} | ${fmtHoras(p.horas)} | ${brl(p.valorHora)} | ${brl(p.total)} |`);
+    }
+    if (linhas.length) {
+      L.push(`#### A pagar em ${mesLabel(mesAtual)} (pelo que já foi trabalhado)`, '', '| Pessoa | Horas | Hora | A pagar |', '|---|---|---|---|', ...linhas, '');
+    }
+  }
+
   // 2. Dados completos
   L.push('## 2. Dados completos', '');
   const clean = (parts) => parts.filter((p) => p != null && String(p).trim() !== '').join(' · ');
@@ -123,7 +261,6 @@ export default function Backup({ all, restore }) {
   const [msg, setMsg] = useState('');
   const [importText, setImportText] = useState('');
   const jsonStr = JSON.stringify(all, null, 2);
-  const analise = montarAnalise(all);
 
   // Backups automáticos na nuvem (uma cópia por dia, feita sozinho).
   const [autoBackups, setAutoBackups] = useState([]);
@@ -132,6 +269,25 @@ export default function Backup({ all, restore }) {
     try { const r = await fetch('/api/backup', { cache: 'no-store' }); const j = await r.json(); if (j.ok) setAutoBackups(Array.isArray(j.backups) ? j.backups : []); } catch { /* ignora */ }
   }, []);
   useEffect(() => { carregarAuto(); }, [carregarAuto]);
+
+  // O PONTO NÃO MORA NO PAINEL: cada batida é uma linha própria no banco. Pra o
+  // relatório poder falar de folha, ele precisa ser buscado — e é melhor buscar
+  // ao abrir a tela do que no clique, porque o navegador só deixa escrever na
+  // área de transferência logo depois do toque, sem espera no meio.
+  const [ponto, setPonto] = useState([]);
+  const [jornadas, setJornadas] = useState({});
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/ponto', { cache: 'no-store' });
+        const j = await r.json();
+        if (j.ok) {
+          setPonto(Array.isArray(j.registros) ? j.registros : []);
+          setJornadas(j.jornadas && typeof j.jornadas === 'object' ? j.jornadas : {});
+        }
+      } catch { /* sem ponto, o relatório sai sem a seção de folha */ }
+    })();
+  }, []);
   const restaurarAuto = async (b) => {
     const data = typeof b === 'string' ? b : b.data;
     const semEstoque = typeof b === 'object' && b.resumo && Number(b.resumo.estoque) === 0;
@@ -188,6 +344,7 @@ export default function Backup({ all, restore }) {
     all.diario.forEach((r) => L.push([r.data, r.clima, r.evento, r.receita, r.nPedidos, r.fiado, r.nota, r.problema, r.decisao, r.aprendizado, r.prioridade].map(q).join(',')));
     baixar('\ufeff' + L.join('\n'), `pico-do-mane-${todayISO()}.csv`, 'text/csv;charset=utf-8');
   };
+  const analise = useMemo(() => montarAnalise({ ...all, ponto, jornadas }), [all, ponto, jornadas]);
   const copiarAnalise = async () => {
     try { await navigator.clipboard.writeText(analise); setMsg('Resumo + dados copiados! Cole no chat com o Claude para análise.'); }
     catch { setMsg('Não consegui copiar automático. Abra "Ver resumo gerado" abaixo, selecione e copie.'); }
@@ -274,10 +431,14 @@ export default function Backup({ all, restore }) {
       <Card style={{ marginBottom: 14, borderColor: C.accent }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Para análise</div>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
-          Gera um relatório com os números já calculados (receita, despesa, lucro e margem por mês, despesas por categoria, maiores fornecedores, contas a pagar e receita por dia da semana) seguido dos dados completos organizados. É só copiar e colar no chat comigo.
+          <b style={{ color: C.text }}>É assim que eu enxergo teu bar.</b> Eu não fico ligado no PicoOS o tempo todo —
+          este botão junta tudo numa mensagem só: resultado por mês, despesas por categoria, fornecedores, contas a
+          pagar, o salão (o que mais vende, quanto sai por dia da semana, ticket médio), o estoque (quanto tem parado,
+          o que está acabando) e a folha do mês. Copia e cola aqui no nosso chat — aí pode me perguntar qualquer coisa
+          sobre o negócio que eu respondo com os teus números de verdade.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Btn onClick={copiarAnalise}>Copiar resumo + dados para análise</Btn>
+          <Btn onClick={copiarAnalise}>Copiar tudo pra mandar pro Claude</Btn>
           <Btn kind="ghost" onClick={() => baixar(analise, `pico-do-mane-analise-${todayISO()}.md`, 'text/markdown;charset=utf-8')}>Baixar relatório de análise (.md)</Btn>
         </div>
         {msg && <div style={{ marginTop: 12, fontSize: 13, color: msg.startsWith('Não') ? C.amber : C.accent }}>{msg}</div>}
