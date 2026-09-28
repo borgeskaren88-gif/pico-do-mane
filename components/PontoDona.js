@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, Empty, SecTitle, PageTitle, KPI } from './ui';
 import RelogioPonto from './RelogioPonto';
 import { fmtDate, todayISO, mesLabel, brl, num } from '../lib/util';
-import { saldoDaPessoa, saldoAcumulado, emReais, valorHoraDoMes, diasDeEscalaDoMes, horasJornada as horasJornadaLib, horasDoTurno, fmtHoras, recadoDoSaldo } from '../lib/ponto';
+import { saldoDaPessoa, saldoAcumulado, emReais, valorHoraDoMes, diasDeEscalaDoMes, horasJornada as horasJornadaLib, horasDoTurno, fmtHoras, recadoDoSaldo, aPagarNoMes, saldoAntesDoMes } from '../lib/ponto';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch { return ''; } };
@@ -122,7 +122,12 @@ export default function PontoDona() {
       g.s = saldoDaPessoa(g.turnos, jornadas[g.papel], ym, hojeISO);
       // O banco de horas roda sobre TODOS os registros da pessoa, não só os do
       // mês aberto — é isso que sobrevive à virada do mês.
-      g.banco = saldoAcumulado(registros.filter((r) => norm(r.nome) === norm(g.nome)), jornadas[g.papel], hojeISO);
+      const todosDela = registros.filter((r) => norm(r.nome) === norm(g.nome));
+      g.banco = saldoAcumulado(todosDela, jornadas[g.papel], hojeISO);
+      // Quanto o trabalho já feito vale. É a pergunta que ela faz no dia de
+      // pagar, e era a única que esta tela não sabia responder.
+      g.pagar = aPagarNoMes(g.turnos, jornadas[g.papel], ym);
+      g.antes = saldoAntesDoMes(todosDela, jornadas[g.papel], ym, hojeISO);
     }
     return [...map.values()].sort((a, b) => b.horas - a.horas);
   }, [registros, ym, jornadas]);
@@ -174,6 +179,86 @@ export default function PontoDona() {
   return (
     <div>
       <PageTitle sub="Horas da equipe neste mês — a equipe bate o ponto, você acompanha aqui">Ponto</PageTitle>
+
+      {/* QUANTO PAGAR. Vem primeiro porque é a pergunta que ela faz.
+          ============================================================
+          "No Ponto tem como deixar claro tipo: até agora você tem que pagar
+          tanto para a Francine."
+
+          A tela sabia dizer horas ("54h") e saldo ("+2h em haver") e não sabia
+          dizer dinheiro. Ela ficava fazendo a conta de cabeça — e conta de
+          cabeça com hora quebrada dá errado, ainda mais no fim do mês.
+
+          O número é o trabalho que JÁ foi feito, pela hora daquele mês. Se
+          alguém saiu duas horas antes em cinco turnos, isso já saiu daqui
+          sozinho. E quem cumpre o mês inteiro fecha exatamente no salário
+          combinado — não é aproximação, é a mesma conta pelo avesso. */}
+      {carregado && pessoas.length > 0 && (
+        <Card style={{ marginBottom: 12, borderColor: C.accent }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 2 }}>
+            <div style={{ fontSize: 15, fontWeight: 900 }}>
+              {ym === todayISO().slice(0, 7) ? 'Até agora, tu tens que pagar' : `A pagar em ${mesLabel(ym)}`}
+            </div>
+            {ym === todayISO().slice(0, 7) && (
+              <div style={{ fontSize: 11.5, color: C.faint, fontWeight: 700 }}>{mesLabel(ym)}, até hoje</div>
+            )}
+          </div>
+
+          {pessoas.map((p) => (
+            <div key={p.nome} style={{ borderTop: `1px solid ${C.hair}`, paddingTop: 10, marginTop: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ fontSize: 14.5, fontWeight: 800, minWidth: 0 }}>
+                  {p.nome}
+                  {rotuloSetor(p.papel) ? <span style={{ color: C.faint, fontWeight: 500, fontSize: 12 }}> · {rotuloSetor(p.papel)}</span> : null}
+                </span>
+                <span style={{ fontSize: 21, fontWeight: 900, color: p.pagar ? C.green : C.faint, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                  {p.pagar ? brl(p.pagar.total) : '—'}
+                </span>
+              </div>
+
+              {p.pagar ? (
+                <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.45, marginTop: 2 }}>
+                  {fmtHoras(p.pagar.horas)} trabalhadas em {p.pagar.turnos} turno(s) × {brl(Math.round(p.pagar.valorHora * 100) / 100)} a hora
+                </div>
+              ) : (
+                // Sem salário configurado não dá pra dizer valor nenhum — e
+                // R$ 0,00 aqui seria mentira com cara de número. O caminho de
+                // arrumar fica a um toque, aberto já.
+                <div style={{ fontSize: 11.5, color: C.amber, lineHeight: 1.45, marginTop: 3 }}>
+                  Falta dizer quanto tu pagas.{' '}
+                  <button onClick={abrirConfig} style={{ background: 'none', border: 'none', padding: 0, color: C.accent, fontSize: 11.5, fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}>
+                    Configurar jornada
+                  </button>
+                </div>
+              )}
+
+              {/* O que veio de antes fica SEPARADO, de propósito: somar aqui
+                  seria decidir por ela uma política de pagamento que ela nunca
+                  me disse ter. O app avisa; quem paga decide. */}
+              {p.antes && Math.abs(p.antes.horas) >= 0.05 && (
+                <div style={{ fontSize: 11.5, color: C.amber, lineHeight: 1.45, marginTop: 4 }}>
+                  De antes de {mesLabel(ym)} {p.antes.horas < 0 ? 'ela está devendo' : 'ela tem a receber'}{' '}
+                  <b>{fmtHoras(p.antes.horas)}</b>{p.antes.reais != null ? ` (${brl(Math.abs(p.antes.reais))})` : ''} — e isso
+                  {' '}<b>não está</b> somado no valor acima.
+                </div>
+              )}
+            </div>
+          ))}
+
+          {pessoas.filter((p) => p.pagar).length > 1 && (
+            <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 12, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: C.muted }}>Todo mundo junto</span>
+              <span style={{ fontSize: 18, fontWeight: 900, color: C.green, fontVariantNumeric: 'tabular-nums' }}>
+                {brl(Math.round(pessoas.reduce((s, p) => s + (p.pagar ? p.pagar.total : 0), 0) * 100) / 100)}
+              </span>
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.5, marginTop: 10 }}>
+            É o que já foi trabalhado, não o salário cheio. Turno ainda aberto entra só quando a pessoa bate a saída.
+          </div>
+        </Card>
+      )}
 
       {/* Relógio da equipe: enche conforme o mês anda. Vermelho enquanto falta
           hora pra fechar a jornada, verde quando já bateu. */}
@@ -345,10 +430,18 @@ export default function PontoDona() {
               </span>
               <span style={{ flexShrink: 0, textAlign: 'right' }}>
                 <span style={{ display: 'block', fontSize: 16, fontWeight: 800, color: C.accent }}>{fmtHoras(p.horas)}</span>
-                {jornadas[p.papel]?.salarioMes > 0 ? (
-                  <span style={{ display: 'block', fontSize: 11, color: C.faint, fontWeight: 700 }}>{brl(jornadas[p.papel].salarioMes)}/mês</span>
-                ) : emReais(p.horas, jornadas[p.papel], ym) != null && (
-                  <span style={{ display: 'block', fontSize: 11, color: C.faint, fontWeight: 700 }}>{brl(emReais(p.horas, jornadas[p.papel], ym))}</span>
+                {/* Aqui ficava o salário cheio — "R$ 1.500,00/mês" — do lado
+                    das horas do mês. Era o número errado no lugar certo: no
+                    dia 10 ela lia 1.500 ao lado de 48h e tinha que descobrir
+                    sozinha que uma coisa não tem nada a ver com a outra. O que
+                    serve ali é quanto aquelas horas valem. */}
+                {p.pagar ? (
+                  <span style={{ display: 'block', fontSize: 11.5, color: C.green, fontWeight: 800 }}>
+                    {brl(p.pagar.total)} <span style={{ color: C.faint, fontWeight: 600 }}>a pagar</span>
+                  </span>
+                ) : null}
+                {jornadas[p.papel]?.salarioMes > 0 && (
+                  <span style={{ display: 'block', fontSize: 10.5, color: C.faint, fontWeight: 600 }}>de {brl(jornadas[p.papel].salarioMes)}/mês</span>
                 )}
               </span>
             </button>
