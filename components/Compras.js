@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
 import { brl, num, numQtd, todayISO, ymOf, fmtDate, addDays, uid, limparNome, montarParcelas, ratearParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
 import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, fatorEntre, UNIDADES } from '../lib/estoque';
+import { efeitoDaEdicaoNaDespesa } from '../lib/despesaDaCompra';
 import { precoNaUnidadeDoItem } from '../lib/cotacao';
 
 // Dados compartilhados da compra (valem pra todos os itens do carrinho).
@@ -154,7 +155,7 @@ function FaltouNoEstoque({ pendentes, onLancar, onDispensar, onLigar, estoque = 
   );
 }
 
-export default function Compras({ dados, cotacoes, despesas = [], estoque = [], onChange, onRegistrar, onEstoque, carrinhoInicial = null, onCarrinhoUsado }) {
+export default function Compras({ dados, cotacoes, despesas = [], estoque = [], onChange, onRegistrar, onPagamento, onEstoque, carrinhoInicial = null, onCarrinhoUsado }) {
   // Sugestões de produto: os itens do ESTOQUE primeiro (esses fazem a compra
   // entrar automático), mais o que já foi comprado/cotado. Digitar e escolher a
   // sugestão garante o nome IGUAL — sem precisar decorar.
@@ -168,6 +169,9 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   const [carrinho, setCarrinho] = useState([]);
   const [gerarCotacao, setGerarCotacao] = useState(true);
   const [editId, setEditId] = useState(null);
+  // O que a edição fez com o dinheiro, escrito na tela. Sem isto ela salvava e
+  // saía sem saber se o financeiro andou — que foi exatamente a queixa.
+  const [msgEdicao, setMsgEdicao] = useState('');
   const [filtroMes, setFiltroMes] = useState(ymOf(todayISO()));
   const [busca, setBusca] = useState('');
   // Boleto parcelado: uma linha por vencimento, com o valor de cada uma.
@@ -391,22 +395,78 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   // Edição de uma linha existente (uma por vez, sem gerar cotação/despesa nova).
   const editar = (d) => {
     setEditId(d.id);
+    setMsgEdicao('');
     setCompra({ data: d.data || todayISO(), fornecedor: d.fornecedor || '', formaPagto: d.formaPagto || 'À vista', pago: d.pago || 'Não', vencimento: d.vencimento || '', nota: d.nota || '' });
     setItem({ produto: d.produto || '', categoria: d.categoria || '', quantidade: d.quantidade || '', valorUnit: d.valorUnit || '', estoqueId: d.estoqueId || '', conteudo: d.conteudo || '', conteudoUnid: d.conteudoUnid || '' });
     setCarrinho([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  // EDITAR UMA COMPRA AGORA MEXE NO DINHEIRO TAMBÉM.
+  //
+  // "Coloquei como pago dois boletos da Copal e meu Dashboard não mudou o
+  // financeiro."
+  //
+  // Ela estava certa, e o defeito era aqui: este salvamento trocava a palavra
+  // "Não" por "Sim" na linha e ia embora. Quem marca pago em Finanças → Contas
+  // a pagar tem a despesa lançada junto; quem marca pago AQUI, na pergunta que
+  // literalmente diz "Já foi paga?", não tinha. Duas portas pro mesmo ato, e a
+  // que ela usou não chegava no financeiro — calada, ainda por cima.
+  //
+  // Vai tudo num pedido só (linha + dinheiro), porque gravar metade seria pior
+  // que não gravar.
   const salvarEdicao = () => {
     if (!item.produto || !item.valorUnit) return;
     const venc = compra.formaPagto === 'À vista' ? compra.data : (compra.vencimento || '');
-    onChange(dados.map((d) => d.id === editId ? {
+    const antes = dados.find((d) => d.id === editId);
+    const atualizar = (d) => ({
       ...d, data: compra.data, produto: limparNome(item.produto), fornecedor: limparNome(compra.fornecedor),
       categoria: item.categoria, quantidade: item.quantidade || '1', valorUnit: item.valorUnit || '0',
       formaPagto: compra.formaPagto, vencimento: venc, pago: compra.pago,
       dataPagamento: compra.pago === 'Sim' ? (d.dataPagamento || compra.data) : '', nota: compra.nota,
       estoqueId: item.estoqueId || '',
       conteudo: item.conteudo || '', conteudoUnid: item.conteudoUnid || '',
-    } : d));
+    });
+    const depois = antes ? atualizar(antes) : null;
+    const efeito = antes ? efeitoDaEdicaoNaDespesa(antes, depois) : { tipo: 'nada' };
+
+    // Sem o canal pro financeiro (telas antigas), grava a linha como antes — mas
+    // não finge que o dinheiro andou.
+    if (!onPagamento || efeito.tipo === 'nada') {
+      onChange(dados.map((d) => (d.id === editId ? atualizar(d) : d)));
+      setMsgEdicao(efeito.tipo === 'nada' ? '' : 'A linha foi salva, mas o financeiro não foi mexido aqui.');
+      cancelarEdicao();
+      return;
+    }
+
+    const op = {};
+    let recado = '';
+    if (efeito.tipo === 'criar') {
+      const despId = uid();
+      op.despesaNova = {
+        id: despId, data: depois.dataPagamento || compra.data, categoria: 'Fornecedores de insumo',
+        descricao: [limparNome(compra.fornecedor), compra.nota && `Nota ${compra.nota}`].filter(Boolean).join(' · ') || limparNome(item.produto) || 'Compra',
+        valor: efeito.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        obs: `Marcada como paga em Compras · ${limparNome(item.produto)}`,
+        origem: 'compra',
+      };
+      op.comprasSubstituir = dados.map((d) => (d.id === editId ? { ...atualizar(d), despesaId: despId } : d));
+      recado = `Lancei ${brl(efeito.valor)} em Despesas. Teu financeiro já mudou.`;
+    } else if (efeito.tipo === 'ajustar') {
+      op.ajustarDespesa = { id: efeito.id, delta: efeito.delta };
+      op.comprasSubstituir = dados.map((d) => (d.id === editId
+        ? { ...atualizar(d), despesaId: compra.pago === 'Sim' ? d.despesaId : '' }
+        : d));
+      recado = efeito.delta < 0
+        ? `Tirei ${brl(Math.abs(efeito.delta))} das Despesas.`
+        : `Somei ${brl(efeito.delta)} nas Despesas.`;
+    } else {
+      // Era paga e não tem despesa ligada: o app não sabe qual lançamento
+      // corrigir, e inventar um seria pior. Diz o número e manda ela olhar.
+      op.comprasSubstituir = dados.map((d) => (d.id === editId ? atualizar(d) : d));
+      recado = `Salvei a linha, mas esta compra não tem despesa ligada — então ${brl(Math.abs(efeito.delta))} podem ter ficado sobrando em Finanças → Despesas. Dá uma olhada lá.`;
+    }
+    onPagamento(op);
+    setMsgEdicao(recado);
     cancelarEdicao();
   };
   const cancelarEdicao = () => { setEditId(null); setCompra(compraVazia()); setItem(itemVazio()); };
@@ -431,6 +491,17 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
       ]} />
 
       {msgLanc && <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginBottom: 12, lineHeight: 1.5 }}>{msgLanc}</div>}
+      {/* O que a edição fez com o dinheiro, por escrito. Antes ela marcava
+          "pago", salvava, e saía sem nenhum sinal de que o financeiro tinha (ou
+          não) mexido — e nesse caso não tinha mexido mesmo. Fica até ela fechar:
+          aviso que some sozinho foi o que deixou os outros casos passarem
+          batido. */}
+      {msgEdicao && (
+        <div style={{ background: C.panel2, border: `1px solid ${msgEdicao.includes('não tem despesa') ? C.amber : C.green}`, borderRadius: 10, padding: '10px 13px', marginBottom: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: msgEdicao.includes('não tem despesa') ? C.amber : C.green, lineHeight: 1.5 }}>{msgEdicao}</span>
+          <button onClick={() => setMsgEdicao('')} aria-label="Fechar aviso" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
+        </div>
+      )}
       <FaltouNoEstoque pendentes={pendentes} onLancar={lancarNoEstoque} onDispensar={dispensar} onLigar={ligarPendente} estoque={estoque} ocupado={lancando} />
 
       <Card style={{ marginBottom: 18 }}>
