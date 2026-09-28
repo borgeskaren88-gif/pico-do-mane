@@ -30,6 +30,7 @@ import RaioX from './RaioX';
 import Backup from './Backup';
 import Cardapio from './Cardapio';
 import Comandas from './Comandas';
+import VendasDoDia from './VendasDoDia';
 import Caixa from './Caixa';
 import Fiados from './Fiados';
 import Clientes from './Clientes';
@@ -289,7 +290,7 @@ export default function Dashboard() {
     } catch { /* ignora */ }
   }, []);
   useEffect(() => { if (['hoje', 'darci', 'relatorios', 'marketing', 'receitas', 'salao', 'caixa', 'diario', 'backup', 'abastecimento', 'previsao'].includes(tab)) carregarVendas(); }, [tab]);
-  useEffect(() => { if (tab === 'salao' && subSalao === 'fiados') carregarVendas(); }, [subSalao]);
+  useEffect(() => { if (tab === 'salao' && (subSalao === 'fiados' || subSalao === 'vendas')) carregarVendas(); }, [subSalao]);
 
 
   // FONTE DO FATURAMENTO: manual. As comandas são só operacionais (salão +
@@ -922,7 +923,7 @@ export default function Dashboard() {
         {tab === 'salao' && (
           <>
             <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-              {[['caixa', 'Caixa'], ['comandas', 'Comandas'], ['fiados', 'Fiados'], ['clientes', 'Clientes'], ['cardapio', 'Cardápio']].map(([v, rot]) => (
+              {[['caixa', 'Caixa'], ['comandas', 'Comandas'], ['vendas', 'Vendas do dia'], ['fiados', 'Fiados'], ['clientes', 'Clientes'], ['cardapio', 'Cardápio']].map(([v, rot]) => (
                 <button key={v} onClick={() => setSubSalao(v)} style={{
                   flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
                   background: subSalao === v ? C.accent : 'transparent', color: subSalao === v ? '#06101F' : C.muted,
@@ -933,6 +934,7 @@ export default function Dashboard() {
               ))}
             </div>
             {subSalao === 'comandas' && <Comandas papel="dona" />}
+            {subSalao === 'vendas' && <VendasDoDia vendas={vendas} />}
             {subSalao === 'caixa' && <Caixa receitas={receitas} onReceitas={upd.receitas} />}
             {subSalao === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} estoque={estoque} />}
             {subSalao === 'fiados' && <Fiados onMudou={carregarVendas} clientes={clientes} receitas={receitas} onReceitas={upd.receitas} />}
