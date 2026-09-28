@@ -5,6 +5,7 @@ import { C, LogoMark, pageBg } from './ui';
 import { ymOf, todayISO, limparNome, fiadoDaVenda, uid, num, brl } from '../lib/util';
 import { comprasPendentesDeEstoque } from '../lib/estoque';
 import { limparCopiaGuardada } from '../lib/versao';
+import { ajustarDespesas } from '../lib/despesaDaCompra';
 import SEED_DATA from '../data/seed.json';
 
 import Brain from './Brain';
@@ -322,7 +323,21 @@ export default function Dashboard() {
     // reenviava TODO o painel a partir da memória do aparelho — então uma tela
     // (ou outro aparelho) com uma cópia velha podia sobrescrever o que outra
     // acabou de gravar (ex.: uma conta marcada como paga voltava a aberta).
-    apiSalvar({ ...parcial });
+    // APAGAR O ÚLTIMO ITEM DE UMA LISTA É INTENÇÃO, NÃO ACIDENTE.
+    //
+    // O servidor tem uma rede de segurança que NÃO deixa um salvamento esvaziar
+    // uma lista financeira — ela existe porque um aparelho com cópia velha
+    // gravando por cima já apagou dados de verdade uma vez.
+    //
+    // Só que a rede pegava junto o caso legítimo: tirar a última despesa, a
+    // última compra. A tela mostrava vazio, o banco voltava cheio, e ninguém
+    // avisava. Aqui a gente sabe a diferença — a lista tinha item, a ação dela
+    // zerou — então diz isso ao servidor. Aparelho com cópia velha nunca diz,
+    // porque nem sabe que está apagando algo.
+    const atuais = { diario, receitas, despesas, compras, cotacoes, garrafas };
+    const intencional = Object.keys(parcial).filter((k) => Array.isArray(parcial[k]) && parcial[k].length === 0
+      && Array.isArray(atuais[k]) && atuais[k].length > 0);
+    apiSalvar(intencional.length ? { ...parcial, intencional } : { ...parcial });
   };
 
   // Se o Google Agenda estiver conectado, sincroniza (com um pequeno atraso pra
@@ -357,22 +372,40 @@ export default function Dashboard() {
   // apagar uma compra/despesa recém-lançada. Recebe a INTENÇÃO (quais ids pagar/
   // estornar, a despesa a lançar/remover) e aplica sobre compras/despesas atuais.
   const aplicarPagamento = (op) => {
-    const parcial = {};
+    let nc = compras;
+    let nd = despesas;
+    let mexeuCompras = false;
+    let mexeuDespesas = false;
+
     if (op.pagarIds && op.pagarIds.length) {
       const ids = new Set(op.pagarIds);
-      const nc = compras.map((x) => (ids.has(x.id) ? { ...x, pago: 'Sim', dataPagamento: op.hoje, despesaId: op.despId } : x));
-      setCompras(nc); parcial.compras = nc;
-      if (op.despesaNova) { const nd = [op.despesaNova, ...despesas]; setDespesas(nd); parcial.despesas = nd; }
+      nc = nc.map((x) => (ids.has(x.id) ? { ...x, pago: 'Sim', dataPagamento: op.hoje, despesaId: op.despId } : x));
+      mexeuCompras = true;
     }
     if (op.estornarIds && op.estornarIds.length) {
       const ids = new Set(op.estornarIds);
-      const nc = compras.map((x) => (ids.has(x.id) ? { ...x, pago: 'Não', dataPagamento: '', despesaId: '' } : x));
-      setCompras(nc); parcial.compras = nc;
-      if (op.removerDespesaIds && op.removerDespesaIds.length) {
-        const rm = new Set(op.removerDespesaIds);
-        const nd = despesas.filter((d) => !rm.has(d.id)); setDespesas(nd); parcial.despesas = nd;
-      }
+      nc = nc.map((x) => (ids.has(x.id) ? { ...x, pago: 'Não', dataPagamento: '', despesaId: '' } : x));
+      mexeuCompras = true;
     }
+    // A LINHA DE COMPRA EDITADA NA MÃO, vinda da tela de Compras.
+    //
+    // Lá o "Já foi paga?" só trocava a palavra na linha, e o dinheiro nunca
+    // chegava no financeiro — duas portas pro mesmo ato e só uma funcionava.
+    // A lista vem pronta da tela junto com o efeito no dinheiro, pra as duas
+    // coisas caírem no MESMO salvamento: meia edição gravada seria pior que
+    // nenhuma.
+    if (Array.isArray(op.comprasSubstituir)) { nc = op.comprasSubstituir; mexeuCompras = true; }
+
+    if (op.despesaNova) { nd = [op.despesaNova, ...nd]; mexeuDespesas = true; }
+    if (op.removerDespesaIds && op.removerDespesaIds.length) {
+      const rm = new Set(op.removerDespesaIds);
+      nd = nd.filter((d) => !rm.has(d.id)); mexeuDespesas = true;
+    }
+    if (op.ajustarDespesa && op.ajustarDespesa.id) { nd = ajustarDespesas(nd, op.ajustarDespesa); mexeuDespesas = true; }
+
+    const parcial = {};
+    if (mexeuCompras) { setCompras(nc); parcial.compras = nc; }
+    if (mexeuDespesas) { setDespesas(nd); parcial.despesas = nd; }
     if (Object.keys(parcial).length) { salvarTudo(parcial); syncGoogle(); }
   };
 
@@ -879,7 +912,7 @@ export default function Dashboard() {
               </>
             )}
 
-            {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} estoque={estoque} onChange={upd.compras} onRegistrar={aplicarCompra} onEstoque={estoqueAcao} carrinhoInicial={carrinhoDaVoz} onCarrinhoUsado={() => setCarrinhoDaVoz(null)} />}
+            {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} estoque={estoque} onChange={upd.compras} onRegistrar={aplicarCompra} onPagamento={aplicarPagamento} onEstoque={estoqueAcao} carrinhoInicial={carrinhoDaVoz} onCarrinhoUsado={() => setCarrinhoDaVoz(null)} />}
             {subAbast === 'margem' && <Margem cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} compras={compras} />}
             {subAbast === 'fornecedores' && <Fornecedores compras={compras} />}
             {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} estoque={estoque} compras={compras} />}

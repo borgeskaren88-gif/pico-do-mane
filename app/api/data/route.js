@@ -59,7 +59,22 @@ export async function POST(request) {
     // já tem dados. Esvaziar receitas/despesas/etc. por completo praticamente
     // nunca é intencional — é a assinatura de um aparelho com cópia vazia/velha
     // gravando por cima. Nesses casos, preserva o que já estava salvo.
+    //
+    // MAS APAGAR DE PROPÓSITO TEM QUE FUNCIONAR.
+    //
+    // Essa rede pegava junto um caso legítimo: apagar o ÚLTIMO item de uma
+    // lista. A lista fica vazia, a rede achava que era aparelho com cópia velha,
+    // e devolvia o item apagado pro lugar. Na prática: a última despesa não
+    // saía, a última compra não saía — e nada dizia nada, o que é pior, porque
+    // a tela mostrava a lista vazia e o banco continuava cheio.
+    //
+    // Quem apaga de propósito manda dizer isso em `intencional`. Aparelho com
+    // cópia velha nunca manda, porque não sabe que está apagando nada — que é
+    // exatamente a diferença entre os dois casos.
+    const intencional = new Set(Array.isArray(dados.intencional) ? dados.intencional : []);
+    delete valor.intencional;
     for (const campo of ['diario', 'receitas', 'despesas', 'compras', 'cotacoes', 'garrafas']) {
+      if (intencional.has(campo)) continue;
       if (campo in dados && Array.isArray(dados[campo]) && dados[campo].length === 0
           && Array.isArray(anterior[campo]) && anterior[campo].length > 0) {
         valor[campo] = anterior[campo];
