@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, valorSessaoValida, valorSessaoCozinha, valorSessaoGarcom, valorSessaoReservas } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { conferirSenhaDona, temSenhaDona, conferirSenhaPapel } from '../../../lib/senha';
+import { lerGeracoes } from '../../../lib/acessos';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,22 +43,27 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, erro: 'Requisição inválida.' }, { status: 400 });
   }
 
+  // A geração em vigor de cada acesso. O crachá sai carimbado com ela — é o que
+  // faz "desconectar todos os aparelhos da cozinha" valer pros crachás velhos e
+  // não pro que está sendo emitido agora.
+  const ger = await lerGeracoes(sb);
+
   let valorCookie = null;
   let papel = null;
   // Com o papel escolhido no login, cozinha e garçom podem usar a mesma senha
   // (1234) sem ambiguidade: o papel é que decide qual acesso abrir.
   if (papelPedido === 'cozinha') {
-    if (senha && comparaSegura(senha, senhaCozinha)) { valorCookie = valorSessaoCozinha(); papel = 'cozinha'; }
+    if (senha && await conferirSenhaPapel(sb, 'cozinha', senha)) { valorCookie = valorSessaoCozinha(ger.cozinha); papel = 'cozinha'; }
   } else if (papelPedido === 'garcom') {
-    if (senha && comparaSegura(senha, senhaGarcom)) { valorCookie = valorSessaoGarcom(); papel = 'garcom'; }
+    if (senha && await conferirSenhaPapel(sb, 'garcom', senha)) { valorCookie = valorSessaoGarcom(ger.garcom); papel = 'garcom'; }
   } else if (papelPedido === 'reservas') {
     // A Mari pode ter trocado a senha dela dentro do app — aí vale a do banco.
-    if (senha && await conferirSenhaPapel(sb, 'reservas', senha)) { valorCookie = valorSessaoReservas(); papel = 'reservas'; }
+    if (senha && await conferirSenhaPapel(sb, 'reservas', senha)) { valorCookie = valorSessaoReservas(ger.reservas); papel = 'reservas'; }
   } else if (papelPedido === 'dona' || !papelPedido) {
     // 'dona' explícito, ou sem papel (compatibilidade): tenta dona e, se não for,
     // ainda aceita cozinha pela senha (não quebra quem já usava só a senha).
     if (senha && await conferirSenhaDona(sb, senha)) { valorCookie = valorSessaoValida(); papel = 'dona'; }
-    else if (!papelPedido && senha && comparaSegura(senha, senhaCozinha)) { valorCookie = valorSessaoCozinha(); papel = 'cozinha'; }
+    else if (!papelPedido && senha && await conferirSenhaPapel(sb, 'cozinha', senha)) { valorCookie = valorSessaoCozinha(ger.cozinha); papel = 'cozinha'; }
   }
 
   if (!valorCookie) {
