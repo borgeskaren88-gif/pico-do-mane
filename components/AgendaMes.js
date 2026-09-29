@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { C, Card, Btn, TextInput, inputStyle } from './ui';
 import { todayISO, addDays, weekday, fmtDate, ymOf } from '../lib/util';
 
@@ -25,6 +25,11 @@ export default function AgendaMes() {
   const [diaSel, setDiaSel] = useState(hoje);
   const [mesAberto, setMesAberto] = useState(false); // o quadradão do mês inteiro
   const [novoAberto, setNovoAberto] = useState(false);
+  // Qual compromisso está sendo editado (null = estou criando um novo). O
+  // formulário é o MESMO nos dois casos: é a mesma pergunta — o quê, quando, a
+  // que horas — e duas telas parecidas pra isso seriam duas pra manter erradas.
+  const [editId, setEditId] = useState(null);
+  const formRef = useRef(null);
   const [evTitulo, setEvTitulo] = useState('');
   const [evData, setEvData] = useState(hoje);
   const [evHora, setEvHora] = useState('19:00');
@@ -203,11 +208,27 @@ export default function AgendaMes() {
                   <span style={{ fontSize: 11, fontWeight: 800, color: cor, background: `color-mix(in srgb, ${cor} 20%, transparent)`, borderRadius: 999, padding: '3px 10px' }}>
                     {etiquetaEvento(ev)}
                   </span>
+                  {/* Mudar o que ficou errado. Antes daqui só dava pra APAGAR
+                      e marcar de novo — e remarcar do zero perde o que já
+                      estava certo e ainda cria um evento novo no Google, em vez
+                      de mover o que existe. */}
+                  {ev.proprio && (
+                    <button onClick={() => abrirEditar(ev)}
+                      style={{ marginLeft: 'auto', border: 'none', background: 'none', color: C.accent, fontSize: 12, fontWeight: 800, cursor: 'pointer', padding: '4px 2px', whiteSpace: 'nowrap' }}>
+                      editar
+                    </button>
+                  )}
                   {ev.proprio && (
                     <button onClick={() => apagarCompromisso(ev)} disabled={apagando === ev.id}
-                      style={{ marginLeft: 'auto', border: 'none', background: 'none', color: C.faint, fontSize: 12, fontWeight: 800, cursor: 'pointer', padding: '4px 2px', whiteSpace: 'nowrap' }}>
+                      style={{ border: 'none', background: 'none', color: C.faint, fontSize: 12, fontWeight: 800, cursor: 'pointer', padding: '4px 2px', whiteSpace: 'nowrap' }}>
                       {apagando === ev.id ? '…' : 'apagar'}
                     </button>
+                  )}
+                  {/* Mesa reservada não se edita aqui: ela é da tela de Reservas,
+                      onde tem nome, telefone e quantas pessoas. Dizer isso evita
+                      ela procurar um botão que não vai existir. */}
+                  {ev.reserva && (
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: C.faint, whiteSpace: 'nowrap' }}>muda em Reservas</span>
                   )}
                   {((ev.tarefa && !ehBoleto(ev)) || ev.proprio) && (
                     <button onClick={() => alternarTarefaAg(ev)} disabled={concluindo === ev.id} title={ev.concluida ? 'Desmarcar' : 'Marcar como feito'}
@@ -224,18 +245,52 @@ export default function AgendaMes() {
     );
   };
 
-  const abrirNovo = () => { setEvData(diaSel); setEvErro(''); setNovoAberto(true); };
+  // Leva ela ATÉ o formulário. Ele fica DEPOIS da lista do dia, então abrir sem
+  // rolar deixa o compromisso em edição fora da tela — e o toque parece não ter
+  // feito nada.
+  const irAoFormulario = () => {
+    if (typeof window === 'undefined') return;
+    const ir = () => { if (formRef.current && formRef.current.scrollIntoView) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+    if (window.requestAnimationFrame) window.requestAnimationFrame(ir); else ir();
+  };
+
+  const abrirNovo = () => {
+    setEditId(null); setEvTitulo(''); setEvData(diaSel); setEvHora('19:00'); setEvDiaTodo(false);
+    setEvErro(''); setNovoAberto(true); irAoFormulario();
+  };
+
+  // Editar um compromisso que já existe. Os dados vêm da lista de compromissos
+  // (a fonte), não do cartão desenhado na tela — o cartão é um resumo.
+  const abrirEditar = (ev) => {
+    const c = compromissos.find((x) => x && x.id === ev.compId);
+    if (!c) return;
+    setEditId(c.id);
+    setEvTitulo(c.titulo || '');
+    setEvData(c.data || diaSel);
+    setEvHora(c.hora || '19:00');
+    setEvDiaTodo(!c.hora);
+    setEvErro(''); setNovoAberto(true); irAoFormulario();
+  };
+
+  const fecharForm = () => { setNovoAberto(false); setEditId(null); setEvErro(''); };
   const salvarEvento = async () => {
     if (!evTitulo.trim()) { setEvErro('Escreve o que é o compromisso.'); return; }
     if (salvandoEv) return;
     setSalvandoEv(true); setEvErro('');
     try {
-      const r = await fetch('/api/agenda', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titulo: evTitulo.trim(), data: evData, hora: evHora, diaTodo: evDiaTodo }) });
+      // Com `id`, o servidor ATUALIZA o que já existe (e atualiza junto no
+      // Google Agenda, quando está conectado) em vez de criar outro.
+      const corpo = { titulo: evTitulo.trim(), data: evData, hora: evHora, diaTodo: evDiaTodo };
+      if (editId) corpo.id = editId;
+      const r = await fetch('/api/agenda', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
       const j = await r.json();
       if (j.ok) {
-        setNovoAberto(false); setEvTitulo(''); setEvDiaTodo(false); setDiaSel(evData);
+        fecharForm(); setEvTitulo(''); setEvDiaTodo(false);
+        // Vai pro dia onde o compromisso foi parar — se ela mudou a data, é lá
+        // que ele está agora, e ficar no dia velho pareceria que sumiu.
+        setDiaSel(evData);
         await carregarCompromissos(); await carregarAgenda();
-      } else setEvErro(j.erro || 'Não consegui marcar o compromisso.');
+      } else setEvErro(j.erro || 'Não consegui salvar o compromisso.');
     } catch { setEvErro('Não consegui marcar — parece que está sem internet.'); }
     setSalvandoEv(false);
   };
@@ -331,8 +386,8 @@ export default function AgendaMes() {
             )}
           </>
         ) : (
-          <div style={{ marginTop: 14, borderTop: `1px solid ${C.line}`, paddingTop: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>Novo compromisso</div>
+          <div ref={formRef} style={{ marginTop: 14, borderTop: `1px solid ${C.line}`, paddingTop: 14, scrollMarginTop: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>{editId ? 'Editar compromisso' : 'Novo compromisso'}</div>
             <div style={{ marginBottom: 10 }}><TextInput value={evTitulo} onChange={setEvTitulo} placeholder="Ex.: Reserva aniversário — 20 pessoas" /></div>
             <div style={{ display: 'grid', gridTemplateColumns: evDiaTodo ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <input type="date" value={evData} onChange={(e) => setEvData(e.target.value)} style={inputStyle} />
@@ -343,8 +398,8 @@ export default function AgendaMes() {
             </label>
             {evErro && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{evErro}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <Btn small onClick={salvarEvento}>{salvandoEv ? 'Adicionando…' : 'Adicionar'}</Btn>
-              <Btn kind="ghost" small onClick={() => { setNovoAberto(false); setEvErro(''); }}>Cancelar</Btn>
+              <Btn small onClick={salvarEvento}>{salvandoEv ? 'Salvando…' : (editId ? 'Salvar' : 'Adicionar')}</Btn>
+              <Btn kind="ghost" small onClick={fecharForm}>Cancelar</Btn>
             </div>
           </div>
         )}
