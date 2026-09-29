@@ -212,24 +212,39 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
   const limiteDe = (nome) => { const c = clientes.find((x) => norm(x.nome) === norm(nome)); return c ? num(c.limite) : 0; };
   const telefoneDe = (nome) => { const c = clientes.find((x) => norm(x.nome) === norm(nome)); return (c && c.telefone) || ''; };
 
-  // Cobrar no WhatsApp: abre a conversa da pessoa com o texto pronto. Sem
-  // telefone cadastrado, copia a mensagem pra ela colar onde quiser.
-  const cobrar = async (g) => {
-    // Cobra o que já venceu; se não venceu nada ainda, fala do total mesmo.
+  // A COBRANÇA ESCRITA, pronta pra mandar.
+  //
+  // Cobra o que já venceu; se não venceu nada ainda, fala do total mesmo.
+  // "correspondendo até o dia X" = o último consumo que entrou nessa conta. É a
+  // data que explica o valor — e o que vier depois dela muda o total, por isso a
+  // frase avisa que o valor pode mudar até o pagamento.
+  const mensagemDe = (g) => {
     const cobrarAgora = g.agora > 0.005;
-    // "correspondendo até o dia X" = o último consumo que entrou nessa conta.
-    // É a data que explica o valor — e o que vier depois dela muda o total, por
-    // isso a frase avisa que o valor pode mudar até o pagamento.
     const ultima = g.vendas[0] || null;
     const ateISO = String((ultima && (ultima.data || ultima.fechadaEm)) || hojeISO).slice(0, 10);
-    const msg = msgCobranca(primeiroNome(g.nome), cobrarAgora ? g.agora : g.total, ateISO, diaDoVencimento(hojeISO, cobrarAgora));
-    const link = zapLink(telefoneDe(g.nome), msg);
-    if (link) { try { window.open(link, '_blank', 'noopener'); } catch { /* ignora */ } return; }
+    return msgCobranca(primeiroNome(g.nome), cobrarAgora ? g.agora : g.total, ateISO, diaDoVencimento(hojeISO, cobrarAgora));
+  };
+
+  // "Fui cobrar a Jamile pelo WhatsApp e não está indo, não sai do lugar."
+  //
+  // Eram DUAS coisas, e as duas davam na mesma cara: nada acontece.
+  //
+  // 1. Abrir o WhatsApp por `window.open` não funciona no app INSTALADO do
+  //    iPhone — o sistema bloqueia calado. Agora o botão é um link de verdade
+  //    (ver Btn com `href`), que o iPhone respeita.
+  //
+  // 2. Sem telefone salvo, o app copiava a mensagem e escrevia o aviso LÁ EM
+  //    CIMA da tela, longe do cartão da pessoa. Ela toca no botão, o recado
+  //    aparece fora do campo de visão, e a tela parece morta. Agora o recado
+  //    nasce colado no botão, dentro do cartão de quem está sendo cobrado.
+  const [recado, setRecado] = useState({}); // { [chave]: texto }
+  const copiarCobranca = async (g) => {
+    const msg = mensagemDe(g);
     try {
       await navigator.clipboard.writeText(msg);
-      setErro(`${g.nome} não tem telefone cadastrado (aba Clientes). Copiei a mensagem pra você colar no WhatsApp.`);
+      setRecado((m) => ({ ...m, [g.chave]: `Mensagem copiada. Abre o WhatsApp de ${primeiroNome(g.nome)} e cola.` }));
     } catch {
-      setErro(`${g.nome} não tem telefone cadastrado. A mensagem seria: ${msg}`);
+      setRecado((m) => ({ ...m, [g.chave]: `Não consegui copiar. A mensagem é: ${msg}` }));
     }
   };
   const rotulo = (nome, mesa) => (nome && nome.trim()) || `Mesa ${mesa}`;
@@ -372,12 +387,33 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                   {/* Receber um valor e abater da conta do cliente (sem ir compra por compra). */}
                   <div style={{ marginTop: 12 }}>
                     {!pagarAberto[g.chave] ? (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <Btn kind="ok" small onClick={() => setPagarAberto((m) => ({ ...m, [g.chave]: true }))} disabled={busy}>Receber valor</Btn>
-                        {/* Cobrança pronta: abre a conversa da pessoa no WhatsApp com o texto escrito. */}
-                        <Btn kind="ghost" small onClick={() => cobrar(g)}>Cobrar no WhatsApp</Btn>
-                        {/* Tirar da lista sem entrar dinheiro (desconto no salário, cortesia…). */}
-                        <Btn kind="ghost" small onClick={() => setSemAberto((m) => ({ ...m, [g.chave]: true }))} disabled={busy}>Baixar sem dinheiro</Btn>
+                      <div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <Btn kind="ok" small onClick={() => setPagarAberto((m) => ({ ...m, [g.chave]: true }))} disabled={busy}>Receber valor</Btn>
+                          {/* Cobrança pronta. COM telefone salvo, é um link de
+                              verdade que abre a conversa da pessoa já com o
+                              texto escrito. SEM telefone, o botão diz isso
+                              ANTES do toque — em vez de parecer que travou. */}
+                          {(() => {
+                            const link = zapLink(telefoneDe(g.nome), mensagemDe(g));
+                            return link
+                              ? <Btn kind="ghost" small href={link} target="_blank">Cobrar no WhatsApp</Btn>
+                              : <Btn kind="ghost" small onClick={() => copiarCobranca(g)}>Copiar cobrança (sem telefone salvo)</Btn>;
+                          })()}
+                          {/* Tirar da lista sem entrar dinheiro (desconto no salário, cortesia…). */}
+                          <Btn kind="ghost" small onClick={() => setSemAberto((m) => ({ ...m, [g.chave]: true }))} disabled={busy}>Baixar sem dinheiro</Btn>
+                        </div>
+                        {recado[g.chave] && (
+                          <div style={{ fontSize: 12, color: C.accent, fontWeight: 700, marginTop: 8, lineHeight: 1.45 }}>
+                            {recado[g.chave]}
+                            {' '}<button onClick={() => setRecado((m) => ({ ...m, [g.chave]: '' }))} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, padding: 0, textDecoration: 'underline' }}>ok</button>
+                          </div>
+                        )}
+                        {!telefoneDe(g.nome) && (
+                          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6, lineHeight: 1.45 }}>
+                            {primeiroNome(g.nome)} não tem telefone salvo. Salva em <b style={{ color: C.muted }}>Salão → Clientes</b> e o botão passa a abrir o WhatsApp dela direto.
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div style={{ background: C.panel2, borderRadius: 10, padding: 10 }}>
