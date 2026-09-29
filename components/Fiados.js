@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { acharCliente, telefoneDoCliente } from '../lib/clientes';
 import { C, Card, Btn, KPI, Empty, SecTitle, PageTitle } from './ui';
 import { brl, num, fmtDate, uid, diaOperacional, fiadoDaVenda, abertoDaVenda, classificarFiado } from '../lib/util';
 
@@ -209,8 +210,12 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
     setSemAberto((m) => ({ ...m, [g.chave]: false }));
   };
 
-  const limiteDe = (nome) => { const c = clientes.find((x) => norm(x.nome) === norm(nome)); return c ? num(c.limite) : 0; };
-  const telefoneDe = (nome) => { const c = clientes.find((x) => norm(x.nome) === norm(nome)); return (c && c.telefone) || ''; };
+  const limiteDe = (nome) => { const c = acharCliente(nome, clientes); return c ? num(c.limite) : 0; };
+  // Quem é esta pessoa no cadastro. A busca tolera o nome digitado às pressas
+  // na comanda ("Jamile" × "Jamile Souza", acento a mais, espaço sobrando) e
+  // se recusa a chutar quando dá empate — ver lib/clientes.js.
+  const clienteDe = (nome) => acharCliente(nome, clientes);
+  const telefoneDe = (nome) => telefoneDoCliente(nome, clientes);
 
   // A COBRANÇA ESCRITA, pronta pra mandar.
   //
@@ -398,7 +403,7 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                             const link = zapLink(telefoneDe(g.nome), mensagemDe(g));
                             return link
                               ? <Btn kind="ghost" small href={link} target="_blank">Cobrar no WhatsApp</Btn>
-                              : <Btn kind="ghost" small onClick={() => copiarCobranca(g)}>Copiar cobrança (sem telefone salvo)</Btn>;
+                              : <Btn kind="ghost" small onClick={() => copiarCobranca(g)}>Copiar cobrança (sem telefone)</Btn>;
                           })()}
                           {/* Tirar da lista sem entrar dinheiro (desconto no salário, cortesia…). */}
                           <Btn kind="ghost" small onClick={() => setSemAberto((m) => ({ ...m, [g.chave]: true }))} disabled={busy}>Baixar sem dinheiro</Btn>
@@ -409,11 +414,27 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                             {' '}<button onClick={() => setRecado((m) => ({ ...m, [g.chave]: '' }))} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, padding: 0, textDecoration: 'underline' }}>ok</button>
                           </div>
                         )}
-                        {!telefoneDe(g.nome) && (
-                          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6, lineHeight: 1.45 }}>
-                            {primeiroNome(g.nome)} não tem telefone salvo. Salva em <b style={{ color: C.muted }}>Salão → Clientes</b> e o botão passa a abrir o WhatsApp dela direto.
-                          </div>
-                        )}
+                        {/* De quem é o número que vai ser cobrado. Quando o nome
+                            da comanda não é igual ao do cadastro ("Jamile" e
+                            "Jamile Souza"), a tela diz em quem ela acertou — o
+                            acerto é bom, mas silencioso ele viraria fé. */}
+                        {(() => {
+                          const c = clienteDe(g.nome);
+                          if (c && c.telefone) {
+                            return norm(c.nome) === norm(g.nome) ? null : (
+                              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6, lineHeight: 1.45 }}>
+                                Vai pro WhatsApp de <b style={{ color: C.muted }}>{c.nome}</b> ({c.telefone}).
+                              </div>
+                            );
+                          }
+                          return (
+                            <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6, lineHeight: 1.45 }}>
+                              {c
+                                ? <>{c.nome} está no cadastro, mas <b style={{ color: C.muted }}>sem telefone</b>. Põe o número em Salão → Clientes.</>
+                                : <>Não achei <b style={{ color: C.muted }}>{primeiroNome(g.nome)}</b> no cadastro. Salva em Salão → Clientes e o botão passa a abrir o WhatsApp direto.</>}
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div style={{ background: C.panel2, borderRadius: 10, padding: 10 }}>
