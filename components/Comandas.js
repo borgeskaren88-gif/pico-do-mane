@@ -149,6 +149,9 @@ export default function Comandas({ papel = 'dona' }) {
     const fiadoVal = num(fecharForm.valores['Fiado'] || '');
     // Trava: fiado sem nome não fecha (senão a dívida some numa "Mesa X").
     if (fiadoVal > 0.005 && !nomeCli) { setErro('Escreva o nome de quem ficou devendo pra fechar no fiado.'); setFechando(false); return; }
+    // Trava: sem contar as pessoas não fecha. Antes o app escrevia "1 pessoa"
+    // por conta própria, e o relatório da dona virava ficção.
+    if (!(Number(fecharForm.pessoas) >= 1)) { setErro('Conta quantas pessoas estavam na mesa — é um toque, ali em cima.'); setFechando(false); return; }
     try {
       const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: nomeCli, descontoPct: num(fecharForm.descontoPct || 0) }) });
       const j = await r.json();
@@ -529,6 +532,8 @@ export default function Comandas({ papel = 'dona' }) {
             const confere = Math.abs(falta) <= 0.005;
             // Fiado SEM nome não pode: senão vira "Mesa X" e você não sabe quem deve.
             const precisaNome = fiadoVal > 0.005 && !(fecharForm.nome || '').trim();
+            // Mesma família do precisaNome: o que falta pra poder fechar.
+            const faltaPessoas = !(Number(fecharForm.pessoas) >= 1);
             const setVal = (f) => (v) => setFecharForm((s) => ({ ...s, valores: { ...s.valores, [f]: v } }));
             const setDesc = (p) => setFecharForm((s) => ({ ...s, descontoPct: p, valores: {} }));
             const preencherResto = (f) => {
@@ -546,6 +551,55 @@ export default function Comandas({ papel = 'dona' }) {
                     Conta de {brl(totalFinal)} · <b>{brl(jaPago)} já pago</b> durante a noite.
                   </div>
                 )}
+                {/* QUANTAS PESSOAS — a primeira pergunta, e obrigatória.
+                    ================================================
+                    Vem ANTES do dinheiro de propósito: no fim da conta quem
+                    está fechando já está de olho na maquininha, e o que não for
+                    perguntado antes não é respondido.
+
+                    E é botão, não campo de digitar: quem fecha conta está em pé,
+                    com a maquininha numa mão e o celular na outra. Um toque num
+                    número grande ela faz; abrir teclado e digitar ela pula. */}
+                {(() => {
+                  const n = Number(fecharForm.pessoas) || 0;
+                  const põe = (v) => setFecharForm((f) => ({ ...f, pessoas: v }));
+                  return (
+                    <div style={{
+                      background: n >= 1 ? C.panel2 : `color-mix(in srgb, ${C.amber} 12%, transparent)`,
+                      border: `1px solid ${n >= 1 ? C.line : C.amber}`,
+                      borderRadius: 10, padding: '10px 12px', marginBottom: 12,
+                    }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, color: n >= 1 ? C.text : C.amber }}>
+                        Quantas pessoas na mesa? {n >= 1 ? '' : '(precisa dizer pra fechar)'}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((v) => (
+                          <button key={v} onClick={() => põe(v)} style={{
+                            border: `1px solid ${n === v ? C.accent : C.line}`,
+                            background: n === v ? C.accent : 'transparent',
+                            color: n === v ? '#06101F' : C.muted,
+                            borderRadius: 10, width: 42, height: 42, fontSize: 16, fontWeight: 800, cursor: 'pointer',
+                          }}>{v}</button>
+                        ))}
+                        {/* Mesa grande existe: aniversário, confraternização. */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 2 }}>
+                          <button onClick={() => põe(Math.max(1, n + 1))} style={{
+                            border: `1px solid ${n > 8 ? C.accent : C.line}`,
+                            background: n > 8 ? C.accent : 'transparent',
+                            color: n > 8 ? '#06101F' : C.muted,
+                            borderRadius: 10, height: 42, padding: '0 14px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                          }}>{n > 8 ? `${n} +1` : 'mais'}</button>
+                        </div>
+                      </div>
+                      {n >= 1 && (
+                        <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>
+                          {n} {n === 1 ? 'pessoa' : 'pessoas'} · {brl(Math.round((totalFinal / n) * 100) / 100)} por pessoa
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Quanto entrou em cada forma? Dá pra dividir. Use “resto” pra completar.</div>
 
                 {/* Sem caixa aberto a venda fica solta: não entra no fechamento
@@ -616,14 +670,21 @@ export default function Comandas({ papel = 'dona' }) {
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <Btn kind="ok" onClick={confirmarFechar} disabled={busy || fechando || !confere || precisaNome}>{fechando ? 'Fechando…' : 'Confirmar'}</Btn>
+                  <Btn kind="ok" onClick={confirmarFechar} disabled={busy || fechando || !confere || precisaNome || faltaPessoas}>{fechando ? 'Fechando…' : 'Confirmar'}</Btn>
                   <Btn kind="ghost" onClick={() => setFecharForm(null)}>Voltar</Btn>
                 </div>
+                {/* Botão apagado sem explicação é o mesmo que botão quebrado:
+                    ela toca, não acontece nada, e conclui que o app travou. */}
+                {faltaPessoas && (
+                  <div style={{ fontSize: 12.5, color: C.amber, fontWeight: 700, marginTop: 8, lineHeight: 1.45 }}>
+                    Falta dizer quantas pessoas estavam na mesa — é o primeiro quadro aqui de cima.
+                  </div>
+                )}
               </Card>
             );
           })() : (
             <div style={{ marginBottom: 14 }}>
-              <Btn kind="ok" onClick={() => { setOutroCliente(!!(sel.nome && !clientes.includes(sel.nome))); setDividirPor(sel.pessoas > 0 ? sel.pessoas : 2); setFecharForm({ valores: {}, nome: sel.nome || '', pessoas: sel.pessoas > 0 ? sel.pessoas : 1 }); }}>Fechar conta · {brl(Math.round((total - somaParciais(sel)) * 100) / 100)}</Btn>
+              <Btn kind="ok" onClick={() => { setOutroCliente(!!(sel.nome && !clientes.includes(sel.nome))); setDividirPor(sel.pessoas > 0 ? sel.pessoas : 2); setFecharForm({ valores: {}, nome: sel.nome || '', pessoas: sel.pessoas > 0 ? sel.pessoas : 0 }); }}>Fechar conta · {brl(Math.round((total - somaParciais(sel)) * 100) / 100)}</Btn>
             </div>
           )
         )}
