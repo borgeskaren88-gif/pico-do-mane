@@ -141,23 +141,41 @@ export function Area({ value, onChange, placeholder, rows = 2 }) {
   );
 }
 
-export function Btn({ children, onClick, kind = 'primary', small, type = 'button', disabled = false, style }) {
+export function Btn({ children, onClick, kind = 'primary', small, type = 'button', disabled = false, style, href, target, rel }) {
   const styles = {
     primary: { background: C.accent, color: '#06101F', border: 'none' },
     ghost: { background: 'transparent', color: C.text, border: `1px solid ${C.line}` },
     danger: { background: 'transparent', color: C.red, border: `1px solid ${C.redSoft}` },
     ok: { background: C.green, color: '#052014', border: 'none' },
   }[kind];
+  const visual = {
+    ...styles, borderRadius: 10, padding: small ? '7px 12px' : '11px 18px',
+    fontSize: small ? 13 : 15, fontWeight: 700,
+    // Desligado tem que PARECER desligado: sem isso o botão fica vivo na tela
+    // e ela toca nele achando que travou.
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.45 : 1,
+    ...style,
+  };
+
+  // COM `href`, ISTO VIRA UM LINK DE VERDADE — e isso não é firula.
+  //
+  // Sair do app pra outro lugar (o WhatsApp, por exemplo) por `window.open` não
+  // funciona no app INSTALADO do iPhone: o navegador bloqueia calado, e quem
+  // tocou vê exatamente nada acontecer. Um <a> de verdade o sistema respeita, e
+  // abre o aplicativo certo.
+  if (href) {
+    return (
+      <a
+        href={href} target={target} rel={rel || (target === '_blank' ? 'noopener noreferrer' : undefined)}
+        style={{ ...visual, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', lineHeight: 1.2 }}
+        onClick={onClick}
+      >{children}</a>
+    );
+  }
+
   return (
-    <button type={type} onClick={onClick} disabled={disabled} style={{
-      ...styles, borderRadius: 10, padding: small ? '7px 12px' : '11px 18px',
-      fontSize: small ? 13 : 15, fontWeight: 700,
-      // Desligado tem que PARECER desligado: sem isso o botão fica vivo na tela
-      // e ela toca nele achando que travou.
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      opacity: disabled ? 0.45 : 1,
-      ...style,
-    }}>{children}</button>
+    <button type={type} onClick={onClick} disabled={disabled} style={visual}>{children}</button>
   );
 }
 
