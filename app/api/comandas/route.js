@@ -403,7 +403,24 @@ export async function POST(request) {
       const descontoPct = Math.max(0, Math.min(100, Number(body?.descontoPct) || 0));
       const desconto = Math.round(totalBruto * descontoPct / 100 * 100) / 100;
       const total = Math.round((totalBruto - desconto) * 100) / 100;
-      const pessoas = Math.max(1, Math.floor(Number(body?.pessoas) || 1));
+      // QUANTAS PESSOAS ESTAVAM NA MESA — agora é obrigatório.
+      //
+      // "Minha atendente não está anotando a quantidade de pessoas por mesa. Tem
+      // como ser obrigatório? Eu preciso dessa informação."
+      //
+      // O pior não era vir vazio: era o que estava escrito aqui antes —
+      // `Math.max(1, ... || 1)`. Sem ninguém contar, a venda era gravada como
+      // "1 pessoa". Não ficava um buraco, ficava uma MENTIRA: a dona abria o
+      // relatório, via "pessoas atendidas" e "gasto por pessoa" e acreditava,
+      // porque número escrito não tem cara de chute.
+      //
+      // A trava mora aqui, e não só na tela, porque tela velha guardada no
+      // aparelho continua mandando pedido — e a regra tem que valer pro garçom,
+      // pra dona e pra qualquer aparelho.
+      const pessoas = Math.floor(Number(body?.pessoas) || 0);
+      if (!(pessoas >= 1 && pessoas <= 99)) {
+        return NextResponse.json({ ok: false, erro: 'Antes de fechar, diz quantas pessoas estavam na mesa.', faltaPessoas: true }, { status: 400 });
+      }
 
       // Quem já pagou a parte dele durante a noite. Esse dinheiro não é cobrado
       // de novo: o que falta receber agora é o total menos ele.
