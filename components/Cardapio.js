@@ -145,8 +145,16 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
                     {num(it.custo) > 0
                       ? <> · <b style={{ color: C.green }}>{brl(custo)}</b> {num(novo.saboresTotal) > 0 ? 'por unidade' : 'por venda'}</>
                       : <> · <b style={{ color: C.amber }}>sem custo cadastrado</b> — o CMV ignora este sabor</>}
-                    {rende > 0 && rende < 1000 && (
-                      <> · 1 {it.unidade} rende <b style={{ color: C.muted }}>{fmt(rende, 1)}</b></>
+                    {rende > 0 && rende < 1000 && (num(novo.saboresTotal) > 0
+                      // NO COMBO, "rende" precisa dizer rende O QUÊ.
+                      //
+                      // A dose de um narguilé é dividida em pedaços (2 metades,
+                      // 4 quartos) pra o cliente poder misturar sabores. Aí
+                      // "1 cx rende 8" é verdade e engana: são 8 PEDAÇOS, que
+                      // dão 4 narguilés. O número que ela quer conferir é o
+                      // segundo — é o que ela vê a caixa render no bar.
+                      ? <> · 1 {it.unidade} rende <b style={{ color: C.muted }}>{fmt(rende, 1)}</b> unidade(s) = <b style={{ color: C.muted }}>{fmt(rende / Math.max(1, Math.floor(num(novo.saboresTotal))), 1)}</b> venda(s) inteira(s)</>
+                      : <> · 1 {it.unidade} rende <b style={{ color: C.muted }}>{fmt(rende, 1)}</b></>
                     )}
                   </div>
                 );
