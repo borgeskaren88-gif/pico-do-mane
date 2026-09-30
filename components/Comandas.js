@@ -5,6 +5,67 @@ import { brl, num } from '../lib/util';
 
 const CATS = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Combos', 'Outros'];
 const FORMAS_PAG = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Fiado'];
+
+// QUANTAS PESSOAS SENTARAM NA MESA.
+//
+// Vive fora do componente porque agora é perguntado em DOIS momentos — ao abrir
+// a mesa e, como rede de segurança, ao fechar a conta — e a pergunta tem que ter
+// a mesma cara nos dois, senão vira duas coisas pra aprender.
+//
+// São três caminhos pro mesmo número, porque são dois jeitos de trabalhar:
+//   1 a 8   um toque só, que é a esmagadora maioria das mesas;
+//   +1      subir de um em um sem teclado, pra quem está com o celular na mão;
+//   outro   digitar direto, que é o caminho curto de quem está no computador —
+//           chegar em 14 clicando seis vezes é o tipo de chatice que faz alguém
+//           parar de preencher.
+function ContadorPessoas({ valor, onChange, titulo, aviso }) {
+  const n = Number(valor) || 0;
+  const falta = !(n >= 1);
+  return (
+    <div style={{
+      background: falta ? `color-mix(in srgb, ${C.amber} 12%, transparent)` : C.panel2,
+      border: `1px solid ${falta ? C.amber : C.line}`,
+      borderRadius: 10, padding: '10px 12px', marginBottom: 12,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, color: falta ? C.amber : C.text }}>
+        {titulo} {falta && aviso ? aviso : ''}
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((v) => (
+          <button key={v} onClick={() => onChange(v)} style={{
+            border: `1px solid ${n === v ? C.accent : C.line}`,
+            background: n === v ? C.accent : 'transparent',
+            color: n === v ? '#06101F' : C.muted,
+            borderRadius: 10, width: 42, height: 42, fontSize: 16, fontWeight: 800, cursor: 'pointer',
+          }}>{v}</button>
+        ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 2 }}>
+          <button onClick={() => onChange(Math.max(1, n + 1))} style={{
+            border: `1px solid ${C.line}`, background: 'transparent', color: C.muted,
+            borderRadius: 10, height: 42, padding: '0 12px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+          }}>+1</button>
+          <input
+            type="number" min="1" max="99" inputMode="numeric"
+            value={n > 8 ? String(n) : ''}
+            onChange={(e) => {
+              const v = Math.floor(Number(e.target.value) || 0);
+              onChange(v >= 1 && v <= 99 ? v : 0);
+            }}
+            placeholder="outro"
+            style={{
+              width: 74, height: 42, boxSizing: 'border-box', textAlign: 'center',
+              background: n > 8 ? C.accent : C.panel2,
+              color: n > 8 ? '#06101F' : C.text,
+              border: `1px solid ${n > 8 ? C.accent : C.line}`,
+              borderRadius: 10, fontSize: 16, fontWeight: 800,
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Formas aceitas num pagamento parcial. Fiado fica de fora de propósito: fiado
 // é dívida, e ela tem nome, limite e lista própria — o caminho dela é o
 // fechamento da conta.
@@ -28,6 +89,7 @@ export default function Comandas({ papel = 'dona' }) {
   const [configAberto, setConfigAberto] = useState(false);
   const [mesasInput, setMesasInput] = useState('');
   const [fecharForm, setFecharForm] = useState(null); // { pagamento, pessoas } quando fechando
+  const [abrindo, setAbrindo] = useState(null); // { mesa, pessoas } enquanto pergunta quantos sentaram
   const [outroCliente, setOutroCliente] = useState(false); // digitar nome fora da lista de clientes
   const [busca, setBusca] = useState('');
   const [picker, setPicker] = useState(false); // tela de adicionar produtos (carrinho)
@@ -95,12 +157,26 @@ export default function Comandas({ papel = 'dona' }) {
     return p;
   };
 
-  // Toca numa mesa do grid: se já tem comanda, entra; se não, abre e entra.
+  // Toca numa mesa do grid: se já tem comanda, entra; se não, PERGUNTA quantas
+  // pessoas sentaram e só então abre.
+  //
+  // "Preciso que ela seja obrigada a fazer na hora que anota a comanda, depois
+  // ela não vai lembrar quantas pessoas tinha na mesa."
+  //
+  // Antes a pergunta ficava só no fechamento. Garantia que o número existisse,
+  // mas às duas da manhã ele vira chute — e chute anotado é pior que campo
+  // vazio, porque tem cara de dado. Agora a conta começa pelo que só se sabe
+  // ali: quantas pessoas acabaram de sentar.
   const tocarMesa = async (mesa) => {
     const existente = comandas.find((c) => String(c.mesa) === String(mesa));
     if (existente) { setSelId(existente.id); return; }
-    const j = await acao({ acao: 'abrir', mesa: String(mesa) });
-    if (j?.comanda) setSelId(j.comanda.id);
+    setErro('');
+    setAbrindo({ mesa: String(mesa), pessoas: 0 });
+  };
+  const confirmarAbrir = async () => {
+    if (!abrindo || !(Number(abrindo.pessoas) >= 1)) return;
+    const j = await acao({ acao: 'abrir', mesa: abrindo.mesa, pessoas: Number(abrindo.pessoas) });
+    if (j?.comanda) { setAbrindo(null); setSelId(j.comanda.id); }
   };
   const salvarMesas = async () => {
     const n = Math.floor(Number(mesasInput));
@@ -551,72 +627,20 @@ export default function Comandas({ papel = 'dona' }) {
                     Conta de {brl(totalFinal)} · <b>{brl(jaPago)} já pago</b> durante a noite.
                   </div>
                 )}
-                {/* QUANTAS PESSOAS — a primeira pergunta, e obrigatória.
-                    ================================================
-                    Vem ANTES do dinheiro de propósito: no fim da conta quem
-                    está fechando já está de olho na maquininha, e o que não for
-                    perguntado antes não é respondido.
-
-                    E é botão, não campo de digitar: quem fecha conta está em pé,
-                    com a maquininha numa mão e o celular na outra. Um toque num
-                    número grande ela faz; abrir teclado e digitar ela pula. */}
-                {(() => {
-                  const n = Number(fecharForm.pessoas) || 0;
-                  const põe = (v) => setFecharForm((f) => ({ ...f, pessoas: v }));
-                  return (
-                    <div style={{
-                      background: n >= 1 ? C.panel2 : `color-mix(in srgb, ${C.amber} 12%, transparent)`,
-                      border: `1px solid ${n >= 1 ? C.line : C.amber}`,
-                      borderRadius: 10, padding: '10px 12px', marginBottom: 12,
-                    }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, color: n >= 1 ? C.text : C.amber }}>
-                        Quantas pessoas na mesa? {n >= 1 ? '' : '(precisa dizer pra fechar)'}
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map((v) => (
-                          <button key={v} onClick={() => põe(v)} style={{
-                            border: `1px solid ${n === v ? C.accent : C.line}`,
-                            background: n === v ? C.accent : 'transparent',
-                            color: n === v ? '#06101F' : C.muted,
-                            borderRadius: 10, width: 42, height: 42, fontSize: 16, fontWeight: 800, cursor: 'pointer',
-                          }}>{v}</button>
-                        ))}
-                        {/* MESA GRANDE — aniversário, confraternização.
-                            Dois caminhos, porque são dois jeitos de trabalhar:
-                            no celular, +1 de cada vez (dedo, sem teclado); no
-                            computador, que é onde o atendimento anota hoje,
-                            digitar 14 é mais rápido do que clicar seis vezes. */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 2 }}>
-                          <button onClick={() => põe(Math.max(1, n + 1))} style={{
-                            border: `1px solid ${C.line}`, background: 'transparent', color: C.muted,
-                            borderRadius: 10, height: 42, padding: '0 12px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
-                          }}>+1</button>
-                          <input
-                            type="number" min="1" max="99" inputMode="numeric"
-                            value={n > 8 ? String(n) : ''}
-                            onChange={(e) => {
-                              const v = Math.floor(Number(e.target.value) || 0);
-                              põe(v >= 1 && v <= 99 ? v : 0);
-                            }}
-                            placeholder="outro"
-                            style={{
-                              width: 74, height: 42, boxSizing: 'border-box', textAlign: 'center',
-                              background: n > 8 ? C.accent : C.panel2,
-                              color: n > 8 ? '#06101F' : C.text,
-                              border: `1px solid ${n > 8 ? C.accent : C.line}`,
-                              borderRadius: 10, fontSize: 16, fontWeight: 800,
-                            }}
-                          />
-                        </div>
-                      </div>
-                      {n >= 1 && (
-                        <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>
-                          {n} {n === 1 ? 'pessoa' : 'pessoas'} · {brl(Math.round((totalFinal / n) * 100) / 100)} por pessoa
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                {/* Rede de segurança: mesa aberta ANTES desta regra existir
+                    (ou aberta por uma tela velha) chega aqui sem o número. Em
+                    vez de deixar passar, pergunta — e o fechamento espera. */}
+                <ContadorPessoas
+                  valor={fecharForm.pessoas}
+                  onChange={(v) => setFecharForm((f) => ({ ...f, pessoas: v }))}
+                  titulo="Quantas pessoas na mesa?"
+                  aviso="(precisa dizer pra fechar)"
+                />
+                {Number(fecharForm.pessoas) >= 1 && (
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: -6, marginBottom: 12 }}>
+                    {fecharForm.pessoas} {Number(fecharForm.pessoas) === 1 ? 'pessoa' : 'pessoas'} · {brl(Math.round((totalFinal / Number(fecharForm.pessoas)) * 100) / 100)} por pessoa
+                  </div>
+                )}
 
                 <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Quanto entrou em cada forma? Dá pra dividir. Use “resto” pra completar.</div>
 
@@ -740,7 +764,37 @@ export default function Comandas({ papel = 'dona' }) {
 
       {erro && <div style={{ fontSize: 13, color: C.red, marginBottom: 10 }}>{erro}</div>}
 
-      {!carregado ? <Empty>Carregando…</Empty> : (
+      {/* A PERGUNTA QUE ABRE A MESA.
+          Aparece no lugar do grid, ocupando a tela: enquanto ela não disser
+          quantos sentaram, não tem mesa nenhuma pra tocar por engano. É um
+          toque, e é o único momento em que essa informação existe de verdade. */}
+      {abrindo && (
+        <Card style={{ marginBottom: 14, padding: 14, borderColor: C.accent }}>
+          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 2 }}>Mesa {abrindo.mesa}</div>
+          <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 12, lineHeight: 1.45 }}>
+            Quantas pessoas sentaram? Marca agora — <b style={{ color: C.text }}>na hora de fechar ninguém lembra</b>.
+          </div>
+          <ContadorPessoas
+            valor={abrindo.pessoas}
+            onChange={(v) => setAbrindo((a) => ({ ...a, pessoas: v }))}
+            titulo="Quantas pessoas na mesa?"
+            aviso="(precisa dizer pra abrir)"
+          />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Btn kind="ok" onClick={confirmarAbrir} disabled={busy || !(Number(abrindo.pessoas) >= 1)}>
+              {busy ? 'Abrindo…' : `Abrir mesa ${abrindo.mesa}`}
+            </Btn>
+            <Btn kind="ghost" onClick={() => setAbrindo(null)}>Cancelar</Btn>
+          </div>
+          {!(Number(abrindo.pessoas) >= 1) && (
+            <div style={{ fontSize: 12, color: C.amber, fontWeight: 700, marginTop: 8 }}>
+              Toca no número de pessoas pra liberar a mesa.
+            </div>
+          )}
+        </Card>
+      )}
+
+      {!carregado ? <Empty>Carregando…</Empty> : abrindo ? null : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(104px, 1fr))', gap: 10 }}>
           {numeros.map((m) => {
             const c = abertasPorMesa.get(m);

@@ -137,7 +137,20 @@ export async function POST(request) {
       const { data } = await sb.from('pdm_dados').select('valor').like('chave', PREFIXO + '%');
       const existente = (data || []).map((r) => r.valor).find((c) => c && c.status === 'aberta' && String(c.mesa) === String(mesa));
       if (existente) return NextResponse.json({ ok: true, comanda: existente, jaExistia: true });
-      const comanda = { id: uid(), mesa, status: 'aberta', itens: [], abertaEm: new Date().toISOString(), abertaPor: p };
+      // QUANTAS PESSOAS — perguntado AQUI, na hora de abrir.
+      //
+      // "Preciso que ela seja obrigada a fazer na hora que anota a comanda,
+      // depois ela não vai lembrar quantas pessoas tinha na mesa."
+      //
+      // Está certíssimo. A trava no fechamento garantia que o número existisse,
+      // mas às duas da manhã ele vira chute — e chute anotado é pior que campo
+      // vazio, porque tem cara de dado. Quem sabe quantos são é quem está na
+      // mesa no momento em que as pessoas sentam.
+      const pessoas = Math.floor(Number(body?.pessoas) || 0);
+      if (!(pessoas >= 1 && pessoas <= 99)) {
+        return NextResponse.json({ ok: false, erro: 'Diz quantas pessoas sentaram nessa mesa.', faltaPessoas: true }, { status: 400 });
+      }
+      const comanda = { id: uid(), mesa, status: 'aberta', pessoas, itens: [], abertaEm: new Date().toISOString(), abertaPor: p };
       await gravarComanda(sb, comanda);
       return NextResponse.json({ ok: true, comanda });
     }
