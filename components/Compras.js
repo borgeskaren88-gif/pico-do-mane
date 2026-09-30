@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
 import { brl, num, numQtd, todayISO, ymOf, fmtDate, addDays, uid, limparNome, montarParcelas, ratearParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
 import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, fatorEntre, UNIDADES } from '../lib/estoque';
@@ -180,6 +180,15 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   const [parcelas, setParcelas] = useState([]);
   const [lancando, setLancando] = useState(false);
   const [msgLanc, setMsgLanc] = useState('');
+  // O recado de "somei no estoque" some sozinho; o de problema, não. E o
+  // relógio de um nunca pode apagar o recado do outro — foi assim que um aviso
+  // que importava já sumiu da tela antes de ela ler.
+  const relogioLanc = useRef(null);
+  const avisarLanc = (texto, apagarEm = 0) => {
+    clearTimeout(relogioLanc.current);
+    setMsgLanc(texto);
+    if (apagarEm > 0) relogioLanc.current = setTimeout(() => setMsgLanc(''), apagarEm);
+  };
   // Gravando a compra. Trava o botão (dois toques = duas notas) e diz na tela
   // que está indo, porque no celular dela a volta do servidor demora.
   const [salvando, setSalvando] = useState(false);
@@ -225,15 +234,14 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
 
   const lancarNoEstoque = async (ids) => {
     if (lancando || !onEstoque) return;
-    setLancando(true); setMsgLanc('');
+    setLancando(true); avisarLanc('');
     const j = await onEstoque({ acao: 'lancarCompras', ids });
     setLancando(false);
     if (j && j.ok) {
-      setMsgLanc(j.lancadas
-        ? `${j.lancadas} compra(s) no estoque: ${(j.resumo || []).map((r) => `${r.item} +${r.qtd} ${r.unidade}`).join(', ')}.`
-        : 'Essas já estavam no estoque — não somei de novo.');
-    } else setMsgLanc('Não consegui lançar agora. Tenta de novo.');
-    setTimeout(() => setMsgLanc(''), 12000);
+      avisarLanc(j.lancadas
+        ? `${j.lancadas === 1 ? 'Somei 1 compra' : `Somei ${j.lancadas} compras`} no estoque: ${(j.resumo || []).map((r) => `${r.item} +${r.qtd} ${r.unidade}`).join(', ')}.`
+        : 'Essas já estavam no estoque — não somei de novo.', 14000);
+    } else avisarLanc('Não consegui lançar agora. Tenta de novo.');
   };
 
   // Dispensar: marca como resolvida SEM mexer no saldo. É pra compra velha que
@@ -245,13 +253,12 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     if (!compraId || !itemId) return;
     onChange(dados.map((d) => (d.id === compraId ? { ...d, estoqueId: itemId } : d)));
     if (itemId === 'nenhum' || !onEstoque) return;
-    setLancando(true); setMsgLanc('');
+    setLancando(true); avisarLanc('');
     const j = await onEstoque({ acao: 'lancarCompras', ids: [compraId], vinculos: { [compraId]: itemId } });
     setLancando(false);
-    setMsgLanc(j && j.ok && j.lancadas
+    avisarLanc(j && j.ok && j.lancadas
       ? `Somei no estoque: ${(j.resumo || []).map((r) => `${r.item} +${r.qtd} ${r.unidade}`).join(', ')}.`
-      : 'Liguei o item. Se o saldo não subir, toca em Entrar na linha.');
-    setTimeout(() => setMsgLanc(''), 12000);
+      : 'Liguei o item. Se o saldo não subir, toca em Entrar na linha.', 14000);
   };
 
   const dispensar = async (ids) => {
@@ -259,11 +266,12 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     if (typeof window !== 'undefined' && !window.confirm(
       `Dispensar ${ids.length} compra(s)?\n\nO aviso some e o estoque NÃO muda. Usa isso quando tu já deu entrada nelas na mão.`,
     )) return;
-    setLancando(true); setMsgLanc('');
+    setLancando(true); avisarLanc('');
     const j = await onEstoque({ acao: 'dispensarCompras', ids });
     setLancando(false);
-    setMsgLanc(j && j.ok ? `${j.dispensadas} compra(s) dispensada(s). O estoque não mudou.` : 'Não consegui agora. Tenta de novo.');
-    setTimeout(() => setMsgLanc(''), 10000);
+    avisarLanc(j && j.ok
+      ? `${j.dispensadas === 1 ? '1 compra dispensada' : `${j.dispensadas} compras dispensadas`}. O estoque não mudou.`
+      : 'Não consegui agora. Tenta de novo.', 12000);
   };
 
   const setC = (k) => (v) => setCompra((f) => ({ ...f, [k]: v }));
