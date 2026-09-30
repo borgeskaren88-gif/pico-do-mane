@@ -5,6 +5,7 @@ import { brl, num, numQtd, todayISO, ymOf, fmtDate, addDays, uid, limparNome, mo
 import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, fatorEntre, UNIDADES } from '../lib/estoque';
 import { efeitoDaEdicaoNaDespesa } from '../lib/despesaDaCompra';
 import { precoNaUnidadeDoItem } from '../lib/cotacao';
+import { guardarRascunho, lerRascunho, limparRascunho, registrarTentativa, lerTentativas, limparTentativas, quandoBR } from '../lib/notaPendente';
 
 // Dados compartilhados da compra (valem pra todos os itens do carrinho).
 const compraVazia = () => ({ data: todayISO(), fornecedor: '', formaPagto: 'À vista', pago: 'Sim', vencimento: '', nota: '' });
@@ -182,6 +183,36 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   // Gravando a compra. Trava o botão (dois toques = duas notas) e diz na tela
   // que está indo, porque no celular dela a volta do servidor demora.
   const [salvando, setSalvando] = useState(false);
+  // A caixa-preta: o que foi enviado e o que voltou, nas últimas vezes. É o que
+  // transforma "não entrou" (mistério) em uma linha que dá pra ler.
+  const [tentativas, setTentativas] = useState([]);
+  const [verTentativas, setVerTentativas] = useState(false);
+  const [rascunhoVoltou, setRascunhoVoltou] = useState(false);
+  const [falhou, setFalhou] = useState('');
+
+  // AO ABRIR A TELA: se ficou uma nota digitada e não gravada, ela volta.
+  //
+  // Antes, uma gravação que não foi levava a nota inteira com ela — e ela
+  // descobria depois, tendo que digitar tudo de novo, produto por produto.
+  useEffect(() => {
+    setTentativas(lerTentativas());
+    if (carrinhoInicial || carrinho.length) return;
+    const r = lerRascunho();
+    if (!r) return;
+    if (r.compra) setCompra({ ...compraVazia(), ...r.compra });
+    if (Array.isArray(r.carrinho)) setCarrinho(r.carrinho);
+    if (r.nParcelas) setNParcelas(r.nParcelas);
+    if (Array.isArray(r.parcelas)) setParcelas(r.parcelas);
+    setRascunhoVoltou(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // E a cada mexida no carrinho, guarda de novo. Editar uma linha antiga não é
+  // nota nova, então não mexe no rascunho.
+  useEffect(() => {
+    if (editId) return;
+    guardarRascunho(carrinho.length ? { compra, carrinho, nParcelas, parcelas } : null);
+  }, [compra, carrinho, nParcelas, parcelas, editId]);
 
   // Compras registradas que não viraram saldo. O servidor refaz esta conta antes
   // de gravar, então tocar duas vezes não soma duas vezes.
@@ -396,12 +427,26 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     // a nota tinha sumido da tela e não estava salva em lugar nenhum — ela
     // digitaria tudo de novo, se descobrisse. Agora, se falhar, o carrinho
     // continua cheio e o aviso diz pra tocar de novo.
-    setSalvando(true);
+    setSalvando(true); setFalhou('');
+    const resumo = { fornecedor: forn, itens: carrinho.length, total: totalCarrinho, pago };
     try {
       const r = await onRegistrar({ comprasNovas: novasCompras, despesaNova, cotacoesNovas });
-      if (r && r.ok === false) return; // o aviso de falha quem mostra é o pai
+      const ok = !!(r && r.ok);
+      // A caixa-preta registra SEMPRE, deu certo ou não. É o que me deixa ler
+      // depois o que aconteceu, em vez de adivinhar.
+      setTentativas(registrarTentativa({
+        ...resumo,
+        resultado: ok ? 'ok' : (r && r.status ? 'erro' : 'sem-resposta'),
+        detalhe: ok ? `${(r.entradas || []).length} entrada(s) no estoque${(r.naoEntraram || []).length ? ` · ${r.naoEntraram.length} sem saldo` : ''}` : (r && (r.erro || r.status) ? String(r.erro || `HTTP ${r.status}`) : 'não chegou resposta'),
+      }));
+      if (!ok) {
+        setFalhou('A nota NÃO foi gravada — e está guardada aqui no aparelho, inteira. Não digita de novo: toca em "Registrar compra" outra vez quando a internet voltar.');
+        return;
+      }
+      limparRascunho();
       setCompra(compraVazia()); setItem(itemVazio()); setCarrinho([]);
       setNParcelas('1'); setParcelas([]);
+      setRascunhoVoltou(false);
     } finally { setSalvando(false); }
   };
 
@@ -516,6 +561,28 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
         </div>
       )}
       <FaltouNoEstoque pendentes={pendentes} onLancar={lancarNoEstoque} onDispensar={dispensar} onLigar={ligarPendente} estoque={estoque} ocupado={lancando} />
+
+      {/* A GRAVAÇÃO NÃO FOI. Isto fica na tela até ela resolver: é a diferença
+          entre "não entrou e eu não sei por quê" e "está aqui, toca de novo". */}
+      {falhou && (
+        <div style={{ background: C.panel, border: `2px solid ${C.red}`, borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: C.red, lineHeight: 1.45 }}>{falhou}</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+            <Btn small onClick={registrar}>{salvando ? 'Enviando…' : 'Tentar de novo'}</Btn>
+            <Btn small kind="ghost" onClick={() => setFalhou('')}>Fechar</Btn>
+          </div>
+        </div>
+      )}
+      {/* A nota que sobrou de uma tentativa anterior. Ela precisa saber que o
+          carrinho não é de agora — senão registra duas vezes. */}
+      {rascunhoVoltou && !falhou && carrinho.length > 0 && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.amber}`, borderRadius: 10, padding: '10px 13px', marginBottom: 14, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.amber, fontWeight: 700, lineHeight: 1.5 }}>
+            Esta nota ficou digitada aqui no aparelho e não foi gravada. Confere e toca em <b>Registrar compra</b> — ou limpa o carrinho pelo × de cada item.
+          </span>
+          <button onClick={() => setRascunhoVoltou(false)} aria-label="Fechar aviso" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
+        </div>
+      )}
 
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar compra' : 'Nova compra'}</div>
@@ -662,6 +729,40 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
           </>
         )}
       </Card>
+
+      {/* A CAIXA-PRETA DOS ENVIOS.
+          "Registrei e não entrou" era um mistério: não havia onde olhar. Aqui
+          fica o que foi enviado e o que o servidor respondeu, das últimas vezes
+          — inclusive as que falharam. Um print disto me diz o motivo. */}
+      {tentativas.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <button onClick={() => setVerTentativas((v) => !v)} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 10, padding: '9px 12px', cursor: 'pointer', color: C.muted, fontSize: 12.5 }}>
+            Últimos envios de compra ({tentativas.length}) — {tentativas[0].resultado === 'ok' ? 'o último deu certo' : 'o último FALHOU'} · {verTentativas ? 'esconder' : 'ver'}
+          </button>
+          {verTentativas && (
+            <Card style={{ marginTop: 8 }}>
+              {tentativas.map((t, i) => {
+                const cor = t.resultado === 'ok' ? C.green : C.red;
+                return (
+                  <div key={i} style={{ padding: '7px 0', borderTop: i ? `1px solid ${C.hair}` : 'none', fontSize: 12.5, lineHeight: 1.5 }}>
+                    <div style={{ color: cor, fontWeight: 800 }}>
+                      {t.resultado === 'ok' ? 'gravou' : t.resultado === 'erro' ? 'o servidor recusou' : 'não chegou no servidor'}
+                      <span style={{ color: C.faint, fontWeight: 400 }}> · {quandoBR(t.em)}</span>
+                    </div>
+                    <div style={{ color: C.muted }}>
+                      {t.fornecedor || 'sem fornecedor'} · {t.itens} {t.itens > 1 ? 'itens' : 'item'} · {brl(t.total)} · {t.pago === 'Sim' ? 'paga' : 'em aberto'}
+                    </div>
+                    {t.detalhe && <div style={{ color: C.faint }}>{t.detalhe}</div>}
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 10 }}>
+                <Btn small kind="ghost" onClick={() => { limparTentativas(); setTentativas([]); }}>Limpar esta lista</Btn>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       <SecTitle>Histórico de compras</SecTitle>
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>

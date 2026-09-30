@@ -440,8 +440,16 @@ export default function Dashboard() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ acao: 'entradaCompras', comprasNovas, despesaNova, cotacoesNovas }),
       });
-      const j = await r.json();
-      if (!j?.ok) throw new Error(j?.erro || 'falhou');
+      // Uma resposta que não é JSON (a tela de login do servidor, a página de
+      // erro do Vercel, o HTML de uma sessão vencida) fazia `r.json()` estourar
+      // e cair no catch dizendo "a conexão falhou" — que é a explicação errada e
+      // manda ela esperar a internet voltar à toa. Aqui o motivo é o de verdade.
+      let j = null;
+      try { j = await r.json(); } catch { j = null; }
+      if (!r.ok || !j?.ok) {
+        const motivo = j?.erro || (r.status === 401 ? 'a sessão venceu — sai e entra de novo' : r.status === 403 ? 'este login não pode registrar compras' : `o servidor respondeu ${r.status}`);
+        const e = new Error(motivo); e.status = r.status; throw e;
+      }
       if (Array.isArray(j.itens)) setEstoque(j.itens);
       if (Array.isArray(j.compras)) setCompras(j.compras);
       if (Array.isArray(j.despesas)) setDespesas(j.despesas);
@@ -463,13 +471,18 @@ export default function Dashboard() {
         avisar('Compra registrada no financeiro. Nenhum item de estoque foi somado — nada nesta nota está ligado a um produto do estoque.');
       }
       syncGoogle();
-      return { ok: true };
+      return { ok: true, entradas, naoEntraram };
     } catch (e) {
       // Uma gravação só tem uma vantagem grande: quando falha, não deixa
-      // metade. Nada entrou — então o carrinho fica onde está e ela só toca de
-      // novo, sem digitar a nota inteira outra vez.
-      avisar('A compra NÃO foi salva — a conexão falhou. Nada foi pro financeiro nem pro estoque, não ficou nada pela metade. O carrinho continua cheio: toca em "Registrar compra" de novo.');
-      return { ok: false, erro: e?.message || 'falhou' };
+      // metade. Nada entrou — então a nota fica guardada no aparelho e ela só
+      // toca de novo, sem digitar tudo outra vez.
+      // `fetch` que não sai do aparelho diz "Failed to fetch", em inglês e sem
+      // explicar nada. Quem lê isto é ela.
+      const cru = e?.message || '';
+      const motivo = (!e?.status && (!cru || /failed to fetch|load failed|network/i.test(cru)))
+        ? 'não deu pra falar com o servidor (internet)' : cru || 'a conexão falhou';
+      avisar(`A compra NÃO foi salva: ${motivo}. Nada foi pro financeiro nem pro estoque — não ficou nada pela metade. A nota está guardada aqui no aparelho: toca em "Registrar compra" de novo.`);
+      return { ok: false, erro: motivo, status: e?.status || 0 };
     }
   };
 
