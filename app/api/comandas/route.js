@@ -496,6 +496,18 @@ export async function POST(request) {
         fiado,
         jaPagoAntes: jaPago > 0.005 ? jaPago : undefined,
         nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens, caixaId: caixaAberto ? caixaAberto.id : null,
+        // CONTAGEM DE VERDADE, e o carimbo que diz isso.
+        //
+        // Até esta regra existir, o servidor preenchia "1 pessoa" sozinho
+        // quando ninguém contava. Essas vendas antigas estão no banco com o
+        // número 1 e são indistinguíveis de uma mesa que era mesmo de uma
+        // pessoa. Sem um carimbo, o relatório somaria as duas coisas e
+        // apresentaria o resultado como se fosse tudo medido.
+        //
+        // Daqui pra frente ninguém fecha sem contar — então toda venda nova
+        // sai marcada, e o relatório consegue dizer quanto do número é medição
+        // e quanto é herança.
+        pessoasContadas: true,
         // Só fica "não pago" (na lista de fiados) o que ficou no fiado.
         pago: fiado <= 0.005, fechadaEm: new Date().toISOString(), fechadaPor: p,
         // A hora em que a mesa ABRIU é o que diz a que horas o bar enche — a
