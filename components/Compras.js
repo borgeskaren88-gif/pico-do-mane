@@ -96,7 +96,7 @@ function FaltouNoEstoque({ pendentes, onLancar, onDispensar, onLigar, estoque = 
         }}
       >
         <span style={{ fontSize: 12.5, color: C.amber, lineHeight: 1.4 }}>
-          {pendentes.length} compra{pendentes.length > 1 ? 's' : ''} não somou saldo no estoque
+          {pendentes.length} compra{pendentes.length > 1 ? 's' : ''} {pendentes.length > 1 ? 'não somaram' : 'não somou'} saldo no estoque
           {semDestino > 0 && <b> · {semDestino} sem item ligado</b>}
         </span>
         <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>ver</span>
@@ -179,6 +179,9 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   const [parcelas, setParcelas] = useState([]);
   const [lancando, setLancando] = useState(false);
   const [msgLanc, setMsgLanc] = useState('');
+  // Gravando a compra. Trava o botão (dois toques = duas notas) e diz na tela
+  // que está indo, porque no celular dela a volta do servidor demora.
+  const [salvando, setSalvando] = useState(false);
 
   // Compras registradas que não viraram saldo. O servidor refaz esta conta antes
   // de gravar, então tocar duas vezes não soma duas vezes.
@@ -313,8 +316,8 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   // Salva a compra inteira: cria as linhas de compra, gera as cotações de preço
   // (se marcado) e, quando a compra já está paga, lança a despesa — tudo de uma
   // vez, pra você digitar só aqui e os dados aparecerem nos três lugares.
-  const registrar = () => {
-    if (!compra.fornecedor || !carrinho.length) return;
+  const registrar = async () => {
+    if (!compra.fornecedor || !carrinho.length || salvando) return;
     if (!parcelasBatem) return; // a soma das parcelas tem que dar o total da nota
     const venc = compra.formaPagto === 'À vista' ? compra.data : (compra.vencimento || '');
     const pago = compra.pago === 'Sim' ? 'Sim' : 'Não';
@@ -384,12 +387,22 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
       if (novos.length) cotacoesNovas = novos;
     }
 
-    // Envia SÓ os itens novos (deltas). O pai junta ao que já existe usando o
-    // estado mais recente — assim registrar uma compra logo depois de outra
-    // nunca apaga a despesa/compra da anterior.
-    onRegistrar({ comprasNovas: novasCompras, despesaNova, cotacoesNovas });
-    setCompra(compraVazia()); setItem(itemVazio()); setCarrinho([]);
-    setNParcelas('1'); setParcelas([]);
+    // Envia SÓ os itens novos (deltas). O servidor junta ao que está no banco,
+    // numa gravação só — dinheiro e estoque juntos.
+    //
+    // E O CARRINHO SÓ SE ESVAZIA COM A CONFIRMAÇÃO DO SERVIDOR.
+    //
+    // Antes a tela limpava na hora e seguia em frente: se a gravação falhasse,
+    // a nota tinha sumido da tela e não estava salva em lugar nenhum — ela
+    // digitaria tudo de novo, se descobrisse. Agora, se falhar, o carrinho
+    // continua cheio e o aviso diz pra tocar de novo.
+    setSalvando(true);
+    try {
+      const r = await onRegistrar({ comprasNovas: novasCompras, despesaNova, cotacoesNovas });
+      if (r && r.ok === false) return; // o aviso de falha quem mostra é o pai
+      setCompra(compraVazia()); setItem(itemVazio()); setCarrinho([]);
+      setNParcelas('1'); setParcelas([]);
+    } finally { setSalvando(false); }
   };
 
   // Edição de uma linha existente (uma por vez, sem gerar cotação/despesa nova).
@@ -640,8 +653,9 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
                     ? 'Compra paga: será lançada em Despesas automaticamente.'
                     : 'Compra em aberto: vai para Contas a Pagar; vira despesa quando você marcar como paga.'}
                 </div>
-                <Btn onClick={registrar} kind={parcelasBatem ? 'primary' : 'ghost'}>
-                  {parcelasBatem ? `Registrar compra (${brl(totalCarrinho)})` : 'Ajusta as parcelas pra registrar'}
+                <Btn onClick={registrar} kind={parcelasBatem && !salvando ? 'primary' : 'ghost'}>
+                  {salvando ? 'Gravando compra e estoque…'
+                    : parcelasBatem ? `Registrar compra (${brl(totalCarrinho)})` : 'Ajusta as parcelas pra registrar'}
                 </Btn>
               </div>
             )}

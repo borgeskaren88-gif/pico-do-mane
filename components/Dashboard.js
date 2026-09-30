@@ -192,6 +192,15 @@ export default function Dashboard() {
   const [carrinhoDaVoz, setCarrinhoDaVoz] = useState(null);
   const [subFinancas, setSubFinancas] = useState('receitas'); // 'receitas' | 'despesas' | 'relatorios'
   const [avisoBaixa, setAvisoBaixa] = useState(''); // resumo da última baixa automática
+  // O aviso de "deu certo" se apaga sozinho depois de um tempo; o de problema
+  // NÃO. Só que o relógio do anterior apagava o aviso seguinte — inclusive um
+  // aviso de problema que tinha que ficar. Guardado aqui pra ser cancelado.
+  const relogioAviso = useRef(null);
+  const avisar = (texto, apagarEm = 0) => {
+    clearTimeout(relogioAviso.current);
+    setAvisoBaixa(texto);
+    if (apagarEm > 0) relogioAviso.current = setTimeout(() => setAvisoBaixa(''), apagarEm);
+  };
   const [vendas, setVendas] = useState([]); // vendas do salão (comandas fechadas)
   const [qualLista, setQualLista] = useState('minha'); // 'minha' | 'cozinha'
   const [subSalao, setSubSalao] = useState('comandas'); // 'comandas' | 'cardapio' | 'fiados'
@@ -414,46 +423,54 @@ export default function Dashboard() {
   // Registro de compra que alimenta compras + cotações + despesas de uma vez
   // (uma compra vira cotação de preço e, se paga, vira despesa), sem um save
   // sobrescrever o outro. Só aplica as listas que vierem no objeto.
-  const aplicarCompra = ({ comprasNovas, despesaNova, cotacoesNovas }) => {
-    // Junta os itens novos ao estado ATUAL (fresco) e salva só esses campos.
-    // Nunca reconstrói a lista inteira a partir de uma cópia da tela, que podia
-    // estar um passo atrás e apagar o que a compra anterior acabou de gravar.
-    const parcial = {};
-    if (comprasNovas && comprasNovas.length) { const next = [...comprasNovas, ...compras]; setCompras(next); parcial.compras = next; }
-    if (cotacoesNovas && cotacoesNovas.length) { const next = [...cotacoesNovas, ...cotacoes]; setCotacoes(next); parcial.cotacoes = next; }
-    if (despesaNova) { const next = [despesaNova, ...despesas]; setDespesas(next); parcial.despesas = next; }
-    if (Object.keys(parcial).length) salvarTudo(parcial);
-    // Entradas automáticas no estoque (via API dedicada): os itens comprados que
-    // já estão no catálogo têm o saldo somado. Fire-and-forget — não trava a
-    // compra se o estoque falhar. Produtos não cadastrados viram sugestão.
-    if (comprasNovas && comprasNovas.length) {
-      // A ENTRADA NO ESTOQUE DEIXOU DE SER "MANDA E ESQUECE".
-      //
-      // Isto era fire-and-forget com `.catch(() => {})`: se a conexão caísse no
-      // meio do bar, ou o celular suspendesse, ou o servidor engasgasse, a
-      // compra ficava salva, o saldo não subia e NINGUÉM ficava sabendo. O
-      // único aviso que existia era pra nome que não casou, durava trinta
-      // segundos e só aparecia se ela estivesse na aba certa.
-      //
-      // Três vezes a mesma cara de erro em dois dias: a compra some da
-      // prateleira e ela descobre na hora de vender.
-      (async () => {
-        try {
-          const r = await fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'entradaCompras', comprasNovas }) });
-          const j = await r.json();
-          if (!j?.ok) throw new Error(j?.erro || 'falhou');
-          if (Array.isArray(j.itens)) setEstoque(j.itens);
-          if (Array.isArray(j.naoEntraram) && j.naoEntraram.length) {
-            // Sem timeout: isto não se resolve sozinho, e sumir da tela é o que
-            // fez os três casos passarem batido.
-            setAvisoBaixa(`Compra registrada — mas ${j.naoEntraram.length > 1 ? 'estes produtos não somaram saldo' : 'este produto não somou saldo'} no estoque: ${j.naoEntraram.join(', ')}. Abre Abastecimento → Compras e usa o painel "Não somou no estoque" pra ligar cada um ao item certo.`);
-          }
-        } catch {
-          setAvisoBaixa('A compra foi salva, mas o estoque NÃO foi somado — a conexão falhou no meio. Abre Abastecimento → Compras: o painel "Não somou no estoque" tem o botão pra lançar sem digitar tudo de novo.');
-        }
-      })();
+  // UM PEDIDO SÓ, PORQUE DOIS CORRIAM UM CONTRA O OUTRO.
+  //
+  // Antes isto disparava dois salvamentos ao mesmo tempo: /api/data com a
+  // compra/despesa/cotação e /api/estoque com o saldo. Os dois leem o painel
+  // inteiro, mexem na cópia e gravam de volta — então o último a gravar apagava
+  // o que o outro tinha acabado de fazer. Ora sumia a compra do financeiro, ora
+  // o saldo voltava ao que era ("no finanças entrou, no estoque não").
+  //
+  // Agora o servidor faz tudo numa gravação só. E o retorno é a verdade do
+  // banco: a tela passa a mostrar o que ficou salvo, não o que ela esperava.
+  const aplicarCompra = async ({ comprasNovas, despesaNova, cotacoesNovas }) => {
+    if (!comprasNovas || !comprasNovas.length) return { ok: false };
+    try {
+      const r = await fetch('/api/estoque', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'entradaCompras', comprasNovas, despesaNova, cotacoesNovas }),
+      });
+      const j = await r.json();
+      if (!j?.ok) throw new Error(j?.erro || 'falhou');
+      if (Array.isArray(j.itens)) setEstoque(j.itens);
+      if (Array.isArray(j.compras)) setCompras(j.compras);
+      if (Array.isArray(j.despesas)) setDespesas(j.despesas);
+      if (Array.isArray(j.cotacoes)) setCotacoes(j.cotacoes);
+      const naoEntraram = Array.isArray(j.naoEntraram) ? j.naoEntraram : [];
+      const entradas = Array.isArray(j.entradas) ? j.entradas : [];
+      // CONFIRMAÇÃO POSITIVA, sempre. Ela disse que não confia nesta área, e
+      // com razão: até aqui o silêncio significava "deu certo" E "deu errado" —
+      // não havia como distinguir um do outro olhando a tela.
+      const qtdBR = (n) => Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+      const listaOk = entradas.map((e) => `+${qtdBR(e.qtd)} ${e.unidade} em ${e.nome}`).join(' · ');
+      if (naoEntraram.length) {
+        // Sem timeout: isto não se resolve sozinho, e sumir da tela é o que fez
+        // os casos anteriores passarem batido.
+        avisar(`Compra registrada${listaOk ? ` e estoque somado: ${listaOk}` : ''} — mas ${naoEntraram.length > 1 ? 'estes produtos não somaram saldo' : 'este produto não somou saldo'}: ${naoEntraram.join(', ')}. Usa o painel "Não somou no estoque" aqui embaixo pra ligar cada um ao item certo.`);
+      } else if (listaOk) {
+        avisar(`Compra registrada e estoque somado: ${listaOk}.`, 12000);
+      } else {
+        avisar('Compra registrada no financeiro. Nenhum item de estoque foi somado — nada nesta nota está ligado a um produto do estoque.');
+      }
+      syncGoogle();
+      return { ok: true };
+    } catch (e) {
+      // Uma gravação só tem uma vantagem grande: quando falha, não deixa
+      // metade. Nada entrou — então o carrinho fica onde está e ela só toca de
+      // novo, sem digitar a nota inteira outra vez.
+      avisar('A compra NÃO foi salva — a conexão falhou. Nada foi pro financeiro nem pro estoque, não ficou nada pela metade. O carrinho continua cheio: toca em "Registrar compra" de novo.');
+      return { ok: false, erro: e?.message || 'falhou' };
     }
-    if (comprasNovas && comprasNovas.length) syncGoogle();
   };
 
   // Estoque e fichas técnicas: fonte é a API dedicada /api/estoque (para ficar
@@ -463,7 +480,7 @@ export default function Dashboard() {
       if (sincronizar) {
         const r = await fetch('/api/estoque', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'sincronizar' }) });
         const j = await r.json();
-        if (j?.ok) { setEstoque(j.itens || []); if (Array.isArray(j.fichas)) setFichas(j.fichas); setEstCarregado(true); if (j.resumo && j.resumo.itens > 0) { setAvisoBaixa(`Estoque atualizado com ${j.resumo.vendas} venda(s).`); setTimeout(() => setAvisoBaixa(''), 6000); } return; }
+        if (j?.ok) { setEstoque(j.itens || []); if (Array.isArray(j.fichas)) setFichas(j.fichas); setEstCarregado(true); if (j.resumo && j.resumo.itens > 0) { avisar(`Estoque atualizado com ${j.resumo.vendas} venda(s).`, 6000); } return; }
       }
       const r = await fetch('/api/estoque', { cache: 'no-store' });
       const j = await r.json();
@@ -501,23 +518,38 @@ export default function Dashboard() {
 
   // Lista de compras: um único save aplica listaCompras/modelos e, quando um
   // item é "lançado", também compras/despesas/cotações — sem corrida de estado.
-  const aplicarLista = (parcial) => {
+  const aplicarLista = async (parcial) => {
     // A Lista de Compras usa sempre a chave "listaCompras"; se a lista aberta é
     // a da cozinha, redireciona pra "listaCozinha" sem mudar o componente.
     const p = { ...parcial };
     if (qualLista === 'cozinha' && 'listaCompras' in p) { p.listaCozinha = p.listaCompras; delete p.listaCompras; }
-    // Listas: substituição direta (é a própria lista, gerida aqui). Financeiro
-    // (compras/despesas/cotações): junta só os NOVOS ao estado atual, pra não
-    // apagar lançamentos recentes com uma cópia velha da tela.
+
+    // "LANÇAR" DA LISTA DE COMPRAS TAMBÉM É UMA COMPRA — E NÃO IA PRO ESTOQUE.
+    //
+    // Este caminho gravava compra, despesa e cotação e não chamava o estoque
+    // nenhuma vez. Quem lançava daqui via o dinheiro entrar e a prateleira
+    // continuar igual, sempre — não era azar de cronômetro, era buraco mesmo.
+    // Agora passa pelo MESMO pedido único do formulário de Compras.
+    //
+    // E vai ANTES de marcar a lista: se a gravação falhar, o item não pode
+    // ficar marcado como "lançado" sem existir compra nenhuma.
+    if (p.comprasNovas && p.comprasNovas.length) {
+      const r = await aplicarCompra({ comprasNovas: p.comprasNovas, despesaNova: p.despesaNova || null, cotacoesNovas: p.cotacoesNovas || [] });
+      if (!r || r.ok === false) return r || { ok: false };
+    }
+
+    // Listas: substituição direta (é a própria lista, gerida aqui). O
+    // financeiro já foi gravado acima, então aqui vai só o que sobrou.
     const salvar = {};
     if (p.listaCompras) { setListaCompras(p.listaCompras); salvar.listaCompras = p.listaCompras; }
     if (p.listaCozinha) { setListaCozinha(p.listaCozinha); salvar.listaCozinha = p.listaCozinha; }
     if (p.listasModelo) { setListasModelo(p.listasModelo); salvar.listasModelo = p.listasModelo; }
-    if (p.comprasNovas && p.comprasNovas.length) { const next = [...p.comprasNovas, ...compras]; setCompras(next); salvar.compras = next; }
-    if (p.cotacoesNovas && p.cotacoesNovas.length) { const next = [...p.cotacoesNovas, ...cotacoes]; setCotacoes(next); salvar.cotacoes = next; }
-    if (p.despesaNova) { const next = [p.despesaNova, ...despesas]; setDespesas(next); salvar.despesas = next; }
+    if (!(p.comprasNovas && p.comprasNovas.length)) {
+      if (p.cotacoesNovas && p.cotacoesNovas.length) { const next = [...p.cotacoesNovas, ...cotacoes]; setCotacoes(next); salvar.cotacoes = next; }
+      if (p.despesaNova) { const next = [p.despesaNova, ...despesas]; setDespesas(next); salvar.despesas = next; }
+    }
     if (Object.keys(salvar).length) salvarTudo(salvar);
-    if (salvar.compras) syncGoogle();
+    return { ok: true };
   };
 
   // Repor na Lista de Compras a partir de outras abas (estoque crítico no
@@ -866,7 +898,7 @@ export default function Dashboard() {
                 style={{ width: '100%', textAlign: 'left', background: C.panel, border: `1px solid ${C.amber}`, borderRadius: 10, padding: '10px 13px', marginBottom: 12, cursor: 'pointer', color: C.text }}
               >
                 <div style={{ fontSize: 13, fontWeight: 800, color: C.amber, lineHeight: 1.45 }}>
-                  {comprasSemSaldo.length} compra{comprasSemSaldo.length > 1 ? 's' : ''} não somou saldo no estoque
+                  {comprasSemSaldo.length} compra{comprasSemSaldo.length > 1 ? 's' : ''} {comprasSemSaldo.length > 1 ? 'não somaram' : 'não somou'} saldo no estoque
                 </div>
                 <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>
                   Já está no financeiro, mas a mercadoria não entrou na prateleira. Toca pra resolver em Compras.

@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
-import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, fundirItens, repontarFichas, repontarCompras, comprasPendentesDeEstoque, igualNome, ehPorcionado } from '../../../lib/estoque';
+import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, entradaDaCompra, fundirItens, repontarFichas, repontarCompras, comprasPendentesDeEstoque, igualNome, ehPorcionado } from '../../../lib/estoque';
 import { separarSacos, abastecerLinha, contarPorcao } from '../../../lib/porcoes';
 import { limparNome, num, numQtd, todayISO } from '../../../lib/util';
 import { notificarEstoqueCritico, notificarSaidaSemVenda } from '../../../lib/push';
@@ -277,19 +277,71 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, itens, corrigidos: 0 });
     }
 
-    // Entrada automática vinda das Compras.
+    // REGISTRAR UMA COMPRA: o dinheiro E a mercadoria, numa gravação só.
+    //
+    // Isto era feito por DOIS pedidos ao mesmo tempo: /api/data gravava a
+    // compra, a despesa e a cotação; /api/estoque somava o saldo. Só que os
+    // dois leem o painel inteiro, mexem na cópia e gravam de volta — e o
+    // /api/data repõe de propósito o estoque que leu no começo (pra não apagar
+    // uma baixa de venda feita em paralelo). Quem gravasse por último apagava o
+    // trabalho do outro:
+    //
+    //   estoque por último  -> a compra desaparecia do financeiro;
+    //   /api/data por último -> o saldo voltava ao que era. "No finanças
+    //                           entrou, no estoque não" — foi o que ela viu.
+    //
+    // Não tem remendo que resolva uma corrida: o que resolve é não correr. Aqui
+    // é UM pedido, UMA leitura fresca e UMA gravação, com tudo dentro. Ou entra
+    // tudo, ou não entra nada — nunca metade.
     if (acao === 'entradaCompras') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 403 });
       const comprasNovas = arr(body?.comprasNovas);
-      const novoEstoque = aplicarEntradasEstoque(itens, comprasNovas);
-      // Quais produtos comprados NÃO acharam um item de estoque com o mesmo nome
-      // (por isso não entraram sozinhos). Serve pra avisar a dona.
-      const naoEntraram = [...new Set(
-        comprasNovas
-          .filter((c) => num(c.quantidade) > 0 && !resolverCompraNoEstoque(c, itens))
-          .map((c) => limparNome(c.produto)).filter(Boolean)
-      )];
-      if (novoEstoque !== itens) { const novo = await gravarEstoque(sb, blob, { estoque: novoEstoque }); return NextResponse.json({ ok: true, itens: arr(novo.estoque), naoEntraram }); }
-      return NextResponse.json({ ok: true, itens, naoEntraram });
+      const despesaNova = (body?.despesaNova && typeof body.despesaNova === 'object') ? body.despesaNova : null;
+      const cotacoesNovas = arr(body?.cotacoesNovas);
+      if (!comprasNovas.length) return NextResponse.json({ ok: true, itens, naoEntraram: [], entradas: [] });
+
+      let naoEntraram = [];
+      let entradas = [];
+      const novo = await gravarEstoque(sb, blob, (base) => {
+        // Tudo é calculado sobre a base FRESCA — inclusive o saldo. Assim uma
+        // comanda fechada neste segundo (que baixou estoque) não é atropelada.
+        const itensFrescos = arr(base.estoque);
+        entradas = [];
+        const temQtd = (c) => numQtd(c && (c.qtdCompra || c.quantidade)) > 0;
+        // Carimba em cada linha ONDE ela caiu no estoque e QUANDO. Sem isso a
+        // ligação era redescoberta pelo nome a cada conferência — e uma compra
+        // já lançada voltava a aparecer como pendente.
+        const carimbadas = comprasNovas.map((c) => {
+          const r = temQtd(c) ? resolverCompraNoEstoque(c, itensFrescos) : null;
+          if (!r) return { ...c };
+          const e = entradaDaCompra(c, r.item);
+          if (e && e.qtd > 0) entradas.push({ nome: r.item.nome, qtd: e.qtd, unidade: r.item.unidade || 'un' });
+          return { ...c, estoqueId: c.estoqueId || r.item.id, estoqueEm: todayISO() };
+        });
+        naoEntraram = [...new Set(
+          carimbadas.filter((c) => temQtd(c) && c.estoqueId !== 'nenhum' && !c.estoqueEm)
+            .map((c) => limparNome(c.produto)).filter(Boolean)
+        )];
+
+        const patch = { estoque: aplicarEntradasEstoque(itensFrescos, carimbadas) };
+        // Reenvio (ela tocou duas vezes, ou a resposta se perdeu na volta) não
+        // pode duplicar nada: casa por id.
+        const jaCompras = new Set(arr(base.compras).map((c) => String(c && c.id)));
+        patch.compras = [...carimbadas.filter((c) => !jaCompras.has(String(c.id))), ...arr(base.compras)];
+        if (despesaNova && despesaNova.id && !arr(base.despesas).some((d) => String(d && d.id) === String(despesaNova.id))) {
+          patch.despesas = [despesaNova, ...arr(base.despesas)];
+        }
+        if (cotacoesNovas.length) {
+          const jaCot = new Set(arr(base.cotacoes).map((c) => String(c && c.id)));
+          patch.cotacoes = [...cotacoesNovas.filter((c) => !jaCot.has(String(c.id))), ...arr(base.cotacoes)];
+        }
+        return patch;
+      });
+      // Só devolve a lista que EXISTE no banco. Devolver `[]` de uma lista que
+      // nunca existiu fazia a tela zerar despesas/cotações que estavam lá.
+      const resp = { ok: true, itens: arr(novo.estoque), naoEntraram, entradas };
+      for (const k of ['compras', 'despesas', 'cotacoes']) if (Array.isArray(novo[k])) resp[k] = novo[k];
+      return NextResponse.json(resp);
     }
 
     // Lança no estoque compras que já estão registradas mas nunca viraram
