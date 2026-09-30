@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, uid, limparNome } from '../lib/util';
-import { UNIDADES } from '../lib/estoque';
+import { UNIDADES, qtdNaUnidadeDoItem, conversaoDaReceita } from '../lib/estoque';
 
 export const CATEGORIAS_CARDAPIO = ['Chopp / Cerveja', 'Drinks / Doses', 'Carta de Vinhos', 'Porções', 'Café & Tapiocas', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Combos', 'Outros'];
 
@@ -107,6 +107,51 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
                 <Field label="Quantidade"><NumInput value={s.qtd} onChange={(v) => setSabor(i, { qtd: v })} /></Field>
                 <Field label="Unidade"><Select value={s.unidade} onChange={(v) => setSabor(i, { unidade: v })} options={UNIDADES} /></Field>
               </div>
+
+              {/* O QUE ESSA QUANTIDADE SIGNIFICA — em dinheiro e em quantos
+                  saem da embalagem.
+                  ============================================================
+                  "Uma caixa de essência vem 50 g, aí não sei quanto vai
+                  exatamente."
+
+                  Ela não tem como saber, e não deveria precisar: ninguém pesa
+                  essência no meio do salão. O que ela SABE (ou consegue
+                  observar numa noite) é quantos narguilés saem de uma caixa.
+
+                  Então a tela passa a mostrar as duas leituras do mesmo número.
+                  Ela digita uma grama qualquer, lê "a caixa rende 4" e "R$ 2,19
+                  cada", e vai ajustando até bater com o que acontece no bar. O
+                  palpite vira um botão de sintonia, em vez de um chute cego que
+                  só aparece errado três meses depois, no CMV. */}
+              {(() => {
+                const it = estoque.find((x) => x && x.id === s.estoqueId);
+                if (!it || !(num(s.qtd) > 0) || !s.unidade) return null;
+                const conv = conversaoDaReceita(s.unidade, it);
+                if (!conv.ok) {
+                  return (
+                    <div style={{ fontSize: 11.5, color: C.amber, lineHeight: 1.45, marginTop: -4, marginBottom: 6 }}>
+                      Não dá pra converter <b>{s.unidade}</b> para <b>{it.unidade}</b> ({it.nome}).
+                      {' '}Preenche o conteúdo de cada {it.unidade} em {s.unidade} no Estoque — senão a conta vira chute.
+                    </div>
+                  );
+                }
+                const naUnidade = qtdNaUnidadeDoItem(num(s.qtd), s.unidade, it);
+                const custo = naUnidade * num(it.custo);
+                const rende = naUnidade > 0 ? 1 / naUnidade : 0;
+                const fmt = (v, casas = 2) => Number(v.toFixed(casas)).toLocaleString('pt-BR', { maximumFractionDigits: casas });
+                return (
+                  <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.5, marginTop: -4, marginBottom: 6 }}>
+                    {fmt(num(s.qtd), 3)} {s.unidade} = <b style={{ color: C.muted }}>{fmt(naUnidade, 3)} {it.unidade}</b>
+                    {num(it.custo) > 0
+                      ? <> · <b style={{ color: C.green }}>{brl(custo)}</b> {num(novo.saboresTotal) > 0 ? 'por unidade' : 'por venda'}</>
+                      : <> · <b style={{ color: C.amber }}>sem custo cadastrado</b> — o CMV ignora este sabor</>}
+                    {rende > 0 && rende < 1000 && (
+                      <> · 1 {it.unidade} rende <b style={{ color: C.muted }}>{fmt(rende, 1)}</b></>
+                    )}
+                  </div>
+                );
+              })()}
+
               <button onClick={() => removerSabor(i)} style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '4px 0' }}>Remover sabor</button>
             </div>
           ))}
