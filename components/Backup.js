@@ -109,11 +109,50 @@ function montarAnalise(all) {
     const fiadoV = vendas.reduce((s, v) => s + num(v.fiado), 0);
     const pessoas = vendas.reduce((s, v) => s + num(v.pessoas), 0);
     const dias = new Set(vendas.map((v) => v.data).filter(Boolean));
+    // QUANTAS PESSOAS FREQUENTARAM O BAR, e quanto cada uma gastou.
+    //
+    // "Quero que toda vez que eu baixar o relatório ele venha com esse dado de
+    // quantidade de pessoas que frequentaram o bar, e ticket médio por pessoa
+    // também."
+    //
+    // Duas contas diferentes que costumam ser confundidas, e por isso aparecem
+    // lado a lado com nome:
+    //   - por COMANDA: quanto rende uma mesa (serve pra pensar em rodízio);
+    //   - por PESSOA: quanto rende cada cliente (serve pra pensar em cardápio,
+    //     preço e promoção).
+    // Uma mesa de R$ 200 com 8 pessoas e outra de R$ 200 com 2 são o mesmo
+    // ticket de mesa e negócios completamente diferentes.
+    const contadas = vendas.filter((v) => v.pessoasContadas);
+    const pessoasContadas = contadas.reduce((s2, v) => s2 + num(v.pessoas), 0);
+    const totalContado = contadas.reduce((s2, v) => s2 + num(v.total), 0);
+
     L.push('### Salão (comandas fechadas)', '');
     L.push(`- Comandas: ${vendas.length} em ${dias.size} dia(s) de movimento`);
-    L.push(`- Vendido: ${brl(totalV)} · ticket médio por comanda ${brl(vendas.length ? totalV / vendas.length : 0)}`);
-    if (pessoas > 0) L.push(`- Pessoas atendidas: ${pessoas} · ${brl(totalV / pessoas)} por pessoa`);
+    L.push(`- Vendido: ${brl(totalV)} · ticket médio por COMANDA ${brl(vendas.length ? totalV / vendas.length : 0)}`);
+    if (pessoas > 0) {
+      L.push(`- **Pessoas que frequentaram o bar: ${pessoas}** · ticket médio por PESSOA ${brl(totalV / pessoas)}`);
+      L.push(`- Média de ${(pessoas / (vendas.length || 1)).toFixed(1).replace('.', ',')} pessoa(s) por mesa`);
+    } else {
+      L.push('- Pessoas: nenhuma comanda tem contagem ainda.');
+    }
     L.push(`- Ficou no fiado: ${brl(fiadoV)} (${pct(fiadoV, totalV)} do vendido)`, '');
+
+    // O AVISO QUE IMPEDE ESTE RELATÓRIO DE MENTIR.
+    //
+    // Até 30/09/2026 o app preenchia "1 pessoa" sozinho quando ninguém contava.
+    // Essas vendas estão no banco indistinguíveis de uma mesa que era mesmo de
+    // uma pessoa — então o número de público dos meses antigos é o menor
+    // possível, e o gasto por pessoa, o maior possível. Dizer isso é o que
+    // separa um relatório de um chute bem formatado.
+    if (contadas.length < vendas.length) {
+      const velhas = vendas.length - contadas.length;
+      L.push(`> **Cuidado com o histórico.** ${velhas} de ${vendas.length} comandas são de antes de a contagem virar obrigatória — nelas o app preenchia "1 pessoa" sozinho quando ninguém contava. Então o público de antes está SUBESTIMADO e o gasto por pessoa, SUPERESTIMADO.`);
+      if (contadas.length > 0 && pessoasContadas > 0) {
+        L.push('>');
+        L.push(`> Só com as ${contadas.length} comandas de contagem confirmada: **${pessoasContadas} pessoas**, ${brl(totalContado)} vendidos, **${brl(totalContado / pessoasContadas)} por pessoa**. É este o número pra confiar.`);
+      }
+      L.push('');
+    }
 
     // Por mês, pra ver a curva — e por dia da semana, que é a decisão de
     // escala que ela toma toda semana.
@@ -121,32 +160,44 @@ function montarAnalise(all) {
     const porDia = new Map();
     const porSemana = new Map();
     for (const v of vendas) {
-      const m = ymOf(v.data); if (m) porMes.set(m, (porMes.get(m) || 0) + num(v.total));
+      const m = ymOf(v.data);
+      if (m) {
+        const cur = porMes.get(m) || { total: 0, pessoas: 0, comandas: 0 };
+        cur.total += num(v.total); cur.pessoas += num(v.pessoas); cur.comandas += 1;
+        porMes.set(m, cur);
+      }
       if (v.data) porDia.set(v.data, (porDia.get(v.data) || 0) + num(v.total));
       const w = weekday(v.data);
       if (w) {
-        const cur = porSemana.get(w) || { total: 0, dias: new Set() };
-        cur.total += num(v.total); cur.dias.add(v.data); porSemana.set(w, cur);
+        const cur = porSemana.get(w) || { total: 0, pessoas: 0, dias: new Set() };
+        cur.total += num(v.total); cur.pessoas += num(v.pessoas); cur.dias.add(v.data); porSemana.set(w, cur);
       }
     }
     if (porMes.size) {
-      L.push('| Mês | Vendido no salão |', '|---|---|');
-      for (const [m, v] of [...porMes.entries()].sort()) L.push(`| ${mesLabel(m)} | ${brl(v)} |`);
+      L.push('| Mês | Comandas | Pessoas | Vendido | Por comanda | Por pessoa |', '|---|---|---|---|---|---|');
+      for (const [m, x] of [...porMes.entries()].sort()) {
+        L.push(`| ${mesLabel(m)} | ${x.comandas} | ${x.pessoas || '—'} | ${brl(x.total)} | ${brl(x.total / (x.comandas || 1))} | ${x.pessoas > 0 ? brl(x.total / x.pessoas) : '—'} |`);
+      }
       L.push('');
     }
     if (porSemana.size) {
-      L.push('#### Salão por dia da semana', '', '| Dia | Média por noite | Total |', '|---|---|---|');
+      L.push('#### Salão por dia da semana', '', '| Dia | Noites | Média por noite | Pessoas por noite | Por pessoa |', '|---|---|---|---|---|');
       for (const dia of DIAS) {
         const x = porSemana.get(dia); if (!x) continue;
-        L.push(`| ${dia} | ${brl(x.total / (x.dias.size || 1))} | ${brl(x.total)} |`);
+        const n = x.dias.size || 1;
+        L.push(`| ${dia} | ${x.dias.size} | ${brl(x.total / n)} | ${x.pessoas > 0 ? (x.pessoas / n).toFixed(1).replace('.', ',') : '—'} | ${x.pessoas > 0 ? brl(x.total / x.pessoas) : '—'} |`);
       }
       L.push('');
     }
     // Os últimos dias em cheio: é o que responde "e ontem, como foi?".
     const ultimos = [...porDia.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 30);
     if (ultimos.length) {
-      L.push('#### Últimos dias de movimento', '', '| Dia | Comandas | Vendido |', '|---|---|---|');
-      for (const [d, v] of ultimos) L.push(`| ${d} | ${vendas.filter((x) => x.data === d).length} | ${brl(v)} |`);
+      L.push('#### Últimos dias de movimento', '', '| Dia | Comandas | Pessoas | Vendido | Por pessoa |', '|---|---|---|---|---|');
+      for (const [d, v] of ultimos) {
+        const doDia = vendas.filter((x) => x.data === d);
+        const p = doDia.reduce((s2, x) => s2 + num(x.pessoas), 0);
+        L.push(`| ${d} | ${doDia.length} | ${p || '—'} | ${brl(v)} | ${p > 0 ? brl(v / p) : '—'} |`);
+      }
       L.push('');
     }
     // O que efetivamente sai pela porta.
