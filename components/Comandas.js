@@ -581,14 +581,32 @@ export default function Comandas({ papel = 'dona' }) {
                             borderRadius: 10, width: 42, height: 42, fontSize: 16, fontWeight: 800, cursor: 'pointer',
                           }}>{v}</button>
                         ))}
-                        {/* Mesa grande existe: aniversário, confraternização. */}
+                        {/* MESA GRANDE — aniversário, confraternização.
+                            Dois caminhos, porque são dois jeitos de trabalhar:
+                            no celular, +1 de cada vez (dedo, sem teclado); no
+                            computador, que é onde o atendimento anota hoje,
+                            digitar 14 é mais rápido do que clicar seis vezes. */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 2 }}>
                           <button onClick={() => põe(Math.max(1, n + 1))} style={{
-                            border: `1px solid ${n > 8 ? C.accent : C.line}`,
-                            background: n > 8 ? C.accent : 'transparent',
-                            color: n > 8 ? '#06101F' : C.muted,
-                            borderRadius: 10, height: 42, padding: '0 14px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
-                          }}>{n > 8 ? `${n} +1` : 'mais'}</button>
+                            border: `1px solid ${C.line}`, background: 'transparent', color: C.muted,
+                            borderRadius: 10, height: 42, padding: '0 12px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                          }}>+1</button>
+                          <input
+                            type="number" min="1" max="99" inputMode="numeric"
+                            value={n > 8 ? String(n) : ''}
+                            onChange={(e) => {
+                              const v = Math.floor(Number(e.target.value) || 0);
+                              põe(v >= 1 && v <= 99 ? v : 0);
+                            }}
+                            placeholder="outro"
+                            style={{
+                              width: 74, height: 42, boxSizing: 'border-box', textAlign: 'center',
+                              background: n > 8 ? C.accent : C.panel2,
+                              color: n > 8 ? '#06101F' : C.text,
+                              border: `1px solid ${n > 8 ? C.accent : C.line}`,
+                              borderRadius: 10, fontSize: 16, fontWeight: 800,
+                            }}
+                          />
                         </div>
                       </div>
                       {n >= 1 && (
