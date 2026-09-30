@@ -40,7 +40,7 @@ export default function RaioX({ receitas = [], despesas = [], cardapio = [], fic
       if (!ficha || !ficha.length) continue;
       const preco = num(c.preco);
       const base = custoDaFicha(ficha, estoque);
-      const sab = custoDosSabores(c.sabores, estoque);
+      const sab = custoDosSabores(c.sabores, estoque, c.saboresTotal);
       const lucroItem = Math.round((preco - base.custo - sab.medio) * 100) / 100;
       arr.push({ nome: c.nome, margem: preco > 0 ? (lucroItem / preco) * 100 : 0, lucro: lucroItem });
     }

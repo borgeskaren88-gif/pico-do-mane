@@ -61,7 +61,7 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [], venda
       const ficha = fichaPorId.get(c.id);
       if (!ficha || !ficha.length) { arr.push({ id: c.id, nome: c.nome, categoria, preco, semFicha: true }); continue; }
       const base = custoDaFicha(ficha, estoque);
-      const sab = custoDosSabores(c.sabores, estoque); // custo médio da fruta escolhida na venda
+      const sab = custoDosSabores(c.sabores, estoque, c.saboresTotal); // custo médio da fruta escolhida na venda
       const custo = Math.round((base.custo + sab.medio) * 100) / 100;
       const lucro = Math.round((preco - custo) * 100) / 100;
       const margem = preco > 0 ? (lucro / preco) * 100 : 0;
