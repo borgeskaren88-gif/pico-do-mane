@@ -29,7 +29,10 @@ export default function RootLayout({ children }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('picoos-tema');if(t!=='claro'&&t!=='escuro')t='escuro';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
+            // Tema E cor são aplicados ANTES de a tela pintar. Se fossem
+            // aplicados pelo React, o app abriria sempre no azul escuro e
+            // trocaria na frente dela — aquela piscada feia a cada abertura.
+            __html: `(function(){try{var t=localStorage.getItem('picoos-tema');if(t!=='claro'&&t!=='escuro')t='escuro';document.documentElement.setAttribute('data-theme',t);var c=localStorage.getItem('picoos-cor');if(['verde','roxo','laranja','rosa','turquesa'].indexOf(c)>=0)document.documentElement.setAttribute('data-cor',c);}catch(e){}})();`,
           }}
         />
         {/* O RESGATE DO PEDAÇO QUE NÃO CHEGOU.
