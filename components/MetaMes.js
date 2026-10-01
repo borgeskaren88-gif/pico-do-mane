@@ -2,11 +2,19 @@
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, NumInput, Field } from './ui';
 import { brl, num, ymOf, todayISO, mesLabel } from '../lib/util';
-import { calcularMeta, diasSemanaDoMovimento } from '../lib/meta';
+import { calcularMeta, diasSemanaDoMovimento, diasDeOperacao } from '../lib/meta';
 
 const TAB = { fontVariantNumeric: 'tabular-nums' };
-const DIAS = [['D', 0], ['S', 1], ['T', 2], ['Q', 3], ['Q', 4], ['S', 5], ['S', 6]];
+const DIAS = [['Dom', 0], ['Seg', 1], ['Ter', 2], ['Qua', 3], ['Qui', 4], ['Sex', 5], ['Sáb', 6]];
 const NOMES = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+const CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+// "qua, qui, sex, sáb e dom" — do jeito que se fala.
+const listar = (ds) => {
+  const n = (ds || []).map((d) => CURTOS[d]);
+  if (!n.length) return 'nenhum dia';
+  if (n.length === 1) return n[0];
+  return `${n.slice(0, -1).join(', ')} e ${n[n.length - 1]}`;
+};
 
 // Cor e recado de cada estado. O verde não é decoração: é a resposta à única
 // pergunta que ela faz olhando o Dashboard — "estou bem ou estou mal?".
@@ -35,10 +43,18 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
     () => receitas.some((r) => r && r.data === hoje && num(r.valor) > 0),
     [receitas, hoje],
   );
-  const m = useMemo(
-    () => calcularMeta({ metas, realizado, ym: mes, hoje, temReceitaHoje }),
-    [metas, realizado, mes, hoje, temReceitaHoje],
+  // Os dias DESTE mês em que entrou dinheiro. Dia com caixa lançado é dia que o
+  // bar abriu — mesmo que a marcação da semana diga o contrário.
+  const diasComReceita = useMemo(
+    () => [...new Set(receitas.filter((r) => r && r.data && ymOf(r.data) === mes && num(r.valor) > 0).map((r) => r.data))],
+    [receitas, mes],
   );
+  const m = useMemo(
+    () => calcularMeta({ metas, realizado, ym: mes, hoje, temReceitaHoje, diasComReceita }),
+    [metas, realizado, mes, hoje, temReceitaHoje, diasComReceita],
+  );
+  const diasAbre = (Array.isArray(metas?.diasSemana) && metas.diasSemana.length && metas.diasSemana.length < 7)
+    ? metas.diasSemana : null;
   const est = ESTADOS[m.estado] || ESTADOS.comecando;
 
   const abrir = () => {
@@ -68,6 +84,7 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
 
   if (editando) {
     const sug = diasSemanaDoMovimento(receitas, hoje);
+    const noMes = diasDeOperacao(mes, (dias && dias.length && dias.length < 7) ? dias : null, diasComReceita);
     return (
       <Card style={{ marginBottom: 14, borderColor: C.accent }}>
         <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>Minha meta</div>
@@ -99,6 +116,26 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
                 }}>{rot}</button>
             );
           })}
+        </div>
+        {/* O NÚMERO QUE A MARCAÇÃO PRODUZ, NA HORA.
+            Sem isto ela marcou um dia só sem perceber, o mês virou "4 noites"
+            e a tela passou a pedir R$ 6.161 por noite. Agora o resultado
+            aparece enquanto ela toca, e um número absurdo salta à vista. */}
+        <div style={{
+          fontSize: 13, lineHeight: 1.5, marginBottom: 10, padding: '8px 11px', borderRadius: 9,
+          background: C.panel2, border: `1px solid ${noMes.length < 8 ? C.amber : C.line}`,
+          color: noMes.length < 8 ? C.amber : C.muted,
+        }}>
+          {(dias || []).length === 0 ? (
+            <>Nenhum dia marcado — marca pelo menos os dias em que tu abres.</>
+          ) : (
+            <>
+              Abrindo <b style={{ color: C.text }}>{(dias || []).length === 7 ? 'todo dia' : listar([...(dias || [])].sort((a, b) => a - b))}</b>,
+              {' '}{mesLabel(mes)} tem <b style={{ color: C.text }}>{noMes.length} noite{noMes.length === 1 ? '' : 's'}</b>
+              {num(valor) > 0 && noMes.length > 0 && <> — dá <b style={{ color: C.text }}>{brl(num(valor) / noMes.length)}</b> por noite</>}.
+              {noMes.length < 8 && <><br />Isso parece pouco. Confere se não ficou dia de menos marcado.</>}
+            </>
+          )}
         </div>
         {sug && sug.length > 0 && sug.length < 7 && (
           <button onClick={usarMovimento} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: '2px 0', marginBottom: 12, textAlign: 'left' }}>
@@ -158,9 +195,19 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
           <i style={{ position: 'absolute', top: -2, bottom: -2, left: `${pctLinha * 100}%`, width: 2, background: C.text, opacity: 0.55 }} title="onde o mês já está" />
         )}
       </div>
-      <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 12 }}>
-        {m.diasDecorridos} de {m.diasTotais} dias de operação · o risco é onde o mês já está
+      {/* QUAIS dias, não só quantos. "4 dias de operação" sozinho é um número
+          que ela não tem como conferir — e o número estava errado. */}
+      <div style={{ fontSize: 11.5, color: C.faint, marginBottom: m.poucasNoites ? 8 : 12, lineHeight: 1.45 }}>
+        {m.diasDecorridos} de {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'}
+        {diasAbre ? <> · abre {listar([...diasAbre].sort((a, b) => a - b))}</> : ' · abre todo dia'}
+        {' '}· o risco é onde o mês já está
       </div>
+      {m.poucasNoites && (
+        <button onClick={abrir} style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'transparent', border: `1px solid ${C.amber}`, borderRadius: 9, padding: '8px 11px', marginBottom: 12, color: C.amber, fontSize: 12.5, lineHeight: 1.45 }}>
+            <b>Só {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'} em {mesLabel(mes)}?</b> Parece que faltou marcar
+            dia em “em que dias o bar abre” — e é por aí que o valor por noite é calculado. Toca pra conferir.
+        </button>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         <div>
