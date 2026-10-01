@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '../../../lib/supabase';
-import { lerNegocio, papeisParaLogin } from '../../../lib/negocio';
+import { lerNegocio, papeisParaLogin, PADRAO } from '../../../lib/negocio';
+import { lerNegocios } from '../../../lib/negocios';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,20 @@ export const dynamic = 'force-dynamic';
 //
 // Se um dia alguém for acrescentar campo aqui: não acrescente. Qualquer coisa
 // a mais vaza pra internet inteira, sem senha.
+//
+// E NO APP DE MUITOS NEGÓCIOS ELE DEVOLVE AINDA MENOS.
+//
+// Ali a tela só precisa saber que existe um campo de código a preencher. O
+// nome de cada negócio NÃO vem, nem quando o código é digitado certo: se
+// viesse, qualquer um na internet chutaria códigos até montar a lista de
+// clientes da Karen. O nome aparece depois de entrar, que é quando já se
+// provou ter o direito de vê-lo.
 export async function GET() {
   try {
+    const muitos = Object.keys(await lerNegocios()).length > 0;
+    if (muitos) {
+      return NextResponse.json({ ok: true, multi: true, nome: '', papeis: papeisParaLogin(PADRAO) });
+    }
     const sb = supabaseServer();
     const { data } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
     const n = lerNegocio(data?.valor || {});
