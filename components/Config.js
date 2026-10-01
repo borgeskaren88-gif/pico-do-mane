@@ -104,7 +104,9 @@ export default function Config({ aberto, onFechar, tema, onTema, cor, onCor, onI
             <span style={{ display: 'block', fontSize: 12, color: C.faint, marginTop: 1, lineHeight: 1.45 }}>
               {recursos && recursos.darci === false
                 ? 'Esta instalação não tem chave de IA — o Darci não responderia.'
-                : 'Responde sobre o negócio. Cada pergunta consome a chave de IA.'}
+                : (modulos && modulos.darci === false)
+                  ? 'Desligado. Liga aqui se quiseres usar — cada pergunta consome a chave de IA.'
+                  : 'Responde sobre o negócio. Cada pergunta consome a chave de IA.'}
             </span>
           </span>
           <button

@@ -273,7 +273,11 @@ export default function Dashboard() {
       setListasModelo(arr(salvo && salvo.listasModelo));
       setMetas((salvo && typeof salvo.metas === 'object' && salvo.metas) || null);
       setNegocio(lerNegocio(salvo || {}));
-      setModulos(lerModulos(salvo || {}));
+      // NA PRIMEIRA ABERTURA, a configuração é a do seed — que é justamente o
+      // que acabou de ser gravado. Lendo de `salvo` (vazio), a tela abria com o
+      // Darci LIGADO e só obedecia o desligado depois de um recarregamento. Ou
+      // seja: no exato momento em que o cliente abre o app pela primeira vez.
+      setModulos(lerModulos(primeiraVez ? SEED_DATA : (salvo || {})));
       setTarefasCozinha(arr(salvo && salvo.tarefasCozinha));
       setCardapio(arr(salvo && salvo.cardapio));
       setClientes(arr(salvo && salvo.clientes));
