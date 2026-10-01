@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaixasVendas, aplicarEntradasEstoque, recalcularCustosPelasCompras, resolverCompraNoEstoque, entradaDaCompra, fundirItens, repontarFichas, repontarCompras, comprasPendentesDeEstoque, igualNome, ehPorcionado } from '../../../lib/estoque';
 import { separarSacos, abastecerLinha, contarPorcao } from '../../../lib/porcoes';
 import { limparNome, num, numQtd, todayISO } from '../../../lib/util';
@@ -53,7 +53,7 @@ export async function GET() {
   const p = papelAtual();
   if (p !== 'dona' && p !== 'cozinha') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const blob = await lerPainel(sb);
     // As fichas só interessam à dona; a cozinha recebe só os itens.
     return NextResponse.json({
@@ -74,7 +74,7 @@ export async function POST(request) {
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
   const acao = String(body?.acao || '');
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const blob = await lerPainel(sb);
     let itens = arr(blob.estoque);
 

@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, sessaoEhValida } from '../../../../lib/auth';
 import { finalizarLogin, sincronizar } from '../../../../lib/google';
-import { supabaseServer } from '../../../../lib/supabase';
+import { bancoDaSessao } from '../../../../lib/negocioAtual';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,7 @@ export async function GET(request) {
     await finalizarLogin(code);
     // Sincroniza os boletos/tarefas assim que conecta.
     try {
-      const sb = supabaseServer();
+      const sb = bancoDaSessao();
       const { data } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
       await sincronizar(data?.valor || {});
     } catch { /* a sincronização pode ser refeita depois */ }

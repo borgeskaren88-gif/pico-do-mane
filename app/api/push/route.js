@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { obterConfigPush, salvarInscricao, removerInscricao, enviarPush, montarResumoDiario, lerAvisos, salvarAvisos } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,7 @@ export async function GET() {
   const p = papelAtual();
   if (p !== 'dona' && p !== 'cozinha' && p !== 'garcom' && p !== 'reservas') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const cfg = await obterConfigPush(sb);
     // Junto vão as preferências de aviso, pra a tela de Notificações já abrir
     // com os interruptores no estado certo.
@@ -34,7 +34,7 @@ export async function POST(request) {
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
   const acao = String(body?.acao || '');
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
 
     if (acao === 'inscrever') {
       await salvarInscricao(sb, body?.sub, body?.apelido, p);

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
 import { num, limparNome, fiadoDaVenda, abertoDaVenda, brl, diaOperacional } from '../../../lib/util';
 import { enviarPush, notificarEstoqueCritico, notificarComandaFechada, notificarSaidaSemVenda } from '../../../lib/push';
@@ -80,7 +80,7 @@ const brlS = (n) => 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
 export async function GET(request) {
   if (!papel()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data, error } = await sb.from('pdm_dados').select('valor').like('chave', PREFIXO + '%');
     if (error) throw error;
     const comandas = (data || [])
@@ -139,7 +139,7 @@ export async function POST(request) {
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
   const acao = txt(body?.acao, 20);
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
 
     // Configurar o nº de mesas do salão (só a dona). Preserva o resto do painel.
     if (acao === 'config') {

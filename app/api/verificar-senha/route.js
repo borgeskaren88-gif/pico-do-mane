@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { conferirSenhaDona } from '../../../lib/senha';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export async function POST(request) {
 
   // Dona: confere pela senha trocada no app (banco) ou pela APP_PASSWORD.
   if (papel === 'dona') {
-    const ok = senha && await conferirSenhaDona(supabaseServer(), senha);
+    const ok = senha && await conferirSenhaDona(bancoDaSessao(), senha);
     return ok ? NextResponse.json({ ok: true, papel }) : NextResponse.json({ ok: false, erro: 'Senha incorreta.' }, { status: 401 });
   }
 

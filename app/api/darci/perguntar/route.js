@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { nomeCookie, papelDaSessao } from '../../../../lib/auth';
-import { supabaseServer } from '../../../../lib/supabase';
+import { bancoDaSessao } from '../../../../lib/negocioAtual';
 import { fichaDoBar, INSTRUCOES } from '../../../../lib/ficha';
 
 export const dynamic = 'force-dynamic';
@@ -245,7 +245,7 @@ export async function POST(request) {
   if (!pergunta) return NextResponse.json({ ok: false, erro: 'Pergunta vazia.' }, { status: 400 });
 
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { dados, vendas, reservas } = await lerTudo(sb);
     const ficha = fichaDoBar(dados, vendas, reservas);
     const antes = historico(body?.antes);

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +34,7 @@ function resumoDe(painel) {
 export async function GET() {
   if (!ehDona()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data, error } = await sb.from('pdm_dados').select('chave, valor').like('chave', PREFIXO + '%');
     if (error) throw error;
     const backups = (data || [])
@@ -52,7 +52,7 @@ export async function POST(request) {
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
   const acao = String(body?.acao || '');
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
 
     // Cópia do dia (chamada quando a dona abre o app). Se já existe a de hoje,
     // não refaz. Depois de gravar, poda os backups mais antigos.

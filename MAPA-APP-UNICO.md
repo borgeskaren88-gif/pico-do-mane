@@ -138,13 +138,17 @@ backup automático diário.
 
 Cada etapa fecha com teste verde antes da seguinte começar.
 
-| | O quê | Termina quando |
-|---|---|---|
-| **1** | A peça do meio + os testes que tentam vazar | dois negócios de mentira convivem no laboratório sem se enxergar |
-| **2** | Entrar com código do negócio; senhas e crachás por negócio | dá pra entrar nos dois, e o crachá de um não vale no outro |
-| **3** | A tela da Karen: criar, suspender, listar | ela cria um negócio do zero sem mexer em Supabase nem Vercel |
-| **4** | Backup e relatório por negócio | o backup de um não traz nada do outro |
-| **5** | A mudança de casa (ver abaixo) | Estimado e Pico do Mané rodando no app único |
+| | O quê | Termina quando | |
+|---|---|---|---|
+| **1** | A peça do meio + os testes que tentam vazar | dois negócios de mentira convivem no laboratório sem se enxergar | ✅ |
+| **2** | Entrar com código do negócio; senhas e crachás por negócio | dá pra entrar nos dois, e o crachá de um não vale no outro | ✅ |
+| **3** | A tela da Karen: criar, suspender, listar | ela cria um negócio do zero sem mexer em Supabase nem Vercel | ✅ |
+| **4** | Backup e relatório por negócio | o backup de um não traz nada do outro | ✅ (veio junto) |
+| **5** | Ligar as 27 rotas + a mudança de casa | Estimado e Pico do Mané rodando com o dono no nome das linhas | pronto, esperando a hora |
+
+**A etapa 4 não existiu como trabalho separado.** O backup já filtrava por chave,
+então ele virou "por negócio" sozinho no instante em que as rotas passaram pela
+peça do meio. Está provado junto com o resto.
 
 Não dá pra fazer tudo isso numa sentada, e eu não vou fingir que dá. São
 **várias conversas nossas**, com coisa publicada e testada no fim de cada uma.
@@ -180,16 +184,36 @@ ser de madrugada, com o bar fechado, e dura alguns minutos.
 
 ---
 
-## O que a Karen vai ter que fazer
+## A hora da virada — o único passo que mexe no que está no ar
 
-Durante a construção: **nada**. Ela lê, pergunta e aprova.
+O código da etapa 5 está pronto e testado, **mas não foi juntado no `main`**, e
+isso é de propósito: a Vercel publica sozinha a cada junção, e este é o único
+pedaço que **não pode** subir sozinho. Ele precisa de duas coisas ao mesmo
+tempo: o código novo e as linhas renomeadas. Subir um sem o outro deixa o app
+aberto e vazio por alguns minutos.
 
-Na mudança de casa:
+Então a virada é uma operação combinada, de manhã cedo ou de madrugada, com o
+bar fechado e ninguém lançando nada. Por projeto (primeiro o Estimado, depois o
+Pico do Mané), a ordem é:
 
-1. Rodar um SQL no Supabase (copiar e colar, igual ao da instalação).
-2. Ajustar as configurações de **um** projeto na Vercel.
-3. Avisar o pessoal do Estimado que o endereço vai mudar.
-4. Conferir, no app de cada um, que os números são os certos.
+1. **Ensaio** — rodar o script sem `--valendo` e ler a lista do que ele faria.
+2. **Valendo** — rodar com `--valendo`. Leva segundos. A partir daqui o app
+   ainda está com o código velho e vai mostrar **vazio**: é o relógio correndo.
+3. **Juntar no `main`** — a Vercel publica em 1 ou 2 minutos.
+4. **Pôr `NEGOCIO_UNICO=<codigo>`** nas configurações daquele projeto e
+   republicar.
+5. **Conferir** o Dashboard, Finanças e Abastecimento: os números têm que ser
+   os mesmos de antes.
+
+A janela de tela vazia é de **uns 3 minutos**. Se algo der errado, o caminho de
+volta é um comando:
+
+```
+node scripts/mudar-de-casa.mjs --negocio=<codigo> --desfazer --valendo
+```
+
+e tirar o `NEGOCIO_UNICO`. O script nunca apaga antes de escrever e conferir, e
+o projeto antigo do Pico do Mané fica intacto por semanas de qualquer jeito.
 
 Depois disso, **vender um sistema vira criar um negócio na tela dela**. Sem
 Supabase, sem Vercel, sem chave nenhuma.

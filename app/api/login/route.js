@@ -2,10 +2,10 @@ import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, valorSessaoValida, valorSessaoCozinha, valorSessaoGarcom, valorSessaoReservas } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { conferirSenhaDona, temSenhaDona, conferirSenhaPapel } from '../../../lib/senha';
 import { lerGeracoes } from '../../../lib/acessos';
-import { bancoDoNegocioAtivo } from '../../../lib/negocios';
+import { bancoDoNegocioAtivo, lerNegocios } from '../../../lib/negocios';
 import { nomeDeNegocioValido } from '../../../lib/banco';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +52,7 @@ export async function POST(request) {
     { status: 401 },
   );
 
-  let sb = supabaseServer();
+  let sb = null;
   let negocio = '';
   if (codigo) {
     if (!nomeDeNegocioValido(codigo)) return recusa();
@@ -60,6 +60,23 @@ export async function POST(request) {
     if (!banco) return recusa();
     sb = banco;
     negocio = codigo;
+  } else {
+    // Sem código, o banco é o da instalação (NEGOCIO_UNICO). Isto PRECISA ser o
+    // mesmo banco que as outras rotas usam: se o login lesse as senhas de um
+    // lugar e a tela de Acessos gravasse em outro, trocar a senha da cozinha
+    // não teria efeito nenhum no login — e "desconectar o aparelho de quem
+    // saiu" viraria um botão que não faz nada.
+    try {
+      sb = bancoDaSessao();
+    } catch {
+      // Duas situações, e a pessoa precisa saber qual é:
+      //  - app de muitos: ela esqueceu de escrever o código;
+      //  - instalação sem NEGOCIO_UNICO: quem configurou é que esqueceu.
+      const temNegocios = Object.keys(await lerNegocios()).length > 0;
+      return temNegocios
+        ? NextResponse.json({ ok: false, erro: 'Escreve o código do negócio.' }, { status: 400 })
+        : NextResponse.json({ ok: false, erro: 'Servidor sem NEGOCIO_UNICO configurado.' }, { status: 500 });
+    }
   }
 
   // A senha da dona pode ter sido trocada no app (guardada no banco) ou vir da

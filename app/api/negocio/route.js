@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDo, nomeDeNegocioValido } from '../../../lib/banco';
 import { lerNegocio, papeisParaLogin, PADRAO } from '../../../lib/negocio';
 import { lerNegocios } from '../../../lib/negocios';
 
@@ -32,7 +32,11 @@ export async function GET() {
     if (muitos) {
       return NextResponse.json({ ok: true, multi: true, nome: '', papeis: papeisParaLogin(PADRAO) });
     }
-    const sb = supabaseServer();
+    // Instalação de um cliente só: o negócio é o da configuração do site. Isto
+    // acontece ANTES de existir login, então não há crachá de onde tirar o nome.
+    const unico = String(process.env.NEGOCIO_UNICO || '').trim().toLowerCase();
+    if (!nomeDeNegocioValido(unico)) return NextResponse.json({ ok: false, nome: '', papeis: [] });
+    const sb = bancoDo(unico);
     const { data } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
     const n = lerNegocio(data?.valor || {});
     return NextResponse.json({ ok: true, nome: n.nome, papeis: papeisParaLogin(n) });

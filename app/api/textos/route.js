@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,7 @@ const podeVer = (p) => p === 'reservas' || p === 'dona';
 export async function GET() {
   if (!podeVer(papel())) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data, error } = await sb.from('pdm_dados').select('valor').like('chave', PREFIXO + '%');
     if (error) throw error;
     const textos = (data || [])
@@ -43,7 +43,7 @@ export async function POST(request) {
   const acao = txt(body?.acao, 20);
 
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
 
     if (acao === 'excluir') {
       const id = txt(body?.id, 40);

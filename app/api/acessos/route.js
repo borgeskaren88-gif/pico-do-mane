@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { ACESSOS, lerGeracoes, subirGeracao } from '../../../lib/acessos';
 import { definirSenhaPapel, senhaFoiTrocada, ehSenhaDeFabrica } from '../../../lib/senha';
 
@@ -19,7 +19,7 @@ function ehDona() {
 export async function GET() {
   if (!ehDona()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const ger = await lerGeracoes(sb);
     const lista = [];
     for (const a of ACESSOS) {
@@ -47,7 +47,7 @@ export async function POST(request) {
   }
 
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
 
     // Cortar: sobe a geração. Todo crachá antigo daquele acesso morre na hora —
     // inclusive o do celular de quem já não trabalha aqui, que era o problema.

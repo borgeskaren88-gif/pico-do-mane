@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { tokenCalendarioValido } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDo } from '../../../lib/banco';
+import { negocioDaUrl } from '../../../lib/negocioAtual';
 import { brl, addDays, agruparContasAbertas } from '../../../lib/util';
 import { lerNegocio } from '../../../lib/negocio';
 
@@ -86,14 +87,36 @@ function montarICS(dados) {
   ].join('\r\n');
 }
 
+// O LINK QUE ELA JÁ TEM NÃO PODE PARAR DE FUNCIONAR.
+//
+// Antes disto, o token era feito sem nome de negócio. Depois, com. Se a conta
+// mudasse e pronto, o link que está dentro do Google Agenda dela (e o do widget
+// no iPhone) parariam de funcionar no dia da virada, calados.
+//
+// Então o token velho também vale — mas SÓ na instalação de um cliente, onde
+// não há vizinho pra enganar: nenhum "n=" na URL e um NEGOCIO_UNICO
+// configurado. No app de muitos, NEGOCIO_UNICO não existe e esta porta nem se
+// abre; lá o token velho não vale pra ninguém.
+function tokenServe(valido, t, negocio, request) {
+  if (valido(t, negocio)) return true;
+  const temN = !!new URL(request.url).searchParams.get('n');
+  const unico = String(process.env.NEGOCIO_UNICO || '').trim();
+  return !temN && !!unico && valido(t, '');
+}
+
 export async function GET(request) {
+  // Este endereço entra SEM crachá (o Google e o iPhone buscam a agenda
+  // sozinhos), então quem é o dono vem escrito na própria URL — e o token é
+  // conferido CONTRA esse nome. O link de um cliente não abre o de outro
+  // porque o nome entra na conta que gera o token.
+  const negocio = negocioDaUrl(request);
   const t = new URL(request.url).searchParams.get('t');
-  if (!tokenCalendarioValido(t)) {
+  if (!negocio || !tokenServe(tokenCalendarioValido, t, negocio, request)) {
     return new NextResponse('Nao autorizado', { status: 401 });
   }
   let dados = {};
   try {
-    const sb = supabaseServer();
+    const sb = bancoDo(negocio);
     const { data } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
     dados = data?.valor || {};
   } catch {

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../../lib/auth';
-import { supabaseServer } from '../../../../lib/supabase';
+import { bancoDaSessao } from '../../../../lib/negocioAtual';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,7 +35,7 @@ function limpar(p) {
 export async function GET() {
   if (!ehDona()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
     return NextResponse.json({ ok: true, prefs: limpar(data?.valor) });
   } catch (e) {
@@ -50,7 +50,7 @@ export async function POST(request) {
   const novo = limpar(body?.prefs);
   if (!Object.keys(novo).length) return NextResponse.json({ ok: false, erro: 'Nada pra salvar.' }, { status: 400 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
     // Junta com o que já estava: quem mexeu só no tom não apaga o resto.
     const prefs = { ...limpar(data?.valor), ...novo };

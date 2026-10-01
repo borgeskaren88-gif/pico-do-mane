@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { criarEvento, atualizarEvento, apagarEvento } from '../../../lib/google';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,7 @@ const papel = () => papelDaSessao(cookies().get(nomeCookie())?.value);
 export async function GET() {
   if (papel() !== 'dona') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data, error } = await sb.from('pdm_dados').select('valor').like('chave', PREFIXO + '%');
     if (error) throw error;
     const compromissos = (data || [])
@@ -45,7 +45,7 @@ export async function POST(request) {
   const acao = txt(body?.acao, 20);
 
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
 
     if (acao === 'excluir') {
       const id = txt(body?.id, 40);

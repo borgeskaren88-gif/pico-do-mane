@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { OCASIOES, LOCAIS, umDe } from '../../../lib/reservas';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { notificarReservaNova } from '../../../lib/push';
 import { criarEvento, atualizarEvento, apagarEvento } from '../../../lib/google';
 
@@ -34,7 +34,7 @@ const podeEscrever = (p) => p === 'reservas' || p === 'dona';
 export async function GET() {
   if (!papel()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data, error } = await sb.from('pdm_dados').select('valor').like('chave', PREFIXO + '%');
     if (error) throw error;
     const reservas = (data || [])
@@ -56,7 +56,7 @@ export async function POST(request) {
   const acao = txt(body?.acao, 20);
 
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
 
     // Marcar/desmarcar "já confirmei com o cliente". Mexe só nesse campo, então
     // não tem como esbarrar no resto da reserva, e some do lembrete da véspera.
