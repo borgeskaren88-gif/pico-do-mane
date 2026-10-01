@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { ACESSOS, lerGeracoes, subirGeracao } from '../../../lib/acessos';
-import { definirSenhaPapel, senhaFoiTrocada } from '../../../lib/senha';
+import { definirSenhaPapel, senhaFoiTrocada, ehSenhaDeFabrica } from '../../../lib/senha';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +23,11 @@ export async function GET() {
     const ger = await lerGeracoes(sb);
     const lista = [];
     for (const a of ACESSOS) {
-      lista.push({ ...a, geracao: ger[a.papel] || 1, senhaPropria: await senhaFoiTrocada(sb, a.papel) });
+      lista.push({
+        ...a, geracao: ger[a.papel] || 1,
+        senhaPropria: await senhaFoiTrocada(sb, a.papel),
+        deFabrica: await ehSenhaDeFabrica(sb, a.papel),
+      });
     }
     return NextResponse.json({ ok: true, acessos: lista });
   } catch (e) {
