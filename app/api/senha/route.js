@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { conferirSenhaPapel, definirSenhaPapel } from '../../../lib/senha';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,7 @@ export async function POST(request) {
   const novaLimpa = nova.trim();
   if (novaLimpa.length < 4) return NextResponse.json({ ok: false, erro: 'A nova senha precisa ter pelo menos 4 caracteres.' }, { status: 400 });
 
-  const sb = supabaseServer();
+  const sb = bancoDaSessao();
   if (!(await conferirSenhaPapel(sb, papel, atual))) {
     return NextResponse.json({ ok: false, erro: 'A senha atual está incorreta.' }, { status: 401 });
   }

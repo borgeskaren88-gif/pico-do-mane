@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { notificarCaixa, notificarConferencia } from '../../../lib/push';
 import { diaOperacional } from '../../../lib/util';
 import { conferirFechamento, movimentoDoDia } from '../../../lib/fechamento';
@@ -178,7 +178,7 @@ export async function GET(request) {
   const p = papel();
   if (!p) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data, error } = await sb.from('pdm_dados').select('valor').like('chave', CX + '%');
     if (error) throw error;
     const caixas = (data || []).map((r) => r.valor).filter(Boolean);
@@ -226,7 +226,7 @@ export async function POST(request) {
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
   const acao = String(body?.acao || '').slice(0, 20);
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data } = await sb.from('pdm_dados').select('valor').like('chave', CX + '%');
     const caixas = (data || []).map((r) => r.valor).filter(Boolean);
     const aberto = caixas.find((c) => c.aberto) || null;

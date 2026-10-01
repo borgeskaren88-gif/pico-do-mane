@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +27,7 @@ async function caixaAbertoId(sb) {
 export async function GET() {
   if (!ehDona()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data, error } = await sb.from('pdm_dados').select('valor').like('chave', PREFIXO + '%');
     if (error) throw error;
     const vendas = (data || []).map((r) => r.valor).filter(Boolean).sort((a, b) => (b.fechadaEm || '').localeCompare(a.fechadaEm || ''));
@@ -60,7 +60,7 @@ export async function POST(request) {
     if (!ids.length) return NextResponse.json({ ok: false, erro: 'Nenhum fiado informado.' }, { status: 400 });
     if (!(valor > 0)) return NextResponse.json({ ok: false, erro: 'Informe um valor maior que zero.' }, { status: 400 });
     try {
-      const sb = supabaseServer();
+      const sb = bancoDaSessao();
       const hoje = hojeBrasil();
       const cxId = semDinheiro ? null : await caixaAbertoId(sb);
       // Lê os fiados escolhidos, mantém só os ainda em aberto, mais antigo primeiro.
@@ -108,7 +108,7 @@ export async function POST(request) {
     const ref = txt(body?.ref, 40);
     if (!ref) return NextResponse.json({ ok: false, erro: 'Baixa não informada.' }, { status: 400 });
     try {
-      const sb = supabaseServer();
+      const sb = bancoDaSessao();
       const { data, error } = await sb.from('pdm_dados').select('chave, valor').like('chave', PREFIXO + '%');
       if (error) throw error;
       let devolvido = 0;
@@ -143,7 +143,7 @@ export async function POST(request) {
   const id = txt(body?.id, 40);
   if (!id) return NextResponse.json({ ok: false, erro: 'Venda não informada.' }, { status: 400 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const chave = PREFIXO + id;
 
     // Receber um fiado: marca como pago e registra quando/como recebeu. Aí ele

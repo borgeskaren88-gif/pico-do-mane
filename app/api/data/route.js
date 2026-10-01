@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, sessaoEhValida } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { notificarNovasTarefasCozinha } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +18,7 @@ export async function GET() {
     return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   }
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data, error } = await sb
       .from('pdm_dados')
       .select('valor')
@@ -45,7 +45,7 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 });
   }
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     // Preserva a lista e as tarefas da cozinha se não vierem no corpo: elas são
     // gravadas pelo acesso da cozinha (/api/lista) e não podem ser apagadas por
     // um salvamento da dona que não as incluiu.

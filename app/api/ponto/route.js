@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { notificarPonto } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +34,7 @@ export async function GET() {
   const p = papel();
   if (!p) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     // Privacidade: cada setor vê só o próprio ponto (cozinha ↔ atendimento). A
     // dona vê todos. Registros antigos sem "papel" (feitos antes da privacidade)
     // aparecem pra qualquer setor, pra não sumir com turno aberto de ninguém.
@@ -58,7 +58,7 @@ export async function POST(request) {
   const acao = txt(body?.acao, 20);
   const nome = txt(body?.nome, 60);
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
 
     if (acao === 'entrada') {
       if (!nome) return NextResponse.json({ ok: false, erro: 'Diga o nome de quem está entrando.' }, { status: 400 });

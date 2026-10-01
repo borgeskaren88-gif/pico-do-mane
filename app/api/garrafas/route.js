@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
-import { supabaseServer } from '../../../lib/supabase';
+import { bancoDaSessao } from '../../../lib/negocioAtual';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +22,7 @@ const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(
 export async function GET() {
   if (!papel()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data, error } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
     if (error) throw error;
     const blob = data?.valor || {};
@@ -45,7 +45,7 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 });
   }
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const { data, error } = await sb.from('pdm_dados').select('valor').eq('chave', CHAVE).maybeSingle();
     if (error) throw error;
     const blob = data?.valor || {};

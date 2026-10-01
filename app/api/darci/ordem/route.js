@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { nomeCookie, papelDaSessao } from '../../../../lib/auth';
-import { supabaseServer } from '../../../../lib/supabase';
+import { bancoDaSessao } from '../../../../lib/negocioAtual';
 import { diaOperacional, addDays, weekday, limparNome, num, brl } from '../../../../lib/util';
 import { CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL } from '../../../../lib/util';
 
@@ -218,7 +218,7 @@ export async function POST(request) {
   if (frase.length < 3) return NextResponse.json({ ok: false, erro: 'Frase vazia.' }, { status: 400 });
 
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const cat = await catalogo(sb);
     const hoje = diaOperacional();
     const sistema = instrucoes(hoje, cat.estoque, cat.fornecedores);

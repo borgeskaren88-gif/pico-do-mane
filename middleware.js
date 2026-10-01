@@ -85,10 +85,17 @@ export async function middleware(req) {
   // "desconectar os aparelhos da cozinha" pararia de funcionar justamente pra
   // quem paga.
   const barra = cookie.indexOf('|');
-  const negocio = barra < 0 ? '' : cookie.slice(0, barra);
+  // DOIS nomes, e eles podem ser diferentes:
+  //   - o do CRACHÁ é o que entrou na conta que o gerou. Crachá de instalação
+  //     de um cliente não tem nome nenhum, e a conta dele é a antiga.
+  //   - o dos DADOS é onde mora a linha das gerações. Numa instalação que já
+  //     mudou de casa, é o NEGOCIO_UNICO — mesmo que o crachá não tenha nome.
+  // Confundir os dois quebra uma das duas coisas, calado.
+  const doCracha = barra < 0 ? '' : cookie.slice(0, barra);
+  const dosDados = doCracha || String(process.env.NEGOCIO_UNICO || '').trim().toLowerCase();
   const semNegocio = barra < 0 ? cookie : cookie.slice(barra + 1);
 
-  const atuais = await geracoes(negocio);
+  const atuais = await geracoes(dosDados);
   // Sem leitura ou com tudo na geração 1: nada foi cortado, nada pode estar
   // vencido. Sai daqui sem gastar uma conta sequer.
   if (!atuais || PAPEIS.every(([p]) => atuais[p] === 1)) return NextResponse.next();
@@ -102,7 +109,7 @@ export async function middleware(req) {
   // cookie da DONA não bate com nenhum dos três — e aí ele passa direto, que é
   // como tem que ser: o acesso dela não se corta por aqui.
   const segredo = process.env.SESSION_SECRET || '';
-  const tempero = (geracao > 1 ? ':g' + geracao : '') + (negocio ? ':n:' + negocio : '');
+  const tempero = (geracao > 1 ? ':g' + geracao : '') + (doCracha ? ':n:' + doCracha : '');
   for (const [papel, prefixo] of PAPEIS) {
     const esperado = await sha256hex(prefixo + segredo + tempero);
     const valor = m ? m[2] : semNegocio;

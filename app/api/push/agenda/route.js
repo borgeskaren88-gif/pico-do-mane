@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../../lib/auth';
-import { supabaseServer } from '../../../../lib/supabase';
+import { bancoDaSessao } from '../../../../lib/negocioAtual';
 import { notificarAgenda, notificarReservasAmanha, notificarPreparoAmanha, notificarValidade } from '../../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +17,7 @@ export async function POST() {
     return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   }
   try {
-    const sb = supabaseServer();
+    const sb = bancoDaSessao();
     const r = await notificarAgenda(sb);
     // Na mesma batida, o lembrete de confirmar as mesas de amanhã.
     let reservas = null;
