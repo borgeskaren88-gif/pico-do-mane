@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { C, LogoMark, pageBg } from './ui';
+import { C, Btn, LogoMark, pageBg } from './ui';
 import { ymOf, todayISO, limparNome, fiadoDaVenda, uid, num, brl } from '../lib/util';
 import { comprasPendentesDeEstoque } from '../lib/estoque';
 import { limparCopiaGuardada } from '../lib/versao';
@@ -183,6 +183,11 @@ export default function Dashboard() {
   // depende dos dois: ele custa por pergunta e precisa de chave no servidor.
   const [modulos, setModulos] = useState(lerModulos({}));
   const [recursos, setRecursos] = useState({ darci: true, voz: true });
+  // Acessos que ainda entram com "1234". O padrão de fábrica é de propósito —
+  // a pessoa precisa entrar no primeiro dia —, mas um 1234 esquecido é outra
+  // coisa. A tela cobra até trocar.
+  const [senhasDeFabrica, setSenhasDeFabrica] = useState([]);
+  const [escondeuAvisoSenha, setEscondeuAvisoSenha] = useState(false);
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [cardapio, setCardapio] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -293,6 +298,18 @@ export default function Dashboard() {
       setLoaded(true);
     })();
   }, []);
+
+  // Quais acessos ainda estão na senha de fábrica. Relê quando ela volta da
+  // tela de Acessos, pra o aviso sumir assim que a troca acontece.
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/acessos', { cache: 'no-store' });
+        const j = await r.json();
+        if (j?.ok) setSenhasDeFabrica((j.acessos || []).filter((a) => a.deFabrica).map((a) => a.nome || a.papel));
+      } catch { /* sem aviso é melhor do que aviso errado */ }
+    })();
+  }, [tab]);
 
   // O que ESTA instalação consegue fazer (tem chave de IA?). Sem isso, uma
   // cópia sem chave mostraria o Darci e ele não responderia nada.
@@ -930,6 +947,28 @@ export default function Dashboard() {
         {/* App novo: a tela de boas-vindas vem antes de tudo, em qualquer aba,
             até ela dizer de quem é o app. */}
         {appNovo && <PrimeiroUso onSalvar={upd.negocio} onIr={irParaTab} />}
+        {/* SENHA DE FÁBRICA AINDA VALENDO.
+            Fica em todas as telas, não só no Dashboard: é a única coisa que
+            separa "o acesso é da equipe" de "o acesso é de quem souber o
+            link". Some sozinho no instante em que a senha é trocada. */}
+        {senhasDeFabrica.length > 0 && !escondeuAvisoSenha && tab !== 'acessos' && (
+          <div style={{ background: C.panel, border: `2px solid ${C.amber}`, borderRadius: 10, padding: '11px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: C.amber, lineHeight: 1.45 }}>
+                {senhasDeFabrica.length === 1
+                  ? `O acesso de ${senhasDeFabrica[0]} ainda entra com a senha de fábrica (1234).`
+                  : `${senhasDeFabrica.length} acessos ainda entram com a senha de fábrica (1234): ${senhasDeFabrica.join(', ')}.`}
+              </div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>
+                Quem souber o link do app entra com ela. Trocar leva dez segundos.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <Btn small onClick={() => irParaTab('acessos')}>Trocar agora</Btn>
+              <Btn small kind="ghost" onClick={() => setEscondeuAvisoSenha(true)}>Depois</Btn>
+            </div>
+          </div>
+        )}
         {tab === 'darci' && temDarci && <Darci {...propsDarci} />}
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,

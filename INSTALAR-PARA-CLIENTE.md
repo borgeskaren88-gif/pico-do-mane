@@ -68,7 +68,7 @@ caracteres embaralhados, sem sentido nenhum, direto no campo da Vercel.
 **Um diferente por cliente** — se dois sites usarem o mesmo, um crachá de um
 poderia valer no outro.
 
-### Importantes — se faltarem, a senha vira `1234`
+### Pode deixar em branco — a equipe entra com `1234` e troca depois
 
 | Nome | O que pôr |
 |---|---|
@@ -76,9 +76,17 @@ poderia valer no outro.
 | `APP_PASSWORD_GARCOM` | Senha do atendimento |
 | `APP_PASSWORD_RESERVAS` | Senha de quem cuida das reservas |
 
-⚠️ **Preencha as três, mesmo que o cliente não vá usar todas.** Sem elas, o
-sistema aceita `1234` — e senha de fábrica é o tipo de coisa que fica anos no ar
-sem ninguém lembrar.
+**Deixar as três em branco é a escolha mais prática:** a equipe entra com `1234`
+no primeiro dia, sem você precisar combinar senha com ninguém, e o próprio
+cliente troca depois em **Configurações → Acessos**.
+
+O risco de o `1234` ficar esquecido está coberto: enquanto algum acesso ainda
+estiver na senha de fábrica, **o app mostra um aviso em todas as telas do dono**,
+com um botão que leva direto à troca. O aviso some sozinho no instante em que a
+senha é trocada, e volta a cada acesso se ele adiar.
+
+A senha de **quem manda** (`APP_PASSWORD`) não tem padrão de fábrica nenhum —
+essa você precisa definir.
 
 ### Opcionais
 
@@ -129,8 +137,8 @@ Passe esta lista **dentro do app do cliente**, não no seu:
 - [ ] Em Abastecimento → Estoque não existe nenhum produto
 - [ ] **Darci não aparece no menu**
 - [ ] O rodapé mostra uma versão (significa que publicou certo)
-- [ ] Entrar com cozinha, atendimento e reservas funciona **com as senhas
-      novas** — e `1234` **não** entra
+- [ ] Entrar com cozinha, atendimento e reservas funciona com `1234`
+- [ ] O aviso de senha de fábrica aparece — é ele que vai cobrar a troca
 - [ ] Abrir o seu app em outra aba e conferir que os números continuam os seus
 
 A última é a mais importante. Faça sempre.
