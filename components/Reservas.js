@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { C, Card, Btn, Empty, pageBg, LogoMark } from './ui';
+import { C, Card, Btn, Empty, pageBg, LogoMark, PageTitle } from './ui';
 import AvisoReservas from './AvisoReservas';
 import SinoNotificacoes from './SinoNotificacoes';
 import ListaMercado from './ListaMercado';
@@ -96,7 +96,7 @@ export function Etiquetas({ reserva, tamanho = 11.5 }) {
   );
 }
 
-export default function Reservas() {
+export default function Reservas({ embutido = false }) {
   const hoje = todayISO();
   const [reservas, setReservas] = useState([]);
   const [carregado, setCarregado] = useState(false);
@@ -255,66 +255,16 @@ export default function Reservas() {
     ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
     : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.2M12 19.3v2.2M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.4 19.6l1.6-1.6M18 6l1.6-1.6" /></svg>;
 
-  return (
-    <div style={{ minHeight: '100dvh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <EstiloShell />
-
-      {/* Mesma casca do painel da Karen: lateral no computador, gaveta no
-          celular. Só o que tem dentro do menu é que muda. */}
-      <div className={`pos-shell${lateralRecolhida ? ' pos-recolhida' : ''}`}>
-        {menuAberto && <div className="pos-overlay" onClick={() => setMenuAberto(false)} />}
-        <aside className={`pos-sidebar${menuAberto ? ' pos-open' : ''}`}>
-          <div className="pos-side-head">
-            <LogoMark size={34} radius={10} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 16, fontWeight: 900, lineHeight: 1 }}>Mari</div>
-              <div style={{ fontSize: 9.5, color: C.accent, letterSpacing: '.08em', textTransform: 'uppercase', marginTop: 3, fontWeight: 800, lineHeight: 1.3 }}>
-                Coordenadora de Operações
-              </div>
-            </div>
-            <button className="pos-recolher" onClick={() => recolherLateral(true)} title="Recolher a lateral" aria-label="Recolher a lateral" style={{ marginLeft: 'auto' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
-            </button>
-          </div>
-          <nav className="pos-nav">
-            <div className="pos-group">
-              <div className="pos-group-title">Operação</div>
-              {MENU.map(([v, rot]) => (
-                <button key={v} onClick={() => irPara(v)} className={`pos-navitem${aba === v ? ' pos-active' : ''}`}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rot}</span>
-                </button>
-              ))}
-            </div>
-          </nav>
-          <div className="pos-side-foot">
-            <BotaoAtualizar />
-            <button onClick={trocarTema} title={tema === 'claro' ? 'Mudar para escuro' : 'Mudar para claro'} aria-label="Trocar tema"
-              style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {iconeTema}
-            </button>
-            <button onClick={sair} style={{ flex: 1, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Sair</button>
-          </div>
-          <VersaoApp />
-        </aside>
-
-        <div className="pos-content">
-          <div className="pos-topbar">
-            <button className="pos-burger" onClick={() => { if (typeof window !== 'undefined' && window.innerWidth >= 820) recolherLateral(false); else setMenuAberto(true); }} aria-label="Abrir menu">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
-              <LogoMark size={28} radius={9} />
-              <div style={{ fontSize: 16, fontWeight: 900, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {MENU.find(([v]) => v === aba)?.[1] || 'Mari'}
-              </div>
-            </div>
-            <BotaoAtualizar />
-          </div>
-
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
-
-        {aba === 'compras' ? <ListaMercado /> : aba === 'pasta' ? <Pasta /> : (
-        <>
+  // O PAINEL DAS RESERVAS, SEPARADO DA CASCA.
+  //
+  // "As vezes a pessoa não tem quem faça isso e acaba tendo que entrar e sair
+  // de login pra fazer." Então o mesmo painel passa a servir em dois lugares: a
+  // tela da Mari (com casca própria) e uma aba dentro do login da dona.
+  //
+  // Separado como VARIÁVEL, não copiado: um conserto aqui vale nos dois. Duas
+  // cópias viram duas telas diferentes em três meses.
+  const painelReservas = (
+    <>
         <LembreteAgenda />
         <AvisoReservas />
 
@@ -529,8 +479,82 @@ export default function Reservas() {
           </div>
         </Card>
 
-        </>
-        )}
+    </>
+  );
+
+  // Embutido no painel da dona: só o conteúdo. A casca (menu, sair, tema) é a
+  // do Dashboard, e o aviso de celular e a troca de senha são os dela.
+  if (embutido) {
+    return (
+      <div>
+        <PageTitle sub="Anotar, confirmar e avisar — sem trocar de login">Reservas</PageTitle>
+        {painelReservas}
+        <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.55, marginTop: 18 }}>
+          Toca num dia pra ver e anotar as reservas dele. Os dias com bolinha já têm mesa guardada.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100dvh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <EstiloShell />
+
+      {/* Mesma casca do painel da Karen: lateral no computador, gaveta no
+          celular. Só o que tem dentro do menu é que muda. */}
+      <div className={`pos-shell${lateralRecolhida ? ' pos-recolhida' : ''}`}>
+        {menuAberto && <div className="pos-overlay" onClick={() => setMenuAberto(false)} />}
+        <aside className={`pos-sidebar${menuAberto ? ' pos-open' : ''}`}>
+          <div className="pos-side-head">
+            <LogoMark size={34} radius={10} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 900, lineHeight: 1 }}>Mari</div>
+              <div style={{ fontSize: 9.5, color: C.accent, letterSpacing: '.08em', textTransform: 'uppercase', marginTop: 3, fontWeight: 800, lineHeight: 1.3 }}>
+                Coordenadora de Operações
+              </div>
+            </div>
+            <button className="pos-recolher" onClick={() => recolherLateral(true)} title="Recolher a lateral" aria-label="Recolher a lateral" style={{ marginLeft: 'auto' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+            </button>
+          </div>
+          <nav className="pos-nav">
+            <div className="pos-group">
+              <div className="pos-group-title">Operação</div>
+              {MENU.map(([v, rot]) => (
+                <button key={v} onClick={() => irPara(v)} className={`pos-navitem${aba === v ? ' pos-active' : ''}`}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rot}</span>
+                </button>
+              ))}
+            </div>
+          </nav>
+          <div className="pos-side-foot">
+            <BotaoAtualizar />
+            <button onClick={trocarTema} title={tema === 'claro' ? 'Mudar para escuro' : 'Mudar para claro'} aria-label="Trocar tema"
+              style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {iconeTema}
+            </button>
+            <button onClick={sair} style={{ flex: 1, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Sair</button>
+          </div>
+          <VersaoApp />
+        </aside>
+
+        <div className="pos-content">
+          <div className="pos-topbar">
+            <button className="pos-burger" onClick={() => { if (typeof window !== 'undefined' && window.innerWidth >= 820) recolherLateral(false); else setMenuAberto(true); }} aria-label="Abrir menu">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
+              <LogoMark size={28} radius={9} />
+              <div style={{ fontSize: 16, fontWeight: 900, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {MENU.find(([v]) => v === aba)?.[1] || 'Mari'}
+              </div>
+            </div>
+            <BotaoAtualizar />
+          </div>
+
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
+
+        {aba === 'compras' ? <ListaMercado /> : aba === 'pasta' ? <Pasta /> : painelReservas}
 
         {/* Ela também recebe os avisos: se a Karen ou o atendimento marcarem
             uma mesa, o celular dela toca igual. */}

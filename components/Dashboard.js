@@ -35,6 +35,7 @@ import Config from './Config';
 import MeuNegocio from './MeuNegocio';
 import PrimeiroUso from './PrimeiroUso';
 import Guia from './Guia';
+import Reservas from './Reservas';
 import Cardapio from './Cardapio';
 import Comandas from './Comandas';
 import VendasDoDia from './VendasDoDia';
@@ -678,7 +679,7 @@ export default function Dashboard() {
     ['darci', 'Darci'], ['brain', 'Brain'], ['hoje', 'Dashboard'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['previsao', 'Previsão'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'], ['despesarapida', 'Despesa Rápida'],
-    ['ponto', 'Ponto'], ['pasta', 'Pasta'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['acessos', 'Acessos'], ['backup', 'Backup'], ['negocio', 'Meu negócio'], ['guia', 'Como usar'],
+    ['ponto', 'Ponto'], ['pasta', 'Pasta'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['acessos', 'Acessos'], ['backup', 'Backup'], ['negocio', 'Meu negócio'], ['guia', 'Como usar'], ['reservas', 'Reservas'],
   ];
 
   // Barra lateral: as áreas agrupadas por assunto (no PC fica fixa na lateral;
@@ -691,7 +692,7 @@ export default function Dashboard() {
   const recolherLateral = (v) => setLateralRecolhida((cur) => { const nv = v == null ? !cur : v; try { localStorage.setItem('picoos-lateral', nv ? 'recolhida' : 'aberta'); } catch { /* ignora */ } return nv; });
   const grupos = [
     { titulo: 'Início', itens: [['hoje', 'Dashboard'], ...(temDarci ? [['darci', 'Darci']] : []), ['brain', 'Brain']] },
-    { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
+    { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['reservas', 'Reservas'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento'], ['previsao', 'Previsão']] },
     { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
     // Backup, Acessos, Notificações e Widget saíram daqui pra dentro da
@@ -1076,6 +1077,11 @@ export default function Dashboard() {
           </>
         )}
         {tab === 'negocio' && <MeuNegocio negocio={negocio} onChange={upd.negocio} />}
+        {/* AS RESERVAS, DENTRO DO LOGIN DA DONA.
+            "Às vezes a pessoa não tem quem faça isso e acaba tendo que entrar e
+            sair de login pra fazer." É o MESMO painel da tela da Mari, não uma
+            cópia — conserto num lugar vale nos dois. */}
+        {tab === 'reservas' && <Reservas embutido />}
         {tab === 'guia' && (
           <Guia
             onIr={irParaTab} nome={(negocio && negocio.nome) || ''}
