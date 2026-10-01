@@ -209,7 +209,7 @@ export default function PontoCozinha() {
               </div>
             );
           })}
-          {!temEscala && <div style={{ fontSize: 12, color: C.faint }}>A saldo (em haver/devendo) aparece quando a Karen configurar a jornada do setor.</div>}
+          {!temEscala && <div style={{ fontSize: 12, color: C.faint }}>A saldo (em haver/devendo) aparece quando a dona configurar a jornada do setor.</div>}
         </div>
       )}
 

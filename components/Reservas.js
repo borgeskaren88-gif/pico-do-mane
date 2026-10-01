@@ -428,7 +428,7 @@ export default function Reservas() {
                         {r.restricoes && <div>Restrição: {r.restricoes}</div>}
                         {r.telefone && <div>Telefone: {r.telefone}</div>}
                         <div>
-                          Anotada por {r.criadoPor === 'dona' ? 'Karen' : r.criadoPor === 'reservas' ? 'Mari' : (r.criadoPor || '—')}
+                          Anotada por {r.criadoPor === 'dona' ? 'a dona' : r.criadoPor === 'reservas' ? 'Reservas' : (r.criadoPor || '—')}
                           {r.criadoEm ? ` em ${fmtDataHora(r.criadoEm)}` : ''}
                         </div>
                         {r.confirmadaEm && <div>Confirmada em {fmtDataHora(r.confirmadaEm)}</div>}
@@ -518,7 +518,7 @@ export default function Reservas() {
                   </label>
                 </div>
                 <div style={{ fontSize: 11.5, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>
-                  Ao salvar, a Karen, a cozinha e o atendimento recebem o aviso no celular — e no dia da reserva ela aparece na tela de todo mundo.
+                  Ao salvar, a dona, a cozinha e o atendimento recebem o aviso no celular — e no dia da reserva ela aparece na tela de todo mundo.
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                   <Btn onClick={salvar} disabled={busy}>{busy ? 'Salvando…' : 'Salvar reserva'}</Btn>

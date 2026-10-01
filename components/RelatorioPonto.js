@@ -18,7 +18,7 @@ const rotuloMes = (ym) => `${MES_NOME[Number(ym.slice(5, 7)) - 1] || ''}/${ym.sl
 // Ponto de cada funcionário, mês a mês — pra fechar pagamento e conferir com a
 // pessoa. Tem mês próprio (o histórico do ponto não é o mesmo das Finanças) e
 // abre turno por turno, com dia, entrada, saída e o total de horas.
-export default function RelatorioPonto({ mesInicial }) {
+export default function RelatorioPonto({ mesInicial, negocio = '' }) {
   const [registros, setRegistros] = useState([]);
   const [jornadas, setJornadas] = useState({});
   const [carregado, setCarregado] = useState(false);
@@ -110,7 +110,7 @@ export default function RelatorioPonto({ mesInicial }) {
   };
 
   const copiar = async () => {
-    const linhas = [`Ponto — ${rotuloMes(mes)} · Pico do Mané`, ''];
+    const linhas = [`Ponto — ${rotuloMes(mes)}${negocio ? ` · ${negocio}` : ''}`, ''];
     for (const p of pessoas) {
       const saldoTxt = p.saldo == null ? ''
         : Math.abs(p.saldo) < 0.02 ? ' — fechou em dia'

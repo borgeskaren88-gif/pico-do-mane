@@ -22,6 +22,7 @@ export const CORES = [
 ];
 
 const ATALHOS = [
+  ['negocio', 'Meu negócio', 'O nome que aparece nas telas'],
   ['backup', 'Backup e relatório', 'Baixar tudo o que está guardado'],
   ['acessos', 'Acessos', 'Senhas e quem pode entrar'],
   ['notificacoes', 'Notificações', 'Os avisos que chegam no celular'],

@@ -6,6 +6,7 @@ import { novoItemEstoque, aplicarMovimentoItem, editarMetadadosItem, aplicarBaix
 import { separarSacos, abastecerLinha, contarPorcao } from '../../../lib/porcoes';
 import { limparNome, num, numQtd, todayISO } from '../../../lib/util';
 import { notificarEstoqueCritico, notificarSaidaSemVenda } from '../../../lib/push';
+import { lerNegocio, nomeDoPapel } from '../../../lib/negocio';
 
 export const dynamic = 'force-dynamic';
 
@@ -172,7 +173,8 @@ export async function POST(request) {
       const alvo = itens.find((it) => it.id === id);
       if (!alvo) return NextResponse.json({ ok: false, erro: 'Item não encontrado.' }, { status: 404 });
       if (!ehPorcionado(alvo)) return NextResponse.json({ ok: false, erro: 'Esse item não é separado em sacos.' }, { status: 400 });
-      const quem = p === 'cozinha' ? 'Cozinha' : 'Karen';
+      // Quem fez o movimento, com o nome que o negócio configurou.
+      const quem = p === 'cozinha' ? nomeDoPapel(lerNegocio(blob), 'cozinha') : nomeDoPapel(lerNegocio(blob), 'dona');
 
       let r = null;
       let brutoNovo = null;

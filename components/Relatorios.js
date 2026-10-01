@@ -60,7 +60,7 @@ function Delta({ atual, anterior, boaSubida = true }) {
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, FONTES_NAO_OPERACIONAL, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import { cmvDoMes, lerCMV, evolucaoCMV, compararCMV, variacaoProdutos, estoqueNoMes } from '../lib/cmv';
 
-export default function Relatorios({ diario, receitas, despesas, mes, setMes, vendas = [], compras = [], estoque = [], fichas = [], cardapio = [] }) {
+export default function Relatorios({ diario, receitas, despesas, mes, setMes, vendas = [], compras = [], estoque = [], fichas = [], cardapio = [], negocio = '' }) {
   const [verDias, setVerDias] = useState(false); // abre o dia a dia da previsão
   const [verCMV, setVerCMV] = useState(false);   // abre a lista de produtos do CMV
   const mesesDisp = [...new Set([...receitas, ...despesas].map((d) => ymOf(d.data)))].sort().reverse();
@@ -755,7 +755,7 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
 
       {/* Ponto por funcionário, mês a mês — com histórico próprio, que o ponto
           pode ter mês que as Finanças ainda não têm (e vice-versa). */}
-      <RelatorioPonto mesInicial={mes} />
+      <RelatorioPonto mesInicial={mes} negocio={negocio} />
     </div>
   );
 }

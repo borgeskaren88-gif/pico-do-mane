@@ -7,7 +7,7 @@ import { C, Card, Btn, Field, SecTitle, inputStyle } from './ui';
 //
 // Serve pra qualquer acesso que troca a senha dele: quem manda o pedido é
 // quem está logado, então ninguém troca a senha de outra pessoa.
-export default function TrocarSenha({ quem = 'da Karen (login e desbloqueio)' }) {
+export default function TrocarSenha({ quem = 'da dona (login e desbloqueio)' }) {
   const [aberto, setAberto] = useState(false);
   const [atual, setAtual] = useState('');
   const [nova, setNova] = useState('');

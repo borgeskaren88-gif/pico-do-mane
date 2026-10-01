@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { tokenCalendarioValido } from '../../../lib/auth';
 import { supabaseServer } from '../../../lib/supabase';
 import { brl, addDays, agruparContasAbertas } from '../../../lib/util';
+import { lerNegocio } from '../../../lib/negocio';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +48,7 @@ function vevento({ uid, data, resumo, descricao, dtstamp }) {
 }
 
 function montarICS(dados) {
+  const marcaCal = lerNegocio(dados).nome;
   const compras = Array.isArray(dados?.compras) ? dados.compras : [];
   const tarefas = Array.isArray(dados?.tarefas) ? dados.tarefas : [];
   const dtstamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
@@ -72,10 +74,10 @@ function montarICS(dados) {
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//PicoOS//Pico do Mane//PT-BR',
+    'PRODID:-//PicoOS//Agenda//PT-BR',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:PicoOS — Pico do Mané',
+    `X-WR-CALNAME:${marcaCal ? `PicoOS — ${marcaCal}` : 'PicoOS'}`,
     'X-WR-TIMEZONE:America/Sao_Paulo',
     'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
     'X-PUBLISHED-TTL:PT1H',
