@@ -77,7 +77,7 @@ function somaParciais(c) {
 }
 const brlS = (n) => 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
 
-export async function GET() {
+export async function GET(request) {
   if (!papel()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
     const sb = supabaseServer();
@@ -87,6 +87,27 @@ export async function GET() {
       .map((r) => r.valor)
       .filter((c) => c && c.status === 'aberta')
       .sort((a, b) => Number(a.mesa) - Number(b.mesa) || (a.abertaEm || '').localeCompare(b.abertaEm || ''));
+
+    // PEDIDO LEVE: só o que muda a toda hora (as mesas abertas e se tem caixa).
+    //
+    // As telas ficam perguntando "mudou alguma coisa?" de 12 em 12 segundos, e
+    // até aqui cada pergunta dessas arrastava o painel INTEIRO do banco junto —
+    // cardápio, estoque, fichas, clientes — pra mostrar "2 mesas · 7 pessoas".
+    // O painel é a coisa mais pesada que existe aqui e quase nada nele muda
+    // entre uma pergunta e outra.
+    //
+    // O Supabase cobra por tudo o que sai do banco. Medindo o Dashboard parado,
+    // 79% da saída era painel relido à toa, 3 vezes por minuto. Com o pedido
+    // leve isso vira quase zero — e o que sobra de folga é o que permite
+    // atender mais gente no mesmo plano.
+    if (new URL(request.url).searchParams.get('leve')) {
+      const { data: cxLeve } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
+      return NextResponse.json({
+        ok: true, leve: true, comandas,
+        caixaAberto: (cxLeve || []).map((r) => r.valor).some((x) => x && x.aberto),
+      });
+    }
+
     const blob = await lerPainel(sb);
     const cardapioAtivo = (Array.isArray(blob.cardapio) ? blob.cardapio : []).filter((i) => i && i.ativo !== false);
     // Disponibilidade de cada item (via fichas técnicas + estoque), pra avisar o
