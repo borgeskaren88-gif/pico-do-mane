@@ -63,6 +63,16 @@ export default function PrimeiroUso({ onSalvar, onIr }) {
         As senhas de cada acesso ficam em <b>Configurações → Acessos</b>. O nome do negócio e dos
         acessos, em <b>Configurações → Meu negócio</b>.
       </div>
+      {/* O guia inteiro mora dentro do app. Quem abre pela primeira vez tem que
+          saber disso aqui, e não depois de se perder. */}
+      <button onClick={() => onIr('guia')}
+        style={{
+          width: '100%', textAlign: 'left', marginTop: 12, padding: '11px 13px', borderRadius: 10,
+          background: 'transparent', border: `1px solid ${C.accent}`, color: C.accent,
+          fontSize: 13.5, fontWeight: 700, cursor: 'pointer', lineHeight: 1.45,
+        }}>
+        Ver o guia completo do primeiro mês →
+      </button>
     </Card>
   );
 }

@@ -7,6 +7,7 @@ import { comprasPendentesDeEstoque } from '../lib/estoque';
 import { limparCopiaGuardada } from '../lib/versao';
 import { lerNegocio } from '../lib/negocio';
 import { lerModulos, darciDisponivel } from '../lib/modulos';
+import { metaDoMes } from '../lib/meta';
 import { ajustarDespesas } from '../lib/despesaDaCompra';
 import SEED_DATA from '../data/seed.json';
 
@@ -33,6 +34,7 @@ import Backup from './Backup';
 import Config from './Config';
 import MeuNegocio from './MeuNegocio';
 import PrimeiroUso from './PrimeiroUso';
+import Guia from './Guia';
 import Cardapio from './Cardapio';
 import Comandas from './Comandas';
 import VendasDoDia from './VendasDoDia';
@@ -676,7 +678,7 @@ export default function Dashboard() {
     ['darci', 'Darci'], ['brain', 'Brain'], ['hoje', 'Dashboard'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['previsao', 'Previsão'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'], ['despesarapida', 'Despesa Rápida'],
-    ['ponto', 'Ponto'], ['pasta', 'Pasta'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['acessos', 'Acessos'], ['backup', 'Backup'], ['negocio', 'Meu negócio'],
+    ['ponto', 'Ponto'], ['pasta', 'Pasta'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['acessos', 'Acessos'], ['backup', 'Backup'], ['negocio', 'Meu negócio'], ['guia', 'Como usar'],
   ];
 
   // Barra lateral: as áreas agrupadas por assunto (no PC fica fixa na lateral;
@@ -1074,6 +1076,14 @@ export default function Dashboard() {
           </>
         )}
         {tab === 'negocio' && <MeuNegocio negocio={negocio} onChange={upd.negocio} />}
+        {tab === 'guia' && (
+          <Guia
+            onIr={irParaTab} nome={(negocio && negocio.nome) || ''}
+            receitas={receitas} estoque={estoque} compras={compras} fichas={fichas}
+            temMeta={metaDoMes(metas, ymOf(todayISO())) > 0}
+            senhasDeFabrica={senhasDeFabrica}
+          />
+        )}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
         {tab === 'salao' && (
           <>
