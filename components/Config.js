@@ -29,7 +29,7 @@ const ATALHOS = [
   ['widget', 'Widget', 'O quadrinho na tela do iPad'],
 ];
 
-export default function Config({ aberto, onFechar, tema, onTema, cor, onCor, onIr }) {
+export default function Config({ aberto, onFechar, tema, onTema, cor, onCor, onIr, modulos, onModulos, recursos }) {
   if (!aberto) return null;
   const ir = (id) => { onIr(id); onFechar(); };
 
@@ -91,6 +91,37 @@ export default function Config({ aberto, onFechar, tema, onTema, cor, onCor, onI
               </button>
             );
           })}
+        </div>
+
+        {/* O QUE ESTE NEGÓCIO USA.
+            O Darci custa dinheiro por pergunta e precisa de chave de IA no
+            servidor. Sem chave, nem adianta ligar — e a tela diz isso em vez
+            de deixar um interruptor que não faz nada. */}
+        <div style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 8 }}>O que eu uso</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 13px', borderRadius: 11, background: C.panel2, border: `1px solid ${C.line}`, marginBottom: 18 }}>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 14.5, fontWeight: 700 }}>Darci, teu sócio</span>
+            <span style={{ display: 'block', fontSize: 12, color: C.faint, marginTop: 1, lineHeight: 1.45 }}>
+              {recursos && recursos.darci === false
+                ? 'Esta instalação não tem chave de IA — o Darci não responderia.'
+                : 'Responde sobre o negócio. Cada pergunta consome a chave de IA.'}
+            </span>
+          </span>
+          <button
+            onClick={() => onModulos && onModulos({ ...(modulos || {}), darci: !(modulos && modulos.darci !== false) })}
+            disabled={!!(recursos && recursos.darci === false)}
+            aria-pressed={!!(modulos && modulos.darci !== false)}
+            style={{
+              flexShrink: 0, border: 'none', borderRadius: 999, width: 50, height: 28, position: 'relative',
+              cursor: recursos && recursos.darci === false ? 'not-allowed' : 'pointer',
+              opacity: recursos && recursos.darci === false ? 0.4 : 1,
+              background: (modulos && modulos.darci !== false) ? C.accent : C.line,
+            }}>
+            <i style={{
+              position: 'absolute', top: 3, left: (modulos && modulos.darci !== false) ? 25 : 3,
+              width: 22, height: 22, borderRadius: 999, background: '#fff', transition: 'left .15s',
+            }} />
+          </button>
         </div>
 
         {/* ATALHOS */}

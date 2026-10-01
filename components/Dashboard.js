@@ -6,6 +6,7 @@ import { ymOf, todayISO, limparNome, fiadoDaVenda, uid, num, brl } from '../lib/
 import { comprasPendentesDeEstoque } from '../lib/estoque';
 import { limparCopiaGuardada } from '../lib/versao';
 import { lerNegocio } from '../lib/negocio';
+import { lerModulos, darciDisponivel } from '../lib/modulos';
 import { ajustarDespesas } from '../lib/despesaDaCompra';
 import SEED_DATA from '../data/seed.json';
 
@@ -178,6 +179,10 @@ export default function Dashboard() {
   // O nome do negócio e os nomes dos acessos. Cada um põe o seu — por isso
   // nada disso fica escrito no código.
   const [negocio, setNegocio] = useState(null);
+  // O que este negócio usa, e o que esta instalação consegue fazer. O Darci
+  // depende dos dois: ele custa por pergunta e precisa de chave no servidor.
+  const [modulos, setModulos] = useState(lerModulos({}));
+  const [recursos, setRecursos] = useState({ darci: true, voz: true });
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [cardapio, setCardapio] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -268,6 +273,7 @@ export default function Dashboard() {
       setListasModelo(arr(salvo && salvo.listasModelo));
       setMetas((salvo && typeof salvo.metas === 'object' && salvo.metas) || null);
       setNegocio(lerNegocio(salvo || {}));
+      setModulos(lerModulos(salvo || {}));
       setTarefasCozinha(arr(salvo && salvo.tarefasCozinha));
       setCardapio(arr(salvo && salvo.cardapio));
       setClientes(arr(salvo && salvo.clientes));
@@ -281,6 +287,18 @@ export default function Dashboard() {
         await apiSalvar({ ...salvo, ...limpos });
       }
       setLoaded(true);
+    })();
+  }, []);
+
+  // O que ESTA instalação consegue fazer (tem chave de IA?). Sem isso, uma
+  // cópia sem chave mostraria o Darci e ele não responderia nada.
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/recursos', { cache: 'no-store' });
+        const j = await r.json();
+        if (j?.ok) setRecursos({ darci: !!j.darci, voz: !!j.voz });
+      } catch { /* na dúvida, deixa como está */ }
     })();
   }, []);
 
@@ -389,6 +407,7 @@ export default function Dashboard() {
     cardapio: (v) => { setCardapio(v); salvarTudo({ cardapio: v }); },
     metas: (v) => { setMetas(v); salvarTudo({ metas: v }); },
     negocio: (v) => { setNegocio(v); salvarTudo({ negocio: v }); },
+    modulos: (v) => { setModulos(v); salvarTudo({ modulos: v }); },
     clientes: (v) => { setClientes(v); salvarTudo({ clientes: v }); },
   };
 
@@ -627,6 +646,8 @@ export default function Dashboard() {
   // APP NOVO DE VERDADE: nenhum lançamento e nenhum nome configurado. Só
   // nesse caso a tela de boas-vindas aparece — no app dela, que tem anos de
   // movimento, nunca.
+  const temDarci = darciDisponivel(modulos, recursos);
+
   const appNovo = !(negocio && negocio.nome)
     && !diario.length && !receitas.length && !despesas.length && !compras.length && !cardapio.length;
 
@@ -646,7 +667,7 @@ export default function Dashboard() {
   useEffect(() => { try { if (localStorage.getItem('picoos-lateral') === 'recolhida') setLateralRecolhida(true); } catch { /* ignora */ } }, []);
   const recolherLateral = (v) => setLateralRecolhida((cur) => { const nv = v == null ? !cur : v; try { localStorage.setItem('picoos-lateral', nv ? 'recolhida' : 'aberta'); } catch { /* ignora */ } return nv; });
   const grupos = [
-    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ['darci', 'Darci'], ['brain', 'Brain']] },
+    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ...(temDarci ? [['darci', 'Darci']] : []), ['brain', 'Brain']] },
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento'], ['previsao', 'Previsão']] },
     { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
@@ -905,12 +926,12 @@ export default function Dashboard() {
         {/* App novo: a tela de boas-vindas vem antes de tudo, em qualquer aba,
             até ela dizer de quem é o app. */}
         {appNovo && <PrimeiroUso onSalvar={upd.negocio} onIr={irParaTab} />}
-        {tab === 'darci' && <Darci {...propsDarci} />}
+        {tab === 'darci' && temDarci && <Darci {...propsDarci} />}
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
             ficha técnica de prato e de drink. As duas leem e escrevem. */}
         {tab === 'pasta' && <Pasta />}
-        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onPerguntar={() => setTab('darci')} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={<DarciFlutuante {...propsDarci} />} metas={metas} onMetas={upd.metas} dona={(negocio && (negocio.dona || (negocio.papeis && negocio.papeis.dona))) || ''} />}
+        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onPerguntar={temDarci ? () => setTab('darci') : null} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={temDarci ? <DarciFlutuante {...propsDarci} /> : null} metas={metas} onMetas={upd.metas} dona={(negocio && (negocio.dona || (negocio.papeis && negocio.papeis.dona))) || ''} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} vendas={vendas} />}
         {tab === 'financas' && (
           <>
@@ -1064,6 +1085,7 @@ export default function Dashboard() {
         aberto={configAberta} onFechar={() => setConfigAberta(false)}
         tema={tema} onTema={aplicarTema}
         cor={cor} onCor={aplicarCor}
+        modulos={modulos} onModulos={upd.modulos} recursos={recursos}
         onIr={(id) => { irParaTab(id); setMenuAberto(false); }}
       />
     </div>
