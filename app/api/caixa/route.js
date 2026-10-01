@@ -125,9 +125,10 @@ const n2 = (n) => {
 //  - Fiado RECEBIDO no turno (recebimentos ligados ao caixa, de qualquer venda,
 //    inclusive de dívidas antigas) — dinheiro que entrou de fiado, NÃO é comanda
 //    de hoje. Fica num balde próprio (fiadoRecebido) pra dar pra separar na tela.
-async function entradasDoCaixa(sb, caixaId) {
-  const { data } = await sb.from('pdm_dados').select('valor').like('chave', VD + '%');
-  const todas = (data || []).map((r) => r.valor).filter(Boolean);
+// Recebe as vendas já lidas, em vez de ler de novo: quem chama aqui quase
+// sempre precisa da mesma lista pra outra coisa, e eram duas varridas da
+// história inteira no mesmo pedido.
+function entradasDoCaixa(todas, caixaId) {
   const vendas = todas.filter((v) => v.caixaId === caixaId);
   const ent = { Dinheiro: 0, Pix: 0, 'Crédito': 0, 'Débito': 0, Fiado: 0 };
   let servico = 0;
@@ -161,13 +162,19 @@ function resumo(caixa, entradas, fiadoRecebido) {
 }
 
 // Vendas de HOJE que ficaram sem caixa nenhum (fechadas com o caixa fechado).
-async function vendasSoltasDoDia(sb) {
-  const hoje = diaOperacional();
+async function todasAsVendas(sb) {
   const { data } = await sb.from('pdm_dados').select('valor').like('chave', VD + '%');
-  return (data || []).map((r) => r.valor).filter((v) => v && !v.caixaId && v.data === hoje);
+  return (data || []).map((r) => r.valor).filter(Boolean);
+}
+function soltasDoDia(todas) {
+  const hoje = diaOperacional();
+  return todas.filter((v) => !v.caixaId && v.data === hoje);
+}
+async function vendasSoltasDoDia(sb) {
+  return soltasDoDia(await todasAsVendas(sb));
 }
 
-export async function GET() {
+export async function GET(request) {
   const p = papel();
   if (!p) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
@@ -176,15 +183,28 @@ export async function GET() {
     if (error) throw error;
     const caixas = (data || []).map((r) => r.valor).filter(Boolean);
     const aberto = caixas.find((c) => c.aberto) || null;
+
+    // PEDIDO LEVE: "tem caixa aberto?" e mais nada.
+    //
+    // O Dashboard pergunta isso de minuto em minuto só pra mostrar o aviso de
+    // caixa esquecido aberto. A resposta completa, porém, varre TODAS as vendas
+    // já registradas no bar — a história inteira — pra contar as de hoje. Num
+    // bar com um ano de comandas isso é a leitura mais cara do sistema, e ela
+    // só cresce. O leve responde lendo apenas as linhas de caixa.
+    if (new URL(request.url).searchParams.get('leve')) {
+      return NextResponse.json({ ok: true, leve: true, aberto });
+    }
+
+    const todas = await todasAsVendas(sb);
     let entradas = null, extra = null, qtdVendas = 0, servico = 0, fiadoRecebido = null;
     if (aberto) {
-      const r = await entradasDoCaixa(sb, aberto.id);
+      const r = entradasDoCaixa(todas, aberto.id);
       entradas = r.entradas; qtdVendas = r.qtdVendas; servico = r.servico; fiadoRecebido = r.fiadoRecebido; extra = resumo(aberto, r.entradas, r.fiadoRecebido);
     }
     // Comanda fechada sem caixa aberto fica "solta": não entra no fechamento
     // nem, por consequência, na receita do dia. Em vez de sumir calada, ela é
     // contada aqui pra tela poder oferecer o resgate.
-    const soltas = await vendasSoltasDoDia(sb);
+    const soltas = soltasDoDia(todas);
     const historico = caixas.filter((c) => !c.aberto).sort((a, b) => (b.fechadoEm || '').localeCompare(a.fechadoEm || '')).slice(0, 15);
     // A lista vale pros dois papéis: a contagem é às cegas pra quem estiver
     // fechando, inclusive pra dona. Ver o saldo esperado enquanto conta faz a
@@ -262,7 +282,7 @@ export async function POST(request) {
       const id = String(body?.id || '').slice(0, 40);
       const caixa = caixas.find((c) => c.id === id && c.aberto);
       if (!caixa) return NextResponse.json({ ok: false, erro: 'Caixa não encontrado ou já fechado.' }, { status: 404 });
-      const { entradas, qtdVendas, servico, fiadoRecebido } = await entradasDoCaixa(sb, caixa.id);
+      const { entradas, qtdVendas, servico, fiadoRecebido } = entradasDoCaixa(await todasAsVendas(sb), caixa.id);
       const r = resumo(caixa, entradas, fiadoRecebido);
       const contado = body?.contado != null && body?.contado !== '' ? n2(body.contado) : null;
       const fechado = {

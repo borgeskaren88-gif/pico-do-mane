@@ -105,12 +105,20 @@ export default function Comandas({ papel = 'dona' }) {
   const infoDe = useRef(null); // id da comanda cujo info está carregado
   const editandoRef = useRef(false);
 
-  const carregar = useCallback(async () => {
+  // Uma volta "leve" traz só as mesas abertas e se o caixa está aberto — é o
+  // que muda de minuto em minuto. O cardápio, os clientes e o nº de mesas quase
+  // nunca mudam no meio do expediente, e vinham junto a cada 12 segundos
+  // puxando o painel inteiro do banco. Agora só vêm na volta completa.
+  const carregar = useCallback(async (leve = false) => {
     try {
-      const r = await fetch('/api/comandas', { cache: 'no-store' });
+      const r = await fetch(`/api/comandas${leve ? '?leve=1' : ''}`, { cache: 'no-store' });
       const j = await r.json();
-      if (j.ok) { setComandas(j.comandas || []); setCardapio(j.cardapio || []); setClientes(j.clientes || []); setCaixaAberto(j.caixaAberto !== false); if (j.mesasQtd) setMesasQtd(j.mesasQtd); setErro(''); }
-      else setErro(j.erro || 'Erro ao carregar.');
+      if (j.ok) {
+        setComandas(j.comandas || []);
+        setCaixaAberto(j.caixaAberto !== false);
+        if (!j.leve) { setCardapio(j.cardapio || []); setClientes(j.clientes || []); if (j.mesasQtd) setMesasQtd(j.mesasQtd); }
+        setErro('');
+      } else setErro(j.erro || 'Erro ao carregar.');
     } catch { setErro('Sem conexão.'); }
     finally { setCarregado(true); }
   }, []);
@@ -120,9 +128,16 @@ export default function Comandas({ papel = 'dona' }) {
   const toggleValores = () => setVerValores((v) => { const nv = !v; try { localStorage.setItem('picoos-ver-valores-mesa', nv ? '1' : '0'); } catch { /* ignora */ } return nv; });
   // Atualiza sozinho de tempos em tempos, pra um garçom ver as mesas do outro.
   // Não recarrega enquanto está mexendo numa comanda, pra não atrapalhar.
+  // De 12 em 12 segundos vai a volta leve; uma vez por minuto vai a completa,
+  // pra o cardápio e o "está acabando" não ficarem velhos na tela do garçom.
+  const voltas = useRef(0);
   useEffect(() => {
-    const t = setInterval(() => { if (!editandoRef.current) carregar(); }, 12000);
-    const onFoco = () => { if (!editandoRef.current) carregar(); };
+    const t = setInterval(() => {
+      if (editandoRef.current) return;
+      voltas.current += 1;
+      carregar(voltas.current % 5 !== 0);
+    }, 12000);
+    const onFoco = () => { if (!editandoRef.current) { voltas.current = 0; carregar(); } };
     window.addEventListener('focus', onFoco);
     return () => { clearInterval(t); window.removeEventListener('focus', onFoco); };
   }, [carregar]);

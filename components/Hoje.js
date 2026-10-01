@@ -13,7 +13,9 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const [caixaAberto, setCaixaAberto] = useState(null);
   useEffect(() => {
     const carregar = async () => {
-      try { const r = await fetch('/api/caixa', { cache: 'no-store' }); const j = await r.json(); setCaixaAberto(j.ok && j.aberto ? j.aberto : null); } catch { /* ignora */ }
+      // "leve": o Dashboard só quer saber SE tem caixa aberto. A resposta
+      // completa varre todas as vendas já feitas no bar pra montar o fechamento.
+      try { const r = await fetch('/api/caixa?leve=1', { cache: 'no-store' }); const j = await r.json(); setCaixaAberto(j.ok && j.aberto ? j.aberto : null); } catch { /* ignora */ }
     };
     carregar(); const t = setInterval(carregar, 60000); return () => clearInterval(t);
   }, []);
@@ -25,7 +27,9 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const [salaoAgora, setSalaoAgora] = useState({ mesas: 0, pessoas: 0 });
   useEffect(() => {
     const carregar = async () => {
-      try { const r = await fetch('/api/comandas', { cache: 'no-store' }); const j = await r.json(); if (j.ok) { const cs = j.comandas || []; setSalaoAgora({ mesas: cs.length, pessoas: cs.reduce((s, c) => s + (Number(c.pessoas) || 0), 0) }); } } catch { /* ignora */ }
+      // "leve": o Dashboard só quer dois números (mesas e pessoas). Sem o leve,
+      // cada uma destas perguntas puxava o painel inteiro do banco junto.
+      try { const r = await fetch('/api/comandas?leve=1', { cache: 'no-store' }); const j = await r.json(); if (j.ok) { const cs = j.comandas || []; setSalaoAgora({ mesas: cs.length, pessoas: cs.reduce((s, c) => s + (Number(c.pessoas) || 0), 0) }); } } catch { /* ignora */ }
     };
     carregar(); const t = setInterval(carregar, 20000); return () => clearInterval(t);
   }, []);
