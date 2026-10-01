@@ -24,23 +24,30 @@ const PAPEIS = [
   ['reservas', 'pico-do-mane-reservas:'],
 ];
 
-let cache = null;      // { geracoes, em }
-let ultimaBoa = null;  // última leitura que deu certo, pra sobreviver a soluço do banco
+// Um cache e uma "última boa" POR NEGÓCIO. Num app de muitos, as gerações de
+// um cliente não têm nada a ver com as do outro: se fosse uma lista só, cortar
+// a cozinha de um bar derrubaria a cozinha de todos os outros na mesma hora.
+const cache = new Map();      // negocio -> { geracoes, em }
+const ultimaBoa = new Map();  // negocio -> geracoes (sobrevive a soluço do banco)
 
-async function geracoes() {
+async function geracoes(negocio) {
   const agora = Date.now();
-  if (cache && agora - cache.em < VALIDADE_CACHE) return cache.geracoes;
+  const guardado = cache.get(negocio);
+  if (guardado && agora - guardado.em < VALIDADE_CACHE) return guardado.geracoes;
 
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return ultimaBoa;
+  if (!url || !key) return ultimaBoa.get(negocio) || null;
 
+  // A linha das gerações mora dentro do negócio, com a marca dele — a mesma que
+  // lib/banco.js põe. Instalação de um cliente só não tem marca nenhuma.
+  const chave = (negocio ? `n:${negocio}:` : '') + CHAVE;
   try {
-    const r = await fetch(`${url}/rest/v1/pdm_dados?select=valor&chave=eq.${CHAVE}`, {
+    const r = await fetch(`${url}/rest/v1/pdm_dados?select=valor&chave=eq.${encodeURIComponent(chave)}`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
       cache: 'no-store',
     });
-    if (!r.ok) return ultimaBoa;
+    if (!r.ok) return ultimaBoa.get(negocio) || null;
     const linhas = await r.json();
     const v = (Array.isArray(linhas) && linhas[0] && linhas[0].valor) || {};
     const out = {};
@@ -48,14 +55,14 @@ async function geracoes() {
       const n = Math.floor(Number(v[p]));
       out[p] = Number.isFinite(n) && n >= 1 ? n : 1;
     }
-    cache = { geracoes: out, em: agora };
-    ultimaBoa = out;
+    cache.set(negocio, { geracoes: out, em: agora });
+    ultimaBoa.set(negocio, out);
     return out;
   } catch {
     // Banco engasgou. Vale a última leitura boa; se nunca houve uma, deixa
     // passar — derrubar a cozinha inteira por causa de um soluço de rede seria
     // trocar um problema raro por um problema toda noite.
-    return ultimaBoa;
+    return ultimaBoa.get(negocio) || null;
   }
 }
 
@@ -71,24 +78,34 @@ export async function middleware(req) {
   const cookie = req.cookies.get('pdm_session')?.value;
   if (!cookie) return NextResponse.next();
 
-  const atuais = await geracoes();
+  // O crachá do app único vem como "negocio|...". O porteiro precisa separar
+  // isso ANTES de qualquer coisa: o nome do negócio diz de quem são as gerações
+  // a consultar E entra na conta que confere o crachá. Sem isso, nenhum crachá
+  // de cliente bateria aqui, o porteiro deixaria todos passarem, e
+  // "desconectar os aparelhos da cozinha" pararia de funcionar justamente pra
+  // quem paga.
+  const barra = cookie.indexOf('|');
+  const negocio = barra < 0 ? '' : cookie.slice(0, barra);
+  const semNegocio = barra < 0 ? cookie : cookie.slice(barra + 1);
+
+  const atuais = await geracoes(negocio);
   // Sem leitura ou com tudo na geração 1: nada foi cortado, nada pode estar
   // vencido. Sai daqui sem gastar uma conta sequer.
   if (!atuais || PAPEIS.every(([p]) => atuais[p] === 1)) return NextResponse.next();
 
   // A geração vem escrita no crachá; crachá antigo, de antes disto existir, é
   // geração 1 — que é justamente o caso do aparelho de quem já estava logado.
-  const m = /^g(\d{1,6})\.(.+)$/.exec(cookie);
+  const m = /^g(\d{1,6})\.(.+)$/.exec(semNegocio);
   const geracao = m ? Math.max(1, Number(m[1])) : 1;
 
   // De qual acesso é este crachá? O porteiro descobre refazendo a conta. O
   // cookie da DONA não bate com nenhum dos três — e aí ele passa direto, que é
   // como tem que ser: o acesso dela não se corta por aqui.
   const segredo = process.env.SESSION_SECRET || '';
-  const tempero = geracao > 1 ? ':g' + geracao : '';
+  const tempero = (geracao > 1 ? ':g' + geracao : '') + (negocio ? ':n:' + negocio : '');
   for (const [papel, prefixo] of PAPEIS) {
     const esperado = await sha256hex(prefixo + segredo + tempero);
-    const valor = m ? m[2] : cookie;
+    const valor = m ? m[2] : semNegocio;
     if (valor !== esperado) continue;
     // É deste acesso. Vale enquanto for da geração em vigor.
     if (geracao >= atuais[papel]) return NextResponse.next();
