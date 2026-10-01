@@ -4,5 +4,6 @@
   "despesas": [],
   "compras": [],
   "cotacoes": [],
-  "garrafas": []
+  "garrafas": [],
+  "modulos": { "darci": false }
 }
