@@ -168,6 +168,9 @@ export default function Dashboard() {
   const [listaCompras, setListaCompras] = useState([]);
   const [listaCozinha, setListaCozinha] = useState([]);
   const [listasModelo, setListasModelo] = useState([]);
+  // A meta de faturamento do mês e os dias em que o bar abre. Não é lista: é
+  // um objetinho { padrao, diasSemana, '2026-10': ... }.
+  const [metas, setMetas] = useState(null);
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [cardapio, setCardapio] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -256,6 +259,7 @@ export default function Dashboard() {
       setListaCompras(arr(salvo && salvo.listaCompras));
       setListaCozinha(arr(salvo && salvo.listaCozinha));
       setListasModelo(arr(salvo && salvo.listasModelo));
+      setMetas((salvo && typeof salvo.metas === 'object' && salvo.metas) || null);
       setTarefasCozinha(arr(salvo && salvo.tarefasCozinha));
       setCardapio(arr(salvo && salvo.cardapio));
       setClientes(arr(salvo && salvo.clientes));
@@ -375,6 +379,7 @@ export default function Dashboard() {
     listaCompras: (v) => { setListaCompras(v); salvarTudo({ listaCompras: v }); },
     tarefasCozinha: (v) => { setTarefasCozinha(v); salvarTudo({ tarefasCozinha: v }); },
     cardapio: (v) => { setCardapio(v); salvarTudo({ cardapio: v }); },
+    metas: (v) => { setMetas(v); salvarTudo({ metas: v }); },
     clientes: (v) => { setClientes(v); salvarTudo({ clientes: v }); },
   };
 
@@ -866,7 +871,7 @@ export default function Dashboard() {
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
             ficha técnica de prato e de drink. As duas leem e escrevem. */}
         {tab === 'pasta' && <Pasta />}
-        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onPerguntar={() => setTab('darci')} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={<DarciFlutuante {...propsDarci} />} />}
+        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onPerguntar={() => setTab('darci')} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={<DarciFlutuante {...propsDarci} />} metas={metas} onMetas={upd.metas} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} vendas={vendas} />}
         {tab === 'financas' && (
           <>

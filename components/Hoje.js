@@ -2,11 +2,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { C, Card, Btn, KPI, Empty } from './ui';
+import MetaMes from './MetaMes';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_NAO_OPERACIONAL, DESPESA_NAO_OPERACIONAL } from '../lib/util';
 
 const TAB = { fontVariantNumeric: 'tabular-nums' };
 
-export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], estoque = [], vendas = [], setTab, darci = null, resumo = null }) {
+export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], estoque = [], vendas = [], setTab, darci = null, resumo = null, metas = null, onMetas }) {
   const [mostrarValores, setMostrarValores] = useState(true);
   const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
   const [caixaAberto, setCaixaAberto] = useState(null);
@@ -102,6 +103,14 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
       {/* O resumo do dia: avisos, mesa reservada e o que mudou, num cartão só.
           Vem depois do título — o nome da tela aparece antes de tudo. */}
       {resumo}
+
+      {/* A META DO MÊS, logo no alto.
+          Ela pediu: "quero que no meu Dashboard apareça algo assim, com uma
+          meta". O número grande sozinho não decide nada — o que decide é
+          quanto falta e quanto precisa por noite nas noites que sobraram. */}
+      {onMetas && (
+        <MetaMes metas={metas} receitas={receitas} realizado={rec} oculto={oculto} onSalvar={onMetas} />
+      )}
 
       {caixaAlerta && (
         <Card style={{ marginBottom: 12, borderColor: C.red }}>
