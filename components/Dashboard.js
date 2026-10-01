@@ -28,6 +28,7 @@ import Cotacoes from './Cotacoes';
 import Relatorios from './Relatorios';
 import RaioX from './RaioX';
 import Backup from './Backup';
+import Config from './Config';
 import Cardapio from './Cardapio';
 import Comandas from './Comandas';
 import VendasDoDia from './VendasDoDia';
@@ -589,19 +590,30 @@ export default function Dashboard() {
   // Tema claro/escuro. O tema inicial já é aplicado no <html> por um script no
   // layout (sem piscar); aqui só lemos o valor atual e deixamos a Karen trocar.
   const [tema, setTema] = useState('escuro');
+  // A cor do destaque (azul, verde, roxo…). Vazio = o azul de sempre.
+  const [cor, setCor] = useState('');
+  const [configAberta, setConfigAberta] = useState(false);
   useEffect(() => {
     const atual = document.documentElement.getAttribute('data-theme') === 'claro' ? 'claro' : 'escuro';
     setTema(atual);
+    setCor(document.documentElement.getAttribute('data-cor') || '');
     const m = document.querySelector('meta[name="theme-color"]');
     if (m) m.setAttribute('content', atual === 'claro' ? '#F6F9FD' : '#0A1220');
   }, []);
-  const trocarTema = () => {
-    const novo = tema === 'claro' ? 'escuro' : 'claro';
+  const aplicarTema = (novo) => {
+    if (novo !== 'claro' && novo !== 'escuro') return;
     setTema(novo);
     document.documentElement.setAttribute('data-theme', novo);
     try { localStorage.setItem('picoos-tema', novo); } catch { /* ignora */ }
     const m = document.querySelector('meta[name="theme-color"]');
     if (m) m.setAttribute('content', novo === 'claro' ? '#F6F9FD' : '#0A1220');
+  };
+  const trocarTema = () => aplicarTema(tema === 'claro' ? 'escuro' : 'claro');
+  const aplicarCor = (nova) => {
+    setCor(nova || '');
+    if (nova) document.documentElement.setAttribute('data-cor', nova);
+    else document.documentElement.removeAttribute('data-cor');
+    try { localStorage.setItem('picoos-cor', nova || ''); } catch { /* ignora */ }
   };
 
   const tabs = [
@@ -624,7 +636,10 @@ export default function Dashboard() {
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento'], ['previsao', 'Previsão']] },
     { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
-    { titulo: 'Gestão', itens: [['pasta', 'Pasta'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['acessos', 'Acessos'], ['backup', 'Backup']] },
+    // Backup, Acessos, Notificações e Widget saíram daqui pra dentro da
+    // engrenagem: são telas de AJUSTAR o sistema, mexidas uma vez e nunca
+    // mais, e estavam alongando o menu do trabalho do dia a dia.
+    { titulo: 'Gestão', itens: [['pasta', 'Pasta'], ['marketing', 'Marketing']] },
   ];
 
   // Lembra a última área aberta (no aparelho), pra que atualizar a página caia na
@@ -843,6 +858,13 @@ export default function Dashboard() {
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.2M12 19.3v2.2M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.4 19.6l1.6-1.6M18 6l1.6-1.6" /></svg>
               )}
             </button>
+            <button onClick={() => setConfigAberta(true)} title="Configurações" aria-label="Configurações"
+              style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3.2" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
             <button onClick={sair} style={{ flex: 1, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Sair</button>
           </div>
           <VersaoApp />
@@ -1018,6 +1040,14 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* A engrenagem abre por cima de tudo: funciona igual no iPad (lateral
+          fixa) e no celular (menu que desliza). */}
+      <Config
+        aberto={configAberta} onFechar={() => setConfigAberta(false)}
+        tema={tema} onTema={aplicarTema}
+        cor={cor} onCor={aplicarCor}
+        onIr={(id) => { irParaTab(id); setMenuAberto(false); }}
+      />
     </div>
   );
 }

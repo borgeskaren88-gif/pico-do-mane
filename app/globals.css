@@ -61,6 +61,42 @@
   --c-card-shadow: 0 1px 2px rgba(20, 49, 99, 0.04), 0 8px 24px rgba(20, 49, 99, 0.06);
 }
 
+/* COR DO APP.
+   O tema (claro/escuro) decide o fundo e a letra; a cor decide o DESTAQUE —
+   os botões, as abas ativas, o brilho do topo. São coisas separadas de
+   propósito: ela pode querer o app roxo tanto no claro quanto no escuro.
+   Cada cor redefine só as quatro variáveis de destaque, por cima do tema, e
+   por isso vem DEPOIS dos blocos de tema aqui em cima. */
+:root[data-cor="verde"] {
+  --c-accent: #1FB562; --c-accent2: #5FD79A;
+  --c-glow-a: rgba(31, 181, 98, 0.26); --c-glow-b: rgba(31, 181, 98, 0);
+}
+:root[data-theme="claro"][data-cor="verde"] { --c-accent: #12924C; --c-accent2: #45BC80; --c-glow-a: rgba(18, 146, 76, 0.07); --c-glow-b: rgba(18, 146, 76, 0); }
+
+:root[data-cor="roxo"] {
+  --c-accent: #8B5CF6; --c-accent2: #B394FA;
+  --c-glow-a: rgba(139, 92, 246, 0.26); --c-glow-b: rgba(139, 92, 246, 0);
+}
+:root[data-theme="claro"][data-cor="roxo"] { --c-accent: #6D34E0; --c-accent2: #9A6BF2; --c-glow-a: rgba(109, 52, 224, 0.07); --c-glow-b: rgba(109, 52, 224, 0); }
+
+:root[data-cor="laranja"] {
+  --c-accent: #F59331; --c-accent2: #F9B771;
+  --c-glow-a: rgba(245, 147, 49, 0.24); --c-glow-b: rgba(245, 147, 49, 0);
+}
+:root[data-theme="claro"][data-cor="laranja"] { --c-accent: #C96C0C; --c-accent2: #E29141; --c-glow-a: rgba(201, 108, 12, 0.07); --c-glow-b: rgba(201, 108, 12, 0); }
+
+:root[data-cor="rosa"] {
+  --c-accent: #EC4899; --c-accent2: #F586BC;
+  --c-glow-a: rgba(236, 72, 153, 0.24); --c-glow-b: rgba(236, 72, 153, 0);
+}
+:root[data-theme="claro"][data-cor="rosa"] { --c-accent: #C72472; --c-accent2: #E05A9B; --c-glow-a: rgba(199, 36, 114, 0.07); --c-glow-b: rgba(199, 36, 114, 0); }
+
+:root[data-cor="turquesa"] {
+  --c-accent: #14B8C4; --c-accent2: #5FD8E0;
+  --c-glow-a: rgba(20, 184, 196, 0.26); --c-glow-b: rgba(20, 184, 196, 0);
+}
+:root[data-theme="claro"][data-cor="turquesa"] { --c-accent: #0B8E99; --c-accent2: #3FB4BE; --c-glow-a: rgba(11, 142, 153, 0.07); --c-glow-b: rgba(11, 142, 153, 0); }
+
 html, body {
   background: var(--c-bg-bottom);
   /* A letra e a cor do texto do PicoOS ficam aqui, no corpo da página. Cada
