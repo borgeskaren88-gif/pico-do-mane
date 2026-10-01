@@ -17,6 +17,10 @@ export default function LoginForm() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [papeis, setPapeis] = useState(PAPEIS_PADRAO);
   const [negocio, setNegocio] = useState('');
+  // Instalação de muitos negócios: aí a pessoa diz de qual é. Numa instalação
+  // de um cliente só (como a do Pico do Mané) este campo nem aparece.
+  const [multi, setMulti] = useState(false);
+  const [codigo, setCodigo] = useState('');
   useEffect(() => {
     let vivo = true;
     (async () => {
@@ -26,6 +30,12 @@ export default function LoginForm() {
         if (!vivo || !j) return;
         if (Array.isArray(j.papeis) && j.papeis.length) setPapeis(j.papeis);
         if (j.nome) setNegocio(j.nome);
+        if (j.multi) {
+          setMulti(true);
+          // Digitado uma vez, lembrado neste aparelho. Quem trabalha no lugar
+          // não devia ter que saber o código de cor todo dia.
+          try { setCodigo(localStorage.getItem('picoos-codigo') || ''); } catch { /* ignora */ }
+        }
       } catch { /* fica com os nomes genéricos */ }
     })();
     return () => { vivo = false; };
@@ -45,13 +55,14 @@ export default function LoginForm() {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senha, papel, lembrar }),
+        body: JSON.stringify({ senha, papel, lembrar, ...(multi ? { codigo: codigo.trim().toLowerCase() } : {}) }),
       });
       const json = await res.json();
       if (json.ok) {
         // Marca a sessão como ativa nesta janela pra a trava de tela não pedir a
         // senha logo depois do login (ela só trava ao fechar e reabrir).
         try { sessionStorage.setItem('pdm_sessaoAtiva', '1'); } catch { /* ignora */ }
+        if (multi) { try { localStorage.setItem('picoos-codigo', codigo.trim().toLowerCase()); } catch { /* ignora */ } }
         router.refresh();
       } else {
         setErro(json.erro || 'Senha incorreta.');
@@ -76,6 +87,20 @@ export default function LoginForm() {
 
         <Card>
           <form onSubmit={entrar}>
+            {multi && (
+              <Field label="Código do negócio">
+                <input
+                  value={codigo}
+                  placeholder="ex: boteco-da-ana"
+                  onChange={(e) => { setCodigo(e.target.value); setErro(''); }}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="organization"
+                  spellCheck="false"
+                  style={inputStyle}
+                />
+              </Field>
+            )}
             <Field label="Quem está entrando?">
               <div style={{ display: 'flex', flexWrap: 'wrap', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 3, gap: 3 }}>
                 {papeis.map(([v, rot]) => (
@@ -97,7 +122,7 @@ export default function LoginForm() {
                   autoCorrect="off"
                   autoComplete="current-password"
                   spellCheck="false"
-                  autoFocus
+                  autoFocus={!multi || !!codigo}
                   style={{ ...inputStyle, paddingRight: 44 }}
                 />
                 <button type="button" onClick={() => setMostrarSenha((v) => !v)}

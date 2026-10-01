@@ -210,12 +210,17 @@ Dito agora, pra não virar surpresa:
 
 ---
 
-## Antes de qualquer coisa: uma limpeza
+## Sobre o histórico do código — decidido
 
-O histórico do código ainda guarda versões antigas do `data/seed.json` com os
-**números de verdade do Pico do Mané**. Hoje não incomoda, porque só a Karen abre
-o repositório.
+O histórico guarda **5 versões antigas do seed** com os números de verdade do
+Pico do Mané (64 receitas, 134 despesas, 89 compras, 149 cotações). **Nenhuma
+chave de verdade** — só os textos dos guias e os exemplos.
 
-Mas o app único é o momento em que isso deixa de ser teoria: é um sistema que
-vai rodar o dinheiro de outras pessoas, e mais cedo ou mais tarde alguém além
-dela vai olhar esse código. **Essa limpeza entra antes da etapa 1.**
+Olhando de perto, reescrever o histórico é pior do que parecia: exige apagar e
+refazer os 179 commits na `main`, e **mesmo assim o GitHub não some com os
+pedaços antigos na hora**. Quem já souber o endereço de um commit velho ainda
+alcança por um tempo.
+
+**Decisão da Karen: não reescrever.** No dia em que ela for dar acesso do código
+a alguém, nasce um repositório novo e limpo, com o código daquele dia num commit
+só. É 100% eficaz, não tem risco, e não custa nada enquanto esse dia não chega.
