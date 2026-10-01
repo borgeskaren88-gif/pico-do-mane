@@ -31,6 +31,7 @@ import RaioX from './RaioX';
 import Backup from './Backup';
 import Config from './Config';
 import MeuNegocio from './MeuNegocio';
+import PrimeiroUso from './PrimeiroUso';
 import Cardapio from './Cardapio';
 import Comandas from './Comandas';
 import VendasDoDia from './VendasDoDia';
@@ -623,6 +624,12 @@ export default function Dashboard() {
     try { localStorage.setItem('picoos-cor', nova || ''); } catch { /* ignora */ }
   };
 
+  // APP NOVO DE VERDADE: nenhum lançamento e nenhum nome configurado. Só
+  // nesse caso a tela de boas-vindas aparece — no app dela, que tem anos de
+  // movimento, nunca.
+  const appNovo = !(negocio && negocio.nome)
+    && !diario.length && !receitas.length && !despesas.length && !compras.length && !cardapio.length;
+
   const tabs = [
     ['darci', 'Darci'], ['brain', 'Brain'], ['hoje', 'Dashboard'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['previsao', 'Previsão'], ['garrafas', 'Controle'],
@@ -895,6 +902,9 @@ export default function Dashboard() {
           </div>
 
       <div style={{ maxWidth: tab === 'brain' ? 1180 : 760, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
+        {/* App novo: a tela de boas-vindas vem antes de tudo, em qualquer aba,
+            até ela dizer de quem é o app. */}
+        {appNovo && <PrimeiroUso onSalvar={upd.negocio} onIr={irParaTab} />}
         {tab === 'darci' && <Darci {...propsDarci} />}
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
