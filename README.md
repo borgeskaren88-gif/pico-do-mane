@@ -1,5 +1,9 @@
 # Central Pico do Mané — site próprio
 
+> **Vai instalar o PicoOS para outra pessoa?** Este guia aqui é para o SEU app.
+> O da cópia para um cliente é o [INSTALAR-PARA-CLIENTE.md](INSTALAR-PARA-CLIENTE.md) —
+> é outro caminho, com outros cuidados.
+
 Este é o mesmo painel que você já usa, agora como um site de verdade: link fixo,
 sem cache travando, funciona igual em qualquer aparelho. Leva uns 15-20 minutos
 para colocar no ar, tudo por navegador, sem instalar nada no computador.
