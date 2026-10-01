@@ -1,9 +1,12 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { C, Card, Field, inputStyle, LogoMark, pageBg } from './ui';
 
-const PAPEIS = [['dona', 'Karen'], ['cozinha', 'Cozinha'], ['garcom', 'Atendimento'], ['reservas', 'Mari']];
+// Os nomes genéricos. Os de verdade vêm da configuração do negócio (cada um
+// põe o seu) — e, se a consulta falhar, estes aqui garantem que ninguém fica
+// sem conseguir entrar por causa de um rótulo.
+const PAPEIS_PADRAO = [['dona', 'Dona'], ['cozinha', 'Cozinha'], ['garcom', 'Atendimento'], ['reservas', 'Reservas']];
 
 export default function LoginForm() {
   const router = useRouter();
@@ -12,6 +15,21 @@ export default function LoginForm() {
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [papeis, setPapeis] = useState(PAPEIS_PADRAO);
+  const [negocio, setNegocio] = useState('');
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const r = await fetch('/api/negocio', { cache: 'no-store' });
+        const j = await r.json();
+        if (!vivo || !j) return;
+        if (Array.isArray(j.papeis) && j.papeis.length) setPapeis(j.papeis);
+        if (j.nome) setNegocio(j.nome);
+      } catch { /* fica com os nomes genéricos */ }
+    })();
+    return () => { vivo = false; };
+  }, []);
 
   const entrar = async (e) => {
     e.preventDefault();
@@ -52,13 +70,15 @@ export default function LoginForm() {
           <div style={{ width: 56, margin: '0 auto 14px' }}><LogoMark size={56} radius={16} /></div>
           <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '.02em' }}>PicoOS</div>
           <div style={{ fontSize: 12, color: C.accent, letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 4, fontWeight: 600 }}>Central de Gestão</div>
+          {/* O nome do negócio de quem usa, embaixo da marca do produto. */}
+          {negocio && <div style={{ fontSize: 14, color: C.muted, marginTop: 8, fontWeight: 700 }}>{negocio}</div>}
         </div>
 
         <Card>
           <form onSubmit={entrar}>
             <Field label="Quem está entrando?">
               <div style={{ display: 'flex', flexWrap: 'wrap', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 3, gap: 3 }}>
-                {PAPEIS.map(([v, rot]) => (
+                {papeis.map(([v, rot]) => (
                   <button key={v} type="button" onClick={() => { setPapel(v); setErro(''); }} style={{
                     flex: '1 1 45%', minWidth: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '9px 6px', fontSize: 14, fontWeight: 700,
                     background: papel === v ? C.accent : 'transparent', color: papel === v ? '#06101F' : C.muted,

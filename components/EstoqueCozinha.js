@@ -80,7 +80,7 @@ export default function EstoqueCozinha() {
             Vencendo ({vencendo.length})
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>
-            Usa primeiro o que está no fim. O que venceu, dá saída e avisa a Karen.
+            Usa primeiro o que está no fim. O que venceu, dá saída e avisa a dona.
           </div>
           {vencendo.map(({ item, dias, nivel }) => (
             <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, borderTop: `1px solid ${C.hair}`, padding: '7px 0', fontSize: 14 }}>

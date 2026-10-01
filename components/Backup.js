@@ -8,7 +8,7 @@ import SEED_DATA from '../data/seed.json';
 // Monta um relatório em texto (Markdown) para análise: um RESUMO com os
 // números já calculados + os DADOS COMPLETOS organizados por seção. Bem mais
 // útil pra analisar do que o JSON cru.
-function montarAnalise(all) {
+function montarAnalise(all, marca = 'Meu negócio') {
   const L = [];
   const arrOu = (v) => (Array.isArray(v) ? v : []);
   const pct = (n, d) => (d ? (n / d * 100).toFixed(1).replace('.', ',') + '%' : '—');
@@ -21,7 +21,7 @@ function montarAnalise(all) {
   const lucroTotal = recTotal - despTotal;
   const meses = [...new Set([...all.receitas, ...all.despesas].map((x) => ymOf(x.data)).filter(Boolean))].sort();
 
-  L.push('# Pico do Mané — Dados para análise');
+  L.push(`# ${marca} — Dados para análise`);
   L.push(`Gerado em ${todayISO()}`, '');
 
   L.push('## 1. Resumo', '');
@@ -308,7 +308,7 @@ function montarAnalise(all) {
   return L.join('\n');
 }
 
-export default function Backup({ all, restore }) {
+export default function Backup({ all, restore, negocio = '' }) {
   const [msg, setMsg] = useState('');
   const [importText, setImportText] = useState('');
   const jsonStr = JSON.stringify(all, null, 2);
@@ -395,7 +395,7 @@ export default function Backup({ all, restore }) {
     all.diario.forEach((r) => L.push([r.data, r.clima, r.evento, r.receita, r.nPedidos, r.fiado, r.nota, r.problema, r.decisao, r.aprendizado, r.prioridade].map(q).join(',')));
     baixar('\ufeff' + L.join('\n'), `pico-do-mane-${todayISO()}.csv`, 'text/csv;charset=utf-8');
   };
-  const analise = useMemo(() => montarAnalise({ ...all, ponto, jornadas }), [all, ponto, jornadas]);
+  const analise = useMemo(() => montarAnalise({ ...all, ponto, jornadas }, negocio || 'Meu negócio'), [all, ponto, jornadas, negocio]);
   const copiarAnalise = async () => {
     try { await navigator.clipboard.writeText(analise); setMsg('Resumo + dados copiados! Cole no chat com o Claude para análise.'); }
     catch { setMsg('Não consegui copiar automático. Abra "Ver resumo gerado" abaixo, selecione e copie.'); }

@@ -60,7 +60,7 @@ export function ResultadoConferencia({ conferencia, conferidoPor, compacto }) {
   const { veredito, faltas = [], totais } = conferencia;
   const grave = totais.receitaPerdidaCerta > 0 || totais.faltaNoCaixa > 0;
   const quem = conferidoPor === 'garcom' ? ' · contado pelo atendimento'
-    : conferidoPor === 'dona' ? ' · contado pela Karen' : '';
+    : conferidoPor === 'dona' ? ' · contado pela dona' : '';
 
   const corpo = (
     <>

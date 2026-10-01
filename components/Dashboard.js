@@ -5,6 +5,7 @@ import { C, LogoMark, pageBg } from './ui';
 import { ymOf, todayISO, limparNome, fiadoDaVenda, uid, num, brl } from '../lib/util';
 import { comprasPendentesDeEstoque } from '../lib/estoque';
 import { limparCopiaGuardada } from '../lib/versao';
+import { lerNegocio } from '../lib/negocio';
 import { ajustarDespesas } from '../lib/despesaDaCompra';
 import SEED_DATA from '../data/seed.json';
 
@@ -29,6 +30,7 @@ import Relatorios from './Relatorios';
 import RaioX from './RaioX';
 import Backup from './Backup';
 import Config from './Config';
+import MeuNegocio from './MeuNegocio';
 import Cardapio from './Cardapio';
 import Comandas from './Comandas';
 import VendasDoDia from './VendasDoDia';
@@ -172,6 +174,9 @@ export default function Dashboard() {
   // A meta de faturamento do mês e os dias em que o bar abre. Não é lista: é
   // um objetinho { padrao, diasSemana, '2026-10': ... }.
   const [metas, setMetas] = useState(null);
+  // O nome do negócio e os nomes dos acessos. Cada um põe o seu — por isso
+  // nada disso fica escrito no código.
+  const [negocio, setNegocio] = useState(null);
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [cardapio, setCardapio] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -261,6 +266,7 @@ export default function Dashboard() {
       setListaCozinha(arr(salvo && salvo.listaCozinha));
       setListasModelo(arr(salvo && salvo.listasModelo));
       setMetas((salvo && typeof salvo.metas === 'object' && salvo.metas) || null);
+      setNegocio(lerNegocio(salvo || {}));
       setTarefasCozinha(arr(salvo && salvo.tarefasCozinha));
       setCardapio(arr(salvo && salvo.cardapio));
       setClientes(arr(salvo && salvo.clientes));
@@ -381,6 +387,7 @@ export default function Dashboard() {
     tarefasCozinha: (v) => { setTarefasCozinha(v); salvarTudo({ tarefasCozinha: v }); },
     cardapio: (v) => { setCardapio(v); salvarTudo({ cardapio: v }); },
     metas: (v) => { setMetas(v); salvarTudo({ metas: v }); },
+    negocio: (v) => { setNegocio(v); salvarTudo({ negocio: v }); },
     clientes: (v) => { setClientes(v); salvarTudo({ clientes: v }); },
   };
 
@@ -620,7 +627,7 @@ export default function Dashboard() {
     ['darci', 'Darci'], ['brain', 'Brain'], ['hoje', 'Dashboard'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['previsao', 'Previsão'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'], ['despesarapida', 'Despesa Rápida'],
-    ['ponto', 'Ponto'], ['pasta', 'Pasta'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['acessos', 'Acessos'], ['backup', 'Backup'],
+    ['ponto', 'Ponto'], ['pasta', 'Pasta'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['acessos', 'Acessos'], ['backup', 'Backup'], ['negocio', 'Meu negócio'],
   ];
 
   // Barra lateral: as áreas agrupadas por assunto (no PC fica fixa na lateral;
@@ -893,7 +900,7 @@ export default function Dashboard() {
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
             ficha técnica de prato e de drink. As duas leem e escrevem. */}
         {tab === 'pasta' && <Pasta />}
-        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onPerguntar={() => setTab('darci')} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={<DarciFlutuante {...propsDarci} />} metas={metas} onMetas={upd.metas} />}
+        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onPerguntar={() => setTab('darci')} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={<DarciFlutuante {...propsDarci} />} metas={metas} onMetas={upd.metas} dona={(negocio && (negocio.dona || (negocio.papeis && negocio.papeis.dona))) || ''} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} vendas={vendas} />}
         {tab === 'financas' && (
           <>
@@ -909,7 +916,7 @@ export default function Dashboard() {
             {subFinancas === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
             {subFinancas === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarPagamento} />}
             {subFinancas === 'raiox' && <RaioX receitas={receitas} despesas={despesas} cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} compras={compras} />}
-            {subFinancas === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} vendas={vendas} compras={compras} estoque={estoque} fichas={fichas} cardapio={cardapio} />}
+            {subFinancas === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} vendas={vendas} compras={compras} estoque={estoque} fichas={fichas} cardapio={cardapio} negocio={(negocio && negocio.nome) || ''} />}
           </>
         )}
         {tab === 'abastecimento' && (
@@ -992,6 +999,7 @@ export default function Dashboard() {
             {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} estoque={estoque} compras={compras} />}
           </>
         )}
+        {tab === 'negocio' && <MeuNegocio negocio={negocio} onChange={upd.negocio} />}
         {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
         {tab === 'salao' && (
           <>
@@ -1022,7 +1030,7 @@ export default function Dashboard() {
         {tab === 'previsao' && <Previsao vendas={vendas} cardapio={cardapio} fichas={fichas} estoque={estoque} />}
         {tab === 'despesarapida' && <DespesaRapida dados={despesas} onChange={upd.despesas} textoInicial={despesaInicial} />}
         {tab === 'acessos' && <Acessos />}
-        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, ideias, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas, vendas }} restore={(d) => {
+        {tab === 'backup' && (<><Auditoria receitas={receitas} despesas={despesas} compras={compras} vendas={vendas} onMudou={carregarVendas} /><Backup negocio={(negocio && negocio.nome) || ''} all={{ diario, receitas, despesas, compras, cotacoes, garrafas, tarefas, ideias, marketing, visitantes, listaCompras, listasModelo, cardapio, clientes, estoque, fichas, vendas }} restore={(d) => {
           const dados = {
             diario: d.diario || diario, receitas: d.receitas || receitas, despesas: d.despesas || despesas,
             compras: d.compras || compras, cotacoes: d.cotacoes || cotacoes, garrafas: d.garrafas || garrafas,

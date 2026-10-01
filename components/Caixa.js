@@ -11,7 +11,7 @@ const hora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isN
 // noite, porque o ISO é UTC e depois das 21h já virou o dia seguinte.
 const diaBR = (iso) => { if (!iso) return ''; try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso)); } catch { return String(iso).slice(0, 10); } };
 const dataHora = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
-const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? 'Karen' : '');
+const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? 'Dona' : '');
 
 // A conferência de estoque não depende mais de nada vindo daqui: quem cruza
 // vendas, fichas e estoque é o servidor, e a lista do que contar vem pronta

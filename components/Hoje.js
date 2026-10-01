@@ -7,7 +7,7 @@ import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparC
 
 const TAB = { fontVariantNumeric: 'tabular-nums' };
 
-export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], estoque = [], vendas = [], setTab, darci = null, resumo = null, metas = null, onMetas }) {
+export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], estoque = [], vendas = [], setTab, darci = null, resumo = null, metas = null, onMetas, dona = '' }) {
   const [mostrarValores, setMostrarValores] = useState(true);
   const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
   const [caixaAberto, setCaixaAberto] = useState(null);
@@ -17,7 +17,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
     };
     carregar(); const t = setInterval(carregar, 60000); return () => clearInterval(t);
   }, []);
-  const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? 'Karen' : 'alguém');
+  const papelRot = (x) => (x === 'garcom' ? 'Atendimento' : x === 'dona' ? (dona || 'a dona') : 'alguém');
   const dataHoraBR = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
   const caixaHoras = caixaAberto?.abertoEm ? (Date.now() - new Date(caixaAberto.abertoEm).getTime()) / 3600000 : 0;
   const caixaAlerta = !!caixaAberto && caixaHoras >= 24;
@@ -88,7 +88,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
         <div>
           <div style={{ fontSize: 12, color: C.faint, textTransform: 'uppercase', letterSpacing: '.06em' }}>{weekday(hoje)}, {fmtDate(hoje)}</div>
           <div style={{ fontSize: 26, fontWeight: 900, marginTop: 2 }}>Dashboard</div>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{saudacao}, Karen · resumo de {mesLabel(mes)}</div>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{saudacao}{dona ? `, ${dona}` : ''} · resumo de {mesLabel(mes)}</div>
         </div>
         {/* O Darci fica aqui, do lado do Ocultar: os dois no mesmo formato. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>

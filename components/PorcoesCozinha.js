@@ -90,7 +90,7 @@ export default function PorcoesCozinha() {
       <PageTitle sub="O que precisa separar e o que precisa levar pra frente">Porções</PageTitle>
 
       {painel.lista.length === 0 && (
-        <Empty>Nenhum produto separado em sacos ainda. Quem cadastra é a Karen, na tela dela.</Empty>
+        <Empty>Nenhum produto separado em sacos ainda. Quem cadastra é a dona, na tela dela.</Empty>
       )}
 
       {painel.lista.length > 0 && painel.aFazer.length === 0 && (
