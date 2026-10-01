@@ -3,6 +3,10 @@
 > **Vai instalar o PicoOS para outra pessoa?** Este guia aqui é para o SEU app.
 > O da cópia para um cliente é o [INSTALAR-PARA-CLIENTE.md](INSTALAR-PARA-CLIENTE.md) —
 > é outro caminho, com outros cuidados.
+>
+> E o [GUIA-DO-DONO.md](GUIA-DO-DONO.md) é para entregar a QUEM VAI USAR: o
+> primeiro mês, em ordem de valor, com o que fazer no dia 1 e o que o PicoOS
+> não faz.
 
 Este é o mesmo painel que você já usa, agora como um site de verdade: link fixo,
 sem cache travando, funciona igual em qualquer aparelho. Leva uns 15-20 minutos
