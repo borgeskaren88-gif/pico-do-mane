@@ -57,7 +57,7 @@ function Delta({ atual, anterior, boaSubida = true }) {
     </span>
   );
 }
-import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, FONTES_NAO_OPERACIONAL, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import { brl, num, todayISO, ymOf, limparNome, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, FONTES_NAO_OPERACIONAL, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import { cmvDoMes, lerCMV, evolucaoCMV, compararCMV, variacaoProdutos, estoqueNoMes } from '../lib/cmv';
 
 export default function Relatorios({ diario, receitas, despesas, mes, setMes, vendas = [], compras = [], estoque = [], fichas = [], cardapio = [], negocio = '' }) {
@@ -172,6 +172,27 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   const ddmm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
   const piorDia = proximos30.linhas.length ? proximos30.linhas.reduce((p, l) => (l.saldo < p.saldo ? l : p), proximos30.linhas[0]) : null;
 
+  // QUANTO DO MÊS FOI CORRERIA.
+  //
+  // A compra de emergência — acabou no meio do expediente e alguém correu no
+  // mercado — costuma ser a mais cara que existe: sem cotação, sem barganha,
+  // preço de varejo. Ninguém media, porque até agora não havia onde marcar.
+  // Agora que a compra carrega a marca, o número aparece — e ele é acionável:
+  // o que mais aparece aqui é o que está faltando no estoque mínimo.
+  const emergencia = useMemo(() => {
+    const doMes = compras.filter((c) => c && c.emergencia === 'Sim' && ymOf(c.data) === mes);
+    const total = doMes.reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
+    const todas = compras.filter((c) => c && ymOf(c.data) === mes)
+      .reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
+    const porProduto = {};
+    for (const c of doMes) {
+      const k = limparNome(c.produto) || '—';
+      porProduto[k] = (porProduto[k] || 0) + num(c.quantidade) * num(c.valorUnit);
+    }
+    const ranking = Object.entries(porProduto).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    return { total, pct: todas > 0 ? (total / todas) * 100 : 0, vezes: doMes.length, ranking, todas };
+  }, [compras, mes]);
+
   // Pizza de despesas por categoria (com %).
   const totalDesp = porCategoria.reduce((s, c) => s + c.val, 0);
   const pizza = porCategoria.map((c, i) => ({ ...c, cor: PIZZA[i % PIZZA.length], pct: totalDesp ? (c.val / totalDesp) * 100 : 0 }));
@@ -180,6 +201,41 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
     <div>
       <PageTitle sub="Resultado do mês">Relatórios</PageTitle>
       <div style={{ marginBottom: 14 }}><Label>Mês do relatório</Label><Select value={mes} onChange={setMes} options={opts} /></div>
+
+      {/* O QUE FOI CORRERIA.
+          Só aparece quando houve — um card de zero todo mês vira paisagem e
+          deixa de ser lido. E o ranking é a parte útil: o produto que mais
+          aparece aqui é o que está com o mínimo do estoque errado. */}
+      {emergencia.total > 0 && (
+        <Card style={{ marginBottom: 14, borderColor: C.amber }}>
+          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.amber, fontWeight: 700, marginBottom: 4 }}>
+            Compra de emergência — {mesLabel(mes)}
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>{brl(emergencia.total)}</div>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
+            {emergencia.pct.toFixed(0)}% de tudo que tu compraste no mês, em{' '}
+            {emergencia.vezes} {emergencia.vezes === 1 ? 'vez' : 'vezes'}.
+          </div>
+          {emergencia.ranking.length > 0 && (
+            <div style={{ marginTop: 12, borderTop: `1px solid ${C.hair}`, paddingTop: 10 }}>
+              <div style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 7 }}>
+                O que mais fez correr
+              </div>
+              {emergencia.ranking.map(([nome, val]) => (
+                <div key={nome} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13.5, padding: '3px 0' }}>
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
+                  <b style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{brl(val)}</b>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: C.faint, marginTop: 12, lineHeight: 1.5 }}>
+            Compra de correria sai mais cara: sem cotação, sem barganha, preço de varejo. O que mais
+            aparece nessa lista é o que está com o <b style={{ color: C.text }}>mínimo do estoque errado</b> —
+            subir o mínimo desses itens é o conserto.
+          </div>
+        </Card>
+      )}
 
       {/* CMV — CUSTO DA MERCADORIA VENDIDA
           Card separado do DRE de propósito. O DRE daqui é de CAIXA: soma o que

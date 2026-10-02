@@ -77,8 +77,14 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
     const ids = new Set(g.itens.map((x) => x.id));
     const despId = uid();
     const despesa = {
-      id: despId, data: hoje, categoria: 'Fornecedores de insumo',
-      descricao: [g.fornecedor, g.nota && `Nota ${g.nota}`].filter(Boolean).join(' · ') || (g.itens[0].produto || 'Conta paga'),
+      // O TIPO DE CONTA VEM DA COMPRA, não é mais chutado.
+      //
+      // Era carimbado sempre como "Fornecedores de insumo". Quando o boleto era
+      // de um equipamento ou de uma manutenção, o DRE recebia aquilo como custo
+      // variável — e o lucro operacional aparecia menor do que é.
+      id: despId, data: hoje, categoria: g.itens.find((x) => x && x.tipoConta)?.tipoConta || 'Fornecedores de insumo',
+      descricao: [g.fornecedor, g.nota && `Nota ${g.nota}`,
+        g.itens.some((x) => x && x.emergencia === 'Sim') && 'emergência'].filter(Boolean).join(' · ') || (g.itens[0].produto || 'Conta paga'),
       valor: g.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       obs: 'Baixa de conta a pagar' + (g.itens.length > 1 ? ` · ${g.itens.length} itens` : ''),
       origem: 'conta-a-pagar',
