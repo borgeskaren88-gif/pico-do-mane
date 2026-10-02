@@ -49,7 +49,6 @@ import Fornecedores from './Fornecedores';
 import FichasTecnicas from './FichasTecnicas';
 import ConferenciaEstoque from './ConferenciaEstoque';
 import Auditoria from './Auditoria';
-import TrocarSenha from './TrocarSenha';
 import Notificacoes from './Notificacoes';
 import DespesaRapida from './DespesaRapida';
 import Widget from './Widget';
@@ -1133,7 +1132,7 @@ export default function Dashboard() {
           setTarefas(dados.tarefas); setIdeias(dados.ideias); setMarketing(dados.marketing); setVisitantes(dados.visitantes);
           setListaCompras(dados.listaCompras); setListasModelo(dados.listasModelo); setCardapio(dados.cardapio); setClientes(dados.clientes);
           apiSalvar(dados);
-        }} /><TrocarSenha /></>)}
+        }} /></>)}
       </div>
         </div>
       </div>

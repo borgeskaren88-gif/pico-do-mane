@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, Empty, PageTitle } from './ui';
+import TrocarSenha from './TrocarSenha';
 
 // QUEM ENTRA NO PICOOS — e como tirar alguém daqui.
 //
@@ -75,10 +76,17 @@ export default function Acessos() {
           estava logado continua entrando. Por isso tem os dois botões aqui — e trocar a senha já desconecta todo mundo
           junto, que quase sempre é o que tu queres.
           <br /><br />
-          O teu acesso de dona não aparece aqui: ele não se corta por esta tela, senão a chave ficaria trancada do lado
-          de dentro.
+          O teu acesso não se <b style={{ color: C.text }}>corta</b> por esta tela — senão a chave ficaria trancada do
+          lado de dentro. Mas a tua senha tu trocas aqui embaixo, que é onde qualquer um procuraria.
         </div>
       </Card>
+
+      {/* A TUA SENHA, ONDE TU FOSTE PROCURAR.
+          Ela morava no fim da tela de Backup, por motivo nenhum além de ter
+          nascido ali. A primeira dona a precisar trocar a senha de primeiro
+          acesso veio parar em Acessos, não achou, e perguntou. Tela de senha
+          mora na tela de senhas. */}
+      <TrocarSenha titulo="A TUA senha" quem="tua — a de entrar e a de destravar a tela" />
 
       {msg && (
         <div style={{ background: C.panel2, border: `1px solid ${msg.startsWith('Pronto') || msg.includes('trocada') ? C.green : C.amber}`, borderRadius: 10, padding: '10px 13px', marginBottom: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
