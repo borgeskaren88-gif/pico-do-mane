@@ -56,7 +56,7 @@ export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }
     <Card style={{ padding: 0, overflow: 'hidden', marginBottom: 14 }}>
       {/* ---- o que precisa de atenção ---- */}
       {avisos.length > 0 && (
-        <div style={{ padding: '12px 14px 10px' }}>
+        <div style={{ padding: '10px 13px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 2 }}>
             <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.09em', color: C.faint }}>PRA OLHAR AGORA</span>
             {urgentes > 0 && (
@@ -75,15 +75,18 @@ export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }
                   onClick={() => setAbertoId(aberto ? '' : av.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
-                    background: 'none', border: 'none', padding: '9px 0', cursor: 'pointer',
+                    // Linhas mais justas: o cartão divide a linha com o relógio
+                    // da meta, e o relógio acompanha a altura dele. Cada pixel a
+                    // mais aqui vira dois na tela.
+                    background: 'none', border: 'none', padding: '6px 0', cursor: 'pointer',
                   }}
                 >
                   <span style={{ width: 7, height: 7, borderRadius: 999, background: cor, flexShrink: 0 }} />
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: C.text, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: C.text, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {av.titulo}
                   </span>
                   {av.valor ? (
-                    <span style={{ flexShrink: 0, fontSize: 14, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums' }}>{av.valor}</span>
+                    <span style={{ flexShrink: 0, fontSize: 13.5, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums' }}>{av.valor}</span>
                   ) : null}
                 </button>
                 {aberto && (
