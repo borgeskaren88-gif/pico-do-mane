@@ -221,9 +221,10 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
       return (
         <button onClick={abrir} title="Definir a meta do mês"
           style={{
-            width: 104, height: 104, borderRadius: 18, cursor: 'pointer', flexShrink: 0,
+            width: 104, minHeight: 104, borderRadius: 18, cursor: 'pointer', flexShrink: 0,
             background: 'transparent', border: `1px dashed ${C.line}`, color: C.muted,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 8,
+            alignSelf: 'stretch', marginBottom: 14,
           }}>
           <span style={{ fontSize: 22, fontWeight: 300, lineHeight: 1 }}>+</span>
           <span style={{ fontSize: 11.5, fontWeight: 700, lineHeight: 1.3, textAlign: 'center' }}>Definir<br />a meta</span>
@@ -325,7 +326,10 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
           style={{
             width: 104, flexShrink: 0, borderRadius: 18, cursor: 'pointer', padding: '10px 8px',
             background: C.panel, border: `1px solid ${m.poucasNoites ? C.amber : `${est.cor}66`}`,
-            color: C.text, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            color: C.text, display: 'flex', flexDirection: 'column', alignItems: 'center',
+            // Acompanha a altura do cartão ao lado: dois blocos do mesmo
+            // tamanho leem como um só; um alto e um baixo leem como sobra.
+            justifyContent: 'center', gap: 6, alignSelf: 'stretch', marginBottom: 14,
           }}>
           <Relogio pct={m.pct} pace={pctLinha} cor={m.poucasNoites ? C.amber : est.cor} tamanho={62} />
           {/* QUANDO A MARCAÇÃO DOS DIAS ESTÁ ERRADA, É ISSO QUE PRECISA SER
