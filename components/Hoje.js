@@ -94,27 +94,27 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           <div style={{ fontSize: 26, fontWeight: 900, marginTop: 2 }}>Dashboard</div>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{saudacao}{dona ? `, ${dona}` : ''} · resumo de {mesLabel(mes)}</div>
         </div>
-        {/* O Darci fica aqui, do lado do Ocultar: os dois no mesmo formato. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          {darci}
-          <button onClick={() => setMostrarValores((v) => !v)} title={mostrarValores ? 'Ocultar valores' : 'Mostrar valores'}
-            style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            {mostrarValores ? 'Ocultar' : 'Mostrar'}
-          </button>
+        {/* O Darci fica aqui, do lado do Ocultar: os dois no mesmo formato.
+            E o relógio da meta embaixo deles, como ela pediu — um quadradinho
+            no canto, em vez de um cartão ocupando meia tela. O detalhe abre por
+            cima, então ele não empurra nada pra baixo nem no celular. */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {darci}
+            <button onClick={() => setMostrarValores((v) => !v)} title={mostrarValores ? 'Ocultar valores' : 'Mostrar valores'}
+              style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              {mostrarValores ? 'Ocultar' : 'Mostrar'}
+            </button>
+          </div>
+          {onMetas && (
+            <MetaMes canto metas={metas} receitas={receitas} realizado={rec} oculto={oculto} onSalvar={onMetas} />
+          )}
         </div>
       </div>
 
       {/* O resumo do dia: avisos, mesa reservada e o que mudou, num cartão só.
           Vem depois do título — o nome da tela aparece antes de tudo. */}
       {resumo}
-
-      {/* A META DO MÊS, logo no alto.
-          Ela pediu: "quero que no meu Dashboard apareça algo assim, com uma
-          meta". O número grande sozinho não decide nada — o que decide é
-          quanto falta e quanto precisa por noite nas noites que sobraram. */}
-      {onMetas && (
-        <MetaMes metas={metas} receitas={receitas} realizado={rec} oculto={oculto} onSalvar={onMetas} />
-      )}
 
       {caixaAlerta && (
         <Card style={{ marginBottom: 12, borderColor: C.red }}>

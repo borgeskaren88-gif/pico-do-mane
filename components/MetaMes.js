@@ -69,7 +69,9 @@ function Relogio({ pct, pace, cor, tamanho = 76 }) {
   );
 }
 
-export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = (t) => t, onSalvar }) {
+// canto: o relógio encaixado no canto do cabeçalho, embaixo do Darci. Um
+// quadrado pequeno, e o detalhe abre por cima — em vez de ocupar meia tela.
+export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = (t) => t, onSalvar, canto = false }) {
   const hoje = todayISO();
   const mes = ymOf(hoje);
   const [editando, setEditando] = useState(false);
@@ -102,6 +104,9 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
     setValor(m.meta > 0 ? String(m.meta).replace('.', ',') : '');
     setSoEsteMes(metas && metas[mes] !== undefined && String(metas[mes]).trim() !== '');
     setDias(Array.isArray(metas?.diasSemana) && metas.diasSemana.length ? [...metas.diasSemana] : [0, 1, 2, 3, 4, 5, 6]);
+    // No canto o editor mora DENTRO do painel que abre por cima — senão ele
+    // tentaria caber no quadradinho de 104px do cabeçalho.
+    setAberto(true);
     setEditando(true);
   };
   const salvar = () => {
@@ -123,7 +128,7 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
     return [...s];
   });
 
-  if (editando) {
+  const montarEditor = () => {
     const sug = diasSemanaDoMovimento(receitas, hoje);
     const noMes = diasDeOperacao(mes, (dias && dias.length && dias.length < 7) ? dias : null, diasComReceita);
     return (
@@ -189,10 +194,42 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
         </div>
       </Card>
     );
-  }
+  };
+
+  // O PAINEL QUE ABRE POR CIMA, no modo canto. Escrito uma vez: ele serve pro
+  // detalhe da meta e pro editor, e os dois precisam dele antes mesmo de
+  // existir meta nenhuma — senão tocar em "definir a meta" abriria um editor
+  // sem lugar onde aparecer.
+  const painelPorCima = (conteudo, borda) => (
+    <div onClick={() => { setAberto(false); setEditando(false); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4, 9, 18, 0.55)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Meta do mês"
+        style={{ width: '100%', maxWidth: 420, maxHeight: '88vh', overflowY: 'auto', background: C.panel, border: `1px solid ${borda || C.line}`, borderRadius: 16, padding: 18, boxShadow: '0 24px 60px rgba(0,0,0,.35)' }}>
+        {conteudo}
+      </div>
+    </div>
+  );
+
+  // No cartão largo o editor toma o lugar do cartão, como sempre tomou. No
+  // canto ele vai pro painel.
+  if (editando && !canto) return montarEditor();
+  if (editando && canto) return painelPorCima(montarEditor(), C.accent);
 
   // SEM META: convida, e não inventa número nenhum.
   if (m.semMeta) {
+    if (canto) {
+      return (
+        <button onClick={abrir} title="Definir a meta do mês"
+          style={{
+            width: 104, height: 104, borderRadius: 18, cursor: 'pointer', flexShrink: 0,
+            background: 'transparent', border: `1px dashed ${C.line}`, color: C.muted,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 8,
+          }}>
+          <span style={{ fontSize: 22, fontWeight: 300, lineHeight: 1 }}>+</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, lineHeight: 1.3, textAlign: 'center' }}>Definir<br />a meta</span>
+        </button>
+      );
+    }
     return (
       <Card style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -211,9 +248,124 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
   const pctBarra = Math.max(0, Math.min(1, m.pct));
   const pctLinha = m.diasTotais > 0 ? Math.max(0, Math.min(1, m.diasDecorridos / m.diasTotais)) : 0;
 
+  // O DETALHE. É o mesmo conteúdo nos dois formatos — no cartão ele abre
+  // embaixo, no canto ele abre por cima. Escrito uma vez só de propósito:
+  // duas cópias viram duas verdades diferentes no dia em que uma for mexida.
+  const detalhe = (
+    <>
+      {/* A barra reta mostra o mesmo que o anel, mas é mais fácil de comparar
+          com o risco quando se quer conferir — não só olhar de relance. */}
+      <div style={{ position: 'relative', height: 10, borderRadius: 999, background: C.panel2, border: `1px solid ${C.hair}`, marginBottom: 4, overflow: 'hidden' }}>
+        <i style={{ display: 'block', height: '100%', width: `${pctBarra * 100}%`, background: est.cor, borderRadius: 999, transition: 'width .6s ease-out' }} />
+        {pctLinha > 0 && pctLinha < 1 && (
+          <i style={{ position: 'absolute', top: -2, bottom: -2, left: `${pctLinha * 100}%`, width: 2, background: C.text, opacity: 0.55 }} title="onde o mês já está" />
+        )}
+      </div>
+      <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 12, lineHeight: 1.45 }}>
+        {m.diasDecorridos} de {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'}
+        {diasAbre ? <> · abre {listar([...diasAbre].sort((a, b) => a - b))}</> : ' · abre todo dia'}
+        {' '}· o risco é onde o mês já está
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Falta</div>
+          <div style={{ fontSize: 16, fontWeight: 800, ...TAB }}>{oculto(brl(m.falta))}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Por noite</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: m.porDia > 0 ? est.cor : C.faint, ...TAB }}>
+            {m.diasRestantes > 0 ? oculto(brl(m.porDia)) : '—'}
+          </div>
+          <div style={{ fontSize: 11, color: C.faint }}>{m.diasRestantes > 0 ? `nas ${m.diasRestantes} que faltam` : 'mês encerrado'}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Fecha em</div>
+          <div style={{ fontSize: 16, fontWeight: 800, ...TAB }}>{m.projecao > 0 ? oculto(brl(m.projecao)) : '—'}</div>
+          <div style={{ fontSize: 11, color: C.faint }}>{m.projecao > 0 ? `${Math.round(m.pctProjecao * 100)}% da meta` : 'sem ritmo ainda'}</div>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12.5, color: C.muted, marginTop: 12, lineHeight: 1.5 }}>
+        {m.bateu ? (
+          <>Bateste a meta de {mesLabel(mes)} — <b style={{ color: C.green }}>{oculto(brl(m.sobrou))}</b> acima. O que vier agora é a mais.</>
+        ) : m.diasRestantes <= 0 ? (
+          <>{mesLabel(mes)} fechou <b style={{ color: C.red }}>{oculto(brl(m.falta))}</b> abaixo da meta.</>
+        ) : m.diasDecorridos === 0 ? (
+          <>Mês novo: <b>{oculto(brl(m.porDia))}</b> por noite nas {m.diasRestantes} noites de {mesLabel(mes)} e tu chegas lá.</>
+        ) : (
+          <>
+            Tua média é <b>{oculto(brl(m.media))}</b> por noite; pra bater a meta precisa de{' '}
+            <b style={{ color: est.cor }}>{oculto(brl(m.porDia))}</b> nas {m.diasRestantes} que faltam.
+            {m.porDia > m.media * 1.3 && <> É bem acima do teu ritmo — ou tu aumentas o movimento, ou essa meta não é desse mês.</>}
+          </>
+        )}
+      </div>
+
+      <button onClick={abrir} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: '10px 2px 0' }}>
+        Editar a meta
+      </button>
+    </>
+  );
+
+  const avisoPoucasNoites = m.poucasNoites && (
+    <button onClick={abrir} style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'transparent', border: `1px solid ${C.amber}`, borderRadius: 9, padding: '8px 11px', marginBottom: 12, color: C.amber, fontSize: 12.5, lineHeight: 1.45 }}>
+      <b>Só {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'} em {mesLabel(mes)}?</b> Parece que faltou marcar
+      dia em “em que dias o bar abre” — e é por aí que o valor por noite é calculado. Toca pra conferir.
+    </button>
+  );
+
+  // ---------------------------------------------------------------- NO CANTO
+  if (canto) {
+    return (
+      <>
+        <button
+          onClick={() => setAberto(true)}
+          title={`Meta de ${mesLabel(mes)}`}
+          style={{
+            width: 104, flexShrink: 0, borderRadius: 18, cursor: 'pointer', padding: '10px 8px',
+            background: C.panel, border: `1px solid ${m.poucasNoites ? C.amber : `${est.cor}66`}`,
+            color: C.text, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+          }}>
+          <Relogio pct={m.pct} pace={pctLinha} cor={m.poucasNoites ? C.amber : est.cor} tamanho={62} />
+          {/* QUANDO A MARCAÇÃO DOS DIAS ESTÁ ERRADA, É ISSO QUE PRECISA SER
+              LIDO — não o valor. Foi assim que um mês virou "4 noites" e a tela
+              passou a pedir R$ 6.161 por noite sem ninguém perceber. */}
+          {m.poucasNoites ? (
+            <span style={{ fontSize: 11, fontWeight: 800, color: C.amber, lineHeight: 1.25, textAlign: 'center' }}>
+              só {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'}?
+            </span>
+          ) : (
+            <span style={{ fontSize: 11.5, fontWeight: 800, lineHeight: 1.2, ...TAB }}>{oculto(brl(m.realizado))}</span>
+          )}
+          <span style={{ fontSize: 10, color: C.faint, textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>
+            Meta
+          </span>
+        </button>
+
+        {aberto && painelPorCima(
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700 }}>Meta · {mesLabel(mes)}</div>
+                <div style={{ fontSize: 24, fontWeight: 900, color: est.cor, lineHeight: 1.2, marginTop: 2, ...TAB }}>{oculto(brl(m.realizado))}</div>
+                <div style={{ fontSize: 13, color: C.muted, ...TAB }}>de {oculto(brl(m.meta))} · {est.titulo}</div>
+              </div>
+              <button onClick={() => setAberto(false)} aria-label="Fechar"
+                style={{ background: 'none', border: 'none', color: C.muted, fontSize: 24, lineHeight: 1, cursor: 'pointer', padding: '0 4px', flexShrink: 0 }}>×</button>
+            </div>
+            {avisoPoucasNoites}
+            {detalhe}
+          </>,
+          `${est.cor}66`,
+        )}
+      </>
+    );
+  }
+
+  // ------------------------------------------------------------- NO CARTÃO
   return (
     <Card style={{ marginBottom: 14, borderColor: `${est.cor}66`, padding: 14 }}>
-      {/* O MOSTRADOR — o que ela olha de relance. */}
       <button
         onClick={() => setAberto((v) => !v)}
         aria-expanded={aberto}
@@ -228,7 +380,6 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
             {oculto(brl(m.realizado))}
           </span>
           <span style={{ display: 'block', fontSize: 12.5, color: C.muted, ...TAB }}>de {oculto(brl(m.meta))} · {est.titulo}</span>
-          {/* O número que manda na noite de hoje fica à vista mesmo fechado. */}
           {m.diasRestantes > 0 && !m.bateu && (
             <span style={{ display: 'block', fontSize: 12.5, marginTop: 3, color: C.faint }}>
               <b style={{ color: est.cor, ...TAB }}>{oculto(brl(m.porDia))}</b> por noite nas {m.diasRestantes} que faltam
@@ -237,75 +388,8 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
         </span>
         <span style={{ flexShrink: 0, color: C.faint, fontSize: 13, transform: aberto ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>⌄</span>
       </button>
-
-      {/* O AVISO DE POUCAS NOITES não espera toque nenhum: ele existe porque um
-          mês virou "4 noites" sem ela perceber e a tela passou a pedir R$ 6.161
-          por noite. Escondido atrás de um toque, não teria servido pra nada. */}
-      {m.poucasNoites && (
-        <button onClick={abrir} style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'transparent', border: `1px solid ${C.amber}`, borderRadius: 9, padding: '8px 11px', marginTop: 12, color: C.amber, fontSize: 12.5, lineHeight: 1.45 }}>
-          <b>Só {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'} em {mesLabel(mes)}?</b> Parece que faltou marcar
-          dia em “em que dias o bar abre” — e é por aí que o valor por noite é calculado. Toca pra conferir.
-        </button>
-      )}
-
-      {aberto && (
-        <div style={{ marginTop: 14, borderTop: `1px solid ${C.hair}`, paddingTop: 12 }}>
-          {/* A barra continua aqui: ela mostra a MESMA coisa do anel, mas em
-              linha reta — e é mais fácil de ler quando se quer comparar com o
-              risco. As duas juntas não brigam; a de cima é de relance, esta é
-              de conferir. */}
-          <div style={{ position: 'relative', height: 10, borderRadius: 999, background: C.panel2, border: `1px solid ${C.hair}`, marginBottom: 4, overflow: 'hidden' }}>
-            <i style={{ display: 'block', height: '100%', width: `${pctBarra * 100}%`, background: est.cor, borderRadius: 999, transition: 'width .6s ease-out' }} />
-            {pctLinha > 0 && pctLinha < 1 && (
-              <i style={{ position: 'absolute', top: -2, bottom: -2, left: `${pctLinha * 100}%`, width: 2, background: C.text, opacity: 0.55 }} title="onde o mês já está" />
-            )}
-          </div>
-          <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 12, lineHeight: 1.45 }}>
-            {m.diasDecorridos} de {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'}
-            {diasAbre ? <> · abre {listar([...diasAbre].sort((a, b) => a - b))}</> : ' · abre todo dia'}
-            {' '}· o risco é onde o mês já está
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            <div>
-              <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Falta</div>
-              <div style={{ fontSize: 16, fontWeight: 800, ...TAB }}>{oculto(brl(m.falta))}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Por noite</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: m.porDia > 0 ? est.cor : C.faint, ...TAB }}>
-                {m.diasRestantes > 0 ? oculto(brl(m.porDia)) : '—'}
-              </div>
-              <div style={{ fontSize: 11, color: C.faint }}>{m.diasRestantes > 0 ? `nas ${m.diasRestantes} que faltam` : 'mês encerrado'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Fecha em</div>
-              <div style={{ fontSize: 16, fontWeight: 800, ...TAB }}>{m.projecao > 0 ? oculto(brl(m.projecao)) : '—'}</div>
-              <div style={{ fontSize: 11, color: C.faint }}>{m.projecao > 0 ? `${Math.round(m.pctProjecao * 100)}% da meta` : 'sem ritmo ainda'}</div>
-            </div>
-          </div>
-
-          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 12, lineHeight: 1.5 }}>
-            {m.bateu ? (
-              <>Bateste a meta de {mesLabel(mes)} — <b style={{ color: C.green }}>{oculto(brl(m.sobrou))}</b> acima. O que vier agora é a mais.</>
-            ) : m.diasRestantes <= 0 ? (
-              <>{mesLabel(mes)} fechou <b style={{ color: C.red }}>{oculto(brl(m.falta))}</b> abaixo da meta.</>
-            ) : m.diasDecorridos === 0 ? (
-              <>Mês novo: <b>{oculto(brl(m.porDia))}</b> por noite nas {m.diasRestantes} noites de {mesLabel(mes)} e tu chegas lá.</>
-            ) : (
-              <>
-                Tua média é <b>{oculto(brl(m.media))}</b> por noite; pra bater a meta precisa de{' '}
-                <b style={{ color: est.cor }}>{oculto(brl(m.porDia))}</b> nas {m.diasRestantes} que faltam.
-                {m.porDia > m.media * 1.3 && <> É bem acima do teu ritmo — ou tu aumentas o movimento, ou essa meta não é desse mês.</>}
-              </>
-            )}
-          </div>
-
-          <button onClick={abrir} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: '10px 2px 0' }}>
-            Editar a meta
-          </button>
-        </div>
-      )}
+      {m.poucasNoites && <div style={{ marginTop: 12 }}>{avisoPoucasNoites}</div>}
+      {aberto && <div style={{ marginTop: 14, borderTop: `1px solid ${C.hair}`, paddingTop: 12 }}>{detalhe}</div>}
     </Card>
   );
 }
