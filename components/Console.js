@@ -103,7 +103,19 @@ export default function Console() {
                 <input type="password" value={senha} onChange={(ev) => { setSenha(ev.target.value); setErro(''); }}
                   autoFocus autoCapitalize="none" autoCorrect="off" spellCheck="false" style={inputStyle} />
               </Field>
-              {erro && <div style={{ color: C.red, fontSize: 13, marginBottom: 12, marginTop: -6 }}>{erro}</div>}
+              {/* A senha daqui foi digitada num campo da Vercel, provavelmente
+                  de um iPad — onde o teclado capitaliza a primeira letra
+                  sozinho. Errar por isso e não ter nenhuma pista do motivo é o
+                  tipo de coisa que faz a pessoa achar que o sistema quebrou. */}
+              {erro && (
+                <div style={{ color: C.red, fontSize: 13, marginBottom: 12, marginTop: -6, lineHeight: 1.5 }}>
+                  {erro}
+                  <span style={{ display: 'block', color: C.faint, fontSize: 12, marginTop: 5 }}>
+                    No celular e no iPad o teclado costuma pôr <b>maiúscula na primeira letra</b> sem
+                    avisar — inclusive lá na Vercel, quando a senha foi guardada. Vale tentar com e sem.
+                  </span>
+                </div>
+              )}
               <Btn kind="primary" type="submit">Entrar</Btn>
             </form>
           </Card>
