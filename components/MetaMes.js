@@ -29,10 +29,51 @@ const ESTADOS = {
   'fechou-abaixo': { cor: C.red, titulo: 'Mês fechou abaixo' },
 };
 
+// O RELÓGIO DA META.
+//
+// O cartão da meta ocupava meia tela e ela olha pra ele todo dia: "não queria
+// algo tão grande, podia ser um quadrado arredondado, como se fosse um relógio,
+// subindo conforme a venda". Então o que decide — onde eu estou e onde eu
+// DEVIA estar — virou um mostrador; o resto continua aqui dentro, a um toque.
+//
+// O risco no anel é a parte que ninguém pede e todo mundo usa: estar com a
+// cor passando do risco é estar adiantada, sem precisar entender conta nenhuma.
+function Relogio({ pct, pace, cor, tamanho = 76 }) {
+  const r = (tamanho - 10) / 2;
+  const volta = 2 * Math.PI * r;
+  const cheio = Math.max(0, Math.min(1, pct));
+  const ang = (Math.max(0, Math.min(1, pace)) * 360) - 90;
+  const rad = (ang * Math.PI) / 180;
+  const c = tamanho / 2;
+  const x1 = c + Math.cos(rad) * (r - 6);
+  const y1 = c + Math.sin(rad) * (r - 6);
+  const x2 = c + Math.cos(rad) * (r + 6);
+  const y2 = c + Math.sin(rad) * (r + 6);
+  return (
+    <svg width={tamanho} height={tamanho} viewBox={`0 0 ${tamanho} ${tamanho}`} style={{ flexShrink: 0, display: 'block' }} aria-hidden="true">
+      <circle cx={c} cy={c} r={r} fill="none" stroke={C.panel2} strokeWidth="8" />
+      <circle
+        cx={c} cy={c} r={r} fill="none" stroke={cor} strokeWidth="8" strokeLinecap="round"
+        strokeDasharray={volta} strokeDashoffset={volta * (1 - cheio)}
+        transform={`rotate(-90 ${c} ${c})`}
+        // Sobe andando, não pulando: o movimento é o que faz parecer relógio.
+        style={{ transition: 'stroke-dashoffset .6s ease-out' }}
+      />
+      {pace > 0 && pace < 1 && (
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={C.text} strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+      )}
+      <text x={c} y={c + 5} textAnchor="middle" fill={cor} fontSize="16" fontWeight="900" fontFamily="system-ui, sans-serif">
+        {Math.round(cheio * 100)}%
+      </text>
+    </svg>
+  );
+}
+
 export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = (t) => t, onSalvar }) {
   const hoje = todayISO();
   const mes = ymOf(hoje);
   const [editando, setEditando] = useState(false);
+  const [aberto, setAberto] = useState(false);
   const [valor, setValor] = useState('');
   const [soEsteMes, setSoEsteMes] = useState(false);
   const [dias, setDias] = useState(null);
@@ -171,78 +212,100 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
   const pctLinha = m.diasTotais > 0 ? Math.max(0, Math.min(1, m.diasDecorridos / m.diasTotais)) : 0;
 
   return (
-    <Card style={{ marginBottom: 14, borderColor: `${est.cor}66` }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
-        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700 }}>
-          Meta · {mesLabel(mes)}
-        </div>
-        <button onClick={abrir} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 2, flexShrink: 0 }}>editar</button>
-      </div>
+    <Card style={{ marginBottom: 14, borderColor: `${est.cor}66`, padding: 14 }}>
+      {/* O MOSTRADOR — o que ela olha de relance. */}
+      <button
+        onClick={() => setAberto((v) => !v)}
+        aria-expanded={aberto}
+        style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.text }}
+      >
+        <Relogio pct={m.pct} pace={pctLinha} cor={est.cor} />
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700 }}>
+            Meta · {mesLabel(mes)}
+          </span>
+          <span style={{ display: 'block', fontSize: 19, fontWeight: 900, color: est.cor, lineHeight: 1.2, marginTop: 2, ...TAB }}>
+            {oculto(brl(m.realizado))}
+          </span>
+          <span style={{ display: 'block', fontSize: 12.5, color: C.muted, ...TAB }}>de {oculto(brl(m.meta))} · {est.titulo}</span>
+          {/* O número que manda na noite de hoje fica à vista mesmo fechado. */}
+          {m.diasRestantes > 0 && !m.bateu && (
+            <span style={{ display: 'block', fontSize: 12.5, marginTop: 3, color: C.faint }}>
+              <b style={{ color: est.cor, ...TAB }}>{oculto(brl(m.porDia))}</b> por noite nas {m.diasRestantes} que faltam
+            </span>
+          )}
+        </span>
+        <span style={{ flexShrink: 0, color: C.faint, fontSize: 13, transform: aberto ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>⌄</span>
+      </button>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 32, fontWeight: 900, color: est.cor, lineHeight: 1.1, ...TAB }}>{oculto(brl(m.realizado))}</div>
-        <div style={{ fontSize: 14, color: C.muted, ...TAB }}>de {oculto(brl(m.meta))}</div>
-      </div>
-      <div style={{ fontSize: 13, fontWeight: 800, color: est.cor, marginTop: 2 }}>
-        {est.titulo}{m.meta > 0 && m.estado !== 'sem-meta' ? ` · ${Math.round(m.pct * 100)}% da meta` : ''}
-      </div>
-
-      {/* A barra, com um risco em "onde o mês já está". Estar com a barra à
-          frente do risco é estar adiantada — sem precisar entender a conta. */}
-      <div style={{ position: 'relative', height: 10, borderRadius: 999, background: C.panel2, border: `1px solid ${C.hair}`, margin: '12px 0 4px', overflow: 'hidden' }}>
-        <i style={{ display: 'block', height: '100%', width: `${pctBarra * 100}%`, background: est.cor, borderRadius: 999 }} />
-        {pctLinha > 0 && pctLinha < 1 && (
-          <i style={{ position: 'absolute', top: -2, bottom: -2, left: `${pctLinha * 100}%`, width: 2, background: C.text, opacity: 0.55 }} title="onde o mês já está" />
-        )}
-      </div>
-      {/* QUAIS dias, não só quantos. "4 dias de operação" sozinho é um número
-          que ela não tem como conferir — e o número estava errado. */}
-      <div style={{ fontSize: 11.5, color: C.faint, marginBottom: m.poucasNoites ? 8 : 12, lineHeight: 1.45 }}>
-        {m.diasDecorridos} de {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'}
-        {diasAbre ? <> · abre {listar([...diasAbre].sort((a, b) => a - b))}</> : ' · abre todo dia'}
-        {' '}· o risco é onde o mês já está
-      </div>
+      {/* O AVISO DE POUCAS NOITES não espera toque nenhum: ele existe porque um
+          mês virou "4 noites" sem ela perceber e a tela passou a pedir R$ 6.161
+          por noite. Escondido atrás de um toque, não teria servido pra nada. */}
       {m.poucasNoites && (
-        <button onClick={abrir} style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'transparent', border: `1px solid ${C.amber}`, borderRadius: 9, padding: '8px 11px', marginBottom: 12, color: C.amber, fontSize: 12.5, lineHeight: 1.45 }}>
-            <b>Só {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'} em {mesLabel(mes)}?</b> Parece que faltou marcar
-            dia em “em que dias o bar abre” — e é por aí que o valor por noite é calculado. Toca pra conferir.
+        <button onClick={abrir} style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'transparent', border: `1px solid ${C.amber}`, borderRadius: 9, padding: '8px 11px', marginTop: 12, color: C.amber, fontSize: 12.5, lineHeight: 1.45 }}>
+          <b>Só {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'} em {mesLabel(mes)}?</b> Parece que faltou marcar
+          dia em “em que dias o bar abre” — e é por aí que o valor por noite é calculado. Toca pra conferir.
         </button>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Falta</div>
-          <div style={{ fontSize: 16, fontWeight: 800, ...TAB }}>{oculto(brl(m.falta))}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Por noite</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: m.porDia > 0 ? est.cor : C.faint, ...TAB }}>
-            {m.diasRestantes > 0 ? oculto(brl(m.porDia)) : '—'}
+      {aberto && (
+        <div style={{ marginTop: 14, borderTop: `1px solid ${C.hair}`, paddingTop: 12 }}>
+          {/* A barra continua aqui: ela mostra a MESMA coisa do anel, mas em
+              linha reta — e é mais fácil de ler quando se quer comparar com o
+              risco. As duas juntas não brigam; a de cima é de relance, esta é
+              de conferir. */}
+          <div style={{ position: 'relative', height: 10, borderRadius: 999, background: C.panel2, border: `1px solid ${C.hair}`, marginBottom: 4, overflow: 'hidden' }}>
+            <i style={{ display: 'block', height: '100%', width: `${pctBarra * 100}%`, background: est.cor, borderRadius: 999, transition: 'width .6s ease-out' }} />
+            {pctLinha > 0 && pctLinha < 1 && (
+              <i style={{ position: 'absolute', top: -2, bottom: -2, left: `${pctLinha * 100}%`, width: 2, background: C.text, opacity: 0.55 }} title="onde o mês já está" />
+            )}
           </div>
-          <div style={{ fontSize: 11, color: C.faint }}>{m.diasRestantes > 0 ? `nas ${m.diasRestantes} que faltam` : 'mês encerrado'}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Fecha em</div>
-          <div style={{ fontSize: 16, fontWeight: 800, ...TAB }}>{m.projecao > 0 ? oculto(brl(m.projecao)) : '—'}</div>
-          <div style={{ fontSize: 11, color: C.faint }}>{m.projecao > 0 ? `${Math.round(m.pctProjecao * 100)}% da meta` : 'sem ritmo ainda'}</div>
-        </div>
-      </div>
+          <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 12, lineHeight: 1.45 }}>
+            {m.diasDecorridos} de {m.diasTotais} noite{m.diasTotais === 1 ? '' : 's'}
+            {diasAbre ? <> · abre {listar([...diasAbre].sort((a, b) => a - b))}</> : ' · abre todo dia'}
+            {' '}· o risco é onde o mês já está
+          </div>
 
-      <div style={{ fontSize: 12.5, color: C.muted, marginTop: 12, lineHeight: 1.5, borderTop: `1px solid ${C.hair}`, paddingTop: 10 }}>
-        {m.bateu ? (
-          <>Bateste a meta de {mesLabel(mes)} — <b style={{ color: C.green }}>{oculto(brl(m.sobrou))}</b> acima. O que vier agora é a mais.</>
-        ) : m.diasRestantes <= 0 ? (
-          <>{mesLabel(mes)} fechou <b style={{ color: C.red }}>{oculto(brl(m.falta))}</b> abaixo da meta.</>
-        ) : m.diasDecorridos === 0 ? (
-          <>Mês novo: <b>{oculto(brl(m.porDia))}</b> por noite nas {m.diasRestantes} noites de {mesLabel(mes)} e tu chegas lá.</>
-        ) : (
-          <>
-            Tua média é <b>{oculto(brl(m.media))}</b> por noite; pra bater a meta precisa de{' '}
-            <b style={{ color: est.cor }}>{oculto(brl(m.porDia))}</b> nas {m.diasRestantes} que faltam.
-            {m.porDia > m.media * 1.3 && <> É bem acima do teu ritmo — ou tu aumentas o movimento, ou essa meta não é desse mês.</>}
-          </>
-        )}
-      </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Falta</div>
+              <div style={{ fontSize: 16, fontWeight: 800, ...TAB }}>{oculto(brl(m.falta))}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Por noite</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: m.porDia > 0 ? est.cor : C.faint, ...TAB }}>
+                {m.diasRestantes > 0 ? oculto(brl(m.porDia)) : '—'}
+              </div>
+              <div style={{ fontSize: 11, color: C.faint }}>{m.diasRestantes > 0 ? `nas ${m.diasRestantes} que faltam` : 'mês encerrado'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: C.faint, textTransform: 'uppercase', letterSpacing: '.05em' }}>Fecha em</div>
+              <div style={{ fontSize: 16, fontWeight: 800, ...TAB }}>{m.projecao > 0 ? oculto(brl(m.projecao)) : '—'}</div>
+              <div style={{ fontSize: 11, color: C.faint }}>{m.projecao > 0 ? `${Math.round(m.pctProjecao * 100)}% da meta` : 'sem ritmo ainda'}</div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 12, lineHeight: 1.5 }}>
+            {m.bateu ? (
+              <>Bateste a meta de {mesLabel(mes)} — <b style={{ color: C.green }}>{oculto(brl(m.sobrou))}</b> acima. O que vier agora é a mais.</>
+            ) : m.diasRestantes <= 0 ? (
+              <>{mesLabel(mes)} fechou <b style={{ color: C.red }}>{oculto(brl(m.falta))}</b> abaixo da meta.</>
+            ) : m.diasDecorridos === 0 ? (
+              <>Mês novo: <b>{oculto(brl(m.porDia))}</b> por noite nas {m.diasRestantes} noites de {mesLabel(mes)} e tu chegas lá.</>
+            ) : (
+              <>
+                Tua média é <b>{oculto(brl(m.media))}</b> por noite; pra bater a meta precisa de{' '}
+                <b style={{ color: est.cor }}>{oculto(brl(m.porDia))}</b> nas {m.diasRestantes} que faltam.
+                {m.porDia > m.media * 1.3 && <> É bem acima do teu ritmo — ou tu aumentas o movimento, ou essa meta não é desse mês.</>}
+              </>
+            )}
+          </div>
+
+          <button onClick={abrir} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: '10px 2px 0' }}>
+            Editar a meta
+          </button>
+        </div>
+      )}
     </Card>
   );
 }
