@@ -1,14 +1,30 @@
 'use client';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
-import { brl, num, numQtd, todayISO, ymOf, fmtDate, addDays, uid, limparNome, montarParcelas, ratearParcelas, CATEGORIAS_PRODUTO } from '../lib/util';
+import { brl, num, numQtd, todayISO, ymOf, fmtDate, addDays, uid, limparNome, montarParcelas, ratearParcelas, CATEGORIAS_PRODUTO, CATEGORIAS_DESPESA } from '../lib/util';
 import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, fatorEntre, UNIDADES } from '../lib/estoque';
 import { efeitoDaEdicaoNaDespesa } from '../lib/despesaDaCompra';
 import { precoNaUnidadeDoItem } from '../lib/cotacao';
 import { guardarRascunho, lerRascunho, limparRascunho, registrarTentativa, lerTentativas, limparTentativas, quandoBR } from '../lib/notaPendente';
 
 // Dados compartilhados da compra (valem pra todos os itens do carrinho).
-const compraVazia = () => ({ data: todayISO(), fornecedor: '', formaPagto: 'À vista', pago: 'Sim', vencimento: '', nota: '' });
+// tipoConta: ONDE ISTO CAI NO DRE.
+//
+// Antes a despesa nascida de uma compra era carimbada sempre como
+// "Fornecedores de insumo", escrito fixo no código. Pra bebida e comida está
+// certo. Pra uma panela, uma peça de manutenção ou um equipamento, não: aquilo
+// vira custo variável no DRE quando não é, e o lucro operacional aparece menor
+// do que de verdade. Era por isso que a mesma compra acabava sendo lançada
+// também em Despesas, à mão — e aí o estoque ficava de fora.
+//
+// emergencia: a corrida ao mercado no meio do expediente. Costuma ser a compra
+// mais cara do mês e ninguém mede, porque não havia onde marcar.
+const TIPO_PADRAO = 'Fornecedores de insumo';
+const impostoVazio = () => ({ icmsST: '', ipi: '', outros: '' });
+const compraVazia = () => ({
+  data: todayISO(), fornecedor: '', formaPagto: 'À vista', pago: 'Sim', vencimento: '', nota: '',
+  tipoConta: TIPO_PADRAO, emergencia: false, imposto: impostoVazio(),
+});
 // Item que está sendo digitado antes de entrar no carrinho.
 // estoqueId: em qual item do estoque esta compra vai somar. Vazio = o sistema
 // descobre pelo nome; 'nenhum' = ela disse que não controla isso no estoque.
@@ -276,6 +292,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
 
   const setC = (k) => (v) => setCompra((f) => ({ ...f, [k]: v }));
   const setI = (k) => (v) => setItem((f) => ({ ...f, [k]: v }));
+  const setImposto = (k) => (v) => setCompra((f) => ({ ...f, imposto: { ...(f.imposto || {}), [k]: v } }));
   // Ao trocar a forma de pagamento, ajusta o "já pago?" pro padrão de cada uma:
   // à vista costuma já estar paga; a prazo vai pro A Pagar (não paga ainda).
   const setForma = (v) => setCompra((f) => ({ ...f, formaPagto: v, pago: v === 'À vista' ? 'Sim' : 'Não' }));
@@ -313,7 +330,21 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
 
   const totalItem = num(item.quantidade) * num(item.valorUnit);
   const difVsCot = menorCot && custoNaNota > 0 ? Math.round((custoNaNota - menorCot.menor) * 100) / 100 : 0;
-  const totalCarrinho = carrinho.reduce((s, it) => s + num(it.quantidade) * num(it.valorUnit), 0);
+  const totalItens = carrinho.reduce((s, it) => s + num(it.quantidade) * num(it.valorUnit), 0);
+  // O IMPOSTO DA NOTA, SEM MEXER NO CAMINHO DO DINHEIRO.
+  //
+  // O boleto da distribuidora vem com ICMS ST e IPI por cima dos produtos, e
+  // nunca fecha com a soma dos itens. Em vez de inventar um caminho novo pro
+  // dinheiro, o imposto entra como UMA LINHA A MAIS da nota — que não vai pro
+  // estoque. Assim parcelas, despesa, fornecedor e DRE continuam somando
+  // sozinhos, pelo mesmo caminho de sempre.
+  const totalImposto = num(compra.imposto?.icmsST) + num(compra.imposto?.ipi) + num(compra.imposto?.outros);
+  const linhaImposto = () => ({
+    produto: 'Impostos da nota', categoria: '', quantidade: '1', valorUnit: String(totalImposto),
+    estoqueId: 'nenhum', conteudo: '', conteudoUnid: '',
+    obs: ['ICMS ST ' + brl(num(compra.imposto?.icmsST)), 'IPI ' + brl(num(compra.imposto?.ipi)), 'outros ' + brl(num(compra.imposto?.outros))].join(' · '),
+  });
+  const totalCarrinho = totalItens + totalImposto;
 
   // Parcelar só faz sentido em compra a prazo. Ao mudar o nº de parcelas (ou o
   // carrinho), as linhas são remontadas a partir do total — e ela ainda pode
@@ -367,10 +398,12 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     if (pago === 'Sim' && totalCarrinho > 0) {
       despId = uid();
       despesaNova = {
-        id: despId, data: compra.data, categoria: 'Fornecedores de insumo',
-        descricao: [forn, compra.nota && `Nota ${compra.nota}`].filter(Boolean).join(' · ') || 'Compra',
+        id: despId, data: compra.data, categoria: compra.tipoConta || TIPO_PADRAO,
+        descricao: [forn, compra.nota && `Nota ${compra.nota}`, compra.emergencia && 'emergência'].filter(Boolean).join(' · ') || 'Compra',
         valor: totalCarrinho.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        obs: `Compra ${compra.formaPagto.toLowerCase()} · ${carrinho.length} ${carrinho.length > 1 ? 'itens' : 'item'}`,
+        obs: [`Compra ${compra.formaPagto.toLowerCase()} · ${carrinho.length} ${carrinho.length > 1 ? 'itens' : 'item'}`,
+          totalImposto > 0 && `imposto da nota ${brl(totalImposto)}`,
+          compra.emergencia && 'COMPRA DE EMERGÊNCIA'].filter(Boolean).join(' · '),
         origem: 'compra',
       };
     }
@@ -386,11 +419,14 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     // cheio — não um terço dele.
     const plano = parcelado ? parcelas : [{ vencimento: venc, valor: String(totalCarrinho) }];
     const nP = plano.length;
-    const totaisItem = carrinho.map((it) => num(it.quantidade) * num(it.valorUnit));
+    // A linha do imposto entra aqui, no fim, junto com os itens — pra o rateio
+    // das parcelas e todas as somas tratarem ela como qualquer outra linha.
+    const itensDaNota = totalImposto > 0 ? [...carrinho, linhaImposto()] : carrinho;
+    const totaisItem = itensDaNota.map((it) => num(it.quantidade) * num(it.valorUnit));
     const rateio = ratearParcelas(totaisItem, plano.map((p) => p.valor));
     const novasCompras = [];
     plano.forEach((p, iP) => {
-      carrinho.forEach((it, iI) => {
+      itensDaNota.forEach((it, iI) => {
         const dinheiro = rateio[iP][iI];
         novasCompras.push({
           id: uid(), data: compra.data, produto: limparNome(it.produto), fornecedor: forn,
@@ -405,7 +441,12 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
           precoCheio: nP > 1 ? (it.valorUnit || '0') : '',
           formaPagto: compra.formaPagto, prazoDias: '', vencimento: p.vencimento || venc, pago,
           dataPagamento: pago === 'Sim' ? compra.data : '',
-          obs: nP > 1 ? `Parcela ${iP + 1}/${nP}` : '', nota: compra.nota,
+          obs: [nP > 1 && `Parcela ${iP + 1}/${nP}`, it.obs].filter(Boolean).join(' · '), nota: compra.nota,
+          // Viajam na linha pra quem pagar depois (Contas a pagar) lançar a
+          // despesa no lugar certo do DRE, e pro relatório saber o que foi
+          // correria.
+          tipoConta: compra.tipoConta || TIPO_PADRAO,
+          emergencia: compra.emergencia ? 'Sim' : '',
           despesaId: despId || undefined,
           parcela: nP > 1 ? `${iP + 1}/${nP}` : '',
           // Onde isto soma no estoque. Fica gravado na linha da compra pra que
@@ -419,6 +460,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
 
     let cotacoesNovas = null;
     if (gerarCotacao) {
+      // A linha de imposto não é produto: não vira cotação de preço.
       const novos = carrinho.filter((it) => num(it.valorUnit) > 0).map((it) => ({
         id: uid(), data: compra.data, produto: limparNome(it.produto), fornecedor: forn,
         preco: it.valorUnit, categoria: it.categoria,
@@ -509,7 +551,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     if (efeito.tipo === 'criar') {
       const despId = uid();
       op.despesaNova = {
-        id: despId, data: depois.dataPagamento || compra.data, categoria: 'Fornecedores de insumo',
+        id: despId, data: depois.dataPagamento || compra.data, categoria: compra.tipoConta || TIPO_PADRAO,
         descricao: [limparNome(compra.fornecedor), compra.nota && `Nota ${compra.nota}`].filter(Boolean).join(' · ') || limparNome(item.produto) || 'Compra',
         valor: efeito.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         obs: `Marcada como paga em Compras · ${limparNome(item.produto)}`,
@@ -638,6 +680,67 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
           </>
         )}
         <Field label="Nota / boleto (opcional)"><TextInput value={compra.nota} onChange={setC('nota')} placeholder="ex: NF 4567" /></Field>
+
+        {/* ONDE ISTO CAI NO DRE.
+            Vem em "Fornecedores de insumo", que é o caso de quase toda compra.
+            Ela só mexe quando não for — e aí não precisa lançar a mesma compra
+            de novo em Despesas só pra classificar certo. */}
+        <Field label="Tipo de conta (onde cai no DRE)">
+          <Select value={compra.tipoConta || TIPO_PADRAO} onChange={setC('tipoConta')} options={CATEGORIAS_DESPESA} />
+        </Field>
+        {(compra.tipoConta || TIPO_PADRAO) !== TIPO_PADRAO && (
+          <div style={{ fontSize: 12, color: C.muted, marginTop: -8, marginBottom: 12, lineHeight: 1.45 }}>
+            Esta compra vai pro DRE como <b style={{ color: C.text }}>{compra.tipoConta}</b> — e não como mercadoria.
+            Os produtos continuam entrando no estoque normal.
+          </div>
+        )}
+
+        {/* COMPRA DE EMERGÊNCIA.
+            A corrida ao mercado no meio do expediente costuma ser a compra mais
+            cara do mês, e ninguém mede porque não havia onde marcar. */}
+        <button type="button" onClick={() => setC('emergencia')(!compra.emergencia)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', cursor: 'pointer',
+            background: compra.emergencia ? C.panel2 : 'transparent', borderRadius: 10, padding: '10px 12px',
+            border: `1px solid ${compra.emergencia ? C.amber : C.line}`, color: C.text, marginBottom: 12,
+          }}>
+          <span style={{
+            width: 18, height: 18, borderRadius: 5, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 12, fontWeight: 900,
+            background: compra.emergencia ? C.amber : 'transparent',
+            border: `1px solid ${compra.emergencia ? C.amber : C.line}`, color: '#2A1A00',
+          }}>{compra.emergencia ? '✓' : ''}</span>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>Foi compra de emergência</span>
+            <span style={{ display: 'block', fontSize: 12, color: C.faint, marginTop: 1, lineHeight: 1.45 }}>
+              Acabou no meio do expediente e teve que correr no mercado. O relatório soma quanto do mês foi assim.
+            </span>
+          </span>
+        </button>
+
+        {/* O IMPOSTO DO BOLETO.
+            O boleto da distribuidora vem com ICMS ST e IPI por cima, e nunca
+            fecha com a soma dos itens. Aqui ele entra como uma linha a mais da
+            nota — que não vai pro estoque. */}
+        <details style={{ marginBottom: 12 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, color: C.accent, fontWeight: 700, padding: '4px 0' }}>
+            O boleto veio com imposto? (ICMS ST, IPI)
+          </summary>
+          <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginTop: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <Field label="ICMS ST (R$)"><NumInput value={compra.imposto?.icmsST || ''} onChange={setImposto('icmsST')} /></Field>
+              <Field label="IPI (R$)"><NumInput value={compra.imposto?.ipi || ''} onChange={setImposto('ipi')} /></Field>
+              <Field label="Outros (R$)"><NumInput value={compra.imposto?.outros || ''} onChange={setImposto('outros')} /></Field>
+            </div>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+              {totalImposto > 0 ? (
+                <>Itens <b style={{ color: C.text }}>{brl(totalItens)}</b> + imposto <b style={{ color: C.text }}>{brl(totalImposto)}</b> ={' '}
+                <b style={{ color: C.text }}>{brl(totalCarrinho)}</b> — tem que fechar com o boleto.
+                O imposto entra como uma linha da nota e <b style={{ color: C.text }}>não vai pro estoque</b>.</>
+              ) : 'Preenche só se o boleto tiver imposto por cima dos produtos.'}
+            </div>
+          </div>
+        </details>
 
         <div style={{ borderTop: `1px solid ${C.line}`, margin: '8px 0 14px' }} />
 
