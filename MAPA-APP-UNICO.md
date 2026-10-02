@@ -184,6 +184,73 @@ ser de madrugada, com o bar fechado, e dura alguns minutos.
 
 ---
 
+## ✅ A virada foi feita — 1 de outubro de 2026, à noite
+
+As duas instalações mudaram de casa e estão rodando com o dono no nome das
+linhas:
+
+| | linhas renomeadas | código do negócio |
+|---|---|---|
+| Estimado | 2 | `estimado` |
+| Pico do Mané | 407 | `pico-do-mane` |
+
+**Não foi preciso rodar o script.** A mudança inteira coube num comando de SQL,
+colado no SQL Editor do Supabase — a mesma tela da instalação. Mais simples e
+mais seguro que o script: o banco faz tudo de uma vez, ou tudo ou nada.
+
+```sql
+-- conferir (não muda nada)
+select
+  count(*) as total,
+  count(*) filter (where chave like 'n:%') as ja_tem_dono,
+  count(*) filter (where chave not like 'n:%' and chave not like 'adm:%') as vao_ganhar_dono
+from pdm_dados;
+
+-- mudar
+update pdm_dados
+set chave = 'n:<codigo>:' || chave
+where chave not like 'n:%' and chave not like 'adm:%';
+
+-- conferir que o prefixo saiu exato (o iPad troca hífen por traço comprido)
+select count(*) filter (where chave like 'n:<codigo>:%') as certas, count(*) as total
+from pdm_dados;
+
+-- desfazer
+update pdm_dados
+set chave = replace(chave, 'n:<codigo>:', '')
+where chave like 'n:<codigo>:%';
+```
+
+**O que deu errado e vale lembrar:** no Estimado a variável foi criada como
+`NEGCIO_UNICO` (sem o O) e o app deu erro 500. O nome de uma variável não se
+edita depois de criada — apaga e cria de novo. **Conferir o nome ANTES de
+publicar** passou a ser parte do procedimento.
+
+**O que sobreviveu sozinho:** o link do widget e o do Google Agenda continuam
+valendo, pela rede que está em `app/api/widget/route.js` e
+`app/api/calendario/route.js` (token antigo aceito, mas só na instalação de um
+cliente).
+
+### O que ainda falta pra ser de verdade um app só
+
+Isto aqui preparou as duas instalações — elas falam a língua nova. Mas continuam
+sendo **dois projetos no Supabase e dois na Vercel**, e o limite de 2 projetos
+grátis continua de pé: **o terceiro cliente ainda não entra**.
+
+Falta juntar:
+
+1. Escolher um projeto do Supabase pra ser o compartilhado (o do Estimado, que
+   tem 2 linhas, é o candidato óbvio).
+2. Levar as 407 linhas do Pico do Mané pra lá.
+3. Apontar **um** projeto da Vercel pra esse banco, com `ADMIN_PASSWORD` e
+   **sem** `NEGOCIO_UNICO`.
+4. Criar os dois negócios na sala de máquinas.
+5. Avisar o pessoal do Estimado que o endereço mudou.
+
+É a conversa seguinte.
+
+---
+
 ## A hora da virada — o único passo que mexe no que está no ar
 
 O código da etapa 5 está pronto e testado, **mas não foi juntado no `main`**, e
