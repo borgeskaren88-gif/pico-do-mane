@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle } from './ui';
-import { brl, num, todayISO, fmtDate, addDays, uid, limparNome, montarParcelas, agruparContasAbertas, CATEGORIAS_PRODUTO } from '../lib/util';
+import { brl, num, totalCompra, todayISO, fmtDate, addDays, uid, limparNome, montarParcelas, agruparContasAbertas, CATEGORIAS_PRODUTO } from '../lib/util';
 import CalendarioFluxo from './CalendarioFluxo';
 
 const formVazio = () => ({ fornecedor: '', descricao: '', categoria: '', valorTotal: '', parcelas: '1' });
@@ -59,7 +59,7 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
   };
 
   const abertas = dados.filter((d) => d.pago !== 'Sim');
-  const total = abertas.reduce((s, d) => s + num(d.quantidade) * num(d.valorUnit), 0);
+  const total = abertas.reduce((s, d) => s + totalCompra(d), 0);
 
   // Agrupa itens que compartilham a mesma "nota/boleto" (mesmo fornecedor) num
   // único pagamento. Itens sem nota ficam individuais. (Helper compartilhado com
@@ -141,7 +141,7 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
       let g = map.get(chave);
       if (!g) { g = { chave, fornecedor: d.fornecedor, nota: (d.nota || '').trim(), dataPagamento: d.dataPagamento, itens: [], total: 0, despesaIds: new Set(), auto: false }; map.set(chave, g); }
       g.itens.push(d);
-      g.total += num(d.quantidade) * num(d.valorUnit);
+      g.total += totalCompra(d);
       if (d.despesaId) { g.despesaIds.add(d.despesaId); g.auto = true; }
       if (d.dataPagamento && (!g.dataPagamento || d.dataPagamento > g.dataPagamento)) g.dataPagamento = d.dataPagamento;
     }

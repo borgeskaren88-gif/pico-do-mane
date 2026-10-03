@@ -1,7 +1,7 @@
 'use client';
 import React, { useMemo, useState } from 'react';
 import { C, Card, Empty, PageTitle } from './ui';
-import { brl, num, ymOf, addDays, diaOperacional, limparNome, fmtDate } from '../lib/util';
+import { brl, num, totalCompra, ymOf, addDays, diaOperacional, limparNome, fmtDate } from '../lib/util';
 
 // Quanto cada fornecedor levou do bar.
 //
@@ -38,7 +38,7 @@ export default function Fornecedores({ compras = [] }) {
     for (const c of compras) {
       if (!c || !dentro(c.data)) continue;
       const nome = limparNome(c.fornecedor) || 'Sem fornecedor';
-      const valor = num(c.quantidade) * num(c.valorUnit);
+      const valor = totalCompra(c);
       if (!m.has(nome)) m.set(nome, { nome, total: 0, n: 0, ultima: '', aberto: 0, produtos: new Map() });
       const f = m.get(nome);
       f.total += valor;
