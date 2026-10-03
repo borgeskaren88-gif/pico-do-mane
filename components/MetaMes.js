@@ -221,7 +221,7 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
       return (
         <button onClick={abrir} title="Definir a meta do mês"
           style={{
-            width: 104, minHeight: 104, borderRadius: 18, cursor: 'pointer', flexShrink: 0,
+            flex: '1 1 104px', minWidth: 104, minHeight: 104, borderRadius: 18, cursor: 'pointer',
             background: 'transparent', border: `1px dashed ${C.line}`, color: C.muted,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 8,
             alignSelf: 'stretch', marginBottom: 14,
@@ -324,7 +324,7 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
           onClick={() => setAberto(true)}
           title={`Meta de ${mesLabel(mes)}`}
           style={{
-            width: 104, flexShrink: 0, borderRadius: 18, cursor: 'pointer', padding: '10px 8px',
+            flex: '1 1 104px', minWidth: 104, borderRadius: 18, cursor: 'pointer', padding: '10px 8px',
             background: C.panel, border: `1px solid ${m.poucasNoites ? C.amber : `${est.cor}66`}`,
             color: C.text, display: 'flex', flexDirection: 'column', alignItems: 'center',
             // Acompanha a altura do cartão ao lado: dois blocos do mesmo

@@ -109,12 +109,18 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           mesmo tempo em lugares diferentes. Juntos viram um bloco só: "o que
           olhar agora" e "onde o mês está".
 
-          A base de 260px é o que mantém os dois na mesma linha até no celular:
-          com 340px o relógio descia e ficava sozinho, com um vão à direita —
-          que é exatamente o desalinho que a gente estava tirando. Abaixo disso
-          o resumo ficaria estreito demais pra ler, e aí sim ele desce. */}
+          QUANDO NÃO CABEM OS DOIS, O RELÓGIO OCUPA A LINHA INTEIRA.
+          Em celular estreito (o dela tem menos de 400px) os dois lado a lado
+          cortariam os avisos no meio — "25 itens zerados no es…". Então ele
+          desce. Mas descer e ficar com 104px deixava um buraco à direita, que
+          é o mesmo desalinho de antes, só que embaixo.
+
+          O truque é o 999: dividindo a mesma linha, o resumo engole toda a
+          folga e o relógio fica no tamanho dele; sozinho na linha, ele cresce e
+          ocupa tudo. Um valor só resolve os dois casos, sem perguntar a
+          largura da tela pra ninguém. */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', flexWrap: 'wrap', marginBottom: 2 }}>
-        <div style={{ flex: '1 1 260px', minWidth: 0 }}>{resumo}</div>
+        <div style={{ flex: '999 1 260px', minWidth: 0 }}>{resumo}</div>
         {onMetas && (
           <MetaMes canto metas={metas} receitas={receitas} realizado={rec} oculto={oculto} onSalvar={onMetas} />
         )}
