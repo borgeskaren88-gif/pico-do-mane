@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, KPI, Area, PageTitle, inputStyle } from './ui';
-import { todayISO, fmtDate, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
+import { totalCompra, todayISO, fmtDate, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
 import { horasDoTurno, fmtHoras, aPagarNoMes } from '../lib/ponto';
 import SEED_DATA from '../data/seed.json';
 
@@ -13,7 +13,6 @@ function montarAnalise(all, marca = 'Meu negócio') {
   const arrOu = (v) => (Array.isArray(v) ? v : []);
   const pct = (n, d) => (d ? (n / d * 100).toFixed(1).replace('.', ',') + '%' : '—');
   const soma = (arr, campo = 'valor') => arr.reduce((s, x) => s + num(x[campo]), 0);
-  const totalCompra = (c) => num(c.quantidade) * num(c.valorUnit);
   const hoje = todayISO();
 
   const recTotal = soma(all.receitas);

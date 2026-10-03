@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
-import { brl, num, numQtd, todayISO, ymOf, fmtDate, addDays, uid, limparNome, montarParcelas, ratearParcelas, CATEGORIAS_PRODUTO, CATEGORIAS_DESPESA } from '../lib/util';
+import { brl, num, numQtd, totalCompra, todayISO, ymOf, fmtDate, addDays, uid, limparNome, montarParcelas, ratearParcelas, CATEGORIAS_PRODUTO, CATEGORIAS_DESPESA } from '../lib/util';
 import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, fatorEntre, UNIDADES } from '../lib/estoque';
 import { efeitoDaEdicaoNaDespesa } from '../lib/despesaDaCompra';
 import { precoNaUnidadeDoItem } from '../lib/cotacao';
@@ -328,9 +328,9 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     return { menor: melhor.unit, forn: limparNome(melhor.c.fornecedor), unidade: alvoItem.item.unidade || 'un' };
   }, [item, alvoItem, cotacoes]);
 
-  const totalItem = num(item.quantidade) * num(item.valorUnit);
+  const totalItem = totalCompra(item);
   const difVsCot = menorCot && custoNaNota > 0 ? Math.round((custoNaNota - menorCot.menor) * 100) / 100 : 0;
-  const totalItens = carrinho.reduce((s, it) => s + num(it.quantidade) * num(it.valorUnit), 0);
+  const totalItens = carrinho.reduce((s, it) => s + totalCompra(it), 0);
   // O IMPOSTO DA NOTA, SEM MEXER NO CAMINHO DO DINHEIRO.
   //
   // O boleto da distribuidora vem com ICMS ST e IPI por cima dos produtos, e
@@ -422,7 +422,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     // A linha do imposto entra aqui, no fim, junto com os itens — pra o rateio
     // das parcelas e todas as somas tratarem ela como qualquer outra linha.
     const itensDaNota = totalImposto > 0 ? [...carrinho, linhaImposto()] : carrinho;
-    const totaisItem = itensDaNota.map((it) => num(it.quantidade) * num(it.valorUnit));
+    const totaisItem = itensDaNota.map((it) => totalCompra(it));
     const rateio = ratearParcelas(totaisItem, plano.map((p) => p.valor));
     const novasCompras = [];
     plano.forEach((p, iP) => {
@@ -585,8 +585,8 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
     .filter((d) => ymOf(d.data) === filtroMes)
     .filter((d) => (d.produto + ' ' + d.fornecedor).toLowerCase().includes(busca.toLowerCase()))
     .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
-  const totalMes = lista.reduce((s, d) => s + num(d.quantidade) * num(d.valorUnit), 0);
-  const gastoGeral = dados.reduce((s, d) => s + num(d.quantidade) * num(d.valorUnit), 0);
+  const totalMes = lista.reduce((s, d) => s + totalCompra(d), 0);
+  const gastoGeral = dados.reduce((s, d) => s + totalCompra(d), 0);
   const emAberto = dados.filter((d) => d.pago !== 'Sim').length;
 
   return (
@@ -808,11 +808,11 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
                   <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: `1px solid ${C.hair}` }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, color: C.text }}>{it.produto}</div>
-                      <div style={{ fontSize: 12, color: C.faint }}>{num(it.quantidade) || 1} × {brl(num(it.valorUnit))}{it.categoria ? ` · ${it.categoria}` : ''}</div>
+                      <div style={{ fontSize: 12, color: C.faint }}>{numQtd(it.quantidade) || 1} × {brl(num(it.valorUnit))}{it.categoria ? ` · ${it.categoria}` : ''}</div>
                       <DestinoEstoque compacto item={it} estoque={estoque} onLigar={() => {}} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                      <b style={{ fontVariantNumeric: 'tabular-nums' }}>{brl(num(it.quantidade) * num(it.valorUnit))}</b>
+                      <b style={{ fontVariantNumeric: 'tabular-nums' }}>{brl(totalCompra(it))}</b>
                       <button onClick={() => removeItem(it.id)} title="Remover" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}>×</button>
                     </div>
                   </div>
@@ -886,7 +886,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
 
       {lista.length === 0 ? <Empty>Nenhuma compra neste mês.</Empty> :
         lista.map((d) => {
-          const tot = num(d.quantidade) * num(d.valorUnit);
+          const tot = totalCompra(d);
           const aberto = d.pago !== 'Sim';
           return (
             <Card key={d.id} style={{ marginBottom: 8, padding: '12px 14px' }}>
@@ -897,7 +897,7 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
                   <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
                     {d.parcela
                       ? <>{numQtd(d.qtdCompra || d.quantidade)} × {brl(num(d.precoCheio))} · <b style={{ color: C.amber }}>parcela {d.parcela}</b></>
-                      : <>{num(d.quantidade)} × {brl(num(d.valorUnit))}</>} · {d.formaPagto}
+                      : <>{numQtd(d.quantidade)} × {brl(num(d.valorUnit))}</>} · {d.formaPagto}
                     {d.vencimento && d.formaPagto === 'Prazo' ? ` · vence ${fmtDate(d.vencimento)}` : ''}
                     {aberto ? <span style={{ color: C.amber }}> · em aberto</span> : <span style={{ color: C.green }}> · pago</span>}
                   </div>

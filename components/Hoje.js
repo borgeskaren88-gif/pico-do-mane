@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { C, Card, Btn, KPI, Empty } from './ui';
 import MetaMes from './MetaMes';
-import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_NAO_OPERACIONAL, DESPESA_NAO_OPERACIONAL } from '../lib/util';
+import { brl, num, totalCompra, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_NAO_OPERACIONAL, DESPESA_NAO_OPERACIONAL } from '../lib/util';
 
 const TAB = { fontVariantNumeric: 'tabular-nums' };
 
@@ -47,7 +47,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   const margem = rec ? (lucro / rec) * 100 : 0;
   const jaTem = diario.some((d) => d.data === hoje);
   const abertas = compras.filter((c) => c.pago !== 'Sim');
-  const totalPagar = abertas.reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
+  const totalPagar = abertas.reduce((s, c) => s + totalCompra(c), 0);
   const gruposAbertos = agruparContasAbertas(abertas);
   const vencidas = gruposAbertos.filter((g) => g.vencimento && g.vencimento < hoje);
   const garrafasEmUso = garrafas.filter((g) => g.dataAbertura && !g.dataTermino);

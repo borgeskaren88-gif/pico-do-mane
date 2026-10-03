@@ -57,7 +57,7 @@ function Delta({ atual, anterior, boaSubida = true }) {
     </span>
   );
 }
-import { brl, num, todayISO, ymOf, limparNome, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, FONTES_NAO_OPERACIONAL, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
+import { brl, num, totalCompra, todayISO, ymOf, limparNome, weekday, fmtDate, mesLabel, addDays, FONTES_RECEITA, FONTES_NAO_OPERACIONAL, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, DESPESA_NAO_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import { cmvDoMes, lerCMV, evolucaoCMV, compararCMV, variacaoProdutos, estoqueNoMes } from '../lib/cmv';
 
 export default function Relatorios({ diario, receitas, despesas, mes, setMes, vendas = [], compras = [], estoque = [], fichas = [], cardapio = [], negocio = '' }) {
@@ -181,13 +181,13 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   // o que mais aparece aqui é o que está faltando no estoque mínimo.
   const emergencia = useMemo(() => {
     const doMes = compras.filter((c) => c && c.emergencia === 'Sim' && ymOf(c.data) === mes);
-    const total = doMes.reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
+    const total = doMes.reduce((s, c) => s + totalCompra(c), 0);
     const todas = compras.filter((c) => c && ymOf(c.data) === mes)
-      .reduce((s, c) => s + num(c.quantidade) * num(c.valorUnit), 0);
+      .reduce((s, c) => s + totalCompra(c), 0);
     const porProduto = {};
     for (const c of doMes) {
       const k = limparNome(c.produto) || '—';
-      porProduto[k] = (porProduto[k] || 0) + num(c.quantidade) * num(c.valorUnit);
+      porProduto[k] = (porProduto[k] || 0) + totalCompra(c);
     }
     const ranking = Object.entries(porProduto).sort((a, b) => b[1] - a[1]).slice(0, 5);
     return { total, pct: todas > 0 ? (total / todas) * 100 : 0, vezes: doMes.length, ranking, todas };

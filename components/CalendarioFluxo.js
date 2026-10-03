@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import { C, Card, NumInput } from './ui';
-import { num, brl, todayISO, fmtDate, limparNome, MESES } from '../lib/util';
+import { totalCompra, num, brl, todayISO, fmtDate, limparNome, MESES } from '../lib/util';
 
 const pad = (n) => String(n).padStart(2, '0');
 const DIAS_CURTO = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
@@ -32,7 +32,7 @@ export default function CalendarioFluxo({ contas }) {
     const m = {};
     for (const c of contas) {
       if (!c.vencimento) continue;
-      m[c.vencimento] = (m[c.vencimento] || 0) + num(c.quantidade) * num(c.valorUnit);
+      m[c.vencimento] = (m[c.vencimento] || 0) + totalCompra(c);
     }
     return m;
   }, [contas]);
@@ -54,7 +54,7 @@ export default function CalendarioFluxo({ contas }) {
     for (const c of (itensPorDia[selecionado] || [])) {
       const nome = limparNome(c.fornecedor) || limparNome(c.produto) || 'Conta';
       const g = map.get(nome) || { nome, total: 0, nota: (c.nota || '').trim() };
-      g.total += num(c.quantidade) * num(c.valorUnit);
+      g.total += totalCompra(c);
       map.set(nome, g);
     }
     return [...map.values()].sort((a, b) => b.total - a.total);

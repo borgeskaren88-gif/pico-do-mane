@@ -1,7 +1,7 @@
 'use client';
 import React, { useMemo, useState } from 'react';
 import { C, Card, Btn, SecTitle, PageTitle } from './ui';
-import { brl, num, fmtDate, limparNome, fiadoDaVenda } from '../lib/util';
+import { brl, num, numQtd, totalCompra, fmtDate, limparNome, fiadoDaVenda } from '../lib/util';
 
 const chaveTxt = (s) => (s || '').trim().toLowerCase();
 
@@ -46,7 +46,7 @@ export default function Auditoria({ receitas = [], despesas = [], compras = [], 
   // e NÃO são duplicata.
   const dupCompras = useMemo(() => duplicados(
     compras.filter((c) => chaveTxt(c.formaPagto) !== 'prazo'),
-    (c) => `${c.data}|${chaveTxt(limparNome(c.produto))}|${chaveTxt(limparNome(c.fornecedor))}|${num(c.valorUnit).toFixed(2)}|${num(c.quantidade)}|${(c.nota || '').trim()}|${c.vencimento || ''}`
+    (c) => `${c.data}|${chaveTxt(limparNome(c.produto))}|${chaveTxt(limparNome(c.fornecedor))}|${num(c.valorUnit).toFixed(2)}|${numQtd(c.quantidade)}|${(c.nota || '').trim()}|${c.vencimento || ''}`
   ), [compras]);
 
   // Vendas de comanda registradas, por dia. As comandas são OPERACIONAIS e não
@@ -86,7 +86,7 @@ export default function Auditoria({ receitas = [], despesas = [], compras = [], 
             {fmtDate(x.data)} · {tipo === 'compra' ? `${limparNome(x.produto)}${x.nota ? ` · Nota ${x.nota}` : ''} (${limparNome(x.fornecedor) || 'sem fornecedor'})` : (x.descricao || x.categoria || '—')}
           </span>
           <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-            {tipo === 'compra' ? brl(num(x.quantidade) * num(x.valorUnit)) : brl(num(x.valor))}
+            {tipo === 'compra' ? brl(totalCompra(x)) : brl(num(x.valor))}
           </span>
         </div>
       ))}

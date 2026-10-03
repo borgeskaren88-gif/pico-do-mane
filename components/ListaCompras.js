@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle, Sugestoes } from './ui';
-import { brl, num, todayISO, addDays, fmtDate, uid, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
+import { brl, num, numQtd, todayISO, addDays, fmtDate, uid, limparNome, CATEGORIAS_PRODUTO } from '../lib/util';
 import MicBtn from './MicBtn';
 
 const itemVazio = () => ({ nome: '', quantidade: '', categoria: '' });
@@ -64,7 +64,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
       let g = map.get(forn);
       if (!g) { g = { fornecedor: forn, itens: [], estimativa: 0, temPreco: false }; map.set(forn, g); }
       g.itens.push({ ...it, best });
-      if (best) { g.estimativa += (num(it.quantidade) || 1) * best.preco; g.temPreco = true; }
+      if (best) { g.estimativa += (numQtd(it.quantidade) || 1) * best.preco; g.temPreco = true; }
     }
     return [...map.values()].sort((a, b) => (a.fornecedor === 'A definir' ? 1 : b.fornecedor === 'A definir' ? -1 : a.fornecedor.localeCompare(b.fornecedor)));
   }, [itens, cotacoes]);
@@ -83,7 +83,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
     const best = melhorCotacao(it.nome);
     setMarcandoId(it.id);
     setLancForm({
-      quantidade: num(it.quantidade) > 0 ? String(num(it.quantidade)).replace('.', ',') : '1',
+      quantidade: numQtd(it.quantidade) > 0 ? String(numQtd(it.quantidade)).replace('.', ',') : '1',
       valor: best ? best.preco.toFixed(2).replace('.', ',') : '',
       fornecedor: (it.fornecedor && it.fornecedor.trim()) || best?.fornecedor || '',
       forma: 'À vista', vencimento: addDays(todayISO(), 7),
@@ -96,7 +96,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
     const hoje = todayISO();
     const aVista = lancForm.forma === 'À vista';
     const unit = lancForm.valor || '0';
-    const qtd = num(lancForm.quantidade) > 0 ? num(lancForm.quantidade) : 1;
+    const qtd = numQtd(lancForm.quantidade) > 0 ? numQtd(lancForm.quantidade) : 1;
     const total = qtd * num(unit);
     const totalStr = total.toFixed(2).replace('.', ',');
     const forn = lancForm.fornecedor.trim();
@@ -123,7 +123,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
     for (const it of g.itens) {
       map[it.id] = {
         sel: true,
-        quantidade: num(it.quantidade) > 0 ? String(num(it.quantidade)).replace('.', ',') : '1',
+        quantidade: numQtd(it.quantidade) > 0 ? String(numQtd(it.quantidade)).replace('.', ',') : '1',
         valor: it.best ? it.best.preco.toFixed(2).replace('.', ',') : '',
       };
     }
@@ -150,7 +150,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
     for (const it of selecionados) {
       const f = selItens[it.id];
       const unit = f.valor || '0';
-      const qtd = num(f.quantidade) > 0 ? num(f.quantidade) : 1;
+      const qtd = numQtd(f.quantidade) > 0 ? numQtd(f.quantidade) : 1;
       total += qtd * num(unit);
       novasCompras.push({
         id: uid(), data: hoje, produto: it.nome, fornecedor: forn, categoria: it.categoria || '',
@@ -231,7 +231,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
               </button>
             )}
             {selForn === g.fornecedor ? (() => {
-              const totalBoleto = g.itens.reduce((s, it) => { const f = selItens[it.id]; if (!f?.sel) return s; const q = num(f.quantidade) > 0 ? num(f.quantidade) : 1; return s + q * num(f.valor); }, 0);
+              const totalBoleto = g.itens.reduce((s, it) => { const f = selItens[it.id]; if (!f?.sel) return s; const q = numQtd(f.quantidade) > 0 ? numQtd(f.quantidade) : 1; return s + q * num(f.valor); }, 0);
               const qtdeSel = g.itens.filter((it) => selItens[it.id]?.sel).length;
               const aVista = boleto.forma === 'À vista';
               return (
@@ -297,8 +297,8 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
                     </div>
                     <Field label="Fornecedor"><TextInput value={lancForm.fornecedor} onChange={setLanc('fornecedor')} placeholder="Ambev…" /></Field>
                     <div style={{ fontSize: 12, color: C.muted, margin: '-4px 0 10px' }}>
-                      Total: <b style={{ color: C.text }}>{brl((num(lancForm.quantidade) > 0 ? num(lancForm.quantidade) : 1) * num(lancForm.valor))}</b>
-                      {num(lancForm.quantidade) > 1 && <span style={{ color: C.faint }}> ({num(lancForm.quantidade)} × {brl(num(lancForm.valor))})</span>}
+                      Total: <b style={{ color: C.text }}>{brl((numQtd(lancForm.quantidade) > 0 ? numQtd(lancForm.quantidade) : 1) * num(lancForm.valor))}</b>
+                      {numQtd(lancForm.quantidade) > 1 && <span style={{ color: C.faint }}> ({numQtd(lancForm.quantidade)} × {brl(num(lancForm.valor))})</span>}
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: lancForm.forma === 'À vista' ? '1fr' : '1fr 1fr', gap: 10 }}>
                       <Field label="Pagamento"><Select value={lancForm.forma} onChange={setLanc('forma')} options={['À vista', 'A prazo']} /></Field>
