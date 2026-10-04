@@ -6,6 +6,142 @@ import { brl, num } from '../lib/util';
 const CATS = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Combos', 'Outros'];
 const FORMAS_PAG = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Fiado'];
 
+// O BALCÃO.
+//
+// "Tem pessoas que entram no bar, pedem uma cerveja e vão embora. Isso deveria
+// contar como uma venda de uma comanda? Não deveria ser."
+//
+// Deveria contar como venda — é por ela que a cerveja sai do estoque e que o
+// fiado fica pendurado num nome. O que não deveria é virar MESA: seis toques
+// pra uma long neck, o grid entupido, e cada cerveja afundando o "ticket médio
+// por mesa" como se fosse uma mesa que consumiu pouco.
+//
+// Esta tela é de propósito a mais burra do app: escolhe o que saiu, diz como
+// pagou, cobra. Item com sabor ou adicional continua pela mesa — ali a pessoa
+// senta, e o caminho comprido faz sentido. Tentar resolver os dois casos na
+// mesma tela deixaria a tela do caso simples parecendo a do caso difícil.
+function TelaBalcao({ cardapio, clientes, onCobrar, onSair, busy, erro }) {
+  const [carrinho, setCarrinho] = useState([]); // [{ id, nome, preco, qtd }]
+  const [busca, setBusca] = useState('');
+  const [forma, setForma] = useState('');
+  const [nome, setNome] = useState('');
+  const [outro, setOutro] = useState(false);
+  const [pessoas, setPessoas] = useState(1);
+
+  // Simples = sem sabor e sem adicional. O resto aparece numa linha explicando,
+  // em vez de sumir: item que some da tela é item que a pessoa procura.
+  const ehSimples = (i) => !(Array.isArray(i.sabores) && i.sabores.length) && !(Array.isArray(i.adicionais) && i.adicionais.length);
+  const ativos = (cardapio || []).filter((i) => i && i.ativo !== false);
+  const complicados = ativos.filter((i) => !ehSimples(i)).length;
+  const lista = ativos.filter(ehSimples).filter((i) => !busca.trim() || (i.nome || '').toLowerCase().includes(busca.trim().toLowerCase()));
+
+  const por = (id) => setCarrinho((cs) => {
+    const ja = cs.find((x) => x.id === id);
+    if (ja) return cs.map((x) => (x.id === id ? { ...x, qtd: x.qtd + 1 } : x));
+    const prod = ativos.find((x) => x.id === id);
+    return [...cs, { id, nome: prod.nome, preco: num(prod.preco), qtd: 1 }];
+  });
+  const mudarQtd = (id, d) => setCarrinho((cs) => cs
+    .map((x) => (x.id === id ? { ...x, qtd: x.qtd + d } : x))
+    .filter((x) => x.qtd > 0));
+
+  const total = carrinho.reduce((s, x) => s + x.preco * x.qtd, 0);
+  const precisaNome = forma === 'Fiado' && !nome.trim();
+  const podeCobrar = carrinho.length > 0 && forma && !precisaNome && !busy;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        <button onClick={onSair} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>‹ Voltar</button>
+        <div style={{ fontSize: 18, fontWeight: 900 }}>Balcão</div>
+      </div>
+      <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 12, lineHeight: 1.45 }}>
+        Pediu e foi embora. Sai do estoque e entra no caixa igual a uma mesa — só não ocupa mesa nenhuma.
+      </div>
+
+      {erro && <div style={{ fontSize: 13, color: C.red, marginBottom: 10 }}>{erro}</div>}
+
+      {carrinho.length > 0 && (
+        <Card style={{ marginBottom: 12, padding: 12, borderColor: C.accent }}>
+          {carrinho.map((x) => (
+            <div key={x.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '6px 0' }}>
+              <span style={{ fontSize: 14.5, fontWeight: 600, minWidth: 0 }}>{x.nome}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <button onClick={() => mudarQtd(x.id, -1)} style={estBtn}>–</button>
+                <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{x.qtd}</span>
+                <button onClick={() => mudarQtd(x.id, +1)} style={estBtn}>+</button>
+                <b style={{ minWidth: 72, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{brl(x.preco * x.qtd)}</b>
+              </div>
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
+            <span style={{ fontSize: 15, fontWeight: 800 }}>Total</span>
+            <b style={{ fontSize: 20, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</b>
+          </div>
+        </Card>
+      )}
+
+      <div style={{ marginBottom: 10 }}><TextInput value={busca} onChange={setBusca} placeholder="Procurar no cardápio…" /></div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+        {lista.map((i) => (
+          <button key={i.id} onClick={() => por(i.id)} disabled={busy}
+            style={{ border: `1px solid color-mix(in srgb, ${C.accent} 22%, ${C.panel})`, background: `color-mix(in srgb, ${C.accent} 7%, ${C.panel})`, color: C.text, borderRadius: 12, padding: '10px 14px', fontSize: 14.5, fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}>
+            {i.nome} <span style={{ color: C.faint, fontWeight: 600 }}>{brl(num(i.preco))}</span>
+          </button>
+        ))}
+        {!lista.length && <Empty>{busca ? 'Nada com esse nome.' : 'Nenhum item simples no cardápio.'}</Empty>}
+      </div>
+      {complicados > 0 && (
+        <div style={{ fontSize: 12, color: C.faint, marginBottom: 16, lineHeight: 1.45 }}>
+          {complicados} {complicados === 1 ? 'item tem' : 'itens têm'} sabor ou adicional pra escolher — {complicados === 1 ? 'esse continua' : 'esses continuam'} pela mesa.
+        </div>
+      )}
+
+      {carrinho.length > 0 && (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Como pagou?</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+            {FORMAS_PAG.map((f) => (
+              <button key={f} onClick={() => setForma(f)} disabled={busy}
+                style={{ border: 'none', borderRadius: 999, padding: '11px 18px', fontSize: 15, fontWeight: 800, cursor: 'pointer',
+                  background: forma === f ? C.accent : `color-mix(in srgb, ${C.accent} 10%, ${C.panel})`,
+                  color: forma === f ? '#06101F' : C.text }}>{f}</button>
+            ))}
+          </div>
+
+          {forma === 'Fiado' && (
+            <div style={{ marginBottom: 14 }}>
+              <Field label="Quem ficou devendo">
+                {clientes.length && !outro ? (
+                  <Select value={nome} onChange={(v) => { if (v === 'Outro (digitar)') { setOutro(true); setNome(''); } else setNome(v); }}
+                    options={['', ...clientes, 'Outro (digitar)']} />
+                ) : (
+                  <TextInput value={nome} onChange={setNome} placeholder="Nome do cliente" />
+                )}
+              </Field>
+              {precisaNome && <div style={{ fontSize: 12, color: C.amber, fontWeight: 700, marginTop: 6 }}>Fiado sem nome vira dívida sem dono. Diz quem foi.</div>}
+            </div>
+          )}
+
+          {/* Quantas pessoas: fica discreto porque quase sempre é 1 — mas
+              existe, pra o "gasto por pessoa" não mentir quando foi um casal. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <span style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Quantas pessoas?</span>
+            <button onClick={() => setPessoas((n) => Math.max(1, n - 1))} style={estBtn}>–</button>
+            <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 800 }}>{pessoas}</span>
+            <button onClick={() => setPessoas((n) => Math.min(99, n + 1))} style={estBtn}>+</button>
+          </div>
+
+          <Btn kind="ok" onClick={() => onCobrar({ carrinho, forma, nome: nome.trim(), pessoas, total })} disabled={!podeCobrar}>
+            {busy ? 'Cobrando…' : `Cobrar ${brl(total)}${forma ? ` · ${forma}` : ''}`}
+          </Btn>
+          {!forma && <div style={{ fontSize: 12, color: C.faint, marginTop: 8 }}>Falta dizer como pagou.</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
 // QUANTAS PESSOAS SENTARAM NA MESA.
 //
 // Vive fora do componente porque agora é perguntado em DOIS momentos — ao abrir
@@ -93,6 +229,8 @@ export default function Comandas({ papel = 'dona' }) {
   const [outroCliente, setOutroCliente] = useState(false); // digitar nome fora da lista de clientes
   const [busca, setBusca] = useState('');
   const [picker, setPicker] = useState(false); // tela de adicionar produtos (carrinho)
+  const [balcao, setBalcao] = useState(false); // tela de venda de balcão (sem mesa)
+  const [recibo, setRecibo] = useState(null);  // confirmação da última venda de balcão
   const [catSel, setCatSel] = useState(null); // categoria escolhida na tela de adicionar
   const [saborDe, setSaborDe] = useState(null); // item cujo seletor de sabor está aberto
   const [comboQtds, setComboQtds] = useState({}); // distribuição de sabores do combo (nome -> qtd)
@@ -146,6 +284,21 @@ export default function Comandas({ papel = 'dona' }) {
   // salvar o nome e lançar um item não "brigam" no servidor: sem a fila, um
   // pedido podia ler a comanda antes do outro gravar e apagar o nome sem querer.
   const filaRef = useRef(Promise.resolve());
+  // COBRAR NO BALCÃO.
+  //
+  // Vai tudo num pedido só — itens e pagamento juntos. Não é economia de
+  // digitação: é que no meio do caminho não existe comanda nenhuma pra ficar
+  // esquecida aberta se a internet cair entre um toque e outro.
+  const cobrarBalcao = async ({ carrinho, forma, nome, pessoas, total }) => {
+    const j = await acao({
+      acao: 'balcao',
+      itens: carrinho.map((x) => ({ cardapioId: x.id, qtd: x.qtd })),
+      pagamentos: [{ forma, valor: total }],
+      nome, pessoas,
+    }, { manterSel: false });
+    if (j && j.ok) { setBalcao(false); setRecibo({ total, forma, nome, quando: Date.now() }); }
+  };
+
   const acao = (payload, { manterSel = true } = {}) => {
     const run = async () => {
       setBusy(true);
@@ -483,6 +636,16 @@ export default function Comandas({ papel = 'dona' }) {
     );
   }
 
+  // ---- Balcão: venda sem mesa ----
+  if (balcao) {
+    return (
+      <TelaBalcao
+        cardapio={cardapio} clientes={clientes} busy={busy} erro={erro}
+        onCobrar={cobrarBalcao} onSair={() => { setBalcao(false); setErro(''); }}
+      />
+    );
+  }
+
   // ---- Detalhe de uma comanda (só o que foi pedido) ----
   if (sel) {
     const conta = contaDe(sel);
@@ -770,7 +933,14 @@ export default function Comandas({ papel = 'dona' }) {
     <div>
       <PageTitle sub={`${nAbertas} mesa${nAbertas === 1 ? '' : 's'} ocupada${nAbertas === 1 ? '' : 's'} de ${mesasQtd}`}>Comandas</PageTitle>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -6, marginBottom: 10 }}>
+      {/* O BALCÃO FICA FORA DO GRID, de propósito.
+          Se virasse mais um quadradinho entre as mesas, voltaria a ser uma
+          mesa — que é exatamente o que ele não é. */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: -6, marginBottom: 10, flexWrap: 'wrap' }}>
+        <button onClick={() => { setBalcao(true); setRecibo(null); setErro(''); }}
+          style={{ border: 'none', background: C.accent, color: '#06101F', borderRadius: 12, padding: '10px 16px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>
+          Balcão
+        </button>
         <button onClick={toggleValores} title="Mostrar ou esconder os valores das mesas"
           style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
           {verValores ? 'Ocultar valores' : 'Mostrar valores'}
@@ -778,6 +948,21 @@ export default function Comandas({ papel = 'dona' }) {
       </div>
 
       {erro && <div style={{ fontSize: 13, color: C.red, marginBottom: 10 }}>{erro}</div>}
+
+      {/* O RECIBO DO BALCÃO.
+          A venda de balcão não deixa rastro na tela — não fica mesa aberta
+          pra ela olhar e saber que deu certo. Sem esta confirmação, o toque
+          no "Cobrar" devolveria a mesma tela de antes, e ela lançaria de novo
+          achando que não pegou. */}
+      {recibo && (
+        <Card style={{ marginBottom: 12, padding: '12px 14px', borderColor: C.green }}>
+          <div style={{ fontSize: 14.5, fontWeight: 800, color: C.green }}>
+            Balcão: {brl(recibo.total)} · {recibo.forma}{recibo.nome ? ` · ${recibo.nome}` : ''}
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Já entrou no caixa e saiu do estoque.</div>
+          <button onClick={() => setRecibo(null)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '8px 0 0' }}>ok</button>
+        </Card>
+      )}
 
       {/* A PERGUNTA QUE ABRE A MESA.
           Aparece no lugar do grid, ocupando a tela: enquanto ela não disser

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, KPI, Area, PageTitle, inputStyle } from './ui';
-import { totalCompra, todayISO, fmtDate, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
+import { ehBalcao, soMesas, totalCompra, todayISO, fmtDate, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
 import { horasDoTurno, fmtHoras, aPagarNoMes } from '../lib/ponto';
 import SEED_DATA from '../data/seed.json';
 
@@ -125,12 +125,19 @@ function montarAnalise(all, marca = 'Meu negócio') {
     const pessoasContadas = contadas.reduce((s2, v) => s2 + num(v.pessoas), 0);
     const totalContado = contadas.reduce((s2, v) => s2 + num(v.total), 0);
 
+    // Balcão (cerveja no balcão, cliente foi embora) é venda, não é mesa: o
+    // dinheiro soma em tudo, mas o ticket de MESA só se calcula sobre mesas.
+    const mesas = soMesas(vendas);
+    const balcao = vendas.filter(ehBalcao);
+    const totalMesas = mesas.reduce((s2, v) => s2 + num(v.total), 0);
+
     L.push('### Salão (comandas fechadas)', '');
-    L.push(`- Comandas: ${vendas.length} em ${dias.size} dia(s) de movimento`);
-    L.push(`- Vendido: ${brl(totalV)} · ticket médio por COMANDA ${brl(vendas.length ? totalV / vendas.length : 0)}`);
+    L.push(`- Comandas: ${mesas.length} em ${dias.size} dia(s) de movimento`);
+    L.push(`- Vendido: ${brl(totalV)} · ticket médio por COMANDA ${brl(mesas.length ? totalMesas / mesas.length : 0)}`);
+    if (balcao.length) L.push(`- Balcão (sem mesa): ${balcao.length} venda(s) · ${brl(balcao.reduce((s2, v) => s2 + num(v.total), 0))}`);
     if (pessoas > 0) {
       L.push(`- **Pessoas que frequentaram o bar: ${pessoas}** · ticket médio por PESSOA ${brl(totalV / pessoas)}`);
-      L.push(`- Média de ${(pessoas / (vendas.length || 1)).toFixed(1).replace('.', ',')} pessoa(s) por mesa`);
+      L.push(`- Média de ${(pessoas / (mesas.length || 1)).toFixed(1).replace('.', ',')} pessoa(s) por mesa`);
     } else {
       L.push('- Pessoas: nenhuma comanda tem contagem ainda.');
     }

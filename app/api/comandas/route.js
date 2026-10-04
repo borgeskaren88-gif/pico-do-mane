@@ -77,6 +77,277 @@ function somaParciais(c) {
 }
 const brlS = (n) => 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
 
+// MONTAR UM ITEM A PARTIR DO CARDÁPIO — um lugar só.
+//
+// O preço vem SEMPRE daqui, do cardápio lido no servidor, nunca do que o
+// aparelho mandou: senão qualquer um adultera o valor da própria conta.
+//
+// Esta função nasceu quando o balcão apareceu. A tentação era copiar o bloco
+// pro caminho novo — e aí o bar passaria a ter DOIS lugares decidindo quanto
+// custa uma cerveja. Dois lugares que precisam concordar sempre acabam
+// discordando; foi exatamente assim que a mesma tela de compras chegou a dizer
+// 3,19 kg e cobrar mil vezes o valor.
+//
+// Devolve { item, mergeKey } ou { erro, status }. mergeKey null = cada pedido é
+// uma linha própria (combos distribuídos nunca se juntam).
+function montarItem(cardapio, pedido) {
+  const cardapioId = txt(pedido?.cardapioId, 40);
+  const saborNome = txt(pedido?.sabor, 40);
+  const prod = (cardapio || []).find((x) => x && x.id === cardapioId);
+  if (!prod) return { erro: 'Item não está no cardápio.', status: 400 };
+  const preco = Number(String(prod.preco).replace(/\./g, '').replace(',', '.')) || 0;
+  // Sabor/variação: se o item tem sabores, guarda a escolha em "extras" pra
+  // baixar do estoque no fechamento. Dois modos:
+  //  - Combo com saboresTotal > 0: o garçom distribui N unidades entre os
+  //    sabores (ex.: 3 Tropical + 2 Melancia = 5). Baixa a soma de cada.
+  //  - Sabor único (saboresTotal vazio): escolhe 1 sabor (ex.: caipirinha).
+  // qStr em vírgula pra o num() ler certo (evita "1.5" virar milhar).
+  const qStr = (v) => String(v).replace('.', ',');
+  const temSabores = Array.isArray(prod.sabores) && prod.sabores.length;
+  const totalSab = Math.floor(Number(prod.saboresTotal) || 0);
+  let sabor, extras, mergeKey = '';
+  if (temSabores && totalSab > 0) {
+    const dist = (pedido && typeof pedido.saboresQtd === 'object' && pedido.saboresQtd) ? pedido.saboresQtd : {};
+    const escolhidos = prod.sabores
+      .map((s) => ({ s, n: Math.max(0, Math.floor(Number(dist[s.nome]) || 0)) }))
+      .filter((x) => x.n > 0);
+    const soma = escolhidos.reduce((a, x) => a + x.n, 0);
+    if (soma !== totalSab) return { erro: `Escolha ${totalSab} no total (você marcou ${soma}).`, status: 400 };
+    extras = escolhidos.map((x) => ({ estoqueId: String(x.s.estoqueId), qtd: qStr(num(x.s.qtd) * x.n), unidade: String(x.s.unidade || '') }));
+    sabor = escolhidos.map((x) => `${x.n} ${x.s.nome}`).join(', ');
+    mergeKey = null; // cada distribuição é uma linha própria (nunca junta)
+  } else if (temSabores) {
+    const s = prod.sabores.find((x) => (x.nome || '').trim().toLowerCase() === saborNome.trim().toLowerCase());
+    if (!s) return { erro: 'Escolha o sabor.', status: 400 };
+    sabor = s.nome;
+    extras = [{ estoqueId: String(s.estoqueId), qtd: String(s.qtd), unidade: String(s.unidade || '') }];
+    mergeKey = sabor;
+  }
+  // Adicionais pagos (ex.: açaí + granola + leite condensado). Cada um soma o
+  // preço dele no item e, se estiver ligado a um item do estoque, baixa junto
+  // no fechamento.
+  const pedidos = (pedido && typeof pedido.adicionais === 'object' && pedido.adicionais) ? pedido.adicionais : {};
+  const listaAdd = Array.isArray(prod.adicionais) ? prod.adicionais : [];
+  const nomesAdd = [];
+  let precoAdd = 0;
+  const extrasAdd = [];
+  for (const a of listaAdd) {
+    if (!a || !a.nome) continue;
+    const n = Math.max(0, Math.floor(Number(pedidos[a.nome]) || 0));
+    if (!n) continue;
+    const pu = Number(String(a.preco == null ? 0 : a.preco).replace(/\./g, '').replace(',', '.')) || 0;
+    precoAdd += pu * n;
+    nomesAdd.push(n > 1 ? `${n}x ${a.nome}` : a.nome);
+    if (a.estoqueId && num(a.qtd) > 0) extrasAdd.push({ estoqueId: String(a.estoqueId), qtd: qStr(num(a.qtd) * n), unidade: String(a.unidade || '') });
+  }
+  const addKey = nomesAdd.join(', ');
+  const precoFinal = Math.round((preco + precoAdd) * 100) / 100;
+  const nomeItem = txt(prod.nome, 200) + (sabor ? ` (${sabor})` : '') + (addKey ? ` + ${addKey}` : '');
+  const todosExtras = [...(Array.isArray(extras) ? extras : []), ...extrasAdd];
+  return {
+    mergeKey, addKey, cardapioId,
+    item: {
+      id: uid(), cardapioId, nome: nomeItem, preco: precoFinal, qtd: 1,
+      ...(sabor ? { sabor } : {}), ...(addKey ? { add: addKey } : {}),
+      ...(todosExtras.length ? { extras: todosExtras } : {}),
+    },
+  };
+}
+
+// Põe o item montado na lista: repetido só soma a quantidade (quando pode
+// juntar), senão entra como linha nova.
+function porNaLista(itens, m) {
+  const existe = m.mergeKey != null
+    ? itens.find((it) => it.cardapioId === m.cardapioId && (it.sabor || '') === m.mergeKey && (it.add || '') === m.addKey)
+    : null;
+  if (existe) existe.qtd = (Number(existe.qtd) || 0) + 1;
+  else itens.push(m.item);
+}
+
+// FECHAR A CONTA — e por que isto virou uma função.
+//
+// Aqui mora TODA a trava do dinheiro: a taxa de serviço, o desconto, a soma das
+// formas de pagamento, o limite de fiado do cliente, a ligação com o caixa
+// aberto, a baixa do estoque pela ficha técnica e os avisos.
+//
+// Quando o balcão apareceu, o caminho fácil era escrever um fechamento novo,
+// mais simples, só pra ele. Seria um segundo lugar decidindo quanto entrou no
+// caixa — e o dia em que os dois discordassem, o bar não teria como saber qual
+// estava certo. Então o balcão não ganhou caminho próprio: ele monta uma
+// comanda em memória e passa por AQUI, pelas mesmas travas.
+//
+// Devolve { venda } ou { falhou: true, erro, status, ... }.
+async function fecharComanda(sb, c, body, p) {
+
+    const subtotal = totalDe(c);
+    if (subtotal <= 0) return { falhou: true, erro: 'Comanda sem consumo. Use cancelar.', status: 400 };
+    // Taxa de serviço (10%): ligada por padrão; a dona/garçom pode tirar na mesa.
+    const servicoOn = c.servico !== false;
+    const servico = servicoOn ? Math.round(subtotal * 0.10 * 100) / 100 : 0;
+    const totalBruto = Math.round((subtotal + servico) * 100) / 100;
+    // Desconto (%) dado na hora de fechar. Abate do total; o que o cliente
+    // paga (e o que as formas de pagamento têm que somar) é o total já com desconto.
+    const descontoPct = Math.max(0, Math.min(100, Number(body?.descontoPct) || 0));
+    const desconto = Math.round(totalBruto * descontoPct / 100 * 100) / 100;
+    const total = Math.round((totalBruto - desconto) * 100) / 100;
+    // QUANTAS PESSOAS ESTAVAM NA MESA — agora é obrigatório.
+    //
+    // "Minha atendente não está anotando a quantidade de pessoas por mesa. Tem
+    // como ser obrigatório? Eu preciso dessa informação."
+    //
+    // O pior não era vir vazio: era o que estava escrito aqui antes —
+    // `Math.max(1, ... || 1)`. Sem ninguém contar, a venda era gravada como
+    // "1 pessoa". Não ficava um buraco, ficava uma MENTIRA: a dona abria o
+    // relatório, via "pessoas atendidas" e "gasto por pessoa" e acreditava,
+    // porque número escrito não tem cara de chute.
+    //
+    // A trava mora aqui, e não só na tela, porque tela velha guardada no
+    // aparelho continua mandando pedido — e a regra tem que valer pro garçom,
+    // pra dona e pra qualquer aparelho.
+    const pessoas = Math.floor(Number(body?.pessoas) || 0);
+    if (!(pessoas >= 1 && pessoas <= 99)) {
+      return { falhou: true, erro: 'Antes de fechar, diz quantas pessoas estavam na mesa.', faltaPessoas: true, status: 400 };
+    }
+
+    // Quem já pagou a parte dele durante a noite. Esse dinheiro não é cobrado
+    // de novo: o que falta receber agora é o total menos ele.
+    const parciais = arrP(c.parciais);
+    const jaPago = somaParciais(c);
+    if (jaPago > total + 0.05) {
+      return { falhou: true, erro: `Já foi pago ${brlS(jaPago)} e a conta com desconto ficou em ${brlS(total)}. Diminui o desconto ou devolve a diferença por fora.`, status: 400 };
+    }
+    const aReceber = Math.round((total - jaPago) * 100) / 100;
+
+    // Pagamento pode ser dividido em várias formas (novo) ou uma só (compat).
+    let pags = [];
+    if (Array.isArray(body?.pagamentos)) {
+      pags = body.pagamentos
+        .map((x) => ({ forma: txt(x?.forma, 20), valor: Math.round((Number(x?.valor) || 0) * 100) / 100 }))
+        .filter((x) => x.forma && x.valor > 0);
+    } else if (aReceber > 0.005) {
+      pags = [{ forma: txt(body?.pagamento, 20) || 'Dinheiro', valor: aReceber }];
+    }
+    // Conta já quitada pelos parciais fecha sem cobrar mais nada.
+    if (!pags.length && aReceber > 0.005) return { falhou: true, erro: 'Informe como foi pago.', status: 400 };
+    const soma = Math.round(pags.reduce((s, x) => s + x.valor, 0) * 100) / 100;
+    if (Math.abs(soma - aReceber) > 0.05) {
+      return { falhou: true, status: 400, erro: jaPago > 0.005
+        ? `Faltam ${brlS(aReceber)} pra fechar (${brlS(jaPago)} já foi pago durante a noite), e as formas somam ${brlS(soma)}.`
+        : 'A soma das formas de pagamento não bate com o total.' };
+    }
+    const fiado = Math.round(pags.filter((x) => x.forma === 'Fiado').reduce((s, x) => s + x.valor, 0) * 100) / 100;
+    const nomeCli = txt(body?.nome, 60) || c.nome || '';
+    // Trava: fiado SEM nome não pode — senão a dívida vira uma "Mesa X" sem dono.
+    if (fiado > 0.005 && !nomeCli) return { falhou: true, erro: 'Fiado precisa do nome de quem ficou devendo.', status: 400 };
+    // Limite de fiado: se o cliente está cadastrado com limite e "bloquear",
+    // barra o novo fiado que passaria do limite (soma o que já está em aberto).
+    if (fiado > 0.005 && nomeCli) {
+      const norm = (s) => (s || '').trim().toLowerCase();
+      const numBR = (s) => { const v = parseFloat(String(s).replace(/\./g, '').replace(',', '.')); return isFinite(v) ? v : 0; };
+      const fmt = (n) => 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
+      const fiadoDe = (v) => { const base = v.fiado != null ? (Number(v.fiado) || 0) : (v.pagamento === 'Fiado' ? (Number(v.total) || 0) : 0); return Math.max(0, base - (Number(v.abatido) || 0)); };
+      const blob = await lerPainel(sb);
+      const clientes = Array.isArray(blob.clientes) ? blob.clientes : [];
+      const cli = clientes.find((x) => norm(x.nome) === norm(nomeCli) && x.bloquear && numBR(x.limite) > 0);
+      if (cli) {
+        const limite = numBR(cli.limite);
+        const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
+        const abertoAtual = (vrows || []).map((r) => r.valor).filter((v) => v && !v.pago && norm(v.nome) === norm(nomeCli)).reduce((s, v) => s + fiadoDe(v), 0);
+        if (abertoAtual + fiado > limite + 0.005) {
+          return { falhou: true, bloqueado: true, erro: `${cli.nome} atingiu o limite de fiado (${fmt(limite)}). Em aberto: ${fmt(abertoAtual)}. Não dá pra fiar mais ${fmt(fiado)}.`, status: 400 };
+        }
+      }
+    }
+    // Liga a venda ao caixa aberto (se houver), pro fechamento do caixa somar.
+    const { data: caixaRows } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
+    const caixaAberto = (caixaRows || []).map((r) => r.valor).find((x) => x && x.aberto);
+    const venda = {
+      id: uid(), data: diaOperacional(), mesa: c.mesa, total, subtotal, servico, desconto, descontoPct, pessoas,
+      // Os parciais entram na venda como pagamento normal: foi dinheiro que
+      // entrou nesta conta, só que mais cedo. O caixa soma daqui.
+      pagamentos: [...parciais.map((x) => ({ forma: x.forma, valor: x.valor, parcial: true, quem: x.quem || '' })), ...pags],
+      pagamento: (parciais.length + pags.length) === 1 ? (pags[0]?.forma || parciais[0]?.forma) : 'Dividido',
+      fiado,
+      jaPagoAntes: jaPago > 0.005 ? jaPago : undefined,
+      nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens, caixaId: caixaAberto ? caixaAberto.id : null,
+      // CONTAGEM DE VERDADE, e o carimbo que diz isso.
+      //
+      // Até esta regra existir, o servidor preenchia "1 pessoa" sozinho
+      // quando ninguém contava. Essas vendas antigas estão no banco com o
+      // número 1 e são indistinguíveis de uma mesa que era mesmo de uma
+      // pessoa. Sem um carimbo, o relatório somaria as duas coisas e
+      // apresentaria o resultado como se fosse tudo medido.
+      //
+      // Daqui pra frente ninguém fecha sem contar — então toda venda nova
+      // sai marcada, e o relatório consegue dizer quanto do número é medição
+      // e quanto é herança.
+      pessoasContadas: true,
+      // O CARIMBO QUE SEPARA BALCÃO DE MESA.
+      //
+      // A venda de balcão é venda de verdade: entra no caixa, baixa o estoque,
+      // pendura o fiado. O que ela NÃO é, é uma mesa — e sem este carimbo o
+      // "ticket médio por comanda" passaria a misturar uma long neck no balcão
+      // com uma mesa de cinco pessoas, e ninguém notaria, porque o número
+      // continuaria parecendo um número.
+      ...(c.balcao ? { balcao: true } : {}),
+      // Só fica "não pago" (na lista de fiados) o que ficou no fiado.
+      pago: fiado <= 0.005, fechadaEm: new Date().toISOString(), fechadaPor: p,
+      // A hora em que a mesa ABRIU é o que diz a que horas o bar enche — a
+      // hora de fechar só diz quando a conta saiu. Guardar as duas deixa o
+      // movimento por horário honesto daqui pra frente.
+      abertaEm: c.abertaEm || '',
+    };
+    const { error: eV } = await sb.from('pdm_dados').upsert(
+      { chave: 'venda:' + venda.id, valor: venda, atualizado_em: new Date().toISOString() },
+      { onConflict: 'chave' }
+    );
+    if (eV) throw eV;
+    // A comanda do balcão nunca chegou a ser gravada (nasce e fecha no mesmo
+    // pedido), então não há linha pra apagar.
+    if (c.persistida !== false) {
+      const { error: eD } = await sb.from('pdm_dados').delete().eq('chave', chaveDe(c.id));
+      if (eD) throw eD;
+    }
+    // Baixa do estoque pela ficha técnica dos itens vendidos. Best-effort: se
+    // algo falhar aqui, a venda NÃO é afetada (a reconciliação pega depois,
+    // via /api/estoque sincronizar, porque a venda ainda não está em baixas).
+    try {
+      const blobAtual = await lerPainel(sb);
+      const rb = aplicarBaixasVendas(arr(blobAtual.estoque), arr(blobAtual.fichas), [venda], arr(blobAtual.estoqueBaixas), false);
+      if (rb.mudou) {
+        await gravarPainelParcial(sb, { estoque: rb.estoque, estoqueBaixas: rb.baixadas });
+        // Avisa na hora se algum item acabou/chegou no mínimo com essa venda.
+        try { await notificarEstoqueCritico(sb, blobAtual.estoque, rb.estoque); } catch (e) { /* push nunca quebra a venda */ }
+      }
+    } catch (e) { /* estoque nunca quebra a venda */ }
+    // Aviso na hora da comanda fechada (fiado ou valor alto, conforme a dona
+    // configurou em Notificações).
+    try { await notificarComandaFechada(sb, venda); } catch (e) { /* push nunca quebra a venda */ }
+    // Aviso na hora: se essa venda no fiado levou o cliente a bater o limite,
+    // manda um push. Best-effort — nunca quebra a venda.
+    if (fiado > 0.005 && venda.nome) {
+      try {
+        const nomeNorm = limparNome(venda.nome).toLowerCase();
+        // Este `blob` não existia neste trecho: vinha de um bloco fechado mais
+        // acima. Dava ReferenceError, e o try logo abaixo engolia — então o
+        // aviso de "fiado no limite" NUNCA chegava no celular dela. Um alarme
+        // que não toca é pior que alarme nenhum, porque dá a sensação de estar
+        // coberta. Agora lê o painel aqui, onde é usado.
+        const blobCli = await lerPainel(sb);
+        const cli = arr(blobCli.clientes).find((x) => limparNome(x.nome).toLowerCase() === nomeNorm);
+        const limite = cli ? num(cli.limite) : 0;
+        if (limite > 0) {
+          const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
+          const devido = (vrows || []).map((r) => r.valor).filter((v) => v && !v.pago && limparNome(v.nome).toLowerCase() === nomeNorm).reduce((s, v) => s + abertoDaVenda(v), 0);
+          if (devido >= limite - 0.005) {
+            await enviarPush(sb, { titulo: 'Fiado no limite', corpo: `${limparNome(venda.nome)} está em ${brl(devido)} de ${brl(limite)}.`, url: '/', tag: 'fiado-' + nomeNorm, audiencia: 'dona' });
+          }
+        }
+      } catch (e) { /* push nunca quebra a venda */ }
+    }
+    return { venda };
+}
+
 export async function GET(request) {
   if (!papel()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
@@ -152,6 +423,59 @@ export async function POST(request) {
 
     // Abrir uma comanda numa mesa. Se a mesa já tem comanda aberta, devolve ela
     // (não duplica a mesa).
+    // VENDA DE BALCÃO: entra, pede uma cerveja e vai embora.
+    //
+    // "Tem pessoas que entram no bar, pedem uma cerveja e vão embora. Isso
+    // deveria contar como uma venda de uma comanda? Não deveria ser."
+    //
+    // Deveria contar como venda — é a comanda que tira a cerveja do estoque e
+    // que pendura o fiado no nome de quem levou. Lançar como receita solta
+    // deixaria a cerveja no estoque pra sempre e o CMV mentiria a favor dela.
+    //
+    // O que ela NÃO deveria ser é uma MESA. Abrir mesa pra uma long neck custa
+    // seis toques, entope o grid e, pior, suja o "ticket médio por mesa": cada
+    // cerveja de balcão entrava na conta como se fosse uma mesa que consumiu
+    // pouco.
+    //
+    // Então o balcão é uma comanda que nasce e morre no mesmo pedido: nunca
+    // chega a ser gravada como mesa aberta, mas passa inteira pelas travas do
+    // fechamento — limite de fiado, baixa de estoque, caixa, avisos.
+    if (acao === 'balcao') {
+      const pedidos = Array.isArray(body?.itens) ? body.itens.slice(0, 40) : [];
+      if (!pedidos.length) return NextResponse.json({ ok: false, erro: 'Escolhe o que foi vendido.' }, { status: 400 });
+      const cardapio = await lerCardapio(sb);
+      const itens = [];
+      for (const ped of pedidos) {
+        // Quantidade vem como repetição do mesmo item: é o que o merge já sabe
+        // fazer, e evita um segundo jeito de dizer "três cervejas".
+        const vezes = Math.max(1, Math.min(99, Math.floor(Number(ped?.qtd) || 1)));
+        for (let k = 0; k < vezes; k++) {
+          const m = montarItem(cardapio, ped);
+          if (m.erro) return NextResponse.json({ ok: false, erro: m.erro }, { status: m.status });
+          porNaLista(itens, m);
+        }
+      }
+      // Quantas pessoas: o balcão assume 1 (entrou uma pessoa, bebeu, saiu), e
+      // a tela deixa mudar quando é um casal. Isso mantém o "gasto por pessoa"
+      // honesto — quem passou pelo bar, passou.
+      const pessoas = Math.max(1, Math.min(99, Math.floor(Number(body?.pessoas) || 1)));
+      const c = {
+        id: uid(), mesa: '', balcao: true, persistida: false,
+        status: 'aberta', pessoas, itens,
+        // Taxa de serviço no balcão não existe: ninguém serviu a mesa de
+        // ninguém. Fica desligada, e a tela nem mostra a opção.
+        servico: false,
+        nome: txt(body?.nome, 60),
+        abertaEm: new Date().toISOString(), abertaPor: p,
+      };
+      const r = await fecharComanda(sb, c, { ...body, pessoas }, p);
+      if (r.falhou) {
+        const { falhou, status, ...resto } = r;
+        return NextResponse.json({ ok: false, ...resto }, { status });
+      }
+      return NextResponse.json({ ok: true, venda: r.venda });
+    }
+
     if (acao === 'abrir') {
       const mesa = txt(body?.mesa, 20);
       if (!mesa) return NextResponse.json({ ok: false, erro: 'Informe a mesa.' }, { status: 400 });
@@ -280,69 +604,9 @@ export async function POST(request) {
     c.itens = Array.isArray(c.itens) ? c.itens : [];
 
     if (acao === 'add') {
-      // O preço vem SEMPRE do cardápio no servidor (não do cliente), pra ninguém
-      // adulterar valor. Item repetido só soma a quantidade.
-      const cardapioId = txt(body?.cardapioId, 40);
-      const saborNome = txt(body?.sabor, 40);
-      const cardapio = await lerCardapio(sb);
-      const prod = cardapio.find((x) => x && x.id === cardapioId);
-      if (!prod) return NextResponse.json({ ok: false, erro: 'Item não está no cardápio.' }, { status: 400 });
-      const preco = Number(String(prod.preco).replace(/\./g, '').replace(',', '.')) || 0;
-      // Sabor/variação: se o item tem sabores, guarda a escolha em "extras" pra
-      // baixar do estoque no fechamento. Dois modos:
-      //  - Combo com saboresTotal > 0: o garçom distribui N unidades entre os
-      //    sabores (ex.: 3 Tropical + 2 Melancia = 5). Baixa a soma de cada.
-      //  - Sabor único (saboresTotal vazio): escolhe 1 sabor (ex.: caipirinha).
-      // qStr em vírgula pra o num() ler certo (evita "1.5" virar milhar).
-      const qStr = (v) => String(v).replace('.', ',');
-      const temSabores = Array.isArray(prod.sabores) && prod.sabores.length;
-      const total = Math.floor(Number(prod.saboresTotal) || 0);
-      let sabor, extras, mergeKey = '';
-      if (temSabores && total > 0) {
-        const dist = (body && typeof body.saboresQtd === 'object' && body.saboresQtd) ? body.saboresQtd : {};
-        const escolhidos = prod.sabores
-          .map((s) => ({ s, n: Math.max(0, Math.floor(Number(dist[s.nome]) || 0)) }))
-          .filter((x) => x.n > 0);
-        const soma = escolhidos.reduce((a, x) => a + x.n, 0);
-        if (soma !== total) return NextResponse.json({ ok: false, erro: `Escolha ${total} no total (você marcou ${soma}).` }, { status: 400 });
-        extras = escolhidos.map((x) => ({ estoqueId: String(x.s.estoqueId), qtd: qStr(num(x.s.qtd) * x.n), unidade: String(x.s.unidade || '') }));
-        sabor = escolhidos.map((x) => `${x.n} ${x.s.nome}`).join(', ');
-        mergeKey = null; // cada distribuição é uma linha própria (nunca junta)
-      } else if (temSabores) {
-        const s = prod.sabores.find((x) => (x.nome || '').trim().toLowerCase() === saborNome.trim().toLowerCase());
-        if (!s) return NextResponse.json({ ok: false, erro: 'Escolha o sabor.' }, { status: 400 });
-        sabor = s.nome;
-        extras = [{ estoqueId: String(s.estoqueId), qtd: String(s.qtd), unidade: String(s.unidade || '') }];
-        mergeKey = sabor;
-      }
-      // Adicionais pagos (ex.: açaí + granola + leite condensado). Cada um soma
-      // o preço dele no item e, se estiver ligado a um item do estoque, baixa
-      // junto no fechamento.
-      const pedidos = (body && typeof body.adicionais === 'object' && body.adicionais) ? body.adicionais : {};
-      const listaAdd = Array.isArray(prod.adicionais) ? prod.adicionais : [];
-      const nomesAdd = [];
-      let precoAdd = 0;
-      const extrasAdd = [];
-      for (const a of listaAdd) {
-        if (!a || !a.nome) continue;
-        const n = Math.max(0, Math.floor(Number(pedidos[a.nome]) || 0));
-        if (!n) continue;
-        const pu = Number(String(a.preco == null ? 0 : a.preco).replace(/\./g, '').replace(',', '.')) || 0;
-        precoAdd += pu * n;
-        nomesAdd.push(n > 1 ? `${n}x ${a.nome}` : a.nome);
-        if (a.estoqueId && num(a.qtd) > 0) extrasAdd.push({ estoqueId: String(a.estoqueId), qtd: qStr(num(a.qtd) * n), unidade: String(a.unidade || '') });
-      }
-      const addKey = nomesAdd.join(', ');
-      const precoFinal = Math.round((preco + precoAdd) * 100) / 100;
-      const nomeItem = txt(prod.nome, 200) + (sabor ? ` (${sabor})` : '') + (addKey ? ` + ${addKey}` : '');
-      const todosExtras = [...(Array.isArray(extras) ? extras : []), ...extrasAdd];
-      const existe = mergeKey != null ? c.itens.find((it) => it.cardapioId === cardapioId && (it.sabor || '') === mergeKey && (it.add || '') === addKey) : null;
-      if (existe) existe.qtd = (Number(existe.qtd) || 0) + 1;
-      else c.itens.push({
-        id: uid(), cardapioId, nome: nomeItem, preco: precoFinal, qtd: 1,
-        ...(sabor ? { sabor } : {}), ...(addKey ? { add: addKey } : {}),
-        ...(todosExtras.length ? { extras: todosExtras } : {}),
-      });
+      const m = montarItem(await lerCardapio(sb), body);
+      if (m.erro) return NextResponse.json({ ok: false, erro: m.erro }, { status: m.status });
+      porNaLista(c.itens, m);
       await gravarComanda(sb, c);
       return NextResponse.json({ ok: true, comanda: c });
     }
@@ -426,160 +690,14 @@ export async function POST(request) {
     }
 
     if (acao === 'fechar') {
-      const subtotal = totalDe(c);
-      if (subtotal <= 0) return NextResponse.json({ ok: false, erro: 'Comanda sem consumo. Use cancelar.' }, { status: 400 });
-      // Taxa de serviço (10%): ligada por padrão; a dona/garçom pode tirar na mesa.
-      const servicoOn = c.servico !== false;
-      const servico = servicoOn ? Math.round(subtotal * 0.10 * 100) / 100 : 0;
-      const totalBruto = Math.round((subtotal + servico) * 100) / 100;
-      // Desconto (%) dado na hora de fechar. Abate do total; o que o cliente
-      // paga (e o que as formas de pagamento têm que somar) é o total já com desconto.
-      const descontoPct = Math.max(0, Math.min(100, Number(body?.descontoPct) || 0));
-      const desconto = Math.round(totalBruto * descontoPct / 100 * 100) / 100;
-      const total = Math.round((totalBruto - desconto) * 100) / 100;
-      // QUANTAS PESSOAS ESTAVAM NA MESA — agora é obrigatório.
-      //
-      // "Minha atendente não está anotando a quantidade de pessoas por mesa. Tem
-      // como ser obrigatório? Eu preciso dessa informação."
-      //
-      // O pior não era vir vazio: era o que estava escrito aqui antes —
-      // `Math.max(1, ... || 1)`. Sem ninguém contar, a venda era gravada como
-      // "1 pessoa". Não ficava um buraco, ficava uma MENTIRA: a dona abria o
-      // relatório, via "pessoas atendidas" e "gasto por pessoa" e acreditava,
-      // porque número escrito não tem cara de chute.
-      //
-      // A trava mora aqui, e não só na tela, porque tela velha guardada no
-      // aparelho continua mandando pedido — e a regra tem que valer pro garçom,
-      // pra dona e pra qualquer aparelho.
-      const pessoas = Math.floor(Number(body?.pessoas) || 0);
-      if (!(pessoas >= 1 && pessoas <= 99)) {
-        return NextResponse.json({ ok: false, erro: 'Antes de fechar, diz quantas pessoas estavam na mesa.', faltaPessoas: true }, { status: 400 });
+      const r = await fecharComanda(sb, c, body, p);
+      if (r.falhou) {
+        const { falhou, status, ...resto } = r;
+        return NextResponse.json({ ok: false, ...resto }, { status });
       }
-
-      // Quem já pagou a parte dele durante a noite. Esse dinheiro não é cobrado
-      // de novo: o que falta receber agora é o total menos ele.
-      const parciais = arrP(c.parciais);
-      const jaPago = somaParciais(c);
-      if (jaPago > total + 0.05) {
-        return NextResponse.json({ ok: false, erro: `Já foi pago ${brlS(jaPago)} e a conta com desconto ficou em ${brlS(total)}. Diminui o desconto ou devolve a diferença por fora.` }, { status: 400 });
-      }
-      const aReceber = Math.round((total - jaPago) * 100) / 100;
-
-      // Pagamento pode ser dividido em várias formas (novo) ou uma só (compat).
-      let pags = [];
-      if (Array.isArray(body?.pagamentos)) {
-        pags = body.pagamentos
-          .map((x) => ({ forma: txt(x?.forma, 20), valor: Math.round((Number(x?.valor) || 0) * 100) / 100 }))
-          .filter((x) => x.forma && x.valor > 0);
-      } else if (aReceber > 0.005) {
-        pags = [{ forma: txt(body?.pagamento, 20) || 'Dinheiro', valor: aReceber }];
-      }
-      // Conta já quitada pelos parciais fecha sem cobrar mais nada.
-      if (!pags.length && aReceber > 0.005) return NextResponse.json({ ok: false, erro: 'Informe como foi pago.' }, { status: 400 });
-      const soma = Math.round(pags.reduce((s, x) => s + x.valor, 0) * 100) / 100;
-      if (Math.abs(soma - aReceber) > 0.05) {
-        return NextResponse.json({ ok: false, erro: jaPago > 0.005
-          ? `Faltam ${brlS(aReceber)} pra fechar (${brlS(jaPago)} já foi pago durante a noite), e as formas somam ${brlS(soma)}.`
-          : 'A soma das formas de pagamento não bate com o total.' }, { status: 400 });
-      }
-      const fiado = Math.round(pags.filter((x) => x.forma === 'Fiado').reduce((s, x) => s + x.valor, 0) * 100) / 100;
-      const nomeCli = txt(body?.nome, 60) || c.nome || '';
-      // Trava: fiado SEM nome não pode — senão a dívida vira uma "Mesa X" sem dono.
-      if (fiado > 0.005 && !nomeCli) return NextResponse.json({ ok: false, erro: 'Fiado precisa do nome de quem ficou devendo.' }, { status: 400 });
-      // Limite de fiado: se o cliente está cadastrado com limite e "bloquear",
-      // barra o novo fiado que passaria do limite (soma o que já está em aberto).
-      if (fiado > 0.005 && nomeCli) {
-        const norm = (s) => (s || '').trim().toLowerCase();
-        const numBR = (s) => { const v = parseFloat(String(s).replace(/\./g, '').replace(',', '.')); return isFinite(v) ? v : 0; };
-        const fmt = (n) => 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
-        const fiadoDe = (v) => { const base = v.fiado != null ? (Number(v.fiado) || 0) : (v.pagamento === 'Fiado' ? (Number(v.total) || 0) : 0); return Math.max(0, base - (Number(v.abatido) || 0)); };
-        const blob = await lerPainel(sb);
-        const clientes = Array.isArray(blob.clientes) ? blob.clientes : [];
-        const cli = clientes.find((x) => norm(x.nome) === norm(nomeCli) && x.bloquear && numBR(x.limite) > 0);
-        if (cli) {
-          const limite = numBR(cli.limite);
-          const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
-          const abertoAtual = (vrows || []).map((r) => r.valor).filter((v) => v && !v.pago && norm(v.nome) === norm(nomeCli)).reduce((s, v) => s + fiadoDe(v), 0);
-          if (abertoAtual + fiado > limite + 0.005) {
-            return NextResponse.json({ ok: false, bloqueado: true, erro: `${cli.nome} atingiu o limite de fiado (${fmt(limite)}). Em aberto: ${fmt(abertoAtual)}. Não dá pra fiar mais ${fmt(fiado)}.` }, { status: 400 });
-          }
-        }
-      }
-      // Liga a venda ao caixa aberto (se houver), pro fechamento do caixa somar.
-      const { data: caixaRows } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
-      const caixaAberto = (caixaRows || []).map((r) => r.valor).find((x) => x && x.aberto);
-      const venda = {
-        id: uid(), data: diaOperacional(), mesa: c.mesa, total, subtotal, servico, desconto, descontoPct, pessoas,
-        // Os parciais entram na venda como pagamento normal: foi dinheiro que
-        // entrou nesta conta, só que mais cedo. O caixa soma daqui.
-        pagamentos: [...parciais.map((x) => ({ forma: x.forma, valor: x.valor, parcial: true, quem: x.quem || '' })), ...pags],
-        pagamento: (parciais.length + pags.length) === 1 ? (pags[0]?.forma || parciais[0]?.forma) : 'Dividido',
-        fiado,
-        jaPagoAntes: jaPago > 0.005 ? jaPago : undefined,
-        nome: txt(body?.nome, 60) || c.nome || '', itens: c.itens, caixaId: caixaAberto ? caixaAberto.id : null,
-        // CONTAGEM DE VERDADE, e o carimbo que diz isso.
-        //
-        // Até esta regra existir, o servidor preenchia "1 pessoa" sozinho
-        // quando ninguém contava. Essas vendas antigas estão no banco com o
-        // número 1 e são indistinguíveis de uma mesa que era mesmo de uma
-        // pessoa. Sem um carimbo, o relatório somaria as duas coisas e
-        // apresentaria o resultado como se fosse tudo medido.
-        //
-        // Daqui pra frente ninguém fecha sem contar — então toda venda nova
-        // sai marcada, e o relatório consegue dizer quanto do número é medição
-        // e quanto é herança.
-        pessoasContadas: true,
-        // Só fica "não pago" (na lista de fiados) o que ficou no fiado.
-        pago: fiado <= 0.005, fechadaEm: new Date().toISOString(), fechadaPor: p,
-        // A hora em que a mesa ABRIU é o que diz a que horas o bar enche — a
-        // hora de fechar só diz quando a conta saiu. Guardar as duas deixa o
-        // movimento por horário honesto daqui pra frente.
-        abertaEm: c.abertaEm || '',
-      };
-      const { error: eV } = await sb.from('pdm_dados').upsert(
-        { chave: 'venda:' + venda.id, valor: venda, atualizado_em: new Date().toISOString() },
-        { onConflict: 'chave' }
-      );
-      if (eV) throw eV;
-      const { error: eD } = await sb.from('pdm_dados').delete().eq('chave', chaveDe(id));
-      if (eD) throw eD;
-      // Baixa do estoque pela ficha técnica dos itens vendidos. Best-effort: se
-      // algo falhar aqui, a venda NÃO é afetada (a reconciliação pega depois,
-      // via /api/estoque sincronizar, porque a venda ainda não está em baixas).
-      try {
-        const blobAtual = await lerPainel(sb);
-        const rb = aplicarBaixasVendas(arr(blobAtual.estoque), arr(blobAtual.fichas), [venda], arr(blobAtual.estoqueBaixas), false);
-        if (rb.mudou) {
-          await gravarPainelParcial(sb, { estoque: rb.estoque, estoqueBaixas: rb.baixadas });
-          // Avisa na hora se algum item acabou/chegou no mínimo com essa venda.
-          try { await notificarEstoqueCritico(sb, blobAtual.estoque, rb.estoque); } catch (e) { /* push nunca quebra a venda */ }
-        }
-      } catch (e) { /* estoque nunca quebra a venda */ }
-      // Aviso na hora da comanda fechada (fiado ou valor alto, conforme a dona
-      // configurou em Notificações).
-      try { await notificarComandaFechada(sb, venda); } catch (e) { /* push nunca quebra a venda */ }
-      // Aviso na hora: se essa venda no fiado levou o cliente a bater o limite,
-      // manda um push. Best-effort — nunca quebra a venda.
-      if (fiado > 0.005 && venda.nome) {
-        try {
-          const nomeNorm = limparNome(venda.nome).toLowerCase();
-          const cli = arr(blob.clientes).find((c) => limparNome(c.nome).toLowerCase() === nomeNorm);
-          const limite = cli ? num(cli.limite) : 0;
-          if (limite > 0) {
-            const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
-            const devido = (vrows || []).map((r) => r.valor).filter((v) => v && !v.pago && limparNome(v.nome).toLowerCase() === nomeNorm).reduce((s, v) => s + abertoDaVenda(v), 0);
-            if (devido >= limite - 0.005) {
-              await enviarPush(sb, { titulo: 'Fiado no limite', corpo: `${limparNome(venda.nome)} está em ${brl(devido)} de ${brl(limite)}.`, url: '/', tag: 'fiado-' + nomeNorm, audiencia: 'dona' });
-            }
-          }
-        } catch (e) { /* push nunca quebra a venda */ }
-      }
-      return NextResponse.json({ ok: true, venda });
+      return NextResponse.json({ ok: true, venda: r.venda });
     }
 
-    // Cancelar (fechar sem virar receita) e remover a comanda. Uma comanda VAZIA
-    // (aberta sem querer) qualquer um pode excluir; com consumo, só a dona — pra
-    // o garçom não apagar o que já foi lançado.
     if (acao === 'cancelar') {
       const temConsumo = (c.itens || []).length > 0;
       if (temConsumo && p !== 'dona') return NextResponse.json({ ok: false, erro: 'Comanda com consumo: só a dona pode cancelar.' }, { status: 403 });
