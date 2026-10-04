@@ -69,7 +69,7 @@ export default function Garcom() {
         {/* Mesa reservada hoje/amanhã: a primeira coisa que aparece ao entrar. */}
         <AvisoReservas />
         <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
-          {[['ponto', 'Ponto'], ['caixa', 'Caixa'], ['comandas', 'Comandas'], ['reservas', 'Reservas'], ['perdas', 'Perdas'], ['avisos', 'Avisos']].map(([v, rot]) => (
+          {[['ponto', 'Ponto'], ['caixa', 'Caixa'], ['comandas', 'Comandas'], ['reservas', 'Reservas'], ['perdas', 'Perdas e consumo'], ['avisos', 'Avisos']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
               flex: '1 0 auto', whiteSpace: 'nowrap', border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 12px', fontSize: 14, fontWeight: 700,
               background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,

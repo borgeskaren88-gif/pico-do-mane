@@ -260,12 +260,15 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     const hoje = todayISO();
     const ym = hoje.slice(0, 7);
     const noPeriodo = (data) => (periodoSaidas === 'hoje' ? data === hoje : data.slice(0, 7) === ym);
+    // `gente` é o que ela pediu: "quero poder saber quem pegou o que". Fica ao
+    // lado de `itens` em vez de substituir — por item responde "quanto saiu de
+    // caipirinha", por pessoa responde "o que o Léo pegou". São duas perguntas.
     const cats = {
-      vendas: { valor: 0, n: 0, itens: {} },
-      perdas: { valor: 0, n: 0, itens: {} },
-      consumo: { valor: 0, n: 0, itens: {} },
-      cortesia: { valor: 0, n: 0, itens: {} },
-      outros: { valor: 0, n: 0, itens: {} },
+      vendas: { valor: 0, n: 0, itens: {}, gente: {} },
+      perdas: { valor: 0, n: 0, itens: {}, gente: {} },
+      consumo: { valor: 0, n: 0, itens: {}, gente: {} },
+      cortesia: { valor: 0, n: 0, itens: {}, gente: {} },
+      outros: { valor: 0, n: 0, itens: {}, gente: {} },
     };
     const catDe = (m) => {
       if (m.tipo === 'venda') return 'vendas';
@@ -287,11 +290,25 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
         const e = cats[c].itens[it.nome] || { valor: 0, qtd: 0, unidade: it.unidade || '' };
         e.valor += val; e.qtd += num(m.qtd);
         cats[c].itens[it.nome] = e;
+        // Movimento antigo não tem nome — é de antes de o campo existir. Vira
+        // "sem nome" em vez de sumir: o valor continua batendo com o total, e
+        // ela vê quanto do mês ainda é herança do tempo sem registro.
+        if (c === 'consumo' || c === 'cortesia') {
+          const quem = (m.quem || '').trim() || 'sem nome';
+          const g = cats[c].gente[quem] || { valor: 0, oque: {} };
+          g.valor += val;
+          const rotulo = (m.produto || '').trim() || it.nome;
+          g.oque[rotulo] = (g.oque[rotulo] || 0) + val;
+          cats[c].gente[quem] = g;
+        }
       }
     }
     const total = cats.vendas.valor + cats.perdas.valor + cats.consumo.valor + cats.cortesia.valor + cats.outros.valor;
     const listaDe = (c) => Object.entries(c.itens).map(([nome, d]) => ({ nome, ...d })).sort((a, b) => b.valor - a.valor);
-    return { cats, total, listaDe, temAlgo: (cats.vendas.n + cats.perdas.n + cats.consumo.n + cats.cortesia.n + cats.outros.n) > 0 };
+    const genteDe = (c) => Object.entries(c.gente || {})
+      .map(([quem, d]) => ({ quem, valor: d.valor, oque: Object.entries(d.oque).map(([n, v]) => ({ nome: n, valor: v })).sort((a, b) => b.valor - a.valor) }))
+      .sort((a, b) => b.valor - a.valor);
+    return { cats, total, listaDe, genteDe, temAlgo: (cats.vendas.n + cats.perdas.n + cats.consumo.n + cats.cortesia.n + cats.outros.n) > 0 };
   }, [itens, periodoSaidas]);
   const [verSaidas, setVerSaidas] = useState(false);
   const [catSaidaAberta, setCatSaidaAberta] = useState('');
@@ -658,6 +675,26 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                     </button>
                     {aberta && (
                       <div style={{ marginTop: 8, marginLeft: 19 }}>
+                        {/* QUEM PEGOU O QUÊ.
+                            Vem antes da lista de ingredientes de propósito: no
+                            consumo da casa a pergunta dela é "de quem foi",
+                            não "quantos ml de cachaça saíram". O detalhe por
+                            ingrediente continua logo abaixo, pra conferir. */}
+                        {(k === 'consumo' || k === 'cortesia') && saidasMes.genteDe(c).length > 0 && (
+                          <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${C.hair}` }}>
+                            {saidasMes.genteDe(c).map((g) => (
+                              <div key={g.quem} style={{ padding: '4px 0' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13.5, fontWeight: 700, color: g.quem === 'sem nome' ? C.faint : C.text }}>
+                                  <span style={{ minWidth: 0 }}>{g.quem}</span>
+                                  <span style={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(g.valor)}</span>
+                                </div>
+                                <div style={{ fontSize: 12, color: C.faint, lineHeight: 1.45 }}>
+                                  {g.oque.map((o) => o.nome).join(' · ')}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {saidasMes.listaDe(c).map((x) => (
                           <div key={x.nome} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, padding: '3px 0', color: C.muted }}>
                             <span style={{ minWidth: 0 }}>{x.nome}</span>
