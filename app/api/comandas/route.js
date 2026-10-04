@@ -526,6 +526,13 @@ export async function POST(request) {
       // QUEM. "Eu só quero poder saber quem pegou o que."
       const quem = limparNome(txt(body?.quem, 60));
       if (!itemId || !(qtd > 0)) return NextResponse.json({ ok: false, erro: 'Escolha o item e diga quanto se perdeu.' }, { status: 400 });
+      // Consumo da casa sem nome não passa, nem por aqui. A trava vive nos dois
+      // caminhos (item do estoque e produto do cardápio) porque a cerveja que a
+      // equipe pega é item do estoque — era justamente ela que não tinha onde
+      // ser lançada, e não adianta abrir a porta e deixar o nome de fora.
+      if (motivo === 'Consumo da casa' && !quem) {
+        return NextResponse.json({ ok: false, erro: 'Diz quem pegou — é pra isso que serve o consumo da casa.', faltaQuem: true }, { status: 400 });
+      }
       const blob = await lerPainel(sb);
       const estoque = Array.isArray(blob.estoque) ? blob.estoque : [];
       let achou = false;

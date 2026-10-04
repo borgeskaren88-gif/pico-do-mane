@@ -9,7 +9,22 @@ import QuemPegou from './QuemPegou';
 //  - Perda / Quebra: baixa um item do estoque cru (quebrou, congelou…).
 //  - Cortesia: escolhe um produto do CARDÁPIO e o sistema baixa os ingredientes
 //    da ficha técnica sozinho (igual a uma venda, só que de graça).
+// O QUE FALTAVA AQUI.
+//
+// "Ela me falou que tem como pôr cortesia, quebrado ou estragado,
+// desperdício — ela não consegue pôr consumo da casa."
+//
+// Estava certa. "Consumo da casa" só existia na outra aba, a do drink/prato
+// pronto — que exige FICHA TÉCNICA pra saber o que baixar. Cerveja não tem
+// ficha: ela é o próprio item do estoque. Então justamente o caso mais comum
+// (a equipe pega uma long neck, uma água, um refri) não tinha onde ser
+// lançado, e o jeito era não registrar — que é como a cerveja some do estoque
+// sem explicação e o inventário nunca fecha.
+//
+// Consumo e cortesia entram aqui com cara diferente das perdas de propósito:
+// não é a mesma coisa, e o resumo "Para onde foi o estoque" separa os dois.
 const MOTIVOS = ['Quebrou', 'Congelou', 'Estragou', 'Venceu'];
+const MOTIVOS_SAIU = [['Consumo da casa', 'Consumo da casa'], ['Cortesia', 'Cortesia']];
 // O que houve com o produto PRONTO (drink, prato). 'Perda' é o que caiu no
 // chão ou voltou: baixa o estoque igual, mas conta como perda, não cortesia.
 const MOTIVOS_PRONTO = [['Cortesia', 'Cortesia'], ['Consumo da casa', 'Consumo da casa'], ['Perda', 'Perda / derrubou']];
@@ -23,6 +38,7 @@ export default function PerdaGarcom() {
   const [selId, setSelId] = useState('');
   const [qtd, setQtd] = useState('');
   const [motivo, setMotivo] = useState('Quebrou');
+  const [tipoSaida, setTipoSaida] = useState('perdeu'); // 'perdeu' | 'saiu' — no item do estoque
   const [motivoPronto, setMotivoPronto] = useState('Perda');
   const [sabor, setSabor] = useState('');
   const [quem, setQuem] = useState('');
@@ -40,16 +56,25 @@ export default function PerdaGarcom() {
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
-  const trocarModo = (m) => { setModo(m); setSelId(''); setBusca(''); setErro(''); setMsg(''); setSabor(''); setQuem(''); setQtd(m === 'cortesia' ? '1' : ''); };
+  const trocarModo = (m) => { setModo(m); setSelId(''); setBusca(''); setErro(''); setMsg(''); setSabor(''); setQuem(''); setTipoSaida('perdeu'); setMotivo('Quebrou'); setQtd(m === 'cortesia' ? '1' : ''); };
 
   const lista = modo === 'perda' ? itens : cardapio;
   const filtro = busca.trim().toLowerCase();
   const filtrada = filtro ? lista.filter((i) => (i.nome || '').toLowerCase().includes(filtro)) : lista;
   const sel = lista.find((i) => i.id === selId) || null;
 
+  // SE PERDEU ou SE ALGUÉM LEVOU — a pergunta vem antes do motivo, porque são
+  // duas coisas diferentes e o resumo do estoque separa as duas. Misturar
+  // "congelou" com "o Léo bebeu" numa lista só foi o que fez o consumo da casa
+  // não existir aqui.
+  const saiuPraAlguem = modo === 'perda' && tipoSaida === 'saiu';
+  const precisaQuem = (saiuPraAlguem && motivo === 'Consumo da casa')
+    || (modo !== 'perda' && motivoPronto === 'Consumo da casa');
+
   const registrar = async () => {
     if (!selId) { setErro(modo === 'perda' ? 'Escolha o item.' : 'Escolha o produto.'); return; }
     if (!(num(qtd) > 0)) { setErro('Diga a quantidade.'); return; }
+    if (precisaQuem && !quem.trim()) { setErro('Diz quem pegou — é pra isso que serve o consumo da casa.'); return; }
     setBusy(true); setErro(''); setMsg('');
     try {
       const body = modo === 'perda'
@@ -60,7 +85,7 @@ export default function PerdaGarcom() {
       if (!j.ok) { setErro(j.erro || 'Não consegui registrar.'); }
       else {
         setMsg(modo === 'perda'
-          ? `Baixa registrada: ${num(qtd)} ${sel?.unidade || ''} de ${sel?.nome || ''} (${motivo}).`
+          ? `${motivo} registrado: ${num(qtd)} ${sel?.unidade || ''} de ${sel?.nome || ''}${quem.trim() ? ` — ${quem.trim()}` : ''}.`
           : `${motivoPronto} registrada: ${num(qtd)}× ${j.prato || sel?.nome || ''}${j.quem ? ` — ${j.quem}` : ''}. Ingredientes baixados do estoque.`);
         setSelId(''); setBusca(''); setSabor(''); setQuem(''); setQtd(modo === 'cortesia' ? '1' : '');
       }
@@ -82,7 +107,7 @@ export default function PerdaGarcom() {
       <Card style={{ marginBottom: 14, background: C.panel2 }}>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
           {modo === 'perda'
-            ? 'Quebrou, congelou, estragou ou venceu? Escolha o item do estoque e diga quanto saiu. Baixa na hora — não mexe no caixa.'
+            ? 'Saiu do estoque sem ser vendido? Pode ter se perdido (quebrou, venceu) ou alguém ter levado (consumo da casa, cortesia). Baixa na hora — não mexe no caixa.'
             : 'Drink que caiu no chão, prato que voltou, cortesia liberada pela dona. Escolhe o produto do cardápio e o sistema baixa os ingredientes da ficha sozinho. Não mexe no caixa.'}
         </div>
       </Card>
@@ -115,17 +140,41 @@ export default function PerdaGarcom() {
           {modo === 'perda' ? (
             <>
               <Field label={`Quanto saiu? (em ${sel.unidade})`}><QtdInput value={qtd} onChange={setQtd} /></Field>
-              <Field label="O que aconteceu?">
+
+              {/* A PERGUNTA QUE FALTAVA.
+                  Antes só havia a lista de perdas, e a cerveja que a equipe
+                  bebe não cabia em nenhuma delas — então não era registrada. */}
+              <Field label="O que houve com isso?">
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[['perdeu', 'Se perdeu'], ['saiu', 'Alguém levou']].map(([v, rot]) => (
+                    <button key={v} onClick={() => { setTipoSaida(v); setMotivo(v === 'saiu' ? 'Consumo da casa' : 'Quebrou'); setQuem(''); setErro(''); }} style={{
+                      flex: 1, border: `1px solid ${tipoSaida === v ? C.accent : C.line}`, background: tipoSaida === v ? C.accent : 'transparent',
+                      color: tipoSaida === v ? '#06101F' : C.muted, borderRadius: 9, padding: '9px 8px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
+                    }}>{rot}</button>
+                  ))}
+                </div>
+              </Field>
+
+              <Field label={saiuPraAlguem ? 'Foi pra quê?' : 'O que aconteceu?'}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {MOTIVOS.map((m) => (
-                    <button key={m} onClick={() => setMotivo(m)} style={{
+                  {(saiuPraAlguem ? MOTIVOS_SAIU.map(([v]) => v) : MOTIVOS).map((m) => (
+                    <button key={m} onClick={() => { setMotivo(m); setErro(''); }} style={{
                       border: `1px solid ${motivo === m ? C.accent : C.line}`, background: motivo === m ? C.accent : 'transparent',
                       color: motivo === m ? '#06101F' : C.muted, borderRadius: 999, padding: '7px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                     }}>{m}</button>
                   ))}
                 </div>
               </Field>
-              <Btn kind="danger" onClick={registrar} disabled={busy}>{busy ? 'Registrando…' : 'Registrar baixa'}</Btn>
+
+              {saiuPraAlguem && (
+                <QuemPegou valor={quem} onChange={setQuem}
+                  titulo={motivo === 'Consumo da casa' ? 'Quem pegou?' : 'Quem liberou?'}
+                  aviso={motivo === 'Consumo da casa' ? '(precisa dizer)' : '(opcional)'} />
+              )}
+
+              <Btn kind={saiuPraAlguem ? 'primary' : 'danger'} onClick={registrar} disabled={busy || (precisaQuem && !quem.trim())}>
+                {busy ? 'Registrando…' : saiuPraAlguem ? `Registrar ${motivo.toLowerCase()}` : 'Registrar baixa'}
+              </Btn>
             </>
           ) : (
             <>
