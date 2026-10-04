@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Empty } from './ui';
 import { num } from '../lib/util';
+import QuemPegou from './QuemPegou';
 
 // Dar cortesia ou registrar consumo da casa de um PRODUTO do cardápio (ex.:
 // narguilé, um drink). O sistema baixa os ingredientes da ficha técnica sozinho.
@@ -19,6 +20,7 @@ export default function CortesiaConsumo({ onFeito }) {
   const [qtd, setQtd] = useState('1');
   const [motivo, setMotivo] = useState('Cortesia');
   const [sabor, setSabor] = useState('');
+  const [quem, setQuem] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [erro, setErro] = useState('');
@@ -42,10 +44,10 @@ export default function CortesiaConsumo({ onFeito }) {
     if (!(num(qtd) > 0)) { setErro('Diga a quantidade.'); return; }
     setBusy(true); setErro(''); setMsg('');
     try {
-      const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'cortesia', cardapioId: selId, qtd: num(qtd), motivo, sabor }) });
+      const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'cortesia', cardapioId: selId, qtd: num(qtd), motivo, sabor, quem }) });
       const j = await r.json();
       if (!j.ok) setErro(j.erro || 'Não consegui registrar.');
-      else { setMsg(`${motivo}: ${num(qtd)}× ${j.prato || sel?.nome || ''}. Ingredientes baixados do estoque.`); setSelId(''); setBusca(''); setQtd('1'); setSabor(''); if (onFeito) onFeito(); }
+      else { setMsg(`${motivo}: ${num(qtd)}× ${j.prato || sel?.nome || ''}${j.quem ? ` — ${j.quem}` : ''}. Ingredientes baixados do estoque.`); setSelId(''); setBusca(''); setQtd('1'); setSabor(''); setQuem(''); if (onFeito) onFeito(); }
     } catch { setErro('Sem conexão.'); }
     finally { setBusy(false); }
   };
@@ -106,7 +108,17 @@ export default function CortesiaConsumo({ onFeito }) {
             </Field>
           )}
           <Field label="Quantas?"><NumInput value={qtd} onChange={setQtd} /></Field>
-          <Btn onClick={registrar} disabled={busy}>{busy ? 'Registrando…' : `Registrar ${motivo.toLowerCase()}`}</Btn>
+          {/* No consumo da casa o nome é obrigatório — é o motivo de a tela
+              existir. Na cortesia ele ajuda a saber quem liberou. Na perda,
+              não: o drink que caiu no chão às vezes não tem dono mesmo. */}
+          {motivo !== 'Perda' && (
+            <QuemPegou valor={quem} onChange={setQuem}
+              titulo={motivo === 'Consumo da casa' ? 'Quem pegou?' : 'Quem liberou?'}
+              aviso={motivo === 'Consumo da casa' ? '(precisa dizer)' : '(opcional)'} />
+          )}
+          <Btn onClick={registrar} disabled={busy || (motivo === 'Consumo da casa' && !quem.trim())}>
+            {busy ? 'Registrando…' : `Registrar ${motivo.toLowerCase()}`}
+          </Btn>
         </Card>
       )}
     </div>

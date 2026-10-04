@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Empty, QtdInput } from './ui';
 import { num } from '../lib/util';
+import QuemPegou from './QuemPegou';
 
 // Baixas feitas pela linha de frente (garçom), SEM ver custos e sem tocar no
 // caixa. Dois modos:
@@ -24,6 +25,7 @@ export default function PerdaGarcom() {
   const [motivo, setMotivo] = useState('Quebrou');
   const [motivoPronto, setMotivoPronto] = useState('Perda');
   const [sabor, setSabor] = useState('');
+  const [quem, setQuem] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [erro, setErro] = useState('');
@@ -38,7 +40,7 @@ export default function PerdaGarcom() {
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
-  const trocarModo = (m) => { setModo(m); setSelId(''); setBusca(''); setErro(''); setMsg(''); setSabor(''); setQtd(m === 'cortesia' ? '1' : ''); };
+  const trocarModo = (m) => { setModo(m); setSelId(''); setBusca(''); setErro(''); setMsg(''); setSabor(''); setQuem(''); setQtd(m === 'cortesia' ? '1' : ''); };
 
   const lista = modo === 'perda' ? itens : cardapio;
   const filtro = busca.trim().toLowerCase();
@@ -51,16 +53,16 @@ export default function PerdaGarcom() {
     setBusy(true); setErro(''); setMsg('');
     try {
       const body = modo === 'perda'
-        ? { acao: 'perda', itemId: selId, qtd: num(qtd), motivo }
-        : { acao: 'cortesia', cardapioId: selId, qtd: num(qtd), motivo: motivoPronto, sabor };
+        ? { acao: 'perda', itemId: selId, qtd: num(qtd), motivo, quem }
+        : { acao: 'cortesia', cardapioId: selId, qtd: num(qtd), motivo: motivoPronto, sabor, quem };
       const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const j = await r.json();
       if (!j.ok) { setErro(j.erro || 'Não consegui registrar.'); }
       else {
         setMsg(modo === 'perda'
           ? `Baixa registrada: ${num(qtd)} ${sel?.unidade || ''} de ${sel?.nome || ''} (${motivo}).`
-          : `${motivoPronto} registrada: ${num(qtd)}× ${j.prato || sel?.nome || ''}. Ingredientes baixados do estoque.`);
-        setSelId(''); setBusca(''); setSabor(''); setQtd(modo === 'cortesia' ? '1' : '');
+          : `${motivoPronto} registrada: ${num(qtd)}× ${j.prato || sel?.nome || ''}${j.quem ? ` — ${j.quem}` : ''}. Ingredientes baixados do estoque.`);
+        setSelId(''); setBusca(''); setSabor(''); setQuem(''); setQtd(modo === 'cortesia' ? '1' : '');
       }
     } catch { setErro('Sem conexão.'); }
     finally { setBusy(false); }
@@ -157,7 +159,16 @@ export default function PerdaGarcom() {
                 </Field>
               )}
               <Field label="Quantas?"><NumInput value={qtd} onChange={setQtd} /></Field>
-              <Btn kind={motivoPronto === 'Perda' ? 'danger' : 'primary'} onClick={registrar} disabled={busy}>
+              {/* No consumo da casa o nome é obrigatório — é o motivo de a tela
+                  existir. Na cortesia e na perda ele é bem-vindo, mas o drink
+                  que caiu no chão às vezes não tem dono mesmo. */}
+              {motivoPronto !== 'Perda' && (
+                <QuemPegou valor={quem} onChange={setQuem}
+                  titulo={motivoPronto === 'Consumo da casa' ? 'Quem pegou?' : 'Quem liberou?'}
+                  aviso={motivoPronto === 'Consumo da casa' ? '(precisa dizer)' : '(opcional)'} />
+              )}
+              <Btn kind={motivoPronto === 'Perda' ? 'danger' : 'primary'} onClick={registrar}
+                disabled={busy || (motivoPronto === 'Consumo da casa' && !quem.trim())}>
                 {busy ? 'Registrando…' : `Registrar ${motivoPronto.toLowerCase()}`}
               </Btn>
             </>

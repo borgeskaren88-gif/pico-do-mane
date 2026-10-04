@@ -523,11 +523,13 @@ export async function POST(request) {
       const itemId = txt(body?.itemId, 40);
       const qtd = Number(body?.qtd);
       const motivo = (txt(body?.motivo, 40) || 'Perda');
+      // QUEM. "Eu só quero poder saber quem pegou o que."
+      const quem = limparNome(txt(body?.quem, 60));
       if (!itemId || !(qtd > 0)) return NextResponse.json({ ok: false, erro: 'Escolha o item e diga quanto se perdeu.' }, { status: 400 });
       const blob = await lerPainel(sb);
       const estoque = Array.isArray(blob.estoque) ? blob.estoque : [];
       let achou = false;
-      const novos = estoque.map((it) => { if (it.id !== itemId) return it; achou = true; return aplicarMovimentoItem(it, 'saida', qtd, motivo + ' (atendimento)'); });
+      const novos = estoque.map((it) => { if (it.id !== itemId) return it; achou = true; return aplicarMovimentoItem(it, 'saida', qtd, motivo + (quem ? ` · ${quem}` : '') + ' (atendimento)', undefined, { ...(quem ? { quem } : {}), por: p }); });
       if (!achou) return NextResponse.json({ ok: false, erro: 'Item não encontrado no estoque.' }, { status: 404 });
       await gravarPainelParcial(sb, { estoque: novos });
       try { await notificarEstoqueCritico(sb, estoque, novos); } catch (e) { /* push nunca quebra a baixa */ }
@@ -535,7 +537,7 @@ export async function POST(request) {
         const it = novos.find((x) => x.id === itemId);
         await notificarSaidaSemVenda(sb, {
           titulo: `${motivo}: ${limparNome(it?.nome)}`,
-          descricao: `${qtd} ${it?.unidade || 'un'} · lançado pelo atendimento`,
+          descricao: `${qtd} ${it?.unidade || 'un'} · ${quem ? `${quem} · ` : ''}lançado pel${p === 'dona' ? 'a dona' : 'o atendimento'}`,
           valor: qtd * num(it?.custo),
         });
       } catch (e) { /* push nunca quebra a baixa */ }
@@ -554,7 +556,15 @@ export async function POST(request) {
       const motivoPedido = txt(body?.motivo, 30);
       const motivoBase = motivoPedido === 'Consumo da casa' ? 'Consumo da casa'
         : motivoPedido === 'Perda' ? 'Perda' : 'Cortesia';
+      // QUEM PEGOU. No consumo da casa é o ponto da coisa: sem nome, o resumo
+      // diz "saiu uma caipirinha" e ela continua sem saber de quem foi.
+      const quem = limparNome(txt(body?.quem, 60));
       if (!cardapioId) return NextResponse.json({ ok: false, erro: 'Escolha o produto.' }, { status: 400 });
+      // Consumo da casa SEM nome é o caso que ela pediu pra resolver: deixar
+      // passar em branco devolveria o problema que motivou isto.
+      if (motivoBase === 'Consumo da casa' && !quem) {
+        return NextResponse.json({ ok: false, erro: 'Diz quem pegou — é pra isso que serve o consumo da casa.', faltaQuem: true }, { status: 400 });
+      }
       const blob = await lerPainel(sb);
       const estoque = Array.isArray(blob.estoque) ? blob.estoque : [];
       const fichas = Array.isArray(blob.fichas) ? blob.fichas : [];
@@ -577,21 +587,21 @@ export async function POST(request) {
 
       const novoEstoque = estoque.slice();
       const nomeCompleto = saborNome ? `${prato} (${saborNome})` : prato;
-      const motivo = `${motivoBase} · ${nomeCompleto}`;
+      const motivo = `${motivoBase} · ${nomeCompleto}${quem ? ` · ${quem}` : ''}`;
       let mudou = false;
       for (const ing of [...ficha.itens, ...extras]) {
         const idx = novoEstoque.findIndex((x) => x.id === ing.estoqueId);
         if (idx < 0) continue;
         const baixa = qtd * qtdNaUnidadeDoItem(ing.qtd, ing.unidade, novoEstoque[idx]);
         if (!(baixa > 0)) continue;
-        novoEstoque[idx] = aplicarMovimentoItem(novoEstoque[idx], 'saida', baixa, motivo);
+        novoEstoque[idx] = aplicarMovimentoItem(novoEstoque[idx], 'saida', baixa, motivo, undefined, { ...(quem ? { quem } : {}), por: p, produto: nomeCompleto });
         mudou = true;
       }
       if (!mudou) return NextResponse.json({ ok: false, erro: 'Não achei ingredientes pra baixar (confira a ficha).' }, { status: 400 });
       await gravarPainelParcial(sb, { estoque: novoEstoque });
       try { await notificarEstoqueCritico(sb, estoque, novoEstoque); } catch (e) { /* push nunca quebra a baixa */ }
-      try { await notificarSaidaSemVenda(sb, { titulo: `${motivoBase}: ${nomeCompleto}`, descricao: `${qtd} ${qtd === 1 ? 'unidade' : 'unidades'} · lançado pelo atendimento` }); } catch (e) { /* push nunca quebra a baixa */ }
-      return NextResponse.json({ ok: true, prato: nomeCompleto });
+      try { await notificarSaidaSemVenda(sb, { titulo: `${motivoBase}: ${nomeCompleto}`, descricao: `${qtd} ${qtd === 1 ? 'unidade' : 'unidades'}${quem ? ` · ${quem}` : ''} · lançado pel${p === 'dona' ? 'a dona' : 'o atendimento'}` }); } catch (e) { /* push nunca quebra a baixa */ }
+      return NextResponse.json({ ok: true, prato: nomeCompleto, quem });
     }
 
     // Ações que mexem numa comanda existente: sempre lê -> altera -> grava
