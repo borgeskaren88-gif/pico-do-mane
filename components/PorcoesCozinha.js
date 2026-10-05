@@ -137,10 +137,13 @@ export default function PorcoesCozinha() {
             )}
 
             {!aberta && (
+              /* "Separei" vinha sempre aceso, mesmo quando a ordem era levar
+                 do Salva-Vidas pra frente. Agora quem acende é o botão que
+                 cumpre o recado — e quando não há nada a fazer, nenhum. */
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Btn small onClick={() => abrir(p, 'separar')}>Separei</Btn>
-                <Btn small kind="ghost" onClick={() => abrir(p, 'abastecer')}>Levei pra frente</Btn>
-                <Btn small kind="ghost" onClick={() => abrir(p, 'contar')}>Contei</Btn>
+                {[['separar', 'Separei'], ['abastecer', 'Levei pra frente'], ['contar', 'Contei']].map(([tipo, rot]) => (
+                  <Btn key={tipo} small kind={p.acao === tipo ? 'primary' : 'ghost'} onClick={() => abrir(p, tipo)}>{rot}</Btn>
+                ))}
               </div>
             )}
 
