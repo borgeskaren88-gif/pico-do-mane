@@ -25,12 +25,33 @@ tu fala na hora, de boca.
 
 ---
 
-## Na mesa com ela (15 minutos)
+## Na mesa com ela (20 minutos)
 
-### Passo 1 — Ela entra, no aparelho dela
+### Passo 1 — Instala no celular DELA (antes de entrar)
 
-Abre `pico-do-mane.vercel.app` **no celular dela**, não no teu. A tela pede três
-coisas:
+O link é **um só, pra todo mundo**: `pico-do-mane.vercel.app`. Não existe link
+por pessoa, e não tem nada pra baixar na loja da Apple nem do Google. Quem
+separa um bar do outro é o código.
+
+**iPhone:** abre o link no Safari → **Compartilhar ↑** → **"Adicionar à Tela de
+Início"** → Adicionar.
+**Android:** abre no Chrome → menu **⋮** → **"Instalar aplicativo"**.
+
+**A ordem importa: instala PRIMEIRO, entra DEPOIS.** O iPhone trata o app
+instalado como um lugar separado do Safari, com a memória dele próprio — quem
+entra no Safari e instala depois vai ter que entrar de novo dentro do ícone, e
+vai achar que deu errado.
+
+Daí em diante ela abre **pelo ícone**, não pelo Safari. É o ícone que faz os
+avisos funcionarem no iPhone.
+
+> **No computador** não precisa instalar: abre o link e salva nos favoritos. No
+> Chrome ou Edge aparece um ícone de instalar na barra de endereço — opcional,
+> serve pra quem vai deixar aberto no balcão o dia todo.
+
+### Passo 2 — Ela entra, dentro do ícone
+
+A tela pede três coisas:
 
 | campo | o que ela põe |
 |---|---|
@@ -38,15 +59,16 @@ coisas:
 | **Quem está entrando?** | **Dona** |
 | **Senha** | a que tu criou |
 
-O código fica guardado no aparelho — ela digita uma vez só, nas próximas já vem
-preenchido.
+O código fica guardado **naquele aparelho** — ela digita uma vez no celular e,
+se usar o computador também, mais uma vez lá. Depois já vem preenchido. Não
+estranha se o computador pedir de novo: é cada lugar com a memória dele.
 
 > **Se der "Código ou senha incorretos":** quase sempre é o teclado do iPhone
 > pondo maiúscula na primeira letra do código, ou um espaço sobrando depois de
 > colar. O campo da senha tem um **"ver"** do lado direito — manda ela tocar e
 > conferir o que está escrito.
 
-### Passo 2 — Ela troca a senha NA HORA
+### Passo 3 — Ela troca a senha NA HORA
 
 **Configurações → Acessos → "A TUA senha".**
 
@@ -57,7 +79,7 @@ depois apaga a senha antiga de onde tu anotou.
 Fala isso em voz alta, com estas palavras: *"a partir de agora essa senha é só
 tua, eu não sei mais."*
 
-### Passo 3 — As senhas da equipe dela
+### Passo 4 — As senhas da equipe dela
 
 Na mesma tela, os três acessos da equipe (**Cozinha**, **Atendimento**,
 **Reservas**) começam com **1234**. A tela avisa enquanto estiverem assim.
@@ -66,7 +88,7 @@ Ela troca os que for usar. Se ela só tem atendimento, troca só esse — acesso
 ninguém usa é melhor ficar com a senha de fábrica avisando do que virar uma
 porta esquecida aberta.
 
-### Passo 4 — O caminho da noite, uma vez só
+### Passo 5 — O caminho da noite, uma vez só
 
 Faz **com ela**, não pra ela. Mesa de mentira, produto de mentira:
 
@@ -77,7 +99,7 @@ Faz **com ela**, não pra ela. Mesa de mentira, produto de mentira:
 
 Pronto. É isso que ela precisa saber hoje.
 
-### Passo 5 — Mostra onde pedir socorro
+### Passo 6 — Mostra onde pedir socorro
 
 O **Darci** responde pergunta em português ("quanto entrou ontem?"). E o teu
 telefone. Diz a frase que tu me disse: **se aparecer qualquer tela preta, manda
