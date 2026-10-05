@@ -933,10 +933,14 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                 )}
 
                 {!(pAcao && pAcao.id === p.id) ? (
+                  /* O botão da vez acende; os outros continuam ali, apagados.
+                     Antes os três tinham o mesmo peso, e "Levei pra frente"
+                     ficava colado num recado que mandava SEPARAR — quem lê
+                     correndo lê o botão, não a frase. */
                   <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                    <Btn kind="ghost" small onClick={() => abrirPorcao(p, 'separar')}>Separei</Btn>
-                    <Btn kind="ghost" small onClick={() => abrirPorcao(p, 'abastecer')}>Levei pra frente</Btn>
-                    <Btn kind="ghost" small onClick={() => abrirPorcao(p, 'contar')}>Contei</Btn>
+                    {[['separar', 'Separei'], ['abastecer', 'Levei pra frente'], ['contar', 'Contei']].map(([tipo, rot]) => (
+                      <Btn key={tipo} kind={p.acao === tipo ? 'primary' : 'ghost'} small onClick={() => abrirPorcao(p, tipo)}>{rot}</Btn>
+                    ))}
                   </div>
                 ) : (
                   <div style={{ marginTop: 10, background: C.panel2, borderRadius: 10, padding: 10 }}>
