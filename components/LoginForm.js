@@ -59,8 +59,12 @@ export default function LoginForm() {
       });
       const json = await res.json();
       if (json.ok) {
-        // Marca a sessão como ativa nesta janela pra a trava de tela não pedir a
-        // senha logo depois do login (ela só trava ao fechar e reabrir).
+        // Marca esta JANELA como a que acabou de entrar.
+        //
+        // No computador ninguém fica logado: uma janela sem esta marca é
+        // sessão herdada de quem estava antes, e o app sai sozinho. Sem marcar
+        // aqui, o próprio login cairia nessa regra e devolveria a tela de
+        // entrar — laço infinito, e ninguém entraria no notebook.
         try { sessionStorage.setItem('pdm_sessaoAtiva', '1'); } catch { /* ignora */ }
         if (multi) { try { localStorage.setItem('picoos-codigo', codigo.trim().toLowerCase()); } catch { /* ignora */ } }
         router.refresh();
