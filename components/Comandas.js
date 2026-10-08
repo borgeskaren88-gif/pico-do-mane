@@ -27,6 +27,7 @@ function TelaBalcao({ cardapio, clientes, onCobrar, onSair, busy, erro }) {
   const [nome, setNome] = useState('');
   const [outro, setOutro] = useState(false);
   const [pessoas, setPessoas] = useState(1);
+  const [desconto, setDesconto] = useState('');
 
   // Simples = sem sabor e sem adicional. O resto aparece numa linha explicando,
   // em vez de sumir: item que some da tela é item que a pessoa procura.
@@ -45,9 +46,26 @@ function TelaBalcao({ cardapio, clientes, onCobrar, onSair, busy, erro }) {
     .map((x) => (x.id === id ? { ...x, qtd: x.qtd + d } : x))
     .filter((x) => x.qtd > 0));
 
-  const total = carrinho.reduce((s, x) => s + x.preco * x.qtd, 0);
+  const bruto = carrinho.reduce((s, x) => s + x.preco * x.qtd, 0);
+
+  // DESCONTO NO BALCÃO, EM REAIS.
+  //
+  // Na mesa o desconto é em porcentagem, que é como se fecha uma conta grande.
+  // No balcão ninguém pensa assim: pensa "tira dois reais" ou "deixa em vinte".
+  // Então o campo é em R$ — mas o que vai pro servidor é a PORCENTAGEM, que é a
+  // conta que o fechamento já sabe fazer. Nenhum caminho novo pro dinheiro.
+  //
+  // E a tela refaz a conta com a MESMA fórmula do servidor, a partir da mesma
+  // porcentagem. Se ela calculasse o total do jeito dela, os dois podiam
+  // discordar num centavo — e centavo que discorda é o começo de toda conta que
+  // não fecha. Aqui eles concordam por construção.
+  const descR = Math.min(Math.max(0, num(desconto)), bruto);
+  const descontoPct = bruto > 0 ? (descR / bruto) * 100 : 0;
+  const descAplicado = Math.round(bruto * descontoPct / 100 * 100) / 100;
+  const total = Math.round((bruto - descAplicado) * 100) / 100;
+
   const precisaNome = forma === 'Fiado' && !nome.trim();
-  const podeCobrar = carrinho.length > 0 && forma && !precisaNome && !busy;
+  const podeCobrar = carrinho.length > 0 && forma && !precisaNome && !busy && total > 0;
 
   return (
     <div>
@@ -74,6 +92,21 @@ function TelaBalcao({ cardapio, clientes, onCobrar, onSair, busy, erro }) {
               </div>
             </div>
           ))}
+          {/* Quando tem desconto, o de cima aparece riscado: ela precisa ver o
+              que deixou de cobrar, não só o que vai cobrar. É esse número que
+              some do caixa no fim da noite sem ninguém lembrar por quê. */}
+          {descAplicado > 0 && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.line}`, fontSize: 13, color: C.faint }}>
+                <span>Sem desconto</span>
+                <span style={{ textDecoration: 'line-through', fontVariantNumeric: 'tabular-nums' }}>{brl(bruto)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, color: C.amber, fontWeight: 700 }}>
+                <span>Desconto</span>
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>− {brl(descAplicado)}</span>
+              </div>
+            </>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
             <span style={{ fontSize: 15, fontWeight: 800 }}>Total</span>
             <b style={{ fontSize: 20, fontVariantNumeric: 'tabular-nums' }}>{brl(total)}</b>
@@ -99,6 +132,17 @@ function TelaBalcao({ cardapio, clientes, onCobrar, onSair, busy, erro }) {
 
       {carrinho.length > 0 && (
         <>
+          {/* O desconto vem ANTES do pagamento, porque é o total com desconto
+              que ela vai cobrar. Depois seria tarde: o valor já estaria dito. */}
+          <Field label="Desconto (R$) — deixa em branco se não teve">
+            <NumInput value={desconto} onChange={setDesconto} />
+          </Field>
+          {descR > 0 && descAplicado >= bruto && (
+            <div style={{ fontSize: 12, color: C.amber, fontWeight: 700, margin: '-6px 0 12px' }}>
+              Isso zera a conta. Se foi de graça mesmo, o caminho é cortesia, em Perdas e consumo — ali sai do estoque sem fingir que entrou dinheiro.
+            </div>
+          )}
+
           <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Como pagou?</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
             {FORMAS_PAG.map((f) => (
@@ -132,7 +176,7 @@ function TelaBalcao({ cardapio, clientes, onCobrar, onSair, busy, erro }) {
             <button onClick={() => setPessoas((n) => Math.min(99, n + 1))} style={estBtn}>+</button>
           </div>
 
-          <Btn kind="ok" onClick={() => onCobrar({ carrinho, forma, nome: nome.trim(), pessoas, total })} disabled={!podeCobrar}>
+          <Btn kind="ok" onClick={() => onCobrar({ carrinho, forma, nome: nome.trim(), pessoas, total, descontoPct })} disabled={!podeCobrar}>
             {busy ? 'Cobrando…' : `Cobrar ${brl(total)}${forma ? ` · ${forma}` : ''}`}
           </Btn>
           {!forma && <div style={{ fontSize: 12, color: C.faint, marginTop: 8 }}>Falta dizer como pagou.</div>}
@@ -289,14 +333,19 @@ export default function Comandas({ papel = 'dona' }) {
   // Vai tudo num pedido só — itens e pagamento juntos. Não é economia de
   // digitação: é que no meio do caminho não existe comanda nenhuma pra ficar
   // esquecida aberta se a internet cair entre um toque e outro.
-  const cobrarBalcao = async ({ carrinho, forma, nome, pessoas, total }) => {
+  const cobrarBalcao = async ({ carrinho, forma, nome, pessoas, total, descontoPct }) => {
     const j = await acao({
       acao: 'balcao',
       itens: carrinho.map((x) => ({ cardapioId: x.id, qtd: x.qtd })),
+      // O valor pago é o total JÁ COM desconto; a porcentagem vai junto pra o
+      // servidor refazer a mesma conta e os dois baterem em centavo.
       pagamentos: [{ forma, valor: total }],
-      nome, pessoas,
+      descontoPct, nome, pessoas,
     }, { manterSel: false });
-    if (j && j.ok) { setBalcao(false); setRecibo({ total, forma, nome, quando: Date.now() }); }
+    if (j && j.ok) {
+      setBalcao(false);
+      setRecibo({ total, forma, nome, desconto: j.venda?.desconto || 0, quando: Date.now() });
+    }
   };
 
   const acao = (payload, { manterSel = true } = {}) => {
@@ -958,6 +1007,7 @@ export default function Comandas({ papel = 'dona' }) {
         <Card style={{ marginBottom: 12, padding: '12px 14px', borderColor: C.green }}>
           <div style={{ fontSize: 14.5, fontWeight: 800, color: C.green }}>
             Balcão: {brl(recibo.total)} · {recibo.forma}{recibo.nome ? ` · ${recibo.nome}` : ''}
+            {recibo.desconto > 0 ? ` · ${brl(recibo.desconto)} de desconto` : ''}
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Já entrou no caixa e saiu do estoque.</div>
           <button onClick={() => setRecibo(null)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '8px 0 0' }}>ok</button>
