@@ -33,6 +33,11 @@ const CHAVE_ABA = 'pdm_sessaoAtiva';     // esta ABA já estava em uso (morre ao
 const CHAVE_VIVA = 'pdm_abaViva';        // batida de coração, compartilhada entre abas
 const CHAVE_TOQUE = 'pdm_ultimoToque';   // último sinal de vida, compartilhado
 
+// O crachá do computador vale dez minutos (lib/auth.js). Renovar de três em
+// três deixa folga pra uma renovação falhar — internet de bar cai — sem
+// derrubar ninguém no meio do serviço.
+const RENOVA_MS = 3 * 60 * 1000;
+
 const BATIDA_MS = 4000;        // de quanto em quanto tempo cada aba diz "estou aqui"
 const IRMA_VIVA_MS = 12000;    // batida mais nova que isso = tem outra aba aberta
 const OCIOSO_MS = 30 * 60 * 1000;  // meia hora parado no computador e sai
@@ -96,7 +101,23 @@ export default function SaiSozinho({ children }) {
     return () => { clearInterval(t); for (const ev of eventos) window.removeEventListener(ev, tocar); };
   }, [estado]);
 
-  // 3) Parado tempo demais: avisa, e depois sai.
+  // 3) Enquanto a tela está aberta, renova o crachá no servidor.
+  //
+  // É isto que faz o X funcionar: o crachá do computador vale pouco e só
+  // continua valendo enquanto alguém está com a tela aberta. Fechou, ninguém
+  // renova, e ele morre sozinho — sem depender de o app ser aberto de novo.
+  useEffect(() => {
+    if (estado !== 'dentro' || ehCelular()) return;
+    const renovar = async () => {
+      if (document.hidden) return; // aba no fundo não segura sessão de ninguém
+      try { await fetch('/api/sessao', { method: 'POST' }); } catch { /* sem rede: a próxima pega */ }
+    };
+    renovar();
+    const t = setInterval(renovar, RENOVA_MS);
+    return () => clearInterval(t);
+  }, [estado]);
+
+  // 4) Parado tempo demais: avisa, e depois sai.
   useEffect(() => {
     if (estado !== 'dentro' || ehCelular()) return;
     const t = setInterval(() => {

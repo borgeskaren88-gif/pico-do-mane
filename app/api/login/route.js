@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { nomeCookie, valorSessaoValida, valorSessaoCozinha, valorSessaoGarcom, valorSessaoReservas } from '../../../lib/auth';
+import { nomeCookie, opcoesDoCracha, valorSessaoValida, valorSessaoCozinha, valorSessaoGarcom, valorSessaoReservas } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { conferirSenhaDona, temSenhaDona, conferirSenhaPapel } from '../../../lib/senha';
 import { lerGeracoes } from '../../../lib/acessos';
@@ -119,15 +119,9 @@ export async function POST(request) {
 
   if (!valorCookie) return recusa();
 
-  cookies().set(nomeCookie(), valorCookie, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    // Celular: 90 dias (continua logado). Computador: sem maxAge = cookie de
-    // sessão, que o navegador apaga ao fechar → pede a senha de novo.
-    ...(lembrar ? { maxAge: 60 * 60 * 24 * 90 } : {}),
-  });
+  // Celular: 90 dias. Computador: dez minutos que o app renova enquanto está
+  // aberto — fechou, morre sozinho. A regra mora em opcoesDoCracha.
+  cookies().set(nomeCookie(), valorCookie, opcoesDoCracha(lembrar));
 
   return NextResponse.json({ ok: true, papel });
 }
