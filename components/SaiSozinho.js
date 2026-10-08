@@ -33,14 +33,26 @@ const CHAVE_ABA = 'pdm_sessaoAtiva';     // esta ABA já estava em uso (morre ao
 const CHAVE_VIVA = 'pdm_abaViva';        // batida de coração, compartilhada entre abas
 const CHAVE_TOQUE = 'pdm_ultimoToque';   // último sinal de vida, compartilhado
 
-// O crachá do computador vale dez minutos (lib/auth.js). Renovar de três em
-// três deixa folga pra uma renovação falhar — internet de bar cai — sem
-// derrubar ninguém no meio do serviço.
-const RENOVA_MS = 3 * 60 * 1000;
+// O crachá do computador vale uma hora (lib/auth.js). Renovar de cinco em
+// cinco minutos dá doze chances de acertar antes de ele vencer — internet de
+// bar cai, notebook dorme, navegador congela aba de fundo. Prazo curto com
+// renovação frequente parece seguro no papel; no sábado à noite, é uma pessoa
+// deslogada no meio do movimento.
+const RENOVA_MS = 5 * 60 * 1000;
 
 const BATIDA_MS = 4000;        // de quanto em quanto tempo cada aba diz "estou aqui"
 const IRMA_VIVA_MS = 12000;    // batida mais nova que isso = tem outra aba aberta
-const OCIOSO_MS = 30 * 60 * 1000;  // meia hora parado no computador e sai
+// DUAS HORAS, não meia.
+//
+// Meia hora parecia generoso até ela dizer que o app saía "toda hora" na
+// correria. Num bar o notebook fica aberto no balcão e ninguém toca nele
+// durante uma hora inteira de movimento — isso é NORMAL, não é ausência.
+//
+// O que este relógio protege é o notebook esquecido aberto com a tela das
+// finanças. Duas horas protege isso do mesmo jeito e não atrapalha ninguém
+// trabalhando. E quem fecha o app continua saindo na hora, que é o caminho que
+// realmente guarda o aparelho compartilhado.
+const OCIOSO_MS = 2 * 60 * 60 * 1000;
 const AVISO_MS = 60 * 1000;        // avisa um minuto antes — sumiço sem aviso é defeito aos olhos de quem usa
 
 function ehCelular() {
@@ -106,15 +118,40 @@ export default function SaiSozinho({ children }) {
   // É isto que faz o X funcionar: o crachá do computador vale pouco e só
   // continua valendo enquanto alguém está com a tela aberta. Fechou, ninguém
   // renova, e ele morre sozinho — sem depender de o app ser aberto de novo.
+  //
+  // AQUI MORAVA UM ERRO QUE CUSTOU UMA NOITE DE SERVIÇO.
+  //
+  // "Agora o sistema fica toda hora saindo do computador do login e isso não é
+  // funcional na correria."
+  //
+  // Esta função pulava a renovação quando `document.hidden` era verdade. A
+  // ideia era "aba no fundo não segura sessão de ninguém". Mas num bar o
+  // navegador passa metade da noite atrás de outra janela, minimizado, ou com a
+  // tela apagada — e `hidden` fica verdade em todos esses. Dez minutos depois o
+  // crachá morria, e ela voltava pro balcão deslogada no meio do movimento.
+  //
+  // O erro de fundo foi pôr DOIS guardas vigiando a mesma coisa. Quem decide se
+  // tem alguém ali é o relógio de ocioso, logo abaixo, que mede TOQUE — a coisa
+  // certa. A renovação não precisa opinar sobre isso, e quando opinou, confundiu
+  // "janela atrás" com "ninguém aqui". Não é a mesma coisa, e a diferença é o
+  // sábado à noite dela.
   useEffect(() => {
     if (estado !== 'dentro' || ehCelular()) return;
     const renovar = async () => {
-      if (document.hidden) return; // aba no fundo não segura sessão de ninguém
       try { await fetch('/api/sessao', { method: 'POST' }); } catch { /* sem rede: a próxima pega */ }
     };
     renovar();
     const t = setInterval(renovar, RENOVA_MS);
-    return () => clearInterval(t);
+    // Voltar pra janela renova na hora: se o notebook dormiu, os temporizadores
+    // param, e esperar o próximo tique seria esperar deslogada.
+    const aoVoltar = () => { if (!document.hidden) renovar(); };
+    window.addEventListener('visibilitychange', aoVoltar);
+    window.addEventListener('focus', aoVoltar);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('visibilitychange', aoVoltar);
+      window.removeEventListener('focus', aoVoltar);
+    };
   }, [estado]);
 
   // 4) Parado tempo demais: avisa, e depois sai.
