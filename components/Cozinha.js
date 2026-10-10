@@ -12,6 +12,7 @@ import PontoCozinha from './PontoCozinha';
 import PorcoesCozinha from './PorcoesCozinha';
 import AvisoPorcoes from './AvisoPorcoes';
 import LembretePonto from './LembretePonto';
+import PedidoPronto from './PedidoPronto';
 import SinoNotificacoes from './SinoNotificacoes';
 
 export default function Cozinha() {
@@ -148,6 +149,8 @@ export default function Cozinha() {
           ))}
         </div>
 
+        {/* A cozinha é quem mais aperta: termina o prato e avisa daqui. */}
+        <PedidoPronto />
         {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
         {aba !== 'porcoes' && <AvisoPorcoes onIr={() => setAba('porcoes')} />}
 

@@ -56,6 +56,7 @@ import Previsao from './Previsao';
 import BotaoAtualizar from './BotaoAtualizar';
 import AtualizacaoAuto from './AtualizacaoAuto';
 import LembreteAgenda from './LembreteAgenda';
+import PedidoPronto from './PedidoPronto';
 import VersaoApp from './VersaoApp';
 import PullToRefresh from './PullToRefresh';
 
@@ -971,6 +972,9 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+        {/* "Às vezes estou na cozinha também": o botão e as tarjas aparecem
+            em qualquer aba da dona, igual aos outros dois logins. */}
+        <PedidoPronto />
         {tab === 'darci' && temDarci && <Darci {...propsDarci} />}
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
