@@ -59,6 +59,7 @@ import LembreteAgenda from './LembreteAgenda';
 import PedidoPronto from './PedidoPronto';
 import VersaoApp from './VersaoApp';
 import PullToRefresh from './PullToRefresh';
+import { sairDeVez } from '../lib/pushClient';
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 
@@ -633,7 +634,7 @@ export default function Dashboard() {
   };
 
   const sair = async () => {
-    await fetch('/api/logout', { method: 'POST' });
+    await sairDeVez();
     router.push('/');
     router.refresh();
   };
@@ -974,7 +975,7 @@ export default function Dashboard() {
         )}
         {/* "Às vezes estou na cozinha também": o botão e as tarjas aparecem
             em qualquer aba da dona, igual aos outros dois logins. */}
-        <PedidoPronto />
+        <PedidoPronto botao={tab === 'hoje'} />
         {tab === 'darci' && temDarci && <Darci {...propsDarci} />}
         {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,

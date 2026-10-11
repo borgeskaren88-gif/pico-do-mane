@@ -14,6 +14,7 @@ import LembreteAgenda from './LembreteAgenda';
 import PontoCozinha from './PontoCozinha';
 import LembretePonto from './LembretePonto';
 import PedidoPronto from './PedidoPronto';
+import { sairDeVez } from '../lib/pushClient';
 
 // Acesso do garçom (linha de frente): as comandas e o caixa do turno. Sem o
 // financeiro do bar, sem relatório — só o que precisa pra atender e bater o caixa.
@@ -32,7 +33,7 @@ export default function Garcom() {
     if (m) m.setAttribute('content', novo === 'claro' ? '#F6F9FD' : '#0A1220');
   };
 
-  const sair = async () => { await fetch('/api/logout', { method: 'POST' }); router.refresh(); };
+  const sair = async () => { await sairDeVez(); router.refresh(); };
 
   return (
     <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -79,7 +80,7 @@ export default function Garcom() {
         </div>
         {/* Fica ACIMA das abas: o prato pronto não espera a pessoa achar a
             tela certa. Aparece igual em qualquer aba. */}
-        <PedidoPronto />
+        <PedidoPronto botao={aba === 'comandas'} />
         {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
         {/* Enquanto o app do atendimento estiver aberto, ele confere se tem
             reserva começando agora — é o que faz o aviso chegar na hora. */}

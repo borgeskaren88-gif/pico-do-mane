@@ -14,6 +14,7 @@ import AvisoPorcoes from './AvisoPorcoes';
 import LembretePonto from './LembretePonto';
 import PedidoPronto from './PedidoPronto';
 import SinoNotificacoes from './SinoNotificacoes';
+import { sairDeVez } from '../lib/pushClient';
 
 export default function Cozinha() {
   const router = useRouter();
@@ -103,7 +104,7 @@ export default function Cozinha() {
     if (m) m.setAttribute('content', novo === 'claro' ? '#F6F9FD' : '#0A1220');
   };
 
-  const sair = async () => { await fetch('/api/logout', { method: 'POST' }); router.refresh(); };
+  const sair = async () => { await sairDeVez(); router.refresh(); };
 
   return (
     <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -150,7 +151,7 @@ export default function Cozinha() {
         </div>
 
         {/* A cozinha é quem mais aperta: termina o prato e avisa daqui. */}
-        <PedidoPronto />
+        <PedidoPronto botao />
         {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
         {aba !== 'porcoes' && <AvisoPorcoes onIr={() => setAba('porcoes')} />}
 
