@@ -397,7 +397,11 @@ export async function GET(request) {
     // sem caixa fica de fora do turno e, por tabela, da receita do dia.
     const { data: cxRows } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
     const caixaAberto = (cxRows || []).map((r) => r.valor).some((x) => x && x.aberto);
-    return NextResponse.json({ ok: true, comandas, cardapio, mesasQtd: mesasDe(blob), clientes, estoqueItens, caixaAberto });
+    // A ordem das categorias é a que a dona arrumou no Cardápio. Sem mandar
+    // ela aqui, a tela do garçom voltaria a usar uma lista fixa própria — e
+    // duas listas que precisam concordar sempre acabam discordando.
+    const cardapioCategorias = Array.isArray(blob.cardapioCategorias) ? blob.cardapioCategorias : null;
+    return NextResponse.json({ ok: true, comandas, cardapio, cardapioCategorias, mesasQtd: mesasDe(blob), clientes, estoqueItens, caixaAberto });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar comandas.' }, { status: 500 });
   }

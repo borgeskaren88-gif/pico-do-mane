@@ -3,7 +3,17 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, PageTitle } from './ui';
 import { brl, num } from '../lib/util';
 
-const CATS = ['Chopp / Cerveja', 'Drinks / Doses', 'Porções', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Combos', 'Outros'];
+// A LISTA FIXA QUE MORAVA AQUI FOI EMBORA.
+//
+// Eram duas listas de categorias no app, e elas já discordavam: a do Cardápio
+// tinha "Carta de Vinhos" e "Café & Tapiocas", esta não. O item não sumia — as
+// abas nascem dos itens que existem — mas a categoria desconhecida pulava pra
+// frente de todas na ordem.
+//
+// Agora existe uma lista só, que a dona arruma na tela de Cardápio, e ela vem
+// do servidor junto com o cardápio. A ordem das abas aqui é a ordem que ela
+// escolheu lá — inclusive pra pôr "Almoço" na frente no dia do almoço.
+import { categoriasDoCardapio } from './Cardapio';
 const FORMAS_PAG = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Fiado'];
 
 // O BALCÃO.
@@ -257,6 +267,7 @@ const somaParciais = (c) => Math.round((Array.isArray(c && c.parciais) ? c.parci
 export default function Comandas({ papel = 'dona' }) {
   const [comandas, setComandas] = useState([]);
   const [cardapio, setCardapio] = useState([]);
+  const [cats, setCats] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [caixaAberto, setCaixaAberto] = useState(true); // otimista: só avisa quando sabe que está fechado
   const [mesasQtd, setMesasQtd] = useState(20);
@@ -298,7 +309,7 @@ export default function Comandas({ papel = 'dona' }) {
       if (j.ok) {
         setComandas(j.comandas || []);
         setCaixaAberto(j.caixaAberto !== false);
-        if (!j.leve) { setCardapio(j.cardapio || []); setClientes(j.clientes || []); if (j.mesasQtd) setMesasQtd(j.mesasQtd); }
+        if (!j.leve) { setCardapio(j.cardapio || []); setCats(j.cardapioCategorias || null); setClientes(j.clientes || []); if (j.mesasQtd) setMesasQtd(j.mesasQtd); }
         setErro('');
       } else setErro(j.erro || 'Erro ao carregar.');
     } catch { setErro('Sem conexão.'); }
@@ -513,12 +524,12 @@ export default function Comandas({ papel = 'dona' }) {
   const rotuloPapel = (x) => (x === 'garcom' ? 'Garçom' : x === 'dona' ? 'Dona' : '');
 
   const cardapioGrupos = useMemo(() => {
-    const ordem = [...CATS, ''];
+    const ordem = [...categoriasDoCardapio(cats, cardapio), ''];
     const map = new Map();
     for (const it of cardapio) { const cat = it.categoria || ''; if (!map.has(cat)) map.set(cat, []); map.get(cat).push(it); }
     return [...map.entries()].sort((a, b) => ordem.indexOf(a[0]) - ordem.indexOf(b[0]))
       .map(([cat, itens]) => ({ cat: cat || 'Outros', itens: itens.sort((x, y) => (x.nome || '').localeCompare(y.nome || '')) }));
-  }, [cardapio]);
+  }, [cardapio, cats]);
 
   // ---- Tela de adicionar produtos (carrinho) ----
   if (sel && picker) {

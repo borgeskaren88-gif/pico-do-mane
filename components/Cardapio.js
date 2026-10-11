@@ -4,13 +4,46 @@ import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, SecTitle, Page
 import { brl, num, uid, limparNome } from '../lib/util';
 import { UNIDADES, qtdNaUnidadeDoItem, conversaoDaReceita } from '../lib/estoque';
 
-export const CATEGORIAS_CARDAPIO = ['Chopp / Cerveja', 'Drinks / Doses', 'Carta de Vinhos', 'Porções', 'Café & Tapiocas', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Combos', 'Outros'];
+// AS CATEGORIAS DE FÁBRICA — o ponto de partida, não a lei.
+//
+// "Eu quero ter a opção de criar categorias no cardápio, tipo quero criar a
+// categoria almoço."
+//
+// Isto aqui era a lista inteira, trancada no código: pra criar "Almoço" ela
+// teria que me pedir e esperar um deploy. Agora é só o que vem pronto no
+// primeiro dia; a lista de verdade mora no banco, e é dela.
+//
+// Duas listas fixas existiam, e elas já tinham DISCORDADO: esta tinha "Carta
+// de Vinhos" e "Café & Tapiocas", a da tela do garçom não. O item não sumia —
+// o garçom monta as abas a partir dos itens que existem — mas a categoria
+// desconhecida pulava pra frente de todas na ordem. Uma lista só, guardada num
+// lugar só, acaba com isso.
+export const CATEGORIAS_PADRAO = ['Chopp / Cerveja', 'Drinks / Doses', 'Carta de Vinhos', 'Porções', 'Café & Tapiocas', 'Não alcoólicos', 'Sobremesas', 'Tabacaria', 'Combos', 'Outros'];
+
+// A lista que vale: a dela, se existir; senão a de fábrica. Sempre com as
+// categorias que os ITENS usam no fim — senão um item cadastrado numa
+// categoria apagada vira item sem aba, invisível pro garçom.
+export function categoriasDoCardapio(guardadas, itens = []) {
+  const base = Array.isArray(guardadas) && guardadas.length ? guardadas.map(String) : CATEGORIAS_PADRAO;
+  const usadas = [...new Set((itens || []).map((i) => (i && i.categoria) || '').filter(Boolean))];
+  const orfas = usadas.filter((c) => !base.includes(c));
+  return [...base, ...orfas];
+}
+
+// Compatibilidade: o nome antigo continua existindo pra quem ainda importa.
+export const CATEGORIAS_CARDAPIO = CATEGORIAS_PADRAO;
+
+const estCat = { width: 30, height: 30, borderRadius: 8, border: `1px solid var(--c-line)`, background: 'transparent', color: 'var(--c-muted)', fontSize: 15, fontWeight: 800, cursor: 'pointer', lineHeight: 1, flexShrink: 0 };
 
 const itemVazio = () => ({ nome: '', preco: '', categoria: '', sabores: [], saboresTotal: '', adicionais: [] });
 
-export default function Cardapio({ dados = [], onChange, estoque = [] }) {
+export default function Cardapio({ dados = [], onChange, estoque = [], categorias, onCategorias }) {
   const [novo, setNovo] = useState(itemVazio());
   const [editId, setEditId] = useState(null);
+  const [catNova, setCatNova] = useState('');
+  const [catErro, setCatErro] = useState('');
+  const [verCats, setVerCats] = useState(false);
+  const CATS = categoriasDoCardapio(categorias, dados);
   const set = (k) => (v) => setNovo((f) => ({ ...f, [k]: v }));
 
   const estoqueOrdenado = useMemo(() => [...estoque].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })), [estoque]);
@@ -29,7 +62,7 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
 
   // Agrupa por categoria, na ordem do cardápio; "sem categoria" por último.
   const grupos = useMemo(() => {
-    const ordem = [...CATEGORIAS_CARDAPIO, ''];
+    const ordem = [...CATS, ''];
     const map = new Map();
     for (const it of dados) {
       const cat = it.categoria || '';
@@ -39,7 +72,7 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
     return [...map.entries()]
       .sort((a, b) => ordem.indexOf(a[0]) - ordem.indexOf(b[0]))
       .map(([cat, itens]) => ({ cat: cat || 'Sem categoria', itens: itens.sort((x, y) => (x.nome || '').localeCompare(y.nome || '')) }));
-  }, [dados]);
+  }, [dados, categorias]);
 
   const salvar = () => {
     if (!novo.nome.trim()) return;
@@ -68,18 +101,101 @@ export default function Cardapio({ dados = [], onChange, estoque = [] }) {
   const excluir = (id) => { if (id === editId) cancelar(); onChange(dados.filter((i) => i.id !== id)); };
   const alternarAtivo = (it) => onChange(dados.map((i) => (i.id === it.id ? { ...i, ativo: i.ativo === false ? true : false } : i)));
 
+  // ---- mexer nas categorias ----
+  const salvarCats = (lista) => { if (onCategorias) onCategorias(lista); };
+
+  const criarCat = () => {
+    const nome = limparNome(catNova);
+    if (!nome) return;
+    // Comparação sem acento e sem maiúscula: "Almoço" e "almoco" são a mesma
+    // categoria pra quem digita correndo, e duas abas iguais na tela do garçom
+    // é o tipo de coisa que ninguém entende e todo mundo xinga.
+    const chave = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    if (CATS.some((c) => chave(c) === chave(nome))) { setCatErro(`"${nome}" já existe.`); return; }
+    salvarCats([...CATS, nome]);
+    setCatNova(''); setCatErro('');
+  };
+
+  const apagarCat = (c) => {
+    const quantos = dados.filter((it) => (it.categoria || '') === c).length;
+    // Apagar categoria com item dentro deixaria o item sem aba — presente no
+    // banco e invisível na tela. Pior que um erro: um sumiço.
+    if (quantos) { setCatErro(`"${c}" tem ${quantos} ${quantos === 1 ? 'item' : 'itens'}. Mova ${quantos === 1 ? 'ele' : 'eles'} pra outra categoria antes de apagar.`); return; }
+    salvarCats(CATS.filter((x) => x !== c));
+    setCatErro('');
+  };
+
+  const mudarOrdem = (i, d) => {
+    const j = i + d;
+    if (j < 0 || j >= CATS.length) return;
+    const lista = [...CATS];
+    [lista[i], lista[j]] = [lista[j], lista[i]];
+    salvarCats(lista);
+  };
+
   const ativos = dados.filter((i) => i.ativo !== false).length;
 
   return (
     <div>
       <PageTitle sub="Os itens que o garçom lança nas comandas">Cardápio</PageTitle>
 
+      {/* AS CATEGORIAS, agora dela.
+          Fica fechado: quem entra aqui quer cadastrar um item, não arrumar
+          categoria. Mexer nisso é coisa de uma vez por mês. */}
+      <Card style={{ marginBottom: 16 }}>
+        <button onClick={() => setVerCats((v) => !v)}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+          <span style={{ color: C.accent, fontSize: 12, fontWeight: 800, width: 12, flexShrink: 0 }}>{verCats ? '▾' : '▸'}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: 15, fontWeight: 800 }}>Categorias do cardápio</span>
+            <span style={{ fontSize: 12, color: C.muted, display: 'block', marginTop: 1 }}>
+              {CATS.length} categorias · viram as abas do garçom, nesta ordem
+            </span>
+          </span>
+        </button>
+
+        {verCats && (
+          <div style={{ marginTop: 12, borderTop: `1px solid ${C.hair}`, paddingTop: 12 }}>
+            {CATS.map((c, i) => {
+              const quantos = dados.filter((it) => (it.categoria || '') === c).length;
+              return (
+                <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i ? `1px solid ${C.hair}` : 'none' }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600 }}>
+                    {c}
+                    <span style={{ color: C.faint, fontWeight: 400 }}> · {quantos} {quantos === 1 ? 'item' : 'itens'}</span>
+                  </span>
+                  {/* A ordem daqui é a ordem das abas do garçom. Subir "Almoço"
+                      no dia do almoço é a diferença entre achar e procurar. */}
+                  <button onClick={() => mudarOrdem(i, -1)} disabled={i === 0} title="Subir"
+                    style={{ ...estCat, opacity: i === 0 ? 0.3 : 1 }}>↑</button>
+                  <button onClick={() => mudarOrdem(i, +1)} disabled={i === CATS.length - 1} title="Descer"
+                    style={{ ...estCat, opacity: i === CATS.length - 1 ? 0.3 : 1 }}>↓</button>
+                  <button onClick={() => apagarCat(c)} title="Apagar"
+                    style={{ ...estCat, color: quantos ? C.faint : C.red, opacity: quantos ? 0.4 : 1 }}>×</button>
+                </div>
+              );
+            })}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <TextInput value={catNova} onChange={(v) => { setCatNova(v); setCatErro(''); }} placeholder="Ex.: Almoço" />
+              </div>
+              <Btn small onClick={criarCat} disabled={!catNova.trim()}>Criar</Btn>
+            </div>
+            {catErro && <div style={{ fontSize: 12, color: C.amber, fontWeight: 700, marginTop: 8, lineHeight: 1.45 }}>{catErro}</div>}
+            <div style={{ fontSize: 11.5, color: C.faint, marginTop: 10, lineHeight: 1.45 }}>
+              Categoria com item dentro não pode ser apagada — os itens ficariam sem aba, invisíveis pro garçom. Mova eles primeiro.
+            </div>
+          </div>
+        )}
+      </Card>
+
       <Card style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>{editId ? 'Editar item' : 'Adicionar item'}</div>
         <Field label="Item"><TextInput value={novo.nome} onChange={set('nome')} placeholder="Chopp 300ml, Porção de frango…" /></Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 12 }}>
           <Field label="Preço (R$)"><NumInput value={novo.preco} onChange={set('preco')} /></Field>
-          <Field label="Categoria"><Select value={novo.categoria} onChange={set('categoria')} options={CATEGORIAS_CARDAPIO} /></Field>
+          <Field label="Categoria"><Select value={novo.categoria} onChange={set('categoria')} options={CATS} /></Field>
         </div>
 
         {/* Sabores / variações (opcional) */}
