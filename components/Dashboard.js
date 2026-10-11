@@ -194,6 +194,7 @@ export default function Dashboard() {
   const [escondeuAvisoSenha, setEscondeuAvisoSenha] = useState(false);
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [cardapio, setCardapio] = useState([]);
+  const [cardapioCategorias, setCardapioCategorias] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [fichas, setFichas] = useState([]);         // fichas técnicas (fonte: /api/estoque)
@@ -289,6 +290,7 @@ export default function Dashboard() {
       setModulos(lerModulos(primeiraVez ? SEED_DATA : (salvo || {})));
       setTarefasCozinha(arr(salvo && salvo.tarefasCozinha));
       setCardapio(arr(salvo && salvo.cardapio));
+      setCardapioCategorias(Array.isArray(salvo && salvo.cardapioCategorias) ? salvo.cardapioCategorias : null);
       setClientes(arr(salvo && salvo.clientes));
       // Grava SÓ em dois casos seguros: (1) primeira vez de verdade (servidor
       // vazio) pra semear; (2) a limpeza de nomes mudou algo — e aí a base é o
@@ -430,6 +432,7 @@ export default function Dashboard() {
     listaCompras: (v) => { setListaCompras(v); salvarTudo({ listaCompras: v }); },
     tarefasCozinha: (v) => { setTarefasCozinha(v); salvarTudo({ tarefasCozinha: v }); },
     cardapio: (v) => { setCardapio(v); salvarTudo({ cardapio: v }); },
+    cardapioCategorias: (v) => { setCardapioCategorias(v); salvarTudo({ cardapioCategorias: v }); },
     metas: (v) => { setMetas(v); salvarTudo({ metas: v }); },
     negocio: (v) => { setNegocio(v); salvarTudo({ negocio: v }); },
     modulos: (v) => { setModulos(v); salvarTudo({ modulos: v }); },
@@ -1111,7 +1114,7 @@ export default function Dashboard() {
             {subSalao === 'comandas' && <Comandas papel="dona" />}
             {subSalao === 'vendas' && <VendasDoDia vendas={vendas} />}
             {subSalao === 'caixa' && <Caixa receitas={receitas} onReceitas={upd.receitas} />}
-            {subSalao === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} estoque={estoque} />}
+            {subSalao === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} estoque={estoque} categorias={cardapioCategorias} onCategorias={upd.cardapioCategorias} />}
             {subSalao === 'fiados' && <Fiados onMudou={carregarVendas} clientes={clientes} receitas={receitas} onReceitas={upd.receitas} />}
             {subSalao === 'clientes' && <Clientes dados={clientes} onChange={upd.clientes} vendas={vendas} />}
           </>
