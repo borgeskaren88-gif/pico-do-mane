@@ -8,6 +8,22 @@
 # Os testes leem o banco direto pra conferir, e sem a marca procurariam chave
 # que não existe mais.
 AQUI=$(dirname "$0")
+
+# O APP DE TESTE SOBE AQUI, DEPOIS DO BUILD.
+#
+# Já perdi uma rodada inteira por isto: o servidor ficou de pé servindo um build
+# antigo enquanto eu reconstruía por baixo, e a tela quebrou com
+# "ChunkLoadError" — pedindo pedaços que não existiam mais. O erro parecia do
+# app e era do laboratório.
+#
+# Agora o runner derruba e sobe de novo a cada bateria. Dois segundos a mais,
+# e uma classe inteira de susto a menos.
+pkill -f "[n]ext-server" >/dev/null 2>&1
+sleep 1
+( cd "$AQUI/.." && SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_ROLE_KEY=chave-de-mentira \
+  APP_PASSWORD=Teste@123 SESSION_SECRET=um-texto-longo-e-aleatorio-so-pra-teste \
+  NEGOCIO_UNICO=pico-do-mane nohup npx next start -p 3100 > "lab/app.log" 2>&1 & )
+sleep 6
 for t in "$@"; do
   pkill -f "[p]grest.mjs" >/dev/null 2>&1
   sleep 1
