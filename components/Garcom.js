@@ -80,7 +80,7 @@ export default function Garcom() {
         </div>
         {/* Fica ACIMA das abas: o prato pronto não espera a pessoa achar a
             tela certa. Aparece igual em qualquer aba. */}
-        <PedidoPronto botao={aba === 'comandas'} />
+        <PedidoPronto />
         {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
         {/* Enquanto o app do atendimento estiver aberto, ele confere se tem
             reserva começando agora — é o que faz o aviso chegar na hora. */}

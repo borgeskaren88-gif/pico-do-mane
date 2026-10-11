@@ -62,16 +62,26 @@ function bipar() {
 const lerVistos = () => { try { return JSON.parse(localStorage.getItem(VISTOS) || '[]'); } catch { return []; } };
 const salvarVistos = (ids) => { try { localStorage.setItem(VISTOS, JSON.stringify(ids.slice(0, 40))); } catch { /* ignora */ } };
 
-// `botao` diz se o BOTÃO de avisar aparece nesta tela. As TARJAS aparecem
-// sempre, em qualquer tela e qualquer papel — elas são o aviso, e esconder o
-// aviso é desfazer a razão disto existir.
+// O BOTÃO EXISTE EM TODA TELA, MAS PEQUENO.
 //
-// "O avisar que o pedido está pronto fica aparecendo em todas as telas, meio
-// chato." Estava certa: o botão não tem o que fazer na tela de Relatórios nem
-// na de Marketing. Ele mora onde a ação acontece — na cozinha, nas comandas do
-// atendimento, e no Hoje da dona. O aviso, não: o aviso tem que alcançar ela
-// onde quer que ela esteja, senão volta o grito.
-export default function PedidoPronto({ botao = true }) {
+// Duas reclamações seguidas, e a segunda desfez a minha correção da primeira:
+//
+//   "Fica aparecendo em todas as telas, meio chato."
+//   "Para mim o botão de avisar que o pedido está pronto sumiu de tudo."
+//
+// Na primeira eu escondi o botão e deixei só no Hoje. Errado por um detalhe
+// que eu devia saber: o app LEMBRA a última aba. Ela não cai no Hoje, cai onde
+// parou — e se parou no Abastecimento, nunca mais viu o botão.
+//
+// O meu teste não pegou porque navegador de teste não tem memória: ele sempre
+// caía no Hoje. Usuário de verdade sempre tem memória. Teste que começa do zero
+// mede um app que ninguém usa.
+//
+// A saída não era escolher ENTRE sempre e nunca: era o tamanho. O que
+// incomodava era um bloco azul de largura inteira em cima de cada tela. Uma
+// pastilha discreta, encostada na direita, fica sempre à mão e não rouba a
+// tela de ninguém.
+export default function PedidoPronto() {
   const [mesas, setMesas] = useState([]);
   const [prontos, setProntos] = useState([]);
   const [abrindo, setAbrindo] = useState(false);
@@ -166,12 +176,14 @@ export default function PedidoPronto({ botao = true }) {
         </Card>
       ))}
 
-      {/* O BOTÃO, só onde a ação acontece. */}
-      {!botao ? null : !abrindo ? (
-        <button onClick={() => { setAbrindo(true); setMsg(''); }}
-          style={{ width: '100%', border: 'none', background: C.accent, color: '#06101F', borderRadius: 12, padding: '12px 16px', fontSize: 15, fontWeight: 800, cursor: 'pointer', marginBottom: 14 }}>
-          🍽️ Avisar que o pedido está pronto
-        </button>
+      {/* A PASTILHA. Pequena, encostada na direita, em toda tela. */}
+      {!abrindo ? (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <button onClick={() => { setAbrindo(true); setMsg(''); }}
+            style={{ border: `1px solid color-mix(in srgb, ${C.accent} 35%, ${C.panel})`, background: `color-mix(in srgb, ${C.accent} 8%, ${C.panel})`, color: C.accent, borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
+            🍽️ Pedido pronto
+          </button>
+        </div>
       ) : (
         <Card style={{ marginBottom: 14, padding: 14, borderColor: C.accent }}>
           <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 2 }}>Qual mesa saiu?</div>

@@ -44,7 +44,11 @@ const pedir = (corpo) => pg.evaluate(async (c) => {
   const r = await fetch('/api/pronto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
   return { status: r.status, j: await r.json() };
 }, corpo);
-const temBotao = async () => (await pg.locator('button:has-text("Avisar que o pedido está pronto")').count()) > 0;
+// Procura pelo que o botão FAZ, não pela frase inteira. A frase já mudou uma
+// vez (era "Avisar que o pedido está pronto", virou a pastilha "Pedido
+// pronto") e o teste reprovou um app que estava certo. Seletor colado na
+// redação quebra toda vez que alguém melhora o texto.
+const temBotao = async () => (await pg.locator('button:has-text("Pedido pronto")').count()) > 0;
 const texto = async () => (await pg.locator('body').innerText()).replace(/ /g, ' ');
 const irPara = async (rot) => {
   await pg.evaluate((r) => {
@@ -54,12 +58,26 @@ const irPara = async (rot) => {
   await pg.waitForTimeout(1800);
 };
 
-console.log('\n### o BOTÃO mora onde a ação acontece');
+console.log('\n### o BOTÃO está em TODA tela — inclusive na que ela deixou aberta');
+// AQUI MORA O ERRO QUE ESTE TESTE DEIXOU PASSAR UMA VEZ.
+//
+// Eu tinha escondido o botão e deixado só no Hoje. O teste passou — e ela
+// disse "sumiu de tudo". O app LEMBRA a última aba: ela não cai no Hoje, cai
+// onde parou. Navegador de teste começa do zero e sempre caía no Hoje, então o
+// teste media um app que ninguém usa.
+//
+// Agora o teste chega COM MEMÓRIA, igual a ela: última aba gravada antes de
+// abrir. É o estado em que todo usuário de verdade está, sempre.
 await entrar('dona');
-cobra('no Hoje (onde ela cai ao entrar) o botão está lá', await temBotao());
-for (const tela of ['Marketing', 'Pasta']) {
+await pg.evaluate(() => localStorage.setItem('picoos-tab', 'abastecimento'));
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3500);
+cobra('ela caiu no Abastecimento, não no Hoje', /Abastecimento/.test(await texto()));
+cobra('e o botão está lá', await temBotao());
+
+for (const tela of ['Marketing', 'Pasta', 'Previsão']) {
   await irPara(tela);
-  cobra(`em ${tela} o botão NÃO aparece`, !(await temBotao()));
+  cobra(`em ${tela} o botão continua à mão`, await temBotao());
 }
 
 console.log('\n### mas o AVISO alcança ela em qualquer tela — senão volta o grito');
@@ -80,7 +98,7 @@ const esperarTarja = async (limiteMs) => {
   return null;
 };
 const segundos = await esperarTarja(15000);
-cobra('a tarja aparece fora do Hoje', segundos !== null, segundos === null ? 'não apareceu em 15s' : `apareceu em ~${segundos}s`);
+cobra('a tarja aparece onde quer que ela esteja', segundos !== null, segundos === null ? 'não apareceu em 15s' : `apareceu em ~${segundos}s`);
 cobra('com o botão de pegar junto', (await pg.locator('button:has-text("Peguei")').count()) > 0);
 
 console.log('\n### "Peguei" tira de TODO MUNDO, não só da tela de quem tocou');
@@ -101,12 +119,12 @@ const g = await pg.evaluate(async () => (await (await fetch('/api/pronto', { cac
 const cru = JSON.stringify(g);
 cobra('nenhum total, preço ou nome de cliente', !/total|preco|preço|valor|fiado/i.test(cru), cru.slice(0, 110));
 
-console.log('\n### no ATENDIMENTO o botão fica nas Comandas, não em Ponto ou Caixa');
+console.log('\n### no ATENDIMENTO idem, em qualquer aba');
 await entrar('garcom');
 await irPara('Comandas');
 cobra('em Comandas o botão está lá', await temBotao());
 await irPara('Ponto');
-cobra('em Ponto NÃO aparece', !(await temBotao()));
+cobra('em Ponto também está à mão', await temBotao());
 // E a tarja continua alcançando, mesmo na aba errada.
 cobra('mas a tarja da mesa 9 está lá', /Mesa 9 pronta/.test(await texto()));
 
