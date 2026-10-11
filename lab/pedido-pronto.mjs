@@ -65,8 +65,22 @@ for (const tela of ['Marketing', 'Pasta']) {
 console.log('\n### mas o AVISO alcança ela em qualquer tela — senão volta o grito');
 // Ela está no Marketing/Pasta agora, longe do botão. A tarja tem que chegar.
 await pedir({ mesa: '9' });
-await pg.waitForTimeout(2500);
-cobra('a tarja aparece fora do Hoje', /Mesa 9 pronta/.test(await texto()), (await texto()).slice(0, 70).replace(/\n/g, ' | '));
+// ESPERA PELA CONDIÇÃO, não por um tempo chutado.
+//
+// Antes esperava 2,5s fixos — e falhou, porque o app só olhava de 20 em 20
+// segundos. O teste estava certo em falhar: a tarja demorava mesmo. Mas um
+// tempo fixo também não prova nada no dia em que a máquina estiver lenta.
+// Agora ele espera o que o bar aceitaria esperar (15s) e desiste depois disso.
+const esperarTarja = async (limiteMs) => {
+  const fim = Date.now() + limiteMs;
+  while (Date.now() < fim) {
+    if (/Mesa 9 pronta/.test(await texto())) return Math.round((limiteMs - (fim - Date.now())) / 1000);
+    await pg.waitForTimeout(1000);
+  }
+  return null;
+};
+const segundos = await esperarTarja(15000);
+cobra('a tarja aparece fora do Hoje', segundos !== null, segundos === null ? 'não apareceu em 15s' : `apareceu em ~${segundos}s`);
 cobra('com o botão de pegar junto', (await pg.locator('button:has-text("Peguei")').count()) > 0);
 
 console.log('\n### "Peguei" tira de TODO MUNDO, não só da tela de quem tocou');

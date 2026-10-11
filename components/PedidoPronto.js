@@ -25,7 +25,17 @@ import { minhaChavePush } from '../lib/pushClient';
 //    aviso que se aprende a ignorar — e aí o próximo, o de verdade, também
 //    passa batido.
 
-const POLL_MS = 20000;
+// DE QUANTO EM QUANTO TEMPO O APP OLHA SE TEM PRATO PRONTO.
+//
+// Vinte segundos parecia barato até o teste mostrar o que significam: a tarja
+// podia demorar vinte segundos pra aparecer, e prato quente não espera vinte
+// segundos. Pra quem tem push, o aviso é instantâneo; a tarja é a rede pra quem
+// NÃO tem — e rede lenta não segura ninguém.
+//
+// Dez segundos dobra a consulta e corta a espera pela metade. Em três aparelhos
+// numa noite de seis horas dá uns 40 MB por mês de leitura — cabe, e é o preço
+// de o aviso valer pra quem não ligou as notificações.
+const POLL_MS = 10000;
 const VISTOS = 'pdm_prontosVistos';
 
 // Um bipe curto, feito na hora — sem arquivo pra baixar. No iPhone o som só sai
