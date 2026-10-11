@@ -44,7 +44,11 @@ const pedir = (corpo) => pg.evaluate(async (c) => {
   const r = await fetch('/api/pronto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
   return { status: r.status, j: await r.json() };
 }, corpo);
-const temBotao = async () => (await pg.locator('button:has-text("Avisar que o pedido está pronto")').count()) > 0;
+// Procura pelo que o botão FAZ, não pela frase inteira. A frase já mudou uma
+// vez (era "Avisar que o pedido está pronto", virou a pastilha "Pedido
+// pronto") e o teste reprovou um app que estava certo. Seletor colado na
+// redação quebra toda vez que alguém melhora o texto.
+const temBotao = async () => (await pg.locator('button:has-text("Pedido pronto")').count()) > 0;
 const texto = async () => (await pg.locator('body').innerText()).replace(/ /g, ' ');
 const irPara = async (rot) => {
   await pg.evaluate((r) => {
