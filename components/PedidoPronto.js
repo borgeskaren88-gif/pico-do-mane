@@ -25,7 +25,17 @@ import { minhaChavePush } from '../lib/pushClient';
 //    aviso que se aprende a ignorar — e aí o próximo, o de verdade, também
 //    passa batido.
 
-const POLL_MS = 20000;
+// DE QUANTO EM QUANTO TEMPO O APP OLHA SE TEM PRATO PRONTO.
+//
+// Vinte segundos parecia barato até o teste mostrar o que significam: a tarja
+// podia demorar vinte segundos pra aparecer, e prato quente não espera vinte
+// segundos. Pra quem tem push, o aviso é instantâneo; a tarja é a rede pra quem
+// NÃO tem — e rede lenta não segura ninguém.
+//
+// Dez segundos dobra a consulta e corta a espera pela metade. Em três aparelhos
+// numa noite de seis horas dá uns 40 MB por mês de leitura — cabe, e é o preço
+// de o aviso valer pra quem não ligou as notificações.
+const POLL_MS = 10000;
 const VISTOS = 'pdm_prontosVistos';
 
 // Um bipe curto, feito na hora — sem arquivo pra baixar. No iPhone o som só sai
@@ -52,7 +62,16 @@ function bipar() {
 const lerVistos = () => { try { return JSON.parse(localStorage.getItem(VISTOS) || '[]'); } catch { return []; } };
 const salvarVistos = (ids) => { try { localStorage.setItem(VISTOS, JSON.stringify(ids.slice(0, 40))); } catch { /* ignora */ } };
 
-export default function PedidoPronto() {
+// `botao` diz se o BOTÃO de avisar aparece nesta tela. As TARJAS aparecem
+// sempre, em qualquer tela e qualquer papel — elas são o aviso, e esconder o
+// aviso é desfazer a razão disto existir.
+//
+// "O avisar que o pedido está pronto fica aparecendo em todas as telas, meio
+// chato." Estava certa: o botão não tem o que fazer na tela de Relatórios nem
+// na de Marketing. Ele mora onde a ação acontece — na cozinha, nas comandas do
+// atendimento, e no Hoje da dona. O aviso, não: o aviso tem que alcançar ela
+// onde quer que ela esteja, senão volta o grito.
+export default function PedidoPronto({ botao = true }) {
   const [mesas, setMesas] = useState([]);
   const [prontos, setProntos] = useState([]);
   const [abrindo, setAbrindo] = useState(false);
@@ -147,9 +166,8 @@ export default function PedidoPronto() {
         </Card>
       ))}
 
-      {/* O BOTÃO. Igual pros três logins, porque no bar dela os papéis se
-          misturam na hora do aperto. */}
-      {!abrindo ? (
+      {/* O BOTÃO, só onde a ação acontece. */}
+      {!botao ? null : !abrindo ? (
         <button onClick={() => { setAbrindo(true); setMsg(''); }}
           style={{ width: '100%', border: 'none', background: C.accent, color: '#06101F', borderRadius: 12, padding: '12px 16px', fontSize: 15, fontWeight: 800, cursor: 'pointer', marginBottom: 14 }}>
           🍽️ Avisar que o pedido está pronto

@@ -12,6 +12,7 @@ import BotaoAtualizar from './BotaoAtualizar';
 import VersaoApp from './VersaoApp';
 import { todayISO, addDays, fmtDate, weekday, ymOf } from '../lib/util';
 import { OCASIOES, LOCAIS, etiquetasDaReserva } from '../lib/reservas';
+import { sairDeVez } from '../lib/pushClient';
 
 const MESES_LONGOS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const LETRAS_SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -244,7 +245,7 @@ export default function Reservas({ embutido = false }) {
   };
 
   const sair = async () => {
-    try { await fetch('/api/logout', { method: 'POST' }); } catch { /* ignora */ }
+    try { await sairDeVez(); } catch { /* ignora */ }
     if (typeof window !== 'undefined') window.location.reload();
   };
 

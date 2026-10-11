@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import { C, Card, Btn, pageBg } from './ui';
+import { sairDeVez } from '../lib/pushClient';
 
 // SAIR SOZINHO NO COMPUTADOR.
 //
@@ -75,7 +76,7 @@ export default function SaiSozinho({ children }) {
     jaSaiu.current = true;
     setEstado('saindo');
     try { sessionStorage.removeItem(CHAVE_ABA); } catch { /* ignora */ }
-    try { await fetch('/api/logout', { method: 'POST' }); } catch { /* sem rede: o reload resolve */ }
+    try { await sairDeVez(); } catch { /* sem rede: o reload resolve */ }
     window.location.reload();
   };
 

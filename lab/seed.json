@@ -1,0 +1,121 @@
+{
+ "painel": {
+  "receitas": [],
+  "despesas": [],
+  "compras": [],
+  "diario": [],
+  "clientes": [
+   {
+    "id": "c1",
+    "nome": "Seu Zé",
+    "telefone": "",
+    "limite": "",
+    "bloquear": false
+   },
+   {
+    "id": "c2",
+    "nome": "Pedro",
+    "telefone": "",
+    "limite": "15,00",
+    "bloquear": true
+   }
+  ],
+  "cardapio": [
+   {
+    "id": "card-long",
+    "nome": "Long neck",
+    "categoria": "Chopp / Cerveja",
+    "preco": "10,00",
+    "ativo": true
+   },
+   {
+    "id": "card-caipi",
+    "nome": "Caipirinha",
+    "categoria": "Drinks / Doses",
+    "preco": "18,00",
+    "ativo": true
+   }
+  ],
+  "fichas": [
+   {
+    "id": "f-long",
+    "cardapioId": "card-long",
+    "itens": [
+     {
+      "estoqueId": "est-long",
+      "qtd": "1",
+      "unidade": "un"
+     }
+    ]
+   },
+   {
+    "id": "f-caipi",
+    "cardapioId": "card-caipi",
+    "itens": [
+     {
+      "estoqueId": "est-cacha",
+      "qtd": "60",
+      "unidade": "ml"
+     }
+    ]
+   }
+  ],
+  "estoque": [
+   {
+    "id": "est-long",
+    "nome": "Long neck",
+    "categoria": "Bebidas",
+    "unidade": "un",
+    "saldo": 40,
+    "minimo": 6,
+    "custo": 4,
+    "movimentos": []
+   },
+   {
+    "id": "est-cacha",
+    "nome": "Cachaça",
+    "categoria": "Bebidas",
+    "unidade": "ml",
+    "saldo": 3000,
+    "minimo": 0,
+    "custo": 0.05,
+    "movimentos": []
+   },
+   {
+    "id": "bat-bruto",
+    "nome": "Batata frita",
+    "categoria": "Cozinha",
+    "unidade": "kg",
+    "saldo": 29.2,
+    "minimo": 2,
+    "custo": 7.76,
+    "movimentos": []
+   },
+   {
+    "id": "bat-saco",
+    "nome": "Batata 400g",
+    "categoria": "Cozinha",
+    "unidade": "saco",
+    "saldo": 9.2,
+    "custo": 3.22,
+    "minimo": 0,
+    "linha": 5.2,
+    "salva": 4,
+    "separar": {
+     "brutoId": "bat-bruto",
+     "gramas": 400,
+     "unidade": "g",
+     "minLinha": 5,
+     "minSalva": 5
+    },
+    "movimentos": []
+   }
+  ],
+  "mesasQtd": 20,
+  "metas": {
+   "padrao": "40000",
+   "diasSemana": null
+  }
+ },
+ "prontos": []
+}

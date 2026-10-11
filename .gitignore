@@ -2,3 +2,8 @@ node_modules
 .next
 .env.local
 .DS_Store
+
+# Saída do laboratório (logs e resultados de rodada) — o que vale é o teste.
+lab/*.log
+lab/r.txt
+lab/*.png
