@@ -151,7 +151,7 @@ export default function Cozinha() {
         </div>
 
         {/* A cozinha é quem mais aperta: termina o prato e avisa daqui. */}
-        <PedidoPronto botao />
+        <PedidoPronto />
         {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
         {aba !== 'porcoes' && <AvisoPorcoes onIr={() => setAba('porcoes')} />}
 
