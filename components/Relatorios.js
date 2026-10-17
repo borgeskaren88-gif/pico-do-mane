@@ -63,6 +63,15 @@ import { cmvDoMes, lerCMV, evolucaoCMV, compararCMV, variacaoProdutos, estoqueNo
 export default function Relatorios({ diario, receitas, despesas, mes, setMes, vendas = [], compras = [], estoque = [], fichas = [], cardapio = [], negocio = '' }) {
   const [verDias, setVerDias] = useState(false); // abre o dia a dia da previsão
   const [verCMV, setVerCMV] = useState(false);   // abre a lista de produtos do CMV
+  // O MIÚDO FICA DOBRADO.
+  //
+  // A página tinha 15 blocos abertos de uma vez e o resultado do mês era o
+  // sétimo. No celular isso é meia dúzia de telas de rolagem até o número que
+  // importa. Agora ela abre curta: veredito, a escada do dinheiro, o CMV e o
+  // destino das despesas. O detalhe de cada coisa está a um toque, e quem
+  // nunca tocar não perde nada de decisão.
+  const [verCMVDetalhe, setVerCMVDetalhe] = useState(false);
+  const [verHistorico, setVerHistorico] = useState(false);
   const mesesDisp = [...new Set([...receitas, ...despesas].map((d) => ymOf(d.data)))].sort().reverse();
   const opts = mesesDisp.length ? mesesDisp : [ymOf(todayISO())];
   const recMes = receitas.filter((r) => ymOf(r.data) === mes);
@@ -78,15 +87,29 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   const totalDespMes = despOpAll.reduce((s, d) => s + num(d.valor), 0);
   const despOutras = Math.round((totalDespMes - custoVar - despOp) * 100) / 100;
   const lucro = totalRec - totalDespMes;
-  // Fora do lucro (só movimenta o caixa): aporte/empréstimo recebido, investimento
-  // e pagamento de dívida/empréstimo.
+  // Fora do lucro (só movimenta o caixa): aporte/empréstimo recebido, investimento,
+  // pagamento de dívida/empréstimo e distribuição de lucro pros sócios.
   const entradaNaoOp = recMes.filter((r) => FONTES_NAO_OPERACIONAL.includes(r.categoria)).reduce((s, r) => s + num(r.valor), 0);
   const investimento = despMes.filter((d) => d.categoria === 'Investimento').reduce((s, d) => s + num(d.valor), 0);
   const dividaPaga = despMes.filter((d) => d.categoria === 'Empréstimo/Dívida').reduce((s, d) => s + num(d.valor), 0);
-  // O que de fato sobrou no caixa depois de TUDO: lucro da operação + o que
-  // entrou de aporte/empréstimo − o que saiu de investimento e pagamento de dívida.
-  const resultadoFinal = Math.round((lucro + entradaNaoOp - investimento - dividaPaga) * 100) / 100;
+  // DISTRIBUIÇÃO DE LUCROS — a linha que faltava, e que fazia o número mentir
+  // pra MAIS.
+  //
+  // Ela é despesa não operacional: sai do lucro da operação, e certo. Só que
+  // depois ninguém a descontava de volta aqui embaixo — então o dinheiro que a
+  // sócia tirou pra si continuava aparecendo como "o que de fato sobrou no
+  // caixa". Tirar R$ 3.000 não mudava o número em nada.
+  //
+  // Pior: o card "Quanto sobrou de verdade" soma TODAS as despesas do mês, com
+  // essa dentro, e mostrava o valor certo. Dois números na mesma página
+  // discordando, e o errado era justamente o que se dizia definitivo.
+  const distribuicao = despMes.filter((d) => d.categoria === 'Distribuição de lucros').reduce((s, d) => s + num(d.valor), 0);
+  // O que de fato sobrou no caixa depois de TUDO. Com a distribuição dentro,
+  // isto fecha exatamente com "entrou − saiu" do mês (disp.noPapel) — as duas
+  // contas percorrem caminhos diferentes e agora chegam no mesmo lugar.
+  const resultadoFinal = Math.round((lucro + entradaNaoOp - investimento - dividaPaga - distribuicao) * 100) / 100;
   const margem = totalRec ? (lucro / totalRec) * 100 : 0;
+  const temForaDaOperacao = entradaNaoOp > 0.005 || investimento > 0.005 || dividaPaga > 0.005 || distribuicao > 0.005;
 
   // CMV: quanto de ingrediente saiu pra produzir o que foi vendido no mês.
   // Fica num card separado, FORA da cascata do DRE, de propósito — veja a nota
@@ -123,10 +146,19 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
     return variacaoProdutos(cmv, antes);
   }, [cmv, cmvAntes, vendas, fichas, estoque, compras, cardapio]);
 
+  // EVOLUÇÃO — só a OPERAÇÃO, igual ao resto da página.
+  //
+  // Antes isto somava tudo: empréstimo que entrou, equipamento comprado,
+  // dívida paga. Todo o resto do relatório tira essas linhas. Resultado: no mês
+  // em que ela pegasse um empréstimo, a barra do gráfico e o DRE logo abaixo
+  // mostravam receitas diferentes pro MESMO mês — e não havia nada na tela
+  // explicando por quê.
   const evolucao = useMemo(() => {
     const map = {};
-    receitas.forEach((r) => { const m = ymOf(r.data); (map[m] = map[m] || { rec: 0, desp: 0 }).rec += num(r.valor); });
-    despesas.forEach((d) => { const m = ymOf(d.data); (map[m] = map[m] || { rec: 0, desp: 0 }).desp += num(d.valor); });
+    receitas.filter((r) => !FONTES_NAO_OPERACIONAL.includes(r.categoria))
+      .forEach((r) => { const m = ymOf(r.data); (map[m] = map[m] || { rec: 0, desp: 0 }).rec += num(r.valor); });
+    despesas.filter((d) => !DESPESA_NAO_OPERACIONAL.includes(d.categoria))
+      .forEach((d) => { const m = ymOf(d.data); (map[m] = map[m] || { rec: 0, desp: 0 }).desp += num(d.valor); });
     return Object.entries(map).sort().slice(-6).map(([m, v]) => ({ mes: MESES[parseInt(m.slice(5)) - 1] || m, receita: v.rec, despesa: v.desp, lucro: v.rec - v.desp }));
   }, [receitas, despesas]);
 
@@ -202,40 +234,118 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
       <PageTitle sub="Resultado do mês">Relatórios</PageTitle>
       <div style={{ marginBottom: 14 }}><Label>Mês do relatório</Label><Select value={mes} onChange={setMes} options={opts} /></div>
 
-      {/* O QUE FOI CORRERIA.
-          Só aparece quando houve — um card de zero todo mês vira paisagem e
-          deixa de ser lido. E o ranking é a parte útil: o produto que mais
-          aparece aqui é o que está com o mínimo do estoque errado. */}
-      {emergencia.total > 0 && (
-        <Card style={{ marginBottom: 14, borderColor: C.amber }}>
-          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.amber, fontWeight: 700, marginBottom: 4 }}>
-            Compra de emergência — {mesLabel(mes)}
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>{brl(emergencia.total)}</div>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
-            {emergencia.pct.toFixed(0)}% de tudo que tu compraste no mês, em{' '}
-            {emergencia.vezes} {emergencia.vezes === 1 ? 'vez' : 'vezes'}.
-          </div>
-          {emergencia.ranking.length > 0 && (
-            <div style={{ marginTop: 12, borderTop: `1px solid ${C.hair}`, paddingTop: 10 }}>
-              <div style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 7 }}>
-                O que mais fez correr
-              </div>
-              {emergencia.ranking.map(([nome, val]) => (
-                <div key={nome} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13.5, padding: '3px 0' }}>
-                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
-                  <b style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{brl(val)}</b>
-                </div>
-              ))}
+      {/* ==================================================================
+          O VEREDITO — a primeira coisa da página.
+          Antes ela abria no seletor de mês e caía direto num card de dado
+          bruto; o resultado do mês era o sétimo bloco. Relatório que se
+          respeita começa pela conclusão e só depois mostra como chegou nela.
+          ================================================================== */}
+      <Card style={{ marginBottom: 14, borderColor: lucro >= 0 ? C.accent : C.red }}>
+        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.muted, fontWeight: 800 }}>
+          {mesLabel(mes)}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+          <span style={{ fontSize: 34, fontWeight: 900, lineHeight: 1, color: lucro >= 0 ? C.accent : C.red, fontVariantNumeric: 'tabular-nums' }}>
+            {brl(lucro)}
+          </span>
+          <Delta atual={lucro} anterior={prev.lucro} />
+        </div>
+        <div style={{ fontSize: 13, color: C.muted, marginTop: 7, lineHeight: 1.5 }}>
+          de <b style={{ color: C.text }}>lucro da operação</b> · margem {margem.toFixed(1)}%
+          {totalRec > 0 && <> · cada R$ 100 vendidos deixaram <b style={{ color: C.text }}>R$ {margem.toFixed(0)}</b></>}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(118px, 1fr))', gap: 8, marginTop: 13 }}>
+          {[['Entrou', disp.entrou, C.green], ['Saiu', disp.saiu, C.amber], ['É teu agora', disp.disponivel, disp.disponivel >= 0 ? C.text : C.red]].map(([rot, v, cor]) => (
+            <div key={rot} style={{ background: C.panel2, borderRadius: 11, padding: '9px 11px', minWidth: 0 }}>
+              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.07em', color: C.faint, fontWeight: 800 }}>{rot}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: cor, marginTop: 3, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brl(v)}</div>
             </div>
-          )}
-          <div style={{ fontSize: 12, color: C.faint, marginTop: 12, lineHeight: 1.5 }}>
-            Compra de correria sai mais cara: sem cotação, sem barganha, preço de varejo. O que mais
-            aparece nessa lista é o que está com o <b style={{ color: C.text }}>mínimo do estoque errado</b> —
-            subir o mínimo desses itens é o conserto.
+          ))}
+        </div>
+
+        <div style={{ fontSize: 12.5, color: C.text, marginTop: 11, lineHeight: 1.55 }}>{disp.recado}</div>
+      </Card>
+
+      {/* ==================================================================
+          A ESCADA DO DINHEIRO — um card no lugar de quatro.
+          A página tinha "Sobrou no papel", "DISPONÍVEL DE VERDADE",
+          "(=) Lucro operacional" e "Resultado do mês (o que sobrou)" em
+          quatro cards espalhados, com nomes que se confundem. Cada um estava
+          certo, mas lado a lado pareciam quatro respostas pra mesma pergunta.
+          São DEGRAUS DE UMA CONTA SÓ: aqui aparecem na ordem, e dá pra
+          acompanhar de cima até o último número com o dedo.
+          ================================================================== */}
+      <Card style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.accent, fontWeight: 700 }}>
+          Do que entrou ao que é teu
+        </div>
+        <div style={{ fontSize: 12, color: C.faint, margin: '5px 0 12px', lineHeight: 1.45 }}>
+          A mesma conta do começo ao fim. Cada degrau tira ou põe uma coisa.
+        </div>
+
+        {[
+          ['Receita bruta', totalRec, C.green, 0],
+          ['(–) Custo variável', -custoVar, C.amber, 0],
+          ['(–) Despesas operacionais', -despOp, C.amber, 0],
+          ...(despOutras > 0.005 ? [['(–) Outras despesas', -despOutras, C.amber, 0]] : []),
+          ['(=) Lucro da operação', lucro, lucro >= 0 ? C.accent : C.red, 1],
+          ...(entradaNaoOp > 0.005 ? [['(+) Empréstimo/aporte que entrou', entradaNaoOp, C.green, 0]] : []),
+          ...(investimento > 0.005 ? [['(–) Investimento (equipamento/reforma)', -investimento, C.amber, 0]] : []),
+          ...(dividaPaga > 0.005 ? [['(–) Empréstimo/dívida que tu pagou', -dividaPaga, C.amber, 0]] : []),
+          ...(distribuicao > 0.005 ? [['(–) Distribuição de lucros (tua parte)', -distribuicao, C.amber, 0]] : []),
+          // Este degrau vem do CAMINHO DE CIMA (lucro ± o que não é operação).
+          // O "disponível" lá embaixo vem do caminho de baixo (entrou − saiu).
+          // São duas contas independentes que têm que cair no mesmo lugar — e
+          // o laboratório confere isso a cada rodada. Foi exatamente aí que a
+          // distribuição de lucros se perdia.
+          ...(temForaDaOperacao ? [['(=) Sobrou no caixa do mês', resultadoFinal, resultadoFinal >= 0 ? C.text : C.red, 1]] : []),
+          ['(–) Contas em aberto', -disp.aPagar, C.red, 0],
+          ['(+) Fiado a receber', disp.aReceber, C.green, 0],
+        ].map(([nome, val, cor, marco]) => (
+          <div key={nome} style={{
+            display: 'flex', justifyContent: 'space-between', gap: 10,
+            padding: marco ? '11px 0' : '7px 0',
+            borderTop: marco ? `1px solid ${C.line}` : 'none',
+          }}>
+            <span style={{ fontSize: marco ? 14 : 13.5, fontWeight: marco ? 800 : 500, color: marco ? C.text : C.muted, minWidth: 0 }}>
+              {nome}
+              {marco === 1 && nome.includes('operação') && <span style={{ color: C.faint, fontWeight: 500 }}> · margem {margem.toFixed(1)}%</span>}
+              {nome.includes('Contas em aberto') && disp.nAPagar > 0 && <span style={{ color: C.faint }}> ({disp.nAPagar})</span>}
+            </span>
+            <span style={{ fontSize: marco ? 15 : 13.5, fontWeight: marco ? 800 : 600, color: cor, fontVariantNumeric: 'tabular-nums', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              {val < 0 ? '− ' : ''}{brl(Math.abs(val))}
+            </span>
           </div>
-        </Card>
-      )}
+        ))}
+
+        {/* O ÚLTIMO DEGRAU, destacado: é o número com que ela decide. */}
+        <div style={{
+          marginTop: 10, borderRadius: 14, padding: '13px 14px',
+          background: `color-mix(in srgb, ${disp.disponivel >= 0 ? C.green : C.red} 14%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${disp.disponivel >= 0 ? C.green : C.red} 45%, transparent)`,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12.5, fontWeight: 900, letterSpacing: '.05em', color: disp.disponivel >= 0 ? C.green : C.red }}>DISPONÍVEL DE VERDADE</span>
+            <span style={{ fontSize: 22, fontWeight: 900, color: disp.disponivel >= 0 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>{brl(disp.disponivel)}</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: C.text, marginTop: 7, lineHeight: 1.55 }}>
+            Lucro no papel não paga fornecedor. Este já conta o que tu <b>deve</b> e o que tem <b>pra receber</b>.
+          </div>
+        </div>
+
+        {disp.emEstoque > 0.005 && (
+          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>
+            Fora disso, tu tem <b style={{ color: C.muted }}>{brl(disp.emEstoque)}</b> parado em mercadoria — já é teu, mas
+            só vira dinheiro quando vender.
+          </div>
+        )}
+
+        <div style={{ fontSize: 11, color: C.faint, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.line}`, lineHeight: 1.5 }}>
+          Aqui é <b style={{ color: C.text }}>dinheiro que saiu</b>: o custo variável é o que tu pagou de mercadoria no mês, tenha
+          vendido ou não. Pra saber se o <b style={{ color: C.text }}>preço</b> está certo, olha o CMV logo abaixo.
+        </div>
+      </Card>
 
       {/* CMV — CUSTO DA MERCADORIA VENDIDA
           Card separado do DRE de propósito. O DRE daqui é de CAIXA: soma o que
@@ -306,6 +416,19 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
               <span style={{ fontWeight: 800, color: cmv.margemBrutaPct >= 0 ? C.accent : C.red }}>{cmv.margemBrutaPct.toFixed(1)}%</span>
             </div>
 
+            {/* O DETALHE DO CMV, DOBRADO.
+                Daqui pra baixo é diagnóstico: por que o número é esse, como
+                vem mudando, qual categoria puxa, o que encareceu. Tudo isso é
+                bom — e nada disso é a resposta. A resposta é a porcentagem lá
+                em cima. Quem quer saber o porquê toca e abre; quem só quer
+                saber se o preço está certo já leu e segue a vida. */}
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+              <Btn kind="ghost" small onClick={() => setVerCMVDetalhe((v) => !v)}>
+                {verCMVDetalhe ? 'Esconder o detalhe' : 'Por que esse número? Ver detalhe'}
+              </Btn>
+            </div>
+
+            {verCMVDetalhe && (<>
             {/* Por que esse número não é o "Custo variável" do DRE. */}
             <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
@@ -410,9 +533,12 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
               </div>
             )}
 
-            {/* FICHA QUEBRADA — vem ANTES de tudo, porque enquanto existir é
-                a única coisa que importa: o número lá em cima saiu sem esses
-                produtos, e eles foram vendidos. */}
+            </>)}
+
+            {/* FICHA QUEBRADA — fica SEMPRE À VISTA, fora do que se dobra.
+                Enquanto existir, é a única coisa que importa: o número lá em
+                cima saiu sem esses produtos, e eles foram vendidos. Alarme
+                não se guarda atrás de botão. */}
             {cmv.impossiveis.length > 0 && (
               <div style={{ marginTop: 14, border: `1px solid ${C.red}`, borderRadius: 12, padding: '11px 13px' }}>
                 <div style={{ fontSize: 13.5, fontWeight: 800, color: C.red }}>
@@ -482,58 +608,51 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
         )}
       </Card>
 
-      {/* ------------------------------------------------------------------
-          O QUE SOBROU DE VERDADE — o DRE ali em cima diz o resultado da
-          operação; isto diz quanto ainda é dela depois de honrar o que deve.
-          ------------------------------------------------------------------ */}
-      <SecTitle>Quanto sobrou de verdade</SecTitle>
       <Card style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>
-          Lucro no papel não paga fornecedor. Aqui entra o que tu <b style={{ color: C.text }}>ainda deve</b> e o que
-          tu <b style={{ color: C.text }}>ainda tem pra receber</b>.
-        </div>
-
-        {[
-          ['Entrou no mês', disp.entrou, C.green, ''],
-          ['Saiu no mês', -disp.saiu, C.amber, ''],
-        ].map(([rot, v, cor]) => (
-          <div key={rot} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 0', fontSize: 13.5, color: C.muted }}>
-            <span>{rot}</span>
-            <span style={{ color: cor, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{v < 0 ? '− ' : ''}{brl(Math.abs(v))}</span>
-          </div>
-        ))}
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}`, fontSize: 14, fontWeight: 800 }}>
-          <span style={{ color: C.text }}>Sobrou no papel</span>
-          <span style={{ color: disp.noPapel >= 0 ? C.text : C.red, fontVariantNumeric: 'tabular-nums' }}>{brl(disp.noPapel)}</span>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 0', fontSize: 13.5, color: C.muted }}>
-          <span>Contas em aberto {disp.nAPagar > 0 ? <span style={{ color: C.faint }}>({disp.nAPagar})</span> : null}</span>
-          <span style={{ color: C.red, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>− {brl(disp.aPagar)}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 0', fontSize: 13.5, color: C.muted }}>
-          <span>Fiado a receber</span>
-          <span style={{ color: C.green, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>+ {brl(disp.aReceber)}</span>
-        </div>
-
-        <div style={{
-          marginTop: 10, borderRadius: 14, padding: '13px 14px',
-          background: `color-mix(in srgb, ${disp.disponivel >= 0 ? C.green : C.red} 14%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${disp.disponivel >= 0 ? C.green : C.red} 45%, transparent)`,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12.5, fontWeight: 900, letterSpacing: '.05em', color: disp.disponivel >= 0 ? C.green : C.red }}>DISPONÍVEL DE VERDADE</span>
-            <span style={{ fontSize: 22, fontWeight: 900, color: disp.disponivel >= 0 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>{brl(disp.disponivel)}</span>
-          </div>
-          <div style={{ fontSize: 12.5, color: C.text, marginTop: 7, lineHeight: 1.55 }}>{disp.recado}</div>
-        </div>
-
-        {disp.emEstoque > 0.005 && (
-          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>
-            Fora disso, tu tem <b style={{ color: C.muted }}>{brl(disp.emEstoque)}</b> parado em mercadoria — já é teu, mas
-            só vira dinheiro quando vender.
+        <div style={{ fontWeight: 700, marginBottom: 12 }}>Para onde foi o dinheiro</div>
+        {pizza.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ position: 'relative', width: 172, height: 172, flexShrink: 0, margin: '0 auto' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pizza} dataKey="val" nameKey="cat" cx="50%" cy="50%" innerRadius={52} outerRadius={82} paddingAngle={2} stroke="none">
+                    {pizza.map((p) => <Cell key={p.cat} fill={p.cor} />)}
+                  </Pie>
+                  <Tooltip formatter={(v) => brl(v)} contentStyle={tooltipModerno} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <div style={{ fontSize: 11, color: C.faint, fontWeight: 600 }}>Total</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{brl(totalDesp)}</div>
+              </div>
+            </div>
+            <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+              {pizza.map((p) => (
+                <div key={p.cat} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 3, background: p.cor, flexShrink: 0 }} />
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.cat}</span>
+                  <span style={{ fontSize: 12, color: C.muted, fontWeight: 700 }}>{p.pct.toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
+        {porCategoria.length === 0 ? <Empty>Sem despesas neste mês.</Empty> :
+          porCategoria.map(({ cat, val }) => (
+            <div key={cat} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                <span style={{ color: C.text }}>{cat}</span>
+                <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{brl(val)}</span>
+              </div>
+              <div style={{ height: 7, background: C.panel2, borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ width: (val / maxCat * 100) + '%', height: '100%', background: CUSTO_VARIAVEL.includes(cat) ? C.amber : C.accent, borderRadius: 4 }} />
+              </div>
+            </div>
+          ))}
+        <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 12, color: C.muted }}>
+          <span><span style={{ display: 'inline-block', width: 10, height: 10, background: C.amber, borderRadius: 3, marginRight: 5 }} />Custo variável</span>
+          <span><span style={{ display: 'inline-block', width: 10, height: 10, background: C.accent, borderRadius: 3, marginRight: 5 }} />Despesa operacional</span>
+        </div>
       </Card>
 
       {/* ------------------------------------------------------------------
@@ -598,61 +717,44 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
         )}
       </Card>
 
+      {/* ==================================================================
+          O HISTÓRICO, DOBRADO.
+          Aqui embaixo é "como vinha sendo" — olhar de vez em quando, não de
+          decidir hoje. Ficava aberto no meio do caminho e empurrava o resto
+          pra longe. Saiu daqui também o gráfico "Lucro por mês": era a mesma
+          meia dúzia de meses do gráfico de barras, desenhada de novo em
+          outro formato. Dois desenhos da mesma coisa não contam duas
+          histórias, só fazem rolar mais.
+          ================================================================== */}
       <Card style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 700, marginBottom: 4 }}>Crescimento</div>
-        <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Comparado com {mesLabel(prevMes)}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[['Receita', totalRec, prev.rec, C.green, true], ['Despesa', totalDespMes, prev.desp, C.amber, false], ['Lucro', lucro, prev.lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, atual, ant, cor, boa]) => (
-            <div key={nome} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: C.panel2, borderRadius: 12, padding: '11px 14px' }}>
-              <span style={{ fontSize: 13, color: C.muted, fontWeight: 600, flexShrink: 0 }}>{nome}</span>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, minWidth: 0 }}>
-                <span style={{ fontSize: 16, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{brl(atual)}</span>
-                <span style={{ minWidth: 48, textAlign: 'right', flexShrink: 0 }}><Delta atual={atual} anterior={ant} boaSubida={boa} /></span>
+        <button onClick={() => setVerHistorico((v) => !v)}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+          <span style={{ color: C.accent, fontSize: 12, fontWeight: 800, width: 12, flexShrink: 0 }}>{verHistorico ? '▾' : '▸'}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: 15, fontWeight: 800 }}>Como vinha sendo</span>
+            <span style={{ fontSize: 12, color: C.muted, display: 'block', marginTop: 1 }}>
+              Últimos meses, comparação com {mesLabel(prevMes)} e o padrão da semana
+            </span>
+          </span>
+        </button>
+
+        {verHistorico && (<>
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.hair}` }}>
+          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 700, marginBottom: 2 }}>Contra {mesLabel(prevMes)}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+            {[['Receita', totalRec, prev.rec, C.green, true], ['Despesa', totalDespMes, prev.desp, C.amber, false], ['Lucro', lucro, prev.lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, atual, ant, cor, boa]) => (
+              <div key={nome} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: C.panel2, borderRadius: 12, padding: '11px 14px' }}>
+                <span style={{ fontSize: 13, color: C.muted, fontWeight: 600, flexShrink: 0 }}>{nome}</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, minWidth: 0 }}>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{brl(atual)}</span>
+                  <span style={{ minWidth: 48, textAlign: 'right', flexShrink: 0 }}><Delta atual={atual} anterior={ant} boaSubida={boa} /></span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <Card style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.accent, fontWeight: 700, marginBottom: 12 }}>DRE — {mesLabel(mes)}</div>
-        {[['Receita bruta', totalRec, C.green, false], ['(–) Custo variável', custoVar, C.amber, false], ['(–) Despesas operacionais', despOp, C.amber, false], ...(despOutras > 0.005 ? [['(–) Outras despesas', despOutras, C.amber, false]] : []), ['(=) Lucro operacional', lucro, lucro >= 0 ? C.accent : C.red, true]].map(([nome, val, cor, bold]) => (
-          <div key={nome} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderTop: bold ? `1px solid ${C.line}` : 'none' }}>
-            <span style={{ fontWeight: bold ? 800 : 500, color: bold ? C.text : C.muted }}>{nome}</span>
-            <span style={{ fontWeight: bold ? 800 : 600, color: cor, fontVariantNumeric: 'tabular-nums' }}>{brl(val)}</span>
+            ))}
           </div>
-        ))}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 10, borderTop: `1px solid ${C.line}` }}>
-          <span style={{ color: C.muted }}>Margem operacional</span>
-          <span style={{ fontWeight: 800, color: margem >= 0 ? C.accent : C.red }}>{margem.toFixed(1)}%</span>
         </div>
-        <div style={{ fontSize: 11, color: C.faint, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}`, lineHeight: 1.5 }}>
-          Aqui é <b style={{ color: C.text }}>dinheiro que saiu</b>: o custo variável é o que tu pagou de mercadoria no mês, tenha vendido ou não. Pra saber se o <b style={{ color: C.text }}>preço</b> está certo, olha o CMV no card acima.
-        </div>
-      </Card>
 
-      {(entradaNaoOp > 0.005 || investimento > 0.005 || dividaPaga > 0.005) && (
-        <Card style={{ marginBottom: 14, background: C.panel2 }}>
-          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.muted, fontWeight: 700, marginBottom: 4 }}>Fora do lucro (não é operação)</div>
-          <div style={{ fontSize: 12, color: C.faint, marginBottom: 10, lineHeight: 1.45 }}>Movimenta o caixa, mas <b style={{ color: C.text }}>não</b> entra no lucro operacional acima — pra o resultado da operação ficar limpo.</div>
-          {[['Empréstimo/aporte que entrou', entradaNaoOp, C.green], ['Investimento (equipamento/reforma)', investimento, C.amber], ['Empréstimo/dívida que você pagou', dividaPaga, C.amber]].filter(([, v]) => v > 0.005).map(([nome, val, cor]) => (
-            <div key={nome} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderTop: `1px solid ${C.line}`, fontSize: 14 }}>
-              <span style={{ color: C.muted, minWidth: 0 }}>{nome}</span>
-              <span style={{ fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(val)}</span>
-            </div>
-          ))}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, paddingTop: 10, marginTop: 6, borderTop: `2px solid ${C.line}` }}>
-            <span style={{ fontWeight: 800, color: C.text }}>Resultado do mês (o que sobrou)</span>
-            <span style={{ fontWeight: 900, fontSize: 18, color: resultadoFinal >= 0 ? C.accent : C.red, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(resultadoFinal)}</span>
-          </div>
-          <div style={{ fontSize: 11, color: C.faint, marginTop: 6, lineHeight: 1.45 }}>
-            Lucro operacional {brl(lucro)}{entradaNaoOp > 0.005 ? ` + aporte ${brl(entradaNaoOp)}` : ''}{investimento > 0.005 ? ` − investimento ${brl(investimento)}` : ''}{dividaPaga > 0.005 ? ` − dívida ${brl(dividaPaga)}` : ''} = o que <b style={{ color: C.text }}>de fato sobrou no caixa</b> depois de tudo.
-          </div>
-        </Card>
-      )}
-
-      <Card style={{ marginBottom: 14 }}>
-        <div style={{ fontWeight: 700, marginBottom: 12 }}>Evolução (receita × despesa)</div>
+        <div style={{ fontWeight: 700, margin: '18px 0 12px' }}>Evolução (receita × despesa)</div>
         {evolucao.length === 0 ? <Empty>Sem dados suficientes.</Empty> : (
           <>
           <div style={{ height: 220 }}>
@@ -683,33 +785,9 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
           </div>
           </>
         )}
-      </Card>
-
-      {evolucao.length > 1 && (
-        <Card style={{ marginBottom: 14 }}>
-          <div style={{ fontWeight: 700, marginBottom: 12 }}>Lucro por mês</div>
-          <div style={{ height: 180 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={evolucao} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gLucro" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={C.accent} stopOpacity={0.32} />
-                    <stop offset="100%" stopColor={C.accent} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="2 7" stroke={C.hair} vertical={false} />
-                <XAxis dataKey="mes" tick={{ fill: C.muted, fontSize: 12 }} axisLine={false} tickLine={false} dy={6} />
-                <YAxis tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={46} tickFormatter={(v) => (v / 1000).toFixed(0) + 'k'} />
-                <Tooltip formatter={(v) => brl(v)} contentStyle={tooltipModerno} labelStyle={{ color: C.muted, fontWeight: 700, marginBottom: 2 }} />
-                <AreaRecharts type="monotone" dataKey="lucro" stroke={C.accent} strokeWidth={3} fill="url(#gLucro)" dot={{ fill: C.accent, r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      )}
 
       {temPadraoSemana && (
-        <Card style={{ marginBottom: 14 }}>
+        <div style={{ marginTop: 18 }}>
           <div style={{ fontWeight: 700, marginBottom: 2 }}>Padrão por dia da semana</div>
           <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>Total de {mesLabel(mes)} — que dia vende e gasta mais</div>
           <div style={{ height: 200 }}>
@@ -743,55 +821,47 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
               Seu melhor dia de venda é <b style={{ color: C.green }}>{melhorDiaVenda.dia}</b> — {brl(melhorDiaVenda.receita)} no mês.
             </div>
           )}
-        </Card>
+        </div>
       )}
+        </>)}
+      </Card>
 
-      <Card style={{ marginBottom: 14 }}>
-        <div style={{ fontWeight: 700, marginBottom: 12 }}>Para onde foi o dinheiro</div>
-        {pizza.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ position: 'relative', width: 172, height: 172, flexShrink: 0, margin: '0 auto' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pizza} dataKey="val" nameKey="cat" cx="50%" cy="50%" innerRadius={52} outerRadius={82} paddingAngle={2} stroke="none">
-                    {pizza.map((p) => <Cell key={p.cat} fill={p.cor} />)}
-                  </Pie>
-                  <Tooltip formatter={(v) => brl(v)} contentStyle={tooltipModerno} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                <div style={{ fontSize: 11, color: C.faint, fontWeight: 600 }}>Total</div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{brl(totalDesp)}</div>
+      {/* O QUE FOI CORRERIA.
+          Desceu pro fim: é detalhe de operação, não resultado do mês. Estava
+          em primeiro lugar na página, antes do próprio DRE. Só aparece quando
+          houve — um card de zero todo mês vira paisagem e deixa de ser lido.
+          E o ranking é a parte útil: o produto que mais aparece aqui é o que
+          está com o mínimo do estoque errado. */}
+      {emergencia.total > 0 && (
+        <Card style={{ marginBottom: 14, borderColor: C.amber }}>
+          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.1em', color: C.amber, fontWeight: 700, marginBottom: 4 }}>
+            Compra de emergência — {mesLabel(mes)}
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>{brl(emergencia.total)}</div>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
+            {emergencia.pct.toFixed(0)}% de tudo que tu compraste no mês, em{' '}
+            {emergencia.vezes} {emergencia.vezes === 1 ? 'vez' : 'vezes'}.
+          </div>
+          {emergencia.ranking.length > 0 && (
+            <div style={{ marginTop: 12, borderTop: `1px solid ${C.hair}`, paddingTop: 10 }}>
+              <div style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 7 }}>
+                O que mais fez correr
               </div>
-            </div>
-            <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-              {pizza.map((p) => (
-                <div key={p.cat} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 3, background: p.cor, flexShrink: 0 }} />
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.cat}</span>
-                  <span style={{ fontSize: 12, color: C.muted, fontWeight: 700 }}>{p.pct.toFixed(0)}%</span>
+              {emergencia.ranking.map(([nome, val]) => (
+                <div key={nome} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13.5, padding: '3px 0' }}>
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
+                  <b style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{brl(val)}</b>
                 </div>
               ))}
             </div>
+          )}
+          <div style={{ fontSize: 12, color: C.faint, marginTop: 12, lineHeight: 1.5 }}>
+            Compra de correria sai mais cara: sem cotação, sem barganha, preço de varejo. O que mais
+            aparece nessa lista é o que está com o <b style={{ color: C.text }}>mínimo do estoque errado</b> —
+            subir o mínimo desses itens é o conserto.
           </div>
-        )}
-        {porCategoria.length === 0 ? <Empty>Sem despesas neste mês.</Empty> :
-          porCategoria.map(({ cat, val }) => (
-            <div key={cat} style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                <span style={{ color: C.text }}>{cat}</span>
-                <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{brl(val)}</span>
-              </div>
-              <div style={{ height: 7, background: C.panel2, borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ width: (val / maxCat * 100) + '%', height: '100%', background: CUSTO_VARIAVEL.includes(cat) ? C.amber : C.accent, borderRadius: 4 }} />
-              </div>
-            </div>
-          ))}
-        <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 12, color: C.muted }}>
-          <span><span style={{ display: 'inline-block', width: 10, height: 10, background: C.amber, borderRadius: 3, marginRight: 5 }} />Custo variável</span>
-          <span><span style={{ display: 'inline-block', width: 10, height: 10, background: C.accent, borderRadius: 3, marginRight: 5 }} />Despesa operacional</span>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {diarioMes.length > 0 && (
         <>
