@@ -421,35 +421,65 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], b
               em cada <b>{item.nome}</b>. Em 100 unidades no mês,
               são <b style={{ color: C.amber }}>{brl((conta.lucroNoSugerido - hoje.lucro) * 100)}</b>.</>
             ) : (
-              <>Teu preço já está acima do necessário pra margem que tu pediu — está
-              sobrando <b style={{ color: C.green }}>{brl(hoje.lucro - conta.lucroNoSugerido)}</b> a mais por unidade.
-              Não precisa mexer.</>
+              // O risco aqui é ela ler o número grande lá em cima como "o preço
+              // certo" e baixar o dela. O sugerido é PISO: o mínimo pra a
+              // margem pedida. Cobrar mais que o piso é o objetivo do negócio.
+              <>O {brl(conta.sugerido)} ali em cima é o <b style={{ color: C.text }}>mínimo</b> pra margem que tu pediu —
+              não é o preço que tu deve cobrar. Tu cobra {brl(hoje.preco)}, que dá{' '}
+              <b style={{ color: C.green }}>{hoje.margem.toFixed(0)}%</b>: bem melhor.
+              <b style={{ color: C.green }}> Não baixa.</b> Esse é um item que banca os que rendem pouco.</>
             )}
           </div>
 
           {/* Fechar o ciclo: mudar o preço sem ter que ir até o Cardápio e
               digitar de novo. Em dois toques, de propósito — é o preço que o
               atendimento vai cobrar do cliente, não dá pra mudar por esbarrão. */}
-          {onCardapio && hoje.preco !== conta.sugerido && (
-            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
-              {aplicado ? (
-                <div style={{ fontSize: 13, color: C.green, fontWeight: 700 }}>
-                  ✓ {item.nome} agora está {brl(num(aplicado))} no cardápio.
-                </div>
-              ) : confirmando ? (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ fontSize: 13, color: C.text, fontWeight: 700, width: '100%', marginBottom: 4 }}>
-                    Trocar o preço de {item.nome} de {brl(hoje.preco)} pra {brl(conta.sugerido)}? O atendimento passa a
-                    cobrar esse valor.
-                  </span>
-                  <Btn kind="ok" small onClick={aplicarNoCardapio}>Sim, trocar</Btn>
-                  <Btn kind="ghost" small onClick={() => setConfirmando(false)}>Agora não</Btn>
-                </div>
-              ) : (
-                <Btn kind="ghost" small onClick={() => setConfirmando(true)}>Pôr {brl(conta.sugerido)} no cardápio</Btn>
-              )}
-            </div>
-          )}
+          {/* O BOTÃO SÓ PODE OFERECER O QUE MELHORA — e aqui eu tinha errado.
+              Na batata dela: custo R$ 3,22, sugerido R$ 10,50, e ela cobra
+              R$ 29,99 (uma margem ótima). A tela dizia "não precisa mexer" e
+              logo abaixo oferecia "Pôr R$ 10,50 no cardápio" — um toque pra
+              jogar fora R$ 18,88 por porção.
+              O preço sugerido é um PISO, o mínimo pra a margem que ela pediu;
+              não é alvo nem teto. Quando ela já cobra mais, baixar é decisão
+              dela e tem que parecer o que é: uma redução, com o tamanho da
+              perda escrito. Nunca o caminho fácil. */}
+          {onCardapio && hoje.preco !== conta.sugerido && (() => {
+            const baixando = conta.sugerido < hoje.preco;
+            const perda = Math.round((hoje.lucro - conta.lucroNoSugerido) * 100) / 100;
+            return (
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                {aplicado ? (
+                  <div style={{ fontSize: 13, color: C.green, fontWeight: 700 }}>
+                    ✓ {item.nome} agora está {brl(num(aplicado))} no cardápio.
+                  </div>
+                ) : confirmando ? (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, color: C.text, fontWeight: 700, width: '100%', marginBottom: 4, lineHeight: 1.55 }}>
+                      {baixando ? (
+                        <>Tens certeza? Isso <b style={{ color: C.red }}>baixa</b> {item.nome} de {brl(hoje.preco)} pra{' '}
+                        {brl(conta.sugerido)} — tu passa a ganhar <b style={{ color: C.red }}>{brl(perda)} a menos</b> em
+                        cada uma. O sugerido é o <b>mínimo</b> pra margem que tu pediu, não o preço que tu deve cobrar.</>
+                      ) : (
+                        <>Trocar o preço de {item.nome} de {brl(hoje.preco)} pra {brl(conta.sugerido)}? O atendimento
+                        passa a cobrar esse valor.</>
+                      )}
+                    </span>
+                    <Btn kind={baixando ? 'danger' : 'ok'} small onClick={aplicarNoCardapio}>
+                      {baixando ? `Sim, baixar pra ${brl(conta.sugerido)}` : 'Sim, trocar'}
+                    </Btn>
+                    <Btn kind="ghost" small onClick={() => setConfirmando(false)}>Agora não</Btn>
+                  </div>
+                ) : baixando ? (
+                  // Discreto de propósito: é uma saída, não uma sugestão.
+                  <button onClick={() => setConfirmando(true)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, padding: 0, textAlign: 'left', lineHeight: 1.5 }}>
+                    se tu quiser mesmo assim, dá pra baixar pra {brl(conta.sugerido)} — mas tu perde {brl(perda)} por unidade
+                  </button>
+                ) : (
+                  <Btn kind="ghost" small onClick={() => setConfirmando(true)}>Pôr {brl(conta.sugerido)} no cardápio</Btn>
+                )}
+              </div>
+            );
+          })()}
         </Card>
       )}
     </div>
