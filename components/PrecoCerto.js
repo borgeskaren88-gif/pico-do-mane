@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, PageTitle, Label } from './ui';
 import { brl, num, uid } from '../lib/util';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
+import { CMV_BOM, CMV_ATENCAO } from '../lib/cmv';
 
 // PREÇO CERTO — quanto COBRAR.
 //
@@ -125,6 +126,9 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], b
     const sobraReais = p * (1 - t / 100) - custo.valor;
     return { preco: p, margem: (sobraReais / p) * 100, lucro: sobraReais };
   }, [modo, item, custo, conta]);
+
+  // O ingrediente como fatia do preço — o CMV do item, antes de o preço existir.
+  const custoPct = conta.estado === 'ok' && conta.preco > 0 ? (custo.valor / conta.preco) * 100 : null;
 
   const fatias = useMemo(() => {
     if (conta.estado !== 'ok') return [];
@@ -286,7 +290,24 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], b
         <div style={{ fontSize: 12, color: C.faint, marginBottom: 14, lineHeight: 1.45 }}>
           Tua margem, contada <b style={{ color: C.muted }}>em cima do preço de venda</b>.
         </div>
-        {campoPct('margem', 'Margem de lucro desejada', '', 'ex.: 25')}
+        {campoPct('margem', 'Margem de lucro desejada', '', 'ex.: 65')}
+
+        {/* O NÚMERO QUE SE PÕE AQUI NÃO É O MESMO DE UMA LOJA — e eu quase a
+            fiz errar isso.
+            O exemplo era "25", copiado das calculadoras de varejo. Lá o custo
+            é a mercadoria pronta, e 25% em cima dela fecha a conta. Aqui o
+            custo é só o INGREDIENTE: aluguel, salário, luz e gás não estão
+            nele. Pôr 25 numa porção que custa R$ 8 de ingrediente dá preço de
+            R$ 11 — ingrediente comendo 72% da venda, quando o saudável em bar
+            é abaixo de 35%. Ela estaria vendendo no prejuízo com a tela
+            dizendo "25% de lucro". */}
+        <div style={{ background: C.panel2, borderRadius: 12, padding: '11px 14px', fontSize: 12, color: C.muted, lineHeight: 1.55, marginBottom: 10 }}>
+          <b style={{ color: C.amber }}>Cuidado com o número aqui.</b> Se tu deixou o rateio de custo fixo vazio, esta
+          margem é tudo que sobra depois do <b style={{ color: C.text }}>ingrediente</b> — e dela ainda saem aluguel,
+          salário, luz, gás e o teu lucro. Em bar e cozinha, o normal é pedir
+          entre <b style={{ color: C.text }}>60% e 70%</b> aqui. Os 25% que as calculadoras de loja sugerem valem pra
+          revenda, onde o custo já é o produto pronto.
+        </div>
         <div style={{ background: C.panel2, borderRadius: 12, padding: '11px 14px', fontSize: 12, color: C.muted, lineHeight: 1.55 }}>
           <b style={{ color: C.text }}>Margem não é markup.</b> Margem é quanto sobra pra ti de cada R$ 100 vendidos.
           Markup é o número que tu multiplica no custo pra chegar no preço. Esta conta usa a margem sobre a venda —
@@ -354,6 +375,24 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], b
               <span style={{ color: C.muted }}>Markup (quanto é o custo multiplicado)</span>
               <b style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>{conta.markup.toFixed(2).replace('.', ',')}×</b>
             </div>
+
+            {/* O MESMO NÚMERO QUE O RELATÓRIO CHAMA DE CMV.
+                Aqui ele aparece ANTES de o preço existir, que é quando ainda
+                dá pra mudar. Se o ingrediente ficar acima de 35% do preço, o
+                mês fecha com CMV ruim — e aí já foi. Mesma régua dos dois
+                lados do sistema, de propósito: dois números com o mesmo nome
+                e faixas diferentes seria pior que não ter nenhum. */}
+            {custoPct != null && (
+              <div style={{ fontSize: 12, color: C.faint, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}`, lineHeight: 1.55 }}>
+                Nesse preço, o ingrediente fica em <b style={{ color: custoPct >= CMV_ATENCAO ? C.red : custoPct >= CMV_BOM ? C.amber : C.green }}>{custoPct.toFixed(0)}% da venda</b>
+                {' '}— é o que o relatório chama de <b style={{ color: C.muted }}>CMV</b>.{' '}
+                {custoPct >= CMV_ATENCAO
+                  ? <>Em bar, acima de {CMV_ATENCAO}% quase sempre é preço defasado. <b style={{ color: C.text }}>Pede mais margem</b> ali em cima.</>
+                  : custoPct >= CMV_BOM
+                    ? <>Em bar, o confortável é abaixo de {CMV_BOM}%. Dá pra apertar um pouco mais a margem.</>
+                    : <>Em bar, abaixo de {CMV_BOM}% é faixa tranquila.</>}
+              </div>
+            )}
           </>
         )}
       </Card>

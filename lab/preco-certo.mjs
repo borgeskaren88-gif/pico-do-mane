@@ -203,6 +203,30 @@ cobra('tocou no "Sim, trocar"', await toque('Sim, trocar'));
 await pg.waitForTimeout(1800);
 cobra('aí sim o cardápio mudou pra 12,50', (await painel()).cardapio[0].preco === '12,50', (await painel()).cardapio[0].preco);
 
+console.log('\n### o exemplo "25%" era uma ARMADILHA pra bar — a tela avisa');
+// Eu copiei "ex.: 25" das calculadoras de varejo. Lá o custo é a mercadoria
+// pronta. Aqui o custo é só o INGREDIENTE — aluguel, salário e luz não estão
+// nele. Com 25% numa porção de R$ 8,00 de ingrediente, o preço sai R$ 11,50 e
+// o ingrediente come 72% da venda. A tela diria "25% de lucro" enquanto ela
+// vendia no vermelho. É o tipo de erro que não dá erro.
+await porCento('Impostos (% da venda)', '0');       // MEI: DAS é fixo, não % da venda
+await porCento('Taxa média do cartão', '3,15');     // a maquininha dela
+await porCento('Margem de lucro desejada', '25');
+await pg.waitForTimeout(900);
+txt = await texto();
+cobra('com 25% o ingrediente come 72% da venda', /72% da venda/.test(txt), (txt.match(/[^\n]*% da venda[^\n]*/) || ['(não mostrou)'])[0]);
+cobra('e a tela manda pedir mais margem', /Pede mais margem/i.test(txt), (txt.match(/[^\n]*acima de 45%[^\n]*/) || [''])[0]);
+
+console.log('\n### com a margem certa pra bar, o número fecha');
+await porCento('Margem de lucro desejada', '65');
+await pg.waitForTimeout(900);
+txt = await texto();
+// 8 ÷ (1 − 0,0315 − 0,65) = R$ 25,12 exatos → R$ 25,50 arredondado pra cima.
+cobra('preço sugerido R$ 25,50', txt.includes('R$ 25,50'), (txt.match(/[^\n]*A conta exata[^\n]*/) || [''])[0]);
+cobra('a conta exata deu R$ 25,12', /R\$ 25,12/.test(txt));
+cobra('e o ingrediente cai pra 32% da venda', /32% da venda/.test(txt), (txt.match(/[^\n]*% da venda[^\n]*/) || [''])[0]);
+cobra('aí sim a tela diz que está tranquilo', /faixa tranquila/i.test(txt));
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
