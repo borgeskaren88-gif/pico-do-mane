@@ -29,6 +29,7 @@ import ContasPagar from './ContasPagar';
 import Garrafas from './Garrafas';
 import Cotacoes from './Cotacoes';
 import Relatorios from './Relatorios';
+import TetoMEI from './TetoMEI';
 import RaioX from './RaioX';
 import Backup from './Backup';
 import Config from './Config';
@@ -200,6 +201,9 @@ export default function Dashboard() {
   // margem alvo). São iguais pra todo produto do bar — ficam guardadas pra ela
   // não redigitar a cada item.
   const [precoBase, setPrecoBase] = useState(null);
+  // Aviso do teto do MEI: { ativo, teto }. Vem ligado por padrão — o sistema é
+  // feito pra microempreendedor, e quem não for desliga no próprio card.
+  const [mei, setMei] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [fichas, setFichas] = useState([]);         // fichas técnicas (fonte: /api/estoque)
@@ -297,6 +301,7 @@ export default function Dashboard() {
       setCardapio(arr(salvo && salvo.cardapio));
       setCardapioCategorias(Array.isArray(salvo && salvo.cardapioCategorias) ? salvo.cardapioCategorias : null);
       setPrecoBase((salvo && salvo.precoBase) || null);
+      setMei((salvo && salvo.mei) || null);
       setClientes(arr(salvo && salvo.clientes));
       // Grava SÓ em dois casos seguros: (1) primeira vez de verdade (servidor
       // vazio) pra semear; (2) a limpeza de nomes mudou algo — e aí a base é o
@@ -440,6 +445,7 @@ export default function Dashboard() {
     cardapio: (v) => { setCardapio(v); salvarTudo({ cardapio: v }); },
     cardapioCategorias: (v) => { setCardapioCategorias(v); salvarTudo({ cardapioCategorias: v }); },
     precoBase: (v) => { setPrecoBase(v); salvarTudo({ precoBase: v }); },
+    mei: (v) => { setMei(v); salvarTudo({ mei: v }); },
     metas: (v) => { setMetas(v); salvarTudo({ metas: v }); },
     negocio: (v) => { setNegocio(v); salvarTudo({ negocio: v }); },
     modulos: (v) => { setModulos(v); salvarTudo({ modulos: v }); },
@@ -1007,7 +1013,7 @@ export default function Dashboard() {
             {subFinancas === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
             {subFinancas === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarPagamento} />}
             {subFinancas === 'raiox' && <RaioX receitas={receitas} despesas={despesas} cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} compras={compras} />}
-            {subFinancas === 'relatorios' && <Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} vendas={vendas} compras={compras} estoque={estoque} fichas={fichas} cardapio={cardapio} negocio={(negocio && negocio.nome) || ''} />}
+            {subFinancas === 'relatorios' && <><TetoMEI receitas={receitas} config={mei} onConfig={upd.mei} /><Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} vendas={vendas} compras={compras} estoque={estoque} fichas={fichas} cardapio={cardapio} negocio={(negocio && negocio.nome) || ''} /></>}
           </>
         )}
         {tab === 'abastecimento' && (
