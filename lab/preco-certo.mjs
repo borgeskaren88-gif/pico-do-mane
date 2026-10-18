@@ -227,6 +227,45 @@ cobra('a conta exata deu R$ 25,12', /R\$ 25,12/.test(txt));
 cobra('e o ingrediente cai pra 32% da venda', /32% da venda/.test(txt), (txt.match(/[^\n]*% da venda[^\n]*/) || [''])[0]);
 cobra('aí sim a tela diz que está tranquilo', /faixa tranquila/i.test(txt));
 
+console.log('\n### QUANDO ELA JÁ COBRA MAIS, O BOTÃO NÃO PODE CONVIDAR A BAIXAR');
+// O caso real que ela mandou: Batata clássica, custo R$ 3,22 de ficha, preço
+// R$ 29,99. Com 65% de margem o sugerido dá R$ 10,50 — e a tela oferecia
+// "Pôr R$ 10,50 no cardápio" logo abaixo de "não precisa mexer". Um toque e
+// ela jogaria fora R$ 18,88 por porção.
+//
+// O sugerido é PISO: o mínimo pra margem pedida. Não é alvo nem teto.
+const pAtual = await painel();
+await gravar({ ...pAtual,
+  estoque: [{ id: 'e1', nome: 'Batata congelada', custo: '8,05', unidade: 'kg', saldo: '30', categoria: 'Cozinha' }],
+  cardapio: [{ id: 'c1', nome: 'Batata clássica', categoria: 'Porções', preco: '29,99', ativo: true }],
+  fichas: [{ cardapioId: 'c1', itens: [{ estoqueId: 'e1', qtd: '0,4', unidade: 'kg' }] }],
+  precoBase: { impostos: '0', cartao: '3,15', comissao: '', delivery: '', margem: '65' },
+});
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Preço certo');
+await pg.evaluate(() => {
+  const s2 = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => /Batata clássica/.test(o.textContent)));
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+  if (s2) { setter.call(s2, 'c1'); s2.dispatchEvent(new Event('change', { bubbles: true })); }
+});
+await pg.waitForTimeout(1400);
+txt = await texto();
+cobra('o sugerido é R$ 10,50', txt.includes('R$ 10,50'), (txt.match(/[^\n]*conta exata[^\n]*/) || [''])[0]);
+cobra('a tela chama isso de MÍNIMO, não de preço certo', /é o mínimo pra margem que tu pediu/i.test(txt), (txt.match(/[^\n]*mínimo[^\n]*/) || ['(não disse)'])[0]);
+cobra('e manda NÃO baixar', /Não baixa/.test(txt));
+cobra('NÃO existe mais o botão "Pôr R$ 10,50 no cardápio"', !(await toque('Pôr R$ 10,50 no cardápio')));
+cobra('a saída pra baixar existe, mas diz o tamanho da perda', /perde R\$ 18,8\d por unidade/.test(txt), (txt.match(/[^\n]*se tu quiser mesmo assim[^\n]*/) || ['(não achou)'])[0]);
+
+console.log('\n### e se ela insistir, a pergunta é em vermelho e diz o que perde');
+cobra('tocou na saída', await toque('se tu quiser mesmo assim'));
+await pg.waitForTimeout(700);
+txt = await texto();
+cobra('pergunta se tem certeza', /Tens certeza\?/.test(txt), (txt.match(/[^\n]*Tens certeza[^\n]*/) || [''])[0]);
+cobra('o botão diz BAIXAR, não "trocar"', /Sim, baixar pra R\$ 10,50/.test(txt));
+cobra('e o preço do cardápio segue intacto até ela confirmar', (await painel()).cardapio[0].preco === '29,99', (await painel()).cardapio[0].preco);
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
