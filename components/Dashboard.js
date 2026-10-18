@@ -45,6 +45,7 @@ import Fiados from './Fiados';
 import Clientes from './Clientes';
 import Estoque from './Estoque';
 import Margem from './Margem';
+import PrecoCerto from './PrecoCerto';
 import Fornecedores from './Fornecedores';
 import FichasTecnicas from './FichasTecnicas';
 import ConferenciaEstoque from './ConferenciaEstoque';
@@ -195,6 +196,10 @@ export default function Dashboard() {
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [cardapio, setCardapio] = useState([]);
   const [cardapioCategorias, setCardapioCategorias] = useState(null);
+  // As taxas da calculadora de preço (imposto, cartão, comissão, delivery,
+  // margem alvo). São iguais pra todo produto do bar — ficam guardadas pra ela
+  // não redigitar a cada item.
+  const [precoBase, setPrecoBase] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [fichas, setFichas] = useState([]);         // fichas técnicas (fonte: /api/estoque)
@@ -291,6 +296,7 @@ export default function Dashboard() {
       setTarefasCozinha(arr(salvo && salvo.tarefasCozinha));
       setCardapio(arr(salvo && salvo.cardapio));
       setCardapioCategorias(Array.isArray(salvo && salvo.cardapioCategorias) ? salvo.cardapioCategorias : null);
+      setPrecoBase((salvo && salvo.precoBase) || null);
       setClientes(arr(salvo && salvo.clientes));
       // Grava SÓ em dois casos seguros: (1) primeira vez de verdade (servidor
       // vazio) pra semear; (2) a limpeza de nomes mudou algo — e aí a base é o
@@ -433,6 +439,7 @@ export default function Dashboard() {
     tarefasCozinha: (v) => { setTarefasCozinha(v); salvarTudo({ tarefasCozinha: v }); },
     cardapio: (v) => { setCardapio(v); salvarTudo({ cardapio: v }); },
     cardapioCategorias: (v) => { setCardapioCategorias(v); salvarTudo({ cardapioCategorias: v }); },
+    precoBase: (v) => { setPrecoBase(v); salvarTudo({ precoBase: v }); },
     metas: (v) => { setMetas(v); salvarTudo({ metas: v }); },
     negocio: (v) => { setNegocio(v); salvarTudo({ negocio: v }); },
     modulos: (v) => { setModulos(v); salvarTudo({ modulos: v }); },
@@ -1006,7 +1013,7 @@ export default function Dashboard() {
         {tab === 'abastecimento' && (
           <>
             <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-              {[['estoque', 'Estoque'], ['margem', 'Margem'], ['lista', 'Lista de Compras'], ['compras', 'Compras'], ['fornecedores', 'Fornecedores'], ['cotacoes', 'Cotações']].map(([v, rot]) => (
+              {[['estoque', 'Estoque'], ['margem', 'Margem'], ['preco', 'Preço certo'], ['lista', 'Lista de Compras'], ['compras', 'Compras'], ['fornecedores', 'Fornecedores'], ['cotacoes', 'Cotações']].map(([v, rot]) => (
                 <button key={v} onClick={() => setSubAbast(v)} style={{
                   flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
                   background: subAbast === v ? C.accent : 'transparent', color: subAbast === v ? '#06101F' : C.muted, whiteSpace: 'nowrap',
@@ -1079,6 +1086,7 @@ export default function Dashboard() {
 
             {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} estoque={estoque} onChange={upd.compras} onRegistrar={aplicarCompra} onPagamento={aplicarPagamento} onEstoque={estoqueAcao} carrinhoInicial={carrinhoDaVoz} onCarrinhoUsado={() => setCarrinhoDaVoz(null)} />}
             {subAbast === 'margem' && <Margem cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} compras={compras} />}
+            {subAbast === 'preco' && <PrecoCerto cardapio={cardapio} fichas={fichas} estoque={estoque} base={precoBase} onBase={upd.precoBase} onCardapio={upd.cardapio} />}
             {subAbast === 'fornecedores' && <Fornecedores compras={compras} />}
             {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} estoque={estoque} compras={compras} />}
           </>
