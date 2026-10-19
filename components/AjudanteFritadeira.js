@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { C, Card, Btn, Label, NumInput, Select } from './ui';
 import { brl, num, numQtd } from '../lib/util';
 import { porcoesFritasPorDia, contaDoOleo, litrosParaMl } from '../lib/fritadeira';
+import ListaDePratos from './ListaDePratos';
 
 // "EU PAGO ISSO EM ÓLEO PORÉM EU NÃO COLOCO ÓLEO NA FICHA TÉCNICA."
 //
@@ -133,15 +134,7 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
             Marca todos — o óleo é dividido entre eles. Com isso eu conto nas tuas vendas quantas porções fritas saem
             por dia, que é a parte que tu não teria como calcular.
           </div>
-          <div style={{ maxHeight: 260, overflowY: 'auto', border: `1px solid ${C.line}`, borderRadius: 10, padding: 8, marginBottom: 12 }}>
-            {ativos.length === 0 ? <div style={{ fontSize: 12.5, color: C.faint, padding: 8 }}>Sem itens no cardápio.</div> : ativos.map((c) => (
-              <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 4px', cursor: 'pointer', fontSize: 13.5 }}>
-                <input type="checkbox" checked={fritos.includes(c.id)} onChange={() => alternar(c.id)} style={{ width: 17, height: 17, flexShrink: 0, accentColor: C.accent }} />
-                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
-                {jaTemOleo(c.id) && <span style={{ fontSize: 10.5, fontWeight: 800, color: C.green, flexShrink: 0 }}>já tem óleo</span>}
-              </label>
-            ))}
-          </div>
+          <ListaDePratos itens={ativos} marcados={fritos} onAlternar={alternar} jaTem={jaTemOleo} rotuloJaTem="já tem óleo" />
 
           {fritos.length > 0 && (
             <div style={{ background: C.panel2, borderRadius: 12, padding: '11px 14px', marginBottom: 14 }}>

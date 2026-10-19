@@ -5,6 +5,7 @@ import { num, uid } from '../lib/util';
 import { UNIDADES, detalheProducao } from '../lib/estoque';
 import { CATEGORIAS_CARDAPIO } from './Cardapio';
 import AjudanteFritadeira from './AjudanteFritadeira';
+import AjudanteAcompanhamentos from './AjudanteAcompanhamentos';
 
 // Modelo de fichas do Pico do Mané (extraído da ficha técnica em PDF). Só os
 // ingredientes com quantidade definida — itens "a gosto" (sal, páprica, orégano,
@@ -125,6 +126,9 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
         cardapio={cardapio} estoque={estoque} fichas={fichas} vendas={vendas}
         config={fritadeira} onConfig={onFritadeira} onAcao={onAcao}
       />
+
+      {/* O QUE SAI JUNTO E SOME DA FICHA: ketchup, limão, molho. */}
+      <AjudanteAcompanhamentos cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={onAcao} />
 
       {/* Importar o modelo pronto (fichas do PDF do Pico do Mané) */}
       <Card style={{ marginBottom: 14, borderColor: C.accent }}>
