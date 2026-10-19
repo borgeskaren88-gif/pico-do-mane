@@ -129,7 +129,7 @@ await pg.evaluate(() => {
 });
 await pg.waitForTimeout(700);
 await campo('Quantos litros tem a embalagem?', '14,5');
-await campo('De quantos em quantos dias tu troca o óleo?', '7');
+await campo('Quantos dias dura UM GALÃO inteiro?', '7');
 
 console.log('\n### O SISTEMA CONTA AS PORÇÕES FRITAS — é o que ela não saberia calcular');
 cobra('marcou a Batata Frita Clássica', await marcar('Batata Frita Clássica'));
@@ -192,6 +192,51 @@ const iC = mCusto.findIndex((l) => l.trim().startsWith('Custo de uma unidade'));
 const custoTela = iC >= 0 ? `${mCusto[iC]} ⇢ ${mCusto[iC + 1]}` : '(não achou)';
 cobra('não é mais R$ 8,00 (só a batata)', !/⇢ R\$ 8,00/.test(custoTela), custoTela);
 cobra('agora conta o óleo: ~R$ 9,36', /R\$ 9,3\d/.test(custoTela), custoTela);
+
+console.log('\n### VENDA QUE GUARDOU SÓ O NOME TAMBÉM CONTA');
+// Foi isto que apareceu na tela dela como "513 ml de óleo por porção".
+// Contando só pelo cardapioId, venda antiga (ou de item recriado) sumia da
+// conta: as porções por dia saíam pequenas, o galão era dividido por quase
+// nada, e o óleo de cada batata ficou do tamanho de meia garrafa.
+const pN = await painel();
+await gravar({ ...pN, fritadeira: undefined, fichas: [{ cardapioId: 'c1', itens: [{ estoqueId: 'bat', qtd: '0,4', unidade: 'kg' }] }] });
+// Uma venda SEM cardapioId, só com o nome do prato.
+await fetch(BANCO, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify([{ chave: `${MARCA}venda:antiga`, valor: { id: 'antiga', data: diasAtras(5), total: 1, itens: [
+    { nome: 'Batata Frita Clássica', qtd: 300, preco: '29,99' },
+  ] } }]) });
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Estoque');
+await irPara('Fichas técnicas');
+await pg.evaluate(() => { const x = [...document.querySelectorAll('button')].find((e) => /Ajudante da fritadeira/.test(e.innerText || '')); if (x) x.click(); });
+await pg.waitForTimeout(800);
+cobra('marcou a batata', await marcar('Batata Frita Clássica'));
+await pg.waitForTimeout(1200);
+txt = await texto();
+// Só a BATATA está marcada agora: 300 porções vêm com cardapioId e 300 vêm
+// só com o nome. Com o conserto dá 600; sem ele, 300 — e aí o galão seria
+// dividido pela metade das porções e o óleo por porção sairia o dobro.
+cobra('a venda sem código entrou na conta (600)', /600 porções/.test(txt), (txt.match(/[^\n]*últimos 30 dias[^\n]*/) || ['(não contou)'])[0]);
+cobra('não ficou só com as que têm código (300)', !/300 porções/.test(txt));
+
+console.log('\n### e o número absurdo não passa calado');
+// Galão de 14,5 L dividido por pouca porção dá centenas de ml por porção.
+// A tela dela mostrou 513 ml sem dizer nada, e isso virou ficha, CMV e preço.
+const pS = await painel();
+await gravar({ ...pS, fritadeira: { oleoId: 'oleo', litros: '14,5', dias: '10', pratos: ['c1'], porDiaManual: '3' } });
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Estoque');
+await irPara('Fichas técnicas');
+await pg.evaluate(() => { const x = [...document.querySelectorAll('button')].find((e) => /Ajudante da fritadeira/.test(e.innerText || '')); if (x) x.click(); });
+await pg.waitForTimeout(1000);
+txt = await texto();
+cobra('avisa que o número é grande demais', /parece grande demais/i.test(txt), (txt.match(/[^\n]*grande demais[^\n]*/) || ['(passou calado)'])[0]);
+cobra('diz a faixa normal (10 a 30 ml)', /10 a 30 ml/.test(txt));
+cobra('e lembra que é o GALÃO, não a fritadeira', /não de quanto em quanto tempo tu troca a fritadeira/i.test(txt));
 
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);

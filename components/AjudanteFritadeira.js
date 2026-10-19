@@ -29,7 +29,7 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
   const conteudoMl = litrosParaMl(litros);
 
   const fritos = Array.isArray(cfg.pratos) ? cfg.pratos : [];
-  const contagem = useMemo(() => porcoesFritasPorDia(vendas, fritos, 30), [vendas, fritos]);
+  const contagem = useMemo(() => porcoesFritasPorDia(vendas, fritos, 30, cardapio), [vendas, fritos, cardapio]);
   // A contagem manda; ela pode corrigir se achar que o mês foi atípico.
   const porDia = cfg.porDiaManual != null && cfg.porDiaManual !== '' ? numQtd(cfg.porDiaManual) : contagem.porDia;
 
@@ -120,11 +120,24 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
           <div style={{ marginBottom: 14 }}>
             {/* Rótulo próprio, não só o título da seção: campo sem nome não é
                 achável por quem usa leitor de tela nem por um teste. */}
-            <Label>De quantos em quantos dias tu troca o óleo?</Label>
-            <NumInput value={cfg.dias || ''} onChange={(v) => set({ dias: v })} placeholder="ex.: 7" />
-            <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.45 }}>
-              Do galão novo até jogar fora. Se tu completa aos poucos em vez de trocar tudo, conta quanto tempo leva pra
-              gastar um galão inteiro.
+            {/* A PERGUNTA ESTAVA AMBÍGUA E DEU 513 ml POR PORÇÃO.
+                Eu perguntava "de quantos em quantos dias tu troca o óleo?" e
+                ela respondeu 10 — que é quando troca a FRITADEIRA. A conta
+                precisa de outra coisa: quanto tempo dura um GALÃO. Se a
+                fritadeira leva 5 L e ela troca a cada 10 dias, o galão de 14 L
+                dura quase um mês. Usando 10, o galão inteiro era dividido por
+                um terço das porções, e o óleo de cada batata ficou do tamanho
+                de meia garrafa.
+                A nota antiga já falava em "gastar um galão inteiro", mas vinha
+                depois, em letra miúda, contradizendo o rótulo. Quando o rótulo
+                e a nota brigam, ganha o rótulo. */}
+            <Label>Quantos dias dura UM GALÃO inteiro?</Label>
+            <NumInput value={cfg.dias || ''} onChange={(v) => set({ dias: v })} placeholder="ex.: 30" />
+            <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.5 }}>
+              Do galão novo até acabar o galão — <b style={{ color: C.muted }}>não</b> é de quanto em quanto tempo tu
+              troca a fritadeira. Se a fritadeira leva 5 L, tu troca a cada 10 dias e o galão tem 14 L, então o galão
+              dura uns <b style={{ color: C.muted }}>28 dias</b>. Na dúvida, olha em Compras de quanto em quanto tempo
+              tu compra óleo.
             </div>
           </div>
 
@@ -164,6 +177,28 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
                 tilápia não castiga o óleo igual a uma batata. Mas errar junto é muito melhor que o custo de hoje, que
                 é zero.
               </div>
+
+              {conta.suspeito && (
+                <div style={{ marginTop: 11, borderRadius: 11, padding: '11px 13px', background: `color-mix(in srgb, ${C.amber} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${C.amber} 45%, transparent)` }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: C.amber }}>Esse número parece grande demais</div>
+                  <div style={{ fontSize: 12.5, color: C.text, marginTop: 5, lineHeight: 1.6 }}>
+                    Uma porção na fritadeira costuma levar de <b>10 a 30 ml</b> de óleo, contando a parte dela no galão
+                    que se joga fora. {conta.mlPorPorcao} ml é muito mais que isso, e quase sempre significa uma destas duas:
+                    <div style={{ marginTop: 7 }}>
+                      <b style={{ color: C.text }}>1.</b> O galão dura mais do que tu disse. Lembra: é quanto tempo dura o
+                      <b> galão</b>, não de quanto em quanto tempo tu troca a fritadeira.
+                    </div>
+                    <div style={{ marginTop: 4 }}>
+                      <b style={{ color: C.text }}>2.</b> Saem mais fritos do que o sistema contou ({porDia} por dia).
+                      Se vocês vendem mais que isso, pode ser comanda que não passou pelo app — ou prato frito que
+                      faltou marcar aí em cima.
+                    </div>
+                    <div style={{ fontSize: 11.5, color: C.faint, marginTop: 8 }}>
+                      Dá pra aplicar assim mesmo, mas o custo de todo frito vai sair inflado — e o preço, junto.
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {feito ? (
                 <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginTop: 12, lineHeight: 1.55 }}>
