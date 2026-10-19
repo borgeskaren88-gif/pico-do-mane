@@ -169,6 +169,16 @@ cobra('explica que acima de 100% não é erro', /Acima de 100% não é erro/.tes
 cobra('e manda olhar de novo daqui a um mês', /daqui a um mês/.test(txt));
 cobra('cada mês mostra a sua porcentagem', /56%/.test(txt), (txt.match(/[^\n]*Ago\/2026[^\n]*/) || [''])[0]);
 
+console.log('\n### e explica o que é o número que faltava explicar');
+// "O que é o não explicado?", ela perguntou, olhando R$ 11.077,11 verde e
+// enorme. Número sem legenda não informa: assusta.
+cobra('o rótulo não é mais jargão', /Falta explicar/.test(txt), (txt.match(/[^\n]*Falta explicar[^\n]*/) || ['(sem rótulo novo)'])[0]);
+cobra('tem a definição em português', /mercadoria que tu pagou e as vendas do período não/.test(txt));
+cobra('e diz que não quer dizer que sumiu', /Não quer dizer que sumiu/.test(txt));
+// Dos R$ 11.081 dela, R$ 9.395,47 são julho inteiro.
+cobra('aponta quanto vem do mês sem app', /R\$ 9\.395,47/.test(txt), (txt.match(/[^\n]*sem venda lançada\. Não é[^\n]*/) || (txt.match(/[^\n]*9\.395[^\n]*/) || ['(não apontou)']))[0]);
+cobra('e diz que não é mercadoria sumida', /Não é mercadoria sumida/.test(txt));
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
