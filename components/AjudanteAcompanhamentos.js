@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { C, Card, Btn, Label, NumInput, Select } from './ui';
 import { brl, num, numQtd } from '../lib/util';
-import { UNIDADES } from '../lib/estoque';
+import { UNIDADES, UNIDADES_CONTEUDO } from '../lib/estoque';
 import { porPorcao, porNasFichas } from '../lib/acompanhamentos';
 import { porcoesFritasPorDia } from '../lib/fritadeira';
 import ListaDePratos from './ListaDePratos';
@@ -15,6 +15,10 @@ import ListaDePratos from './ListaDePratos';
 // O que trava não é saber que vão. É que pôr "1 sachê" em doze fichas, uma por
 // uma, é trabalho que ninguém faz duas vezes. Então aqui se faz de uma vez.
 
+// kg vira g e L vira ml sozinhos; 'un', 'cx', 'pct' e afins não têm sub-unidade
+// natural, e aí a ficha sairia em fração da embalagem.
+const MENOR_NAO_SERVE = (it) => !['kg', 'L'].includes(it && it.unidade);
+
 const SUGESTOES = ['ketchup', 'limão', 'limao', 'maionese', 'molho', 'guardanapo', 'palito', 'mostarda', 'barbecue', 'sal', 'tempero'];
 
 export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], fichas = [], vendas = [], onAcao }) {
@@ -25,6 +29,12 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
   const [unidade, setUnidade] = useState('');
   const [rendimento, setRendimento] = useState('');
   const [dias, setDias] = useState('');
+  // O tamanho da embalagem, quando o estoque ainda não sabe. O ajudante do
+  // óleo já pergunta isso na própria tela; aqui eu mandava ela pra outra tela
+  // digitar e voltar — trabalho sem motivo, e no meio do caminho ela esquece
+  // o que estava fazendo.
+  const [conteudo, setConteudo] = useState('');
+  const [conteudoUnid, setConteudoUnid] = useState('g');
   const [pratos, setPratos] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [feito, setFeito] = useState(null);
@@ -48,15 +58,21 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
   // No modo "dura tantos dias", o rendimento sai da conta: dias × porções/dia.
   const rende = modo === 'duracao' ? numQtd(dias) * contagem.porDia : 0;
 
+  // O que o estoque já sabe manda; o que ela digitar aqui vale enquanto não
+  // souber, e é gravado no item quando ela aplicar.
+  const conteudoSalvo = item && numQtd(item.conteudo) > 0 && item.conteudoUnid ? { qtd: numQtd(item.conteudo), unid: item.conteudoUnid } : null;
+  const conteudoVale = conteudoSalvo || (numQtd(conteudo) > 0 && conteudoUnid ? { qtd: numQtd(conteudo), unid: conteudoUnid } : null);
+  const precisaConteudo = !!item && (modo === 'duracao' || modo === 'rendimento') && !!MENOR_NAO_SERVE(item);
+
   const calc = useMemo(() => {
     if (!item) return null;
-    if (modo === 'duracao') return rende > 0 ? porPorcao({ unidadeItem: item.unidade, rendimento: rende, conteudo: item.conteudo, conteudoUnid: item.conteudoUnid }) : null;
-    if (modo === 'rendimento') return porPorcao({ unidadeItem: item.unidade, rendimento, conteudo: item.conteudo, conteudoUnid: item.conteudoUnid });
+    if (modo === 'duracao') return rende > 0 ? porPorcao({ unidadeItem: item.unidade, rendimento: rende, conteudo: conteudoVale && conteudoVale.qtd, conteudoUnid: conteudoVale && conteudoVale.unid }) : null;
+    if (modo === 'rendimento') return porPorcao({ unidadeItem: item.unidade, rendimento, conteudo: conteudoVale && conteudoVale.qtd, conteudoUnid: conteudoVale && conteudoVale.unid });
     const q = numQtd(qtd);
     if (!(q > 0)) return null;
     const u = unidade || item.unidade || 'un';
     return { qtd: String(qtd), unidade: u, legivel: `${qtd} ${u}` };
-  }, [item, modo, qtd, unidade, rendimento, rende]);
+  }, [item, modo, qtd, unidade, rendimento, rende, conteudoVale]);
 
   // Quanto isso custa por porção — é o que transforma "é só um limãozinho" em
   // número. Em cima de 100 porções no mês, "só um limãozinho" vira dinheiro.
@@ -65,24 +81,29 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
     const u = item.unidade;
     const q = numQtd(String(calc.qtd).replace(',', '.'));
     let emUnidadeDoItem = q;
-    const dentro = numQtd(item.conteudo);
-    if (dentro > 0 && item.conteudoUnid === calc.unidade) emUnidadeDoItem = q / dentro; // "16 g de um galão de 3.200 g"
+    const dentro = conteudoVale ? conteudoVale.qtd : 0;
+    if (dentro > 0 && conteudoVale.unid === calc.unidade) emUnidadeDoItem = q / dentro; // "16 g de um galão de 3.200 g"
     else if ((u === 'kg' && calc.unidade === 'g') || (u === 'L' && calc.unidade === 'ml')) emUnidadeDoItem = q / 1000;
     else if (calc.unidade !== u) return null; // conversão que eu não sei fazer: melhor não chutar
     return Math.round(emUnidadeDoItem * num(item.custo) * 100) / 100;
-  }, [item, calc]);
+  }, [item, calc, conteudoVale]);
 
   const alternar = (id) => setPratos((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
 
   const aplicar = async () => {
     if (!item || !calc || !pratos.length || salvando) return;
     setSalvando(true);
+    // Se o tamanho da embalagem veio daqui, o estoque passa a saber — senão a
+    // baixa de estoque não teria como converter "18 g" em fração de galão.
+    if (!conteudoSalvo && conteudoVale) {
+      await onAcao({ acao: 'edit', id: item.id, campos: { nome: item.nome, categoria: item.categoria, unidade: item.unidade || 'un', minimo: num(item.minimo), custo: num(item.custo), conteudo: conteudoVale.qtd, conteudoUnid: conteudoVale.unid, validade: item.validade || '' } });
+    }
     await onAcao({ acao: 'fichas', fichas: porNasFichas({ fichas, cardapioIds: pratos, estoqueId, qtd: calc.qtd, unidade: calc.unidade }) });
     setSalvando(false);
     setFeito({ n: pratos.length, nome: item.nome, legivel: calc.legivel, custo: custoPorPorcao });
   };
 
-  const limpar = () => { setFeito(null); setEstoqueId(''); setQtd(''); setUnidade(''); setRendimento(''); setDias(''); setPratos([]); };
+  const limpar = () => { setFeito(null); setEstoqueId(''); setQtd(''); setUnidade(''); setRendimento(''); setDias(''); setConteudo(''); setPratos([]); };
 
   return (
     <Card style={{ marginBottom: 14, borderColor: aberto ? C.accent : C.cardBorder }}>
@@ -155,6 +176,28 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
                         <Label>Unidade</Label>
                         <Select value={unidade || item.unidade || 'un'} onChange={setUnidade} options={UNIDADES} />
                       </div>
+                    </div>
+                  )}
+
+                  {precisaConteudo && (
+                    <div style={{ marginBottom: 12 }}>
+                      <Label>Quanto tem na embalagem?</Label>
+                      {conteudoSalvo ? (
+                        <div style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>
+                          {conteudoSalvo.qtd} {conteudoSalvo.unid} <span style={{ color: C.faint, fontWeight: 400 }}>· já estava no estoque</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}><NumInput value={conteudo} onChange={setConteudo} placeholder="ex.: 3500" /></div>
+                            <div style={{ width: 110, flexShrink: 0 }}><Select value={conteudoUnid} onChange={setConteudoUnid} options={UNIDADES_CONTEUDO} /></div>
+                          </div>
+                          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.45 }}>
+                            Está no rótulo — um galão de ketchup de 3,5 kg é 3500 g. Sem isso a ficha sai em fração de
+                            galão ("0,005 un"), que ninguém confere de olho. Eu gravo no estoque junto.
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
 
