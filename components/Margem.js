@@ -1,7 +1,7 @@
 'use client';
 import React, { useMemo, useState } from 'react';
 import { C, Card, KPI, Empty, PageTitle, TextInput } from './ui';
-import { brl, num, diaOperacional, ymOf, mesLabel } from '../lib/util';
+import { brl, num, diaOperacional, todayISO, ymOf, mesLabel } from '../lib/util';
 import { norm } from '../lib/darci';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
 import { cmvDoMes, lerCMV, estoqueNoMes } from '../lib/cmv';
@@ -47,6 +47,21 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [], venda
     return [...set].sort().reverse().slice(0, 12);
   }, [vendas]);
 
+  // O CUSTO AQUI TEM QUE SER O MESMO DO RELATÓRIO.
+  //
+  // Estas telas liam o custo guardado em cada item do estoque; o CMV do
+  // relatório reconstrói o custo pelas NOTAS DE COMPRA — e é só nesse caminho
+  // que o saco porcionado ("Carne 300g") herda o preço do quilo comprado.
+  // Resultado: a mesma Favorita custava R$ 12,39 aqui, com 300 g de carne a
+  // R$ 48/kg sumindo no caminho.
+  //
+  // Duas réguas pro mesmo prato é pior que uma régua torta: ela confere, vê
+  // números diferentes e para de confiar nos dois.
+  const estoqueCusteado = useMemo(
+    () => estoqueNoMes(estoque, compras, ymOf(todayISO())).estoque,
+    [estoque, compras],
+  );
+
   const fichaPorId = useMemo(
     () => new Map(fichas.filter((f) => f && f.cardapioId).map((f) => [f.cardapioId, Array.isArray(f.itens) ? f.itens : []])),
     [fichas],
@@ -60,8 +75,8 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [], venda
       const categoria = c.categoria || '';
       const ficha = fichaPorId.get(c.id);
       if (!ficha || !ficha.length) { arr.push({ id: c.id, nome: c.nome, categoria, preco, semFicha: true }); continue; }
-      const base = custoDaFicha(ficha, estoque);
-      const sab = custoDosSabores(c.sabores, estoque, c.saboresTotal); // custo médio da fruta escolhida na venda
+      const base = custoDaFicha(ficha, estoqueCusteado);
+      const sab = custoDosSabores(c.sabores, estoqueCusteado, c.saboresTotal); // custo médio da fruta escolhida na venda
       const custo = Math.round((base.custo + sab.medio) * 100) / 100;
       const lucro = Math.round((preco - custo) * 100) / 100;
       const margem = preco > 0 ? (lucro / preco) * 100 : 0;
@@ -79,7 +94,7 @@ export default function Margem({ cardapio = [], fichas = [], estoque = [], venda
       if (ordem === 'mes') return b.lucroMes - a.lucroMes; // quem mais pôs dinheiro no bolso
       return a.margem - b.margem;                          // piores primeiro
     });
-  }, [cardapio, fichaPorId, estoque, vendido, ordem]);
+  }, [cardapio, fichaPorId, estoqueCusteado, vendido, ordem]);
 
   const comFicha = linhas.filter((l) => !l.semFicha);
   const noPrejuizo = comFicha.filter((l) => l.lucro < -0.005).length;
