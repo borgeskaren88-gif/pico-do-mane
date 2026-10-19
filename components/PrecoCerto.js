@@ -1,9 +1,9 @@
 'use client';
 import React, { useMemo, useState, useEffect } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, PageTitle, Label } from './ui';
-import { brl, num, todayISO, uid } from '../lib/util';
+import { brl, num, todayISO, ymOf, uid } from '../lib/util';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
-import { CMV_BOM, CMV_ATENCAO } from '../lib/cmv';
+import { CMV_BOM, CMV_ATENCAO, estoqueNoMes} from '../lib/cmv';
 import { rateioDoMes, mesFechadoAnterior } from '../lib/rateio';
 
 // PREÇO CERTO — quanto COBRAR.
@@ -42,7 +42,7 @@ const redondo = (v) => Math.ceil(v * 2 - 1e-9) / 2;
 
 const pct = (v) => Math.max(0, num(v));
 
-export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], despesas = [], vendas = [], base, onBase, onCardapio }) {
+export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], compras = [], despesas = [], vendas = [], base, onBase, onCardapio }) {
   const [modo, setModo] = useState('cardapio'); // 'cardapio' | 'zero'
   const [itemId, setItemId] = useState('');
   const [taxas, setTaxas] = useState(() => ({ ...PADRAO, ...(base || {}) }));
@@ -72,6 +72,21 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], d
     [despesas, vendas],
   );
 
+  // O CUSTO AQUI TEM QUE SER O MESMO DO RELATÓRIO.
+  //
+  // Estas telas liam o custo guardado em cada item do estoque; o CMV do
+  // relatório reconstrói o custo pelas NOTAS DE COMPRA — e é só nesse caminho
+  // que o saco porcionado ("Carne 300g") herda o preço do quilo comprado.
+  // Resultado: a mesma Favorita custava R$ 12,39 aqui, com 300 g de carne a
+  // R$ 48/kg sumindo no caminho.
+  //
+  // Duas réguas pro mesmo prato é pior que uma régua torta: ela confere, vê
+  // números diferentes e para de confiar nos dois.
+  const estoqueCusteado = useMemo(
+    () => estoqueNoMes(estoque, compras, ymOf(todayISO())).estoque,
+    [estoque, compras],
+  );
+
   const fichaPorId = useMemo(
     () => new Map(fichas.filter((f) => f && f.cardapioId).map((f) => [f.cardapioId, Array.isArray(f.itens) ? f.itens : []])),
     [fichas],
@@ -90,10 +105,10 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], d
       if (!item) return { valor: 0, pronto: false, motivo: 'escolhe' };
       const ficha = fichaPorId.get(item.id);
       if (!ficha || !ficha.length) return { valor: 0, pronto: false, motivo: 'sem-ficha' };
-      const b = custoDaFicha(ficha, estoque);
-      const sab = custoDosSabores(item.sabores, estoque, item.saboresTotal);
+      const b = custoDaFicha(ficha, estoqueCusteado);
+      const sab = custoDosSabores(item.sabores, estoqueCusteado, item.saboresTotal);
       const v = Math.round((b.custo + sab.medio + num(embalagem) + num(rateio)) * 100) / 100;
-      return { valor: v, pronto: v > 0, completo: b.completo, motivo: v > 0 ? '' : 'sem-custo' };
+      return { valor: v, pronto: v > 0, completo: b.completo, faltando: b.faltando || [], motivo: v > 0 ? '' : 'sem-custo' };
     }
     const soma = ingredientes.reduce((s, i) => s + num(i.valor), 0);
     const n = Math.max(0, num(rende));
@@ -101,7 +116,7 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], d
     if (!(n > 0)) return { valor: 0, pronto: false, motivo: 'sem-rendimento' };
     const v = Math.round((soma / n + num(embalagem) + num(rateio)) * 100) / 100;
     return { valor: v, pronto: v > 0, motivo: '' };
-  }, [modo, item, fichaPorId, estoque, ingredientes, rende, embalagem, rateio]);
+  }, [modo, item, fichaPorId, estoqueCusteado, ingredientes, rende, embalagem, rateio]);
 
   // ---- a conta ----
   const conta = useMemo(() => {
@@ -231,7 +246,8 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], d
             )}
             {custo.pronto && custo.completo === false && (
               <div style={{ fontSize: 12, color: C.amber, lineHeight: 1.5, marginBottom: 10 }}>
-                Atenção: algum ingrediente da ficha está sem custo. O custo abaixo sai <b>por baixo</b> — e o preço, também.
+                Atenção: {custo.faltando && custo.faltando.length ? <>sem custo no estoque: <b>{custo.faltando.join(', ')}</b>. </> : <>algum ingrediente da ficha está sem custo. </>}
+                O custo abaixo sai <b>por baixo</b> — e o preço, também.
               </div>
             )}
           </>

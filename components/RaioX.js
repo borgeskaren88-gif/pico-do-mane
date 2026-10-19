@@ -31,6 +31,13 @@ export default function RaioX({ receitas = [], despesas = [], cardapio = [], fic
   const saldoFinal = Math.round((lucro + aporte - investimento - dividaPaga) * 100) / 100;
 
   // Saúde do cardápio (margem por item, via custo da ficha).
+  // Mesma régua de custo do relatório: o saco porcionado só herda o preço do
+  // quilo comprado no caminho que reconstrói pelas notas. Ver PrecoCerto.js.
+  const estoqueCusteado = useMemo(
+    () => estoqueNoMes(estoque, compras, ymOf(todayISO())).estoque,
+    [estoque, compras],
+  );
+
   const fichaPorId = useMemo(() => new Map(fichas.filter((f) => f && f.cardapioId).map((f) => [f.cardapioId, Array.isArray(f.itens) ? f.itens : []])), [fichas]);
   const margens = useMemo(() => {
     const arr = [];
@@ -39,13 +46,13 @@ export default function RaioX({ receitas = [], despesas = [], cardapio = [], fic
       const ficha = fichaPorId.get(c.id);
       if (!ficha || !ficha.length) continue;
       const preco = num(c.preco);
-      const base = custoDaFicha(ficha, estoque);
-      const sab = custoDosSabores(c.sabores, estoque, c.saboresTotal);
+      const base = custoDaFicha(ficha, estoqueCusteado);
+      const sab = custoDosSabores(c.sabores, estoqueCusteado, c.saboresTotal);
       const lucroItem = Math.round((preco - base.custo - sab.medio) * 100) / 100;
       arr.push({ nome: c.nome, margem: preco > 0 ? (lucroItem / preco) * 100 : 0, lucro: lucroItem });
     }
     return arr;
-  }, [cardapio, fichaPorId, estoque]);
+  }, [cardapio, fichaPorId, estoqueCusteado]);
   const margemMedia = margens.length ? margens.reduce((s, m) => s + m.margem, 0) / margens.length : 0;
   const noPrejuizo = margens.filter((m) => m.lucro < -0.005).sort((a, b) => a.lucro - b.lucro);
 
