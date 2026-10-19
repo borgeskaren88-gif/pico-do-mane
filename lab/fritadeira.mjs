@@ -238,6 +238,29 @@ cobra('avisa que o número é grande demais', /parece grande demais/i.test(txt),
 cobra('diz a faixa normal (10 a 30 ml)', /10 a 30 ml/.test(txt));
 cobra('e lembra que é o GALÃO, não a fritadeira', /não de quanto em quanto tempo tu troca a fritadeira/i.test(txt));
 
+console.log('\n### mostra DE ONDE vem a contagem, prato a prato');
+// Ela olhou "2,73 por dia" e não tinha como julgar — mas sabe de cor que num
+// sábado saem 20 a 30 batatas. Com a lista aberta ela vê num segundo o que eu
+// não vejo daqui: prato marcado que nunca vendeu.
+cobra('tem a lista "de onde vem essa conta"', /De onde vem essa conta/i.test(txt), (txt.match(/[^\n]*De onde vem[^\n]*/i) || ['(não mostra)'])[0]);
+cobra('com a batata e quanto saiu dela', /Batata Frita Clássica[\s\S]{0,40}em 30 dias/.test(txt), (txt.match(/[^\n]*em 30 dias[^\n]*/) || [''])[0]);
+
+console.log('\n### e NÃO comemora um número que ela mesma reprovou');
+// Ela aplicou com o aviso aberto e apareceu um ✓ verde dizendo "agora o CMV
+// conta o óleo", como se estivesse tudo certo. Duas mensagens opostas na mesma
+// tela: a de baixo é a última que se lê, e é a que fica.
+cobra('tocou em aplicar com o número suspeito', await pg.evaluate(() => {
+  const x = [...document.querySelectorAll('button')].find((e) => /Pôr o óleo na ficha/.test(e.innerText || ''));
+  if (x) { x.click(); return true; }
+  return false;
+}));
+await pg.waitForTimeout(2400);
+txt = await texto();
+cobra('não diz "agora o CMV conta o óleo"', !/agora o CMV do relatório conta o óleo/.test(txt), (txt.match(/[^\n]*CMV do relatório[^\n]*/) || [''])[0]);
+cobra('avisa que aplicou fora da faixa', /Apliquei, mas com o número fora da faixa/.test(txt), (txt.match(/[^\n]*fora da faixa[^\n]*/) || ['(comemorou assim mesmo)'])[0]);
+cobra('diz que a ficha é substituída se refizer', /a ficha é substituída/.test(txt));
+cobra('e manda não decidir preço com isso', /não usa o preço desses pratos/.test(txt));
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
