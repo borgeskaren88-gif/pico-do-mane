@@ -136,6 +136,20 @@ cobra('tocou em "Usar R$ 3,30"', await toque('Usar R$ 3,30'));
 await pg.waitForTimeout(900);
 cobra('agora o custo é R$ 11,30', /⇢ R\$ 11,30/.test(await linhaCusto()), await linhaCusto());
 
+console.log('\n### "ESSA MARGEM É SAUDÁVEL?" — a tela responde com o alvo do mês');
+// A pergunta não tem resposta em faixa de revista: 65% só é saudável se o
+// faturamento cobrir o fixo. O sistema conhece as duas pontas, então em vez de
+// opinar ele dá o alvo.
+//   despesa de casa de setembro .... R$ 9.900,00
+//   margem pedida .................. 65%
+//   faturamento pra empatar ........ 9.900 ÷ 0,65 = R$ 15.230,77
+txt = await texto();
+cobra('pergunta se a margem paga a casa', /Essa margem paga a casa/i.test(txt), (txt.match(/[^\n]*paga a casa[^\n]*/i) || ['(não responde)'])[0]);
+cobra('usa a despesa real de setembro', /R\$ 9\.900,00/.test(txt));
+cobra('e diz o faturamento pra empatar: R$ 15.230,77', /R\$ 15\.230,77/.test(txt), (txt.match(/[^\n]*só pra empatar[^\n]*/) || [''])[0]);
+cobra('deixando claro que acima disso é lucro', /O que passar disso é lucro/.test(txt));
+cobra('e que a resposta não é faixa de revista', /faixa de revista/.test(txt));
+
 console.log('\n### e dá pra tirar, que o rateio é opcional');
 cobra('tocou em "Tirar"', await toque('Tirar'));
 await pg.waitForTimeout(900);
