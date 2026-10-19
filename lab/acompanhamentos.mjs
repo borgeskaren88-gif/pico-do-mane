@@ -35,7 +35,7 @@ await gravar({ ...p0,
   estoque: [
     { id: 'bat', nome: 'Batata congelada', custo: '20', unidade: 'kg', saldo: '40', categoria: 'Cozinha' },
     { id: 'ket', nome: 'Ketchup sachê', custo: '0,35', unidade: 'un', saldo: '500', categoria: 'Cozinha' },
-    { id: 'gal', nome: 'Ketchup galão', custo: '45', unidade: 'un', saldo: '3', categoria: 'Cozinha', conteudo: 3200, conteudoUnid: 'g' },
+    { id: 'gal', nome: 'Ketchup galão', custo: '45', unidade: 'un', saldo: '3', categoria: 'Cozinha' },
     { id: 'lim', nome: 'Limão', custo: '10', unidade: 'kg', saldo: '8', categoria: 'Cozinha' },
   ],
   cardapio: [
@@ -183,9 +183,13 @@ console.log('\n### KETCHUP DE GALÃO: "quantos dias dura" é como ela pensa de v
 // potinho — quantos potinhos saem de um galão ninguém contou na vida, mas
 // quanto tempo o galão dura todo bar sabe.
 //
-//   galão de 3.200 g, dura 10 dias
+//   galão de 3,5 kg = 3.500 g, dura 10 dias
 //   20 porções fritas por dia × 10 = 200 porções por galão
-//   3.200 ÷ 200 = 16 g por porção · R$ 45 ÷ 200 = R$ 0,23
+//   3.500 ÷ 200 = 17,5 → 18 g por porção · R$ 45 ÷ 200 = R$ 0,23
+//
+// E o estoque NÃO sabe o peso do galão — é o caso dela. O ajudante tem que
+// perguntar ali mesmo e gravar, senão ela sai da tela pra digitar noutra e no
+// meio do caminho esquece o que estava fazendo.
 await pg.reload({ waitUntil: 'domcontentloaded' });
 await pg.waitForTimeout(3600);
 await irPara('Abastecimento');
@@ -202,18 +206,24 @@ await pg.waitForTimeout(600);
 cobra('existe o modo por duração', await toque('Sei quantos dias dura'));
 await pg.waitForTimeout(700);
 txt = await texto();
+cobra('pergunta o tamanho do galão ali mesmo', /quanto tem na embalagem/i.test(txt), (txt.match(/[^\n]*EMBALAGEM[^\n]*/i) || ['(não perguntou)'])[0]);
+cobra('respondeu 3500 g', await campo('Quanto tem na embalagem?', '3500'));
+await pg.waitForTimeout(700);
+txt = await texto();
 cobra('pergunta quantos dias dura um galão', /quantos dias dura 1 un de ketchup galão/i.test(txt), (txt.match(/[^\n]*DIAS DURA[^\n]*/i) || ['(não perguntou)'])[0]);
 cobra('e já diz quantas porções contou por dia', /20 por dia/.test(txt), (txt.match(/[^\n]*por dia[^\n]*/) || [''])[0]);
 cobra('respondeu 10 dias', await campo('Quantos dias dura 1 un de Ketchup galão?', '10'));
 await pg.waitForTimeout(900);
 txt = await texto();
-cobra('converteu pra 16 g por porção (não "0,005 un")', /16 g/.test(txt), (txt.match(/[^\n]*em cada porção[^\n]*/) || [''])[0]);
+cobra('converteu pra 18 g por porção (não "0,005 un")', /18 g/.test(txt), (txt.match(/[^\n]*em cada porção[^\n]*/) || [''])[0]);
 cobra('e mostra a conta por trás', /10 dias × 20 porções por dia = 200 porções/.test(txt), (txt.match(/[^\n]*porções por embalagem[^\n]*/) || ['(não mostrou)'])[0]);
 cobra('custa R$ 0,23 por porção', /R\$ 0,23/.test(txt));
 cobra('aplicou nos dois', await toque('Pôr em 2 prato(s)'));
 await pg.waitForTimeout(2200);
 const fim = (await painel()).fichas.find((f) => f.cardapioId === 'c1');
-cobra('o galão entrou em gramas na ficha', fim.itens.some((i) => i.estoqueId === 'gal' && i.qtd === '16' && i.unidade === 'g'), JSON.stringify(fim.itens));
+cobra('o galão entrou em gramas na ficha', fim.itens.some((i) => i.estoqueId === 'gal' && i.qtd === '18' && i.unidade === 'g'), JSON.stringify(fim.itens));
+const galEstoque = (await painel()).estoque.find((e) => e.id === 'gal');
+cobra('e o estoque passou a saber que o galão tem 3.500 g', Number(galEstoque.conteudo) === 3500 && galEstoque.conteudoUnid === 'g', JSON.stringify({ c: galEstoque.conteudo, u: galEstoque.conteudoUnid }));
 
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
