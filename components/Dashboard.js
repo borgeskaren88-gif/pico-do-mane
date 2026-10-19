@@ -50,6 +50,7 @@ import PrecoCerto from './PrecoCerto';
 import Fornecedores from './Fornecedores';
 import FichasTecnicas from './FichasTecnicas';
 import ConferenciaEstoque from './ConferenciaEstoque';
+import ConferirVendas from './ConferirVendas';
 import Auditoria from './Auditoria';
 import Notificacoes from './Notificacoes';
 import DespesaRapida from './DespesaRapida';
@@ -1070,7 +1071,13 @@ export default function Dashboard() {
                 </div>
                 {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} cotacoes={cotacoes} fichas={fichas} cardapio={cardapio} duplicadosIgnorados={dupIgnorados} onRepor={reporLista} onLevarPraCompras={levarPraCompras} />}
                 {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} vendas={vendas} fritadeira={fritadeira} onFritadeira={upd.fritadeira} onAcao={estoqueAcao} />}
-                {subEstoque === 'conferencia' && <ConferenciaEstoque estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} onAcao={estoqueAcao} carregado={estCarregado} />}
+                {subEstoque === 'conferencia' && (<>
+                  {/* A conferência que não pede contagem nenhuma vem antes da
+                      que pede: se a mercadoria comprada já não bate com as
+                      vendas, contar prateleira não vai resolver. */}
+                  <ConferirVendas compras={compras} vendas={vendas} fichas={fichas} estoque={estoque} cardapio={cardapio} />
+                  <ConferenciaEstoque estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} onAcao={estoqueAcao} carregado={estCarregado} />
+                </>)}
                 {subEstoque === 'cortesia' && <CortesiaConsumo onFeito={() => carregarEstoque({})} />}
               </>
             )}
