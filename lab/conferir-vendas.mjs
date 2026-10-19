@@ -135,6 +135,40 @@ cobra('diz quanto do vendido tem ficha', /% do que tu vendeu tem ficha/.test(txt
 cobra('e manda arrumar a ficha ANTES de desconfiar', /antes de desconfiar/.test(txt));
 cobra('NÃO acusa venda sumindo em primeiro lugar', !/1\. Venda que não passou/.test(txt));
 
+console.log('\n### SISTEMA ENTRANDO EM USO NÃO PODE SER LIDO COMO VAZAMENTO');
+// O caso REAL dela, com os números do print:
+//   Jul  comprou 9.395,47  ·  vendas explicam     0,00  →   0%
+//   Ago  comprou 5.369,54  ·  vendas explicam 3.024,73  →  56%
+//   Set  comprou 4.148,85  ·  vendas explicam 4.812,03  → 116%
+// A média deu 41% e o card acusou "venda que não passou pelo app" em primeiro
+// lugar. Mas julho zerado não é venda sumindo: é mês em que o app ainda não
+// rodava. E setembro acima de 100% é o contrário de problema.
+//
+// Um número que acusa justamente quem acabou de adotar a ferramenta ensina a
+// ignorar a ferramenta.
+const pR = await painel();
+await gravar({ ...pR, estoque: ESTOQUE, cardapio: CARDAPIO, fichas: FICHAS, despesas: [], receitas: [], diario: [],
+  compras: [
+    { id: 'j', data: '2026-07-05', produto: 'Batata', quantidade: '1', valorUnit: '9395,47', tipoConta: 'Fornecedores de insumo' },
+    { id: 'a', data: '2026-08-05', produto: 'Batata', quantidade: '1', valorUnit: '5369,54', tipoConta: 'Fornecedores de insumo' },
+    { id: 's', data: '2026-09-05', produto: 'Batata', quantidade: '1', valorUnit: '4148,85', tipoConta: 'Fornecedores de insumo' },
+  ] });
+for (const v of ['m0', 'm1', 'm2']) await fetch(`${BANCO}?chave=eq.${MARCA}venda:${v}`, { method: 'DELETE' });
+// Julho: NENHUMA venda. Agosto: 378 batatas (×R$ 8 = 3.024). Setembro: 601 (4.808).
+for (const [k, mes, qtd] of [['m1', '2026-08', 378], ['m2', '2026-09', 601]]) {
+  await fetch(BANCO, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify([{ chave: `${MARCA}venda:${k}`, valor: { id: k, data: `${mes}-10`, total: 1, itens: [{ cardapioId: 'c1', nome: 'Batata Frita', qtd, preco: '30,00' }] } }]) });
+}
+await recarregar();
+txt = await abrir();
+cobra('NÃO acusa venda sumindo', !/1\. Venda que não passou/.test(txt), (txt.match(/[^\n]*1\.[^\n]*/) || [''])[0]);
+cobra('diz que é rodagem, não vazamento', /rodagem, não vazamento/i.test(txt), (txt.match(/[^\n]*rodagem[^\n]*/) || ['(não reconheceu)'])[0]);
+cobra('aponta o mês sem venda lançada', /Jul\/2026/.test(txt) && /sem venda lançada/.test(txt), (txt.match(/[^\n]*sem venda lançada[^\n]*/) || ['(não apontou)'])[0]);
+cobra('e mostra o último mês saudável', /Set\/2026/.test(txt) && /11[0-9]%/.test(txt), (txt.match(/[^\n]*último mês fechado[\s\S]{0,90}/) || [''])[0].replace(/\n/g, ' '));
+cobra('explica que acima de 100% não é erro', /Acima de 100% não é erro/.test(txt));
+cobra('e manda olhar de novo daqui a um mês', /daqui a um mês/.test(txt));
+cobra('cada mês mostra a sua porcentagem', /56%/.test(txt), (txt.match(/[^\n]*Ago\/2026[^\n]*/) || [''])[0]);
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
