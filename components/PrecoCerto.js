@@ -1,9 +1,10 @@
 'use client';
 import React, { useMemo, useState, useEffect } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, PageTitle, Label } from './ui';
-import { brl, num, uid } from '../lib/util';
+import { brl, num, todayISO, uid } from '../lib/util';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
 import { CMV_BOM, CMV_ATENCAO } from '../lib/cmv';
+import { rateioDoMes, mesFechadoAnterior } from '../lib/rateio';
 
 // PREÇO CERTO — quanto COBRAR.
 //
@@ -41,7 +42,7 @@ const redondo = (v) => Math.ceil(v * 2 - 1e-9) / 2;
 
 const pct = (v) => Math.max(0, num(v));
 
-export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], base, onBase, onCardapio }) {
+export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], despesas = [], vendas = [], base, onBase, onCardapio }) {
   const [modo, setModo] = useState('cardapio'); // 'cardapio' | 'zero'
   const [itemId, setItemId] = useState('');
   const [taxas, setTaxas] = useState(() => ({ ...PADRAO, ...(base || {}) }));
@@ -64,6 +65,12 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], b
     setTaxas(novo);
     if (onBase) onBase(novo);
   };
+
+  // O rateio do fixo, calculado do último mês FECHADO dela.
+  const rateioAuto = useMemo(
+    () => rateioDoMes({ despesas, vendas, mes: mesFechadoAnterior(todayISO()) }),
+    [despesas, vendas],
+  );
 
   const fichaPorId = useMemo(
     () => new Map(fichas.filter((f) => f && f.cardapioId).map((f) => [f.cardapioId, Array.isArray(f.itens) ? f.itens : []])),
@@ -253,9 +260,50 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], b
           <Label>Rateio de custo fixo por unidade (se quiser)</Label>
           <NumInput value={rateio} onChange={setRateio} placeholder="0,00" />
           <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.45 }}>
-            Aluguel e luz divididos por quantas unidades tu vende no mês. Pode deixar vazio — aí o preço cobre o
-            ingrediente e a margem, e o fixo sai do bolo do mês.
+            Salário, aluguel, luz e gás divididos por quantas unidades tu vende no mês. Pode deixar vazio — aí o preço
+            cobre o ingrediente e a margem, e o fixo sai do bolo do mês.
           </div>
+
+          {/* "MÃO DE OBRA NÃO SE PÕE TAMBÉM?"
+              Na ficha não — a cozinheira ganha igual no sábado cheio e na
+              terça parada, então não é custo DO prato. Mas a pergunta está
+              certa no que importa: salário num bar pesa muito mais que luz e
+              gás, e ignorar isso na hora de pôr preço é pior que ignorar a
+              conta de energia. O lugar disso é este campo — e eu vinha
+              mandando ela "preencher o rateio" sem nunca dizer com qual
+              número. O sistema conhece as duas pontas; que ele faça a conta. */}
+          {rateioAuto && rateioAuto.porUnidade > 0 && (
+            <div style={{ background: C.panel2, borderRadius: 12, padding: '11px 14px', marginTop: 10 }}>
+              <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6 }}>
+                Em <b style={{ color: C.text }}>{rateioAuto.rotulo}</b> tuas despesas de casa somaram{' '}
+                <b style={{ color: C.text }}>{brl(rateioAuto.casa)}</b> e saíram{' '}
+                <b style={{ color: C.text }}>{rateioAuto.unidades}</b> unidades. Dá{' '}
+                <b style={{ color: C.accent }}>{brl(rateioAuto.porUnidade)}</b> de custo de casa em cada coisa que sai.
+                {rateioAuto.maiores && rateioAuto.maiores.length > 0 && (
+                  <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6 }}>
+                    O que mais pesou: {rateioAuto.maiores.map((m) => `${m.cat} ${brl(m.val)}`).join(' · ')}
+                  </div>
+                )}
+              </div>
+              <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Btn kind="ghost" small onClick={() => setRateio(String(rateioAuto.porUnidade).replace('.', ','))}>
+                  Usar {brl(rateioAuto.porUnidade)}
+                </Btn>
+                {num(rateio) > 0 && <Btn kind="ghost" small onClick={() => setRateio('')}>Tirar</Btn>}
+              </div>
+              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 9, lineHeight: 1.5 }}>
+                É uma <b style={{ color: C.muted }}>média por cabeça</b>: um chopp e um camarão não dão o mesmo trabalho
+                pra cozinha, e aqui levam a mesma fatia. Grosseiro — mas muito melhor que tratar o salário como se não
+                existisse.
+              </div>
+            </div>
+          )}
+          {rateioAuto && !rateioAuto.porUnidade && (
+            <div style={{ fontSize: 11.5, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>
+              Eu calcularia esse número sozinho a partir de {rateioAuto.rotulo}, mas ainda falta{' '}
+              {rateioAuto.falta === 'despesas' ? 'lançar as despesas de casa daquele mês' : 'venda de comanda naquele mês'}.
+            </div>
+          )}
         </div>
 
         {custo.pronto && (

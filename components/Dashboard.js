@@ -1096,7 +1096,7 @@ export default function Dashboard() {
 
             {subAbast === 'compras' && <Compras dados={compras} cotacoes={cotacoes} despesas={despesas} estoque={estoque} onChange={upd.compras} onRegistrar={aplicarCompra} onPagamento={aplicarPagamento} onEstoque={estoqueAcao} carrinhoInicial={carrinhoDaVoz} onCarrinhoUsado={() => setCarrinhoDaVoz(null)} />}
             {subAbast === 'margem' && <Margem cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} compras={compras} />}
-            {subAbast === 'preco' && <PrecoCerto cardapio={cardapio} fichas={fichas} estoque={estoque} base={precoBase} onBase={upd.precoBase} onCardapio={upd.cardapio} />}
+            {subAbast === 'preco' && <PrecoCerto cardapio={cardapio} fichas={fichas} estoque={estoque} despesas={despesas} vendas={vendas} base={precoBase} onBase={upd.precoBase} onCardapio={upd.cardapio} />}
             {subAbast === 'fornecedores' && <Fornecedores compras={compras} />}
             {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} estoque={estoque} compras={compras} />}
           </>
