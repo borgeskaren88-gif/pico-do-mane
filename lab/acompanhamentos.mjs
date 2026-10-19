@@ -35,6 +35,7 @@ await gravar({ ...p0,
   estoque: [
     { id: 'bat', nome: 'Batata congelada', custo: '20', unidade: 'kg', saldo: '40', categoria: 'Cozinha' },
     { id: 'ket', nome: 'Ketchup sachê', custo: '0,35', unidade: 'un', saldo: '500', categoria: 'Cozinha' },
+    { id: 'gal', nome: 'Ketchup galão', custo: '45', unidade: 'un', saldo: '3', categoria: 'Cozinha', conteudo: 3200, conteudoUnid: 'g' },
     { id: 'lim', nome: 'Limão', custo: '10', unidade: 'kg', saldo: '8', categoria: 'Cozinha' },
   ],
   cardapio: [
@@ -46,6 +47,16 @@ await gravar({ ...p0,
   despesas: [], receitas: [], compras: [], diario: [], fritadeira: undefined,
   precoBase: { impostos: '0', cartao: '3,15', comissao: '', delivery: '', margem: '65' },
 });
+
+// 600 porções em 30 dias = 20 por dia, pro modo "quantos dias dura".
+const diasAtras = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+for (const [i, d] of [diasAtras(2), diasAtras(9), diasAtras(18)].entries()) {
+  await fetch(BANCO, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify([{ chave: `${MARCA}venda:k${i}`, valor: { id: `k${i}`, data: d, total: 1, itens: [
+      { cardapioId: 'c1', nome: 'Batata Frita Clássica', qtd: 100, preco: '29,99' },
+      { cardapioId: 'c2', nome: 'Isca de Tilápia', qtd: 100, preco: '45,00' },
+    ] } }]) });
+}
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const ctx = await b.newContext({ viewport: { width: 1280, height: 1000 }, serviceWorkers: 'block' });
@@ -166,6 +177,43 @@ const i = l.findIndex((x) => x.trim().startsWith('Custo de uma unidade'));
 const linha = i < 0 ? '(não achou)' : `${l[i]} ⇢ ${l[i + 1] || ''}`;
 cobra('não é mais R$ 8,00', !/⇢ R\$ 8,00/.test(linha), linha);
 cobra('agora é R$ 8,60 (batata + ketchup + limão)', /⇢ R\$ 8,60/.test(linha), linha);
+
+console.log('\n### KETCHUP DE GALÃO: "quantos dias dura" é como ela pensa de verdade');
+// "Eu troco óleo a cada 10 dias", disse ela. E o ketchup é galão que vai pro
+// potinho — quantos potinhos saem de um galão ninguém contou na vida, mas
+// quanto tempo o galão dura todo bar sabe.
+//
+//   galão de 3.200 g, dura 10 dias
+//   20 porções fritas por dia × 10 = 200 porções por galão
+//   3.200 ÷ 200 = 16 g por porção · R$ 45 ÷ 200 = R$ 0,23
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Estoque');
+await irPara('Fichas técnicas');
+await pg.evaluate(() => { const x = [...document.querySelectorAll('button')].find((e) => /Acompanhamentos — ketchup/.test(e.innerText || '')); if (x) x.click(); });
+await pg.waitForTimeout(800);
+cobra('escolheu o galão', await escolher('gal', 'Ketchup galão'));
+await pg.waitForTimeout(800);
+cobra('marcou a batata', await marcar('Batata Frita Clássica'));
+await pg.waitForTimeout(400);
+cobra('marcou a isca', await marcar('Isca de Tilápia'));
+await pg.waitForTimeout(600);
+cobra('existe o modo por duração', await toque('Sei quantos dias dura'));
+await pg.waitForTimeout(700);
+txt = await texto();
+cobra('pergunta quantos dias dura um galão', /quantos dias dura 1 un de ketchup galão/i.test(txt), (txt.match(/[^\n]*DIAS DURA[^\n]*/i) || ['(não perguntou)'])[0]);
+cobra('e já diz quantas porções contou por dia', /20 por dia/.test(txt), (txt.match(/[^\n]*por dia[^\n]*/) || [''])[0]);
+cobra('respondeu 10 dias', await campo('Quantos dias dura 1 un de Ketchup galão?', '10'));
+await pg.waitForTimeout(900);
+txt = await texto();
+cobra('converteu pra 16 g por porção (não "0,005 un")', /16 g/.test(txt), (txt.match(/[^\n]*em cada porção[^\n]*/) || [''])[0]);
+cobra('e mostra a conta por trás', /10 dias × 20 porções por dia = 200 porções/.test(txt), (txt.match(/[^\n]*porções por embalagem[^\n]*/) || ['(não mostrou)'])[0]);
+cobra('custa R$ 0,23 por porção', /R\$ 0,23/.test(txt));
+cobra('aplicou nos dois', await toque('Pôr em 2 prato(s)'));
+await pg.waitForTimeout(2200);
+const fim = (await painel()).fichas.find((f) => f.cardapioId === 'c1');
+cobra('o galão entrou em gramas na ficha', fim.itens.some((i) => i.estoqueId === 'gal' && i.qtd === '16' && i.unidade === 'g'), JSON.stringify(fim.itens));
 
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
