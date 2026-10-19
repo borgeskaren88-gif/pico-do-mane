@@ -4,6 +4,7 @@ import { C, Card, Btn, Field, Select, NumInput, Empty, SecTitle, PageTitle, inpu
 import { num, uid } from '../lib/util';
 import { UNIDADES, detalheProducao } from '../lib/estoque';
 import { CATEGORIAS_CARDAPIO } from './Cardapio';
+import AjudanteFritadeira from './AjudanteFritadeira';
 
 // Modelo de fichas do Pico do Mané (extraído da ficha técnica em PDF). Só os
 // ingredientes com quantidade definida — itens "a gosto" (sal, páprica, orégano,
@@ -44,7 +45,7 @@ const MODELO_FICHAS = [
 // ESTOQUE (com quantidade e unidade). É isso que faz a venda de um prato baixar
 // os insumos sozinha. `fichas` é uma lista de { cardapioId, itens:[{estoqueId,
 // qtd, unidade}] }.
-export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [], onAcao }) {
+export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [], vendas = [], fritadeira, onFritadeira, onAcao }) {
   const [importando, setImportando] = useState(false);
   const [report, setReport] = useState(null);
 
@@ -116,6 +117,14 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
           Para cada item do cardápio, diga os ingredientes do <b style={{ color: C.text }}>estoque</b> e quanto usa (ex.: Favorita = 300 g de carne + 200 g de batata). Quando a comanda com esse item fechar, o estoque baixa automático. Compra em kg e receita em g? O app converte sozinho.
         </div>
       </Card>
+
+      {/* O ÓLEO QUE FALTA EM TODA FICHA.
+          Fica aqui em cima, antes do modelo: é o buraco de custo que ela tem
+          hoje em TODOS os fritos, não um detalhe de um prato. */}
+      <AjudanteFritadeira
+        cardapio={cardapio} estoque={estoque} fichas={fichas} vendas={vendas}
+        config={fritadeira} onConfig={onFritadeira} onAcao={onAcao}
+      />
 
       {/* Importar o modelo pronto (fichas do PDF do Pico do Mané) */}
       <Card style={{ marginBottom: 14, borderColor: C.accent }}>

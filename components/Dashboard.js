@@ -204,6 +204,8 @@ export default function Dashboard() {
   // Aviso do teto do MEI: { ativo, teto }. Vem ligado por padrão — o sistema é
   // feito pra microempreendedor, e quem não for desliga no próprio card.
   const [mei, setMei] = useState(null);
+  // Ajudante da fritadeira: { oleoId, litros, dias, pratos:[], porDiaManual }.
+  const [fritadeira, setFritadeira] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [fichas, setFichas] = useState([]);         // fichas técnicas (fonte: /api/estoque)
@@ -302,6 +304,7 @@ export default function Dashboard() {
       setCardapioCategorias(Array.isArray(salvo && salvo.cardapioCategorias) ? salvo.cardapioCategorias : null);
       setPrecoBase((salvo && salvo.precoBase) || null);
       setMei((salvo && salvo.mei) || null);
+      setFritadeira((salvo && salvo.fritadeira) || null);
       setClientes(arr(salvo && salvo.clientes));
       // Grava SÓ em dois casos seguros: (1) primeira vez de verdade (servidor
       // vazio) pra semear; (2) a limpeza de nomes mudou algo — e aí a base é o
@@ -446,6 +449,7 @@ export default function Dashboard() {
     cardapioCategorias: (v) => { setCardapioCategorias(v); salvarTudo({ cardapioCategorias: v }); },
     precoBase: (v) => { setPrecoBase(v); salvarTudo({ precoBase: v }); },
     mei: (v) => { setMei(v); salvarTudo({ mei: v }); },
+    fritadeira: (v) => { setFritadeira(v); salvarTudo({ fritadeira: v }); },
     metas: (v) => { setMetas(v); salvarTudo({ metas: v }); },
     negocio: (v) => { setNegocio(v); salvarTudo({ negocio: v }); },
     modulos: (v) => { setModulos(v); salvarTudo({ modulos: v }); },
@@ -1065,7 +1069,7 @@ export default function Dashboard() {
                   ))}
                 </div>
                 {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} cotacoes={cotacoes} fichas={fichas} cardapio={cardapio} duplicadosIgnorados={dupIgnorados} onRepor={reporLista} onLevarPraCompras={levarPraCompras} />}
-                {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={estoqueAcao} />}
+                {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} vendas={vendas} fritadeira={fritadeira} onFritadeira={upd.fritadeira} onAcao={estoqueAcao} />}
                 {subEstoque === 'conferencia' && <ConferenciaEstoque estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} onAcao={estoqueAcao} carregado={estCarregado} />}
                 {subEstoque === 'cortesia' && <CortesiaConsumo onFeito={() => carregarEstoque({})} />}
               </>
