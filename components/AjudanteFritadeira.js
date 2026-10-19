@@ -66,7 +66,7 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
     }
     await onAcao({ acao: 'fichas', fichas: novas });
     setSalvando(false);
-    setFeito({ n: marcados.length, ml: conta.mlPorPorcao, custo: conta.custoPorPorcao });
+    setFeito({ n: marcados.length, ml: conta.mlPorPorcao, custo: conta.custoPorPorcao, suspeito: !!conta.suspeito });
   };
 
   const opcoesOleo = useMemo(
@@ -156,6 +156,30 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
                 <b style={{ color: C.text }}>{contagem.porDia} por dia</b>.
                 {contagem.total === 0 && <> Ainda não tenho venda desses itens; preenche abaixo quantas tu acha que saem.</>}
               </div>
+              {/* DE ONDE VEM O NÚMERO.
+                  Ela olhou "2,73 por dia" e não tinha como julgar, mas sabe de
+                  cor que num sábado saem 20 a 30 batatas. Com a lista aberta
+                  ela vê num segundo o que eu não vejo daqui: prato marcado que
+                  nunca vendeu, ou campeão que ficou de fora. */}
+              {contagem.porPrato && contagem.porPrato.length > 0 && (
+                <div style={{ marginTop: 10, paddingTop: 9, borderTop: `1px solid ${C.hair}` }}>
+                  <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.07em', color: C.faint, fontWeight: 800, marginBottom: 6 }}>
+                    De onde vem essa conta
+                  </div>
+                  {contagem.porPrato.slice(0, 12).map((p) => (
+                    <div key={p.nome} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '3px 0', fontSize: 12.5 }}>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: p.qtd > 0 ? C.text : C.faint }}>{p.nome}</span>
+                      <b style={{ flexShrink: 0, color: p.qtd > 0 ? C.text : C.amber, fontVariantNumeric: 'tabular-nums' }}>
+                        {p.qtd > 0 ? `${p.qtd} em 30 dias` : 'nenhuma venda'}
+                      </b>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 11.5, color: C.faint, marginTop: 7, lineHeight: 1.5 }}>
+                    Se algum prato que sai muito aparecer com pouca ou nenhuma venda, a conta vai sair errada — e aí o
+                    número de baixo é melhor que a contagem.
+                  </div>
+                </div>
+              )}
               <div style={{ marginTop: 10 }}>
                 <Label>Porções fritas por dia (deixa vazio pra usar a contagem)</Label>
                 <NumInput value={cfg.porDiaManual || ''} onChange={(v) => set({ porDiaManual: v })} placeholder={String(contagem.porDia || '')} />
@@ -201,10 +225,27 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
               )}
 
               {feito ? (
-                <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginTop: 12, lineHeight: 1.55 }}>
-                  ✓ Pus {feito.ml} ml de óleo na ficha de {feito.n} prato(s). O custo de cada um subiu {brl(feito.custo)} —
-                  e agora o CMV do relatório conta o óleo.
-                </div>
+                /* A TELA NÃO PODE COMEMORAR O QUE ELA MESMA REPROVOU.
+                   Ela aplicou com o aviso aberto, e logo abaixo apareceu um ✓
+                   verde dizendo "agora o CMV conta o óleo" — como se estivesse
+                   tudo certo. Duas mensagens opostas na mesma tela: a de baixo
+                   é a última que se lê, e é a que fica. */
+                feito.suspeito ? (
+                  <div style={{ fontSize: 13, color: C.text, fontWeight: 600, marginTop: 12, lineHeight: 1.6, background: `color-mix(in srgb, ${C.amber} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${C.amber} 50%, transparent)`, borderRadius: 11, padding: '11px 13px' }}>
+                    <b style={{ color: C.amber }}>Apliquei, mas com o número fora da faixa.</b> Os {feito.ml} ml entraram
+                    na ficha de {feito.n} prato(s) e cada um ficou {brl(feito.custo)} mais caro — o que é muito, e vai
+                    inflar o CMV do relatório e o preço sugerido de todo frito.
+                    <div style={{ marginTop: 7 }}>
+                      Arruma os dois campos acima e aplica de novo: <b>a ficha é substituída</b>, não somada. Enquanto
+                      não arrumar, não usa o preço desses pratos pra decidir nada.
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginTop: 12, lineHeight: 1.55 }}>
+                    ✓ Pus {feito.ml} ml de óleo na ficha de {feito.n} prato(s). O custo de cada um subiu {brl(feito.custo)} —
+                    e agora o CMV do relatório conta o óleo.
+                  </div>
+                )
               ) : (
                 <div style={{ marginTop: 12 }}>
                   <Btn kind="ok" small onClick={aplicar} disabled={salvando || marcados.length === 0}>
