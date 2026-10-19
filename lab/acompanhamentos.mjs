@@ -155,6 +155,12 @@ cobra('respondeu 40', await campo('1 kg de Limão dá quantas porções?', '40')
 await pg.waitForTimeout(800);
 txt = await texto();
 cobra('converteu pra 25 g por porção', /25 g/.test(txt), (txt.match(/[^\n]*em cada porção[^\n]*/) || [''])[0]);
+// A DICA TEM QUE RESPONDER A PERGUNTA QUE FOI FEITA.
+// A primeira versão terminava em FATIAS enquanto o campo pede PORÇÕES: quem
+// seguisse digitava o dobro e o limão saía pela metade do preço — o erro que
+// este ajudante existe pra evitar.
+cobra('a dica termina em porções, não em fatias', /32 porções/.test(txt) && /não 64/.test(txt), (txt.match(/[^\n]*porções —[^\n]*/) || ['(dica não achada)'])[0]);
+cobra('e lembra das 2 fatias por porção', /2 fatias/.test(txt));
 cobra('e custa R$ 0,25', /R\$ 0,25/.test(txt));
 cobra('marcou a batata', await marcar('Batata Frita Clássica'));
 await pg.waitForTimeout(400);
