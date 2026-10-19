@@ -393,6 +393,27 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], c
         </div>
         {campoPct('margem', 'Margem de lucro desejada', '', 'ex.: 65')}
 
+        {/* "ESSA MARGEM DE 65% É SAUDÁVEL?"
+            Perguntar isso é o passo certo, e a resposta não é uma faixa de
+            revista: depende do que a casa custa. Os 65% não são lucro — deles
+            ainda saem aluguel, salário e luz. A margem só é saudável se o
+            faturamento cobrir o fixo, e o sistema conhece as duas pontas.
+            Então em vez de uma opinião, um alvo: quanto ela precisa faturar
+            no mês pra pagar a casa com essa margem. */}
+        {conta.margemPct > 0 && rateioAuto && rateioAuto.casa > 0 && (
+          <div style={{ background: C.panel2, borderRadius: 12, padding: '11px 14px', marginBottom: 10, fontSize: 12.5, color: C.text, lineHeight: 1.65 }}>
+            <b style={{ color: C.accent }}>Essa margem paga a casa?</b> Com {conta.margemPct.toFixed(0)}%, cada R$ 100
+            vendidos deixam R$ {conta.margemPct.toFixed(0)} depois do ingrediente e do cartão. Tuas despesas de casa em{' '}
+            {rateioAuto.rotulo} foram <b>{brl(rateioAuto.casa)}</b> — então tu precisa faturar{' '}
+            <b style={{ color: C.accent }}>{brl(Math.round((rateioAuto.casa / (conta.margemPct / 100)) * 100) / 100)}</b>{' '}
+            no mês só pra empatar. O que passar disso é lucro de verdade.
+            <div style={{ fontSize: 11.5, color: C.faint, marginTop: 7, lineHeight: 1.55 }}>
+              Margem alta com faturamento baixo não paga conta, e margem menor com movimento paga. Por isso a resposta
+              pra "65% é saudável?" não é uma faixa de revista — é este número aqui, comparado com o que tu fatura.
+            </div>
+          </div>
+        )}
+
         {/* O NÚMERO QUE SE PÕE AQUI NÃO É O MESMO DE UMA LOJA — e eu quase a
             fiz errar isso.
             O exemplo era "25", copiado das calculadoras de varejo. Lá o custo
