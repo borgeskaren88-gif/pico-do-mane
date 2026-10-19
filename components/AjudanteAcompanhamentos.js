@@ -226,9 +226,19 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
                           estimar quantas porções saem de um quilo. */}
                       <Label>{`1 ${item.unidade || 'un'} de ${item.nome} dá quantas porções?`}</Label>
                       <NumInput value={rendimento} onChange={setRendimento} placeholder="ex.: 40" />
-                      <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.45 }}>
-                        Chute de cozinha serve. Um limão dá umas 8 fatias e um quilo tem uns 7 limões — então
-                        um quilo dá quase 60 fatias.
+                      {/* A DICA TEM QUE RESPONDER A PERGUNTA QUE FOI FEITA.
+                          A primeira versão terminava em FATIAS ("um quilo dá
+                          quase 60 fatias") enquanto o campo pede PORÇÕES. Quem
+                          seguisse a dica digitava o dobro, e o limão saía pela
+                          metade do preço — justamente o erro que este ajudante
+                          existe pra evitar. Agora a conta vai até o fim, e o
+                          último passo é o que ela disse: "duas fatias por
+                          porção". */}
+                      <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.5 }}>
+                        Chute de cozinha serve, mas vai até <b style={{ color: C.muted }}>porções</b>, não até fatias.
+                        Ex.: um limão dá umas 8 fatias e num quilo vêm uns 8 limões, então o quilo dá umas 64 fatias.
+                        Se cada porção leva <b style={{ color: C.muted }}>2 fatias</b>, o quilo rende umas{' '}
+                        <b style={{ color: C.text }}>32 porções</b> — é 32 que entra aqui, não 64.
                       </div>
                     </div>
                   )}
