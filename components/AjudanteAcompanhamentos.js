@@ -4,6 +4,7 @@ import { C, Card, Btn, Label, NumInput, Select } from './ui';
 import { brl, num, numQtd } from '../lib/util';
 import { UNIDADES } from '../lib/estoque';
 import { porPorcao, porNasFichas } from '../lib/acompanhamentos';
+import { porcoesFritasPorDia } from '../lib/fritadeira';
 import ListaDePratos from './ListaDePratos';
 
 // "TEM O KETCHUP QUE VAI, TEM LIMÃO FATIA QUE VAI NAS PORÇÕES."
@@ -16,13 +17,14 @@ import ListaDePratos from './ListaDePratos';
 
 const SUGESTOES = ['ketchup', 'limão', 'limao', 'maionese', 'molho', 'guardanapo', 'palito', 'mostarda', 'barbecue', 'sal', 'tempero'];
 
-export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], fichas = [], onAcao }) {
+export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], fichas = [], vendas = [], onAcao }) {
   const [aberto, setAberto] = useState(false);
   const [estoqueId, setEstoqueId] = useState('');
   const [modo, setModo] = useState('direto'); // 'direto' | 'rendimento'
   const [qtd, setQtd] = useState('');
   const [unidade, setUnidade] = useState('');
   const [rendimento, setRendimento] = useState('');
+  const [dias, setDias] = useState('');
   const [pratos, setPratos] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [feito, setFeito] = useState(null);
@@ -41,14 +43,20 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
     return [...sugeridos, ...resto].map((e) => ({ value: e.id, label: rot(e) }));
   }, [estoque]);
 
+  // Quantas porções desses pratos saem por dia — a parte que ela não conta.
+  const contagem = useMemo(() => porcoesFritasPorDia(vendas, pratos, 30), [vendas, pratos]);
+  // No modo "dura tantos dias", o rendimento sai da conta: dias × porções/dia.
+  const rende = modo === 'duracao' ? numQtd(dias) * contagem.porDia : 0;
+
   const calc = useMemo(() => {
     if (!item) return null;
-    if (modo === 'rendimento') return porPorcao({ unidadeItem: item.unidade, rendimento });
+    if (modo === 'duracao') return rende > 0 ? porPorcao({ unidadeItem: item.unidade, rendimento: rende, conteudo: item.conteudo, conteudoUnid: item.conteudoUnid }) : null;
+    if (modo === 'rendimento') return porPorcao({ unidadeItem: item.unidade, rendimento, conteudo: item.conteudo, conteudoUnid: item.conteudoUnid });
     const q = numQtd(qtd);
     if (!(q > 0)) return null;
     const u = unidade || item.unidade || 'un';
     return { qtd: String(qtd), unidade: u, legivel: `${qtd} ${u}` };
-  }, [item, modo, qtd, unidade, rendimento]);
+  }, [item, modo, qtd, unidade, rendimento, rende]);
 
   // Quanto isso custa por porção — é o que transforma "é só um limãozinho" em
   // número. Em cima de 100 porções no mês, "só um limãozinho" vira dinheiro.
@@ -57,7 +65,9 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
     const u = item.unidade;
     const q = numQtd(String(calc.qtd).replace(',', '.'));
     let emUnidadeDoItem = q;
-    if ((u === 'kg' && calc.unidade === 'g') || (u === 'L' && calc.unidade === 'ml')) emUnidadeDoItem = q / 1000;
+    const dentro = numQtd(item.conteudo);
+    if (dentro > 0 && item.conteudoUnid === calc.unidade) emUnidadeDoItem = q / dentro; // "16 g de um galão de 3.200 g"
+    else if ((u === 'kg' && calc.unidade === 'g') || (u === 'L' && calc.unidade === 'ml')) emUnidadeDoItem = q / 1000;
     else if (calc.unidade !== u) return null; // conversão que eu não sei fazer: melhor não chutar
     return Math.round(emUnidadeDoItem * num(item.custo) * 100) / 100;
   }, [item, calc]);
@@ -72,7 +82,7 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
     setFeito({ n: pratos.length, nome: item.nome, legivel: calc.legivel, custo: custoPorPorcao });
   };
 
-  const limpar = () => { setFeito(null); setEstoqueId(''); setQtd(''); setUnidade(''); setRendimento(''); setPratos([]); };
+  const limpar = () => { setFeito(null); setEstoqueId(''); setQtd(''); setUnidade(''); setRendimento(''); setDias(''); setPratos([]); };
 
   return (
     <Card style={{ marginBottom: 14, borderColor: aberto ? C.accent : C.cardBorder }}>
@@ -111,9 +121,21 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
 
               {item && (
                 <>
-                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.accent, fontWeight: 800, marginBottom: 8 }}>2 · Quanto vai em cada porção</div>
+                  {/* OS PRATOS VÊM ANTES DA QUANTIDADE.
+                      Era o contrário, e ficava errado: no modo "quanto tempo
+                      dura" eu preciso saber quantas porções saem por dia, e
+                      isso sai dos pratos marcados. Perguntar a quantidade
+                      antes de saber em quais pratos era pedir na ordem em que
+                      a conta não fecha. */}
+                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.accent, fontWeight: 800, marginBottom: 4 }}>2 · Em quais pratos vai</div>
+                  <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 10, lineHeight: 1.45 }}>
+                    Marca todas as porções que saem com isso. Se já tiver na ficha, a quantidade é atualizada.
+                  </div>
+                  <ListaDePratos itens={ativos} marcados={pratos} onAlternar={alternar} jaTem={jaTem} />
+
+                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.accent, fontWeight: 800, marginBottom: 8 }}>3 · Quanto vai em cada porção</div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-                    {[['direto', 'Sei a quantidade'], ['rendimento', 'Sei quantas porções rende']].map(([v, rot]) => (
+                    {[['direto', 'Sei a quantidade'], ['duracao', 'Sei quantos dias dura'], ['rendimento', 'Sei quantas porções rende']].map(([v, rot]) => (
                       <button key={v} onClick={() => setModo(v)} style={{
                         borderRadius: 999, padding: '7px 13px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
                         border: `1px solid ${modo === v ? C.accent : C.line}`,
@@ -123,7 +145,7 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
                     ))}
                   </div>
 
-                  {modo === 'direto' ? (
+                  {modo === 'direto' && (
                     <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <Label>Quantidade</Label>
@@ -134,10 +156,30 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
                         <Select value={unidade || item.unidade || 'un'} onChange={setUnidade} options={UNIDADES} />
                       </div>
                     </div>
-                  ) : (
+                  )}
+
+                  {modo === 'duracao' && (
                     <div style={{ marginBottom: 6 }}>
-                      {/* A PERGUNTA QUE ELA CONSEGUE RESPONDER.
-                          Ninguém sabe dizer "23 g de limão". Todo mundo sabe
+                      {/* O JEITO COMO ELA REALMENTE PENSA.
+                          "Troco óleo a cada 10 dias", disse ela — e o ketchup
+                          é galão que vai pro potinho, onde "quantos potinhos
+                          saem de um galão" ninguém contou na vida. Mas
+                          "quanto tempo dura um galão" todo bar sabe. */}
+                      <Label>{`Quantos dias dura 1 ${item.unidade || 'un'} de ${item.nome}?`}</Label>
+                      <NumInput value={dias} onChange={setDias} placeholder="ex.: 10" />
+                      <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.45 }}>
+                        {pratos.length === 0
+                          ? 'Marca os pratos ali em cima que eu conto nas tuas vendas quantas porções saem por dia.'
+                          : contagem.total > 0
+                            ? `Nos últimos 30 dias saíram ${contagem.total} porções desses pratos — ${contagem.porDia} por dia. É isso que eu uso pra dividir a embalagem.`
+                            : 'Ainda não tenho venda desses pratos pra contar. Usa um dos outros dois jeitos por enquanto.'}
+                      </div>
+                    </div>
+                  )}
+
+                  {modo === 'rendimento' && (
+                    <div style={{ marginBottom: 6 }}>
+                      {/* Ninguém sabe dizer "23 g de limão". Todo mundo sabe
                           estimar quantas porções saem de um quilo. */}
                       <Label>{`1 ${item.unidade || 'un'} de ${item.nome} dá quantas porções?`}</Label>
                       <NumInput value={rendimento} onChange={setRendimento} placeholder="ex.: 40" />
@@ -152,6 +194,11 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
                     <div style={{ background: C.panel2, borderRadius: 12, padding: '11px 14px', margin: '12px 0 14px', fontSize: 13, color: C.text, lineHeight: 1.6 }}>
                       Vai <b style={{ color: C.accent }}>{calc.legivel}</b> de {item.nome} em cada porção
                       {custoPorPorcao != null && <> — <b style={{ color: C.accent }}>{brl(custoPorPorcao)}</b></>}.
+                      {modo === 'duracao' && rende > 0 && (
+                        <div style={{ fontSize: 11.5, color: C.faint, marginTop: 5 }}>
+                          {dias} dias × {contagem.porDia} porções por dia = {Math.round(rende * 10) / 10} porções por embalagem.
+                        </div>
+                      )}
                       {custoPorPorcao != null && custoPorPorcao > 0 && (
                         <div style={{ fontSize: 11.5, color: C.faint, marginTop: 5 }}>
                           Parece pouco, mas em 500 porções no mês são {brl(Math.round(custoPorPorcao * 500 * 100) / 100)}.
@@ -165,12 +212,6 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
                       )}
                     </div>
                   )}
-
-                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: C.accent, fontWeight: 800, marginBottom: 4 }}>3 · Em quais pratos</div>
-                  <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 10, lineHeight: 1.45 }}>
-                    Marca todas as porções que saem com isso. Se já tiver na ficha, a quantidade é atualizada.
-                  </div>
-                  <ListaDePratos itens={ativos} marcados={pratos} onAlternar={alternar} jaTem={jaTem} />
 
                   <Btn kind="ok" small onClick={aplicar} disabled={salvando || !calc || !pratos.length}>
                     {salvando ? 'Pondo…' : `Pôr em ${pratos.length} prato(s)`}

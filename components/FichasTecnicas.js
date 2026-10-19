@@ -128,7 +128,7 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
       />
 
       {/* O QUE SAI JUNTO E SOME DA FICHA: ketchup, limão, molho. */}
-      <AjudanteAcompanhamentos cardapio={cardapio} estoque={estoque} fichas={fichas} onAcao={onAcao} />
+      <AjudanteAcompanhamentos cardapio={cardapio} estoque={estoque} fichas={fichas} vendas={vendas} onAcao={onAcao} />
 
       {/* Importar o modelo pronto (fichas do PDF do Pico do Mané) */}
       <Card style={{ marginBottom: 14, borderColor: C.accent }}>
