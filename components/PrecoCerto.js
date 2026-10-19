@@ -116,6 +116,8 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], b
     };
   }, [taxas, custo]);
 
+  const hojePreco = modo === 'cardapio' && item ? num(item.preco) : 0;
+
   // ---- o que o preço de hoje realmente dá ----
   // O pulo do gato desta tela. A calculadora diz quanto cobrar; isto diz
   // quanto ela está deixando na mesa por NÃO cobrar.
@@ -129,6 +131,9 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], b
 
   // O ingrediente como fatia do preço — o CMV do item, antes de o preço existir.
   const custoPct = conta.estado === 'ok' && conta.preco > 0 ? (custo.valor / conta.preco) * 100 : null;
+  // Quanto o preço sugerido sobe em cima do que ela cobra hoje. É o tamanho
+  // do salto que diz se a conta "× 100 unidades" ainda vale alguma coisa.
+  const saltoPct = conta.estado === 'ok' && hojePreco > 0 ? ((conta.sugerido - hojePreco) / hojePreco) * 100 : 0;
 
   const fatias = useMemo(() => {
     if (conta.estado !== 'ok') return [];
@@ -417,9 +422,35 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], b
               <>Cada <b>{item.nome}</b> que sai te custa <b style={{ color: C.red }}>{brl(Math.abs(hoje.lucro))}</b> do
               teu bolso. Vender mais só aumenta o buraco — esse preço precisa subir.</>
             ) : hoje.preco < conta.sugerido ? (
+              // "EM 100 UNIDADES SÃO R$ X" TEM UMA SUPOSIÇÃO ESCONDIDA: que ela
+              // vai vender as mesmas 100 depois de subir o preço. Num aumento
+              // de R$ 2 isso é quase verdade. Num combo de R$ 399,99 que ia pra
+              // R$ 529,50 — 32% a mais — não é: quantidade cai quando o preço
+              // sobe, e o quanto cai nenhuma conta aqui sabe.
+              //
+              // Número que parece certo e depende de suposição não dita é do
+              // mesmo tipo dos que eu já consertei neste sistema. Então a
+              // suposição passa a vir escrita, e quanto maior o salto, mais
+              // forte o aviso.
               <>Tu está deixando <b style={{ color: C.amber }}>{brl(conta.lucroNoSugerido - hoje.lucro)}</b> na mesa
               em cada <b>{item.nome}</b>. Em 100 unidades no mês,
-              são <b style={{ color: C.amber }}>{brl((conta.lucroNoSugerido - hoje.lucro) * 100)}</b>.</>
+              são <b style={{ color: C.amber }}>{brl((conta.lucroNoSugerido - hoje.lucro) * 100)}</b>
+              {' '}— <span style={{ color: C.muted }}>se continuar vendendo o mesmo tanto</span>.
+              {saltoPct >= 12 && (
+                <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${C.line}`, fontSize: 12.5, color: C.muted, lineHeight: 1.6 }}>
+                  <b style={{ color: C.amber }}>Mas olha o tamanho do salto:</b> de {brl(hoje.preco)} pra {brl(conta.sugerido)}
+                  {' '}é <b style={{ color: C.text }}>{saltoPct.toFixed(0)}% mais caro</b>. Aumento desse tamanho mexe na
+                  quantidade que sai, e aí as 100 unidades podem virar 70.{' '}
+                  {saltoPct >= 25
+                    ? <>Nesse caso vale subir <b style={{ color: C.text }}>aos poucos</b> e olhar o que acontece com a
+                      venda, em vez de dar o salto inteiro de uma vez.</>
+                    : <>Vale subir e acompanhar se a saída se mantém.</>}
+                  {' '}Em <b style={{ color: C.text }}>combo</b> isso é ainda mais delicado: ele costuma ter margem menor
+                  de propósito, porque o trabalho dele é <b style={{ color: C.text }}>vender mais</b>. Quem decide se
+                  valeu é o lucro do mês inteiro, não o de uma unidade — isso está em{' '}
+                  <b style={{ color: C.text }}>Margem → quem mais deu no mês</b>.
+                </div>
+              )}</>
             ) : (
               // O risco aqui é ela ler o número grande lá em cima como "o preço
               // certo" e baixar o dela. O sugerido é PISO: o mínimo pra a

@@ -266,6 +266,57 @@ cobra('pergunta se tem certeza', /Tens certeza\?/.test(txt), (txt.match(/[^\n]*T
 cobra('o botão diz BAIXAR, não "trocar"', /Sim, baixar pra R\$ 10,50/.test(txt));
 cobra('e o preço do cardápio segue intacto até ela confirmar', (await painel()).cardapio[0].preco === '29,99', (await painel()).cardapio[0].preco);
 
+console.log('\n### "EM 100 UNIDADES SÃO R$ X" DEPENDE DE UMA SUPOSIÇÃO — e ela tem que vir escrita');
+// O combo que ela testou: Apple Green, custo R$ 168,63, ela cobra R$ 399,99.
+// Com 65% o sugerido dá R$ 529,50 — 32% mais caro. A tela dizia que ela
+// deixava R$ 12.543,04 por mês na mesa, como se as 100 unidades continuassem
+// saindo ao preço novo. Num salto desse tamanho, não continuam.
+const pCombo = await painel();
+await gravar({ ...pCombo,
+  estoque: [{ id: 'e2', nome: 'Insumo do combo', custo: '168,63', unidade: 'un', saldo: '30', categoria: 'Outros' }],
+  cardapio: [{ id: 'c2', nome: 'Apple Green', categoria: 'Combos', preco: '399,99', ativo: true }],
+  fichas: [{ cardapioId: 'c2', itens: [{ estoqueId: 'e2', qtd: '1', unidade: 'un' }] }],
+  precoBase: { impostos: '0', cartao: '3,15', comissao: '', delivery: '', margem: '65' },
+});
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Preço certo');
+await pg.evaluate(() => {
+  const s3 = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => /Apple Green/.test(o.textContent)));
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+  if (s3) { setter.call(s3, 'c2'); s3.dispatchEvent(new Event('change', { bubbles: true })); }
+});
+await pg.waitForTimeout(1400);
+txt = await texto();
+cobra('reproduz o caso dela: sugerido R$ 529,50', txt.includes('R$ 529,50'), (txt.match(/[^\n]*conta exata[^\n]*/) || [''])[0]);
+cobra('e o R$ 125,43 por unidade', /R\$ 125,4\d/.test(txt), (txt.match(/[^\n]*na mesa[^\n]*/) || [''])[0]);
+cobra('A SUPOSIÇÃO VEM ESCRITA', /se continuar vendendo o mesmo tanto/.test(txt), (txt.match(/[^\n]*mesmo tanto[^\n]*/) || ['(continua escondida)'])[0]);
+cobra('diz o tamanho do salto (32%)', /32% mais caro/.test(txt), (txt.match(/[^\n]*mais caro[^\n]*/) || [''])[0]);
+cobra('avisa que a quantidade cai', /100 unidades podem virar 70/.test(txt));
+cobra('manda subir aos poucos num salto grande', /aos poucos/.test(txt));
+cobra('e explica que combo tem margem menor de propósito', /vender mais/.test(txt) && /combo/i.test(txt));
+cobra('aponta onde se decide isso de verdade', /quem mais deu no mês/.test(txt));
+
+console.log('\n### num aumento pequeno o aviso NÃO aparece — senão vira paisagem');
+// Batata a R$ 10,00 com sugerido R$ 12,50 é 25% ... ainda grande. Usa um
+// caso de verdade pequeno: preço 12,00 contra sugerido 12,50 = 4%.
+const pP = await painel();
+await gravar({ ...pP, cardapio: [{ ...pP.cardapio[0], preco: '510,00' }] });
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Preço certo');
+await pg.evaluate(() => {
+  const s4 = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => /Apple Green/.test(o.textContent)));
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+  if (s4) { setter.call(s4, 'c2'); s4.dispatchEvent(new Event('change', { bubbles: true })); }
+});
+await pg.waitForTimeout(1400);
+txt = await texto();
+cobra('ainda diz que está deixando na mesa', /na mesa/.test(txt));
+cobra('mas sem o sermão do salto (só 4%)', !/mais caro/.test(txt), (txt.match(/[^\n]*mais caro[^\n]*/) || [''])[0]);
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
