@@ -60,7 +60,14 @@ export default function ConferirVendas({ compras = [], vendas = [], fichas = [],
           {r.pct == null ? <Empty>{titulo}</Empty> : (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 8, marginBottom: 12 }}>
-                {[['Tu comprou', brl(r.comprado), C.text], ['As vendas explicam', brl(r.explicado), cor], ['Não explicado', brl(r.diferenca), r.diferenca > 0 ? cor : C.faint]].map(([rot, v, c]) => (
+                {[
+                  ['Tu comprou', brl(r.comprado), C.text],
+                  ['As vendas explicam', brl(r.explicado), cor],
+                  // Em rodagem este número não é veredito nenhum — pintá-lo da
+                  // cor do estado (verde) ao lado da palavra "não explicado"
+                  // só confunde. Fica neutro.
+                  ['Falta explicar', brl(r.diferenca), r.estado === 'rodagem' ? C.faint : r.diferenca > 0 ? cor : C.faint],
+                ].map(([rot, v, c]) => (
                   <div key={rot} style={{ background: C.panel2, borderRadius: 11, padding: '9px 11px', minWidth: 0 }}>
                     <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.07em', color: C.faint, fontWeight: 800 }}>{rot}</div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: c, marginTop: 3, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</div>
@@ -71,9 +78,17 @@ export default function ConferirVendas({ compras = [], vendas = [], fichas = [],
               <div style={{ display: 'flex', height: 12, borderRadius: 7, overflow: 'hidden', background: C.panel2, marginBottom: 6 }}>
                 <div style={{ width: `${Math.min(100, r.pct)}%`, background: cor }} />
               </div>
-              <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6, marginBottom: 12 }}>
+              <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6, marginBottom: 8 }}>
                 De cada R$ 100 de mercadoria que entrou, as vendas explicam{' '}
                 <b style={{ color: cor }}>R$ {r.pct.toFixed(0)}</b>.
+              </div>
+              {/* "Não explicado" era jargão meu, e ela precisou perguntar o que
+                  era olhando um número grande na tela. Número sem legenda não
+                  informa: assusta. */}
+              <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.55, marginBottom: 12 }}>
+                <b style={{ color: C.muted }}>Falta explicar</b> é a mercadoria que tu pagou e as vendas do período não
+                dão conta de justificar. Não quer dizer que sumiu: pode estar na prateleira, pode ser venda que não foi
+                lançada, pode ser perda. Quem diz qual é o caso são as linhas abaixo.
               </div>
 
               {/* A LEITURA. Ficha incompleta derruba este número sozinha, sem
@@ -91,6 +106,13 @@ export default function ConferirVendas({ compras = [], vendas = [], fichas = [],
                   o app ainda não estava em uso, e a compra daquele mês ficou sem par. </>}
                   No último mês fechado (<b>{r.ultimo.rotulo}</b>) as vendas explicam{' '}
                   <b style={{ color: C.green }}>{r.ultimo.pct.toFixed(0)}%</b> do que entrou, que é saudável.
+                  {r.naoExplicadoSemApp > 0 && (
+                    <div style={{ marginTop: 7 }}>
+                      Dos <b>{brl(r.diferenca)}</b> que faltam explicar, <b style={{ color: C.green }}>{brl(r.naoExplicadoSemApp)}</b>{' '}
+                      são desse(s) mês(es) sem venda lançada. Não é mercadoria sumida — é compra de um tempo em que o
+                      app não registrava nada.
+                    </div>
+                  )}
                   <div style={{ fontSize: 11.5, color: C.faint, marginTop: 8, lineHeight: 1.55 }}>
                     Acima de 100% não é erro: é mês em que saiu estoque comprado antes. O número dos três meses vai
                     subir sozinho conforme os meses antigos saem da janela. Vale olhar isto de novo daqui a um mês —
