@@ -127,6 +127,70 @@ txt = await texto();
 cobra('diz QUAL ingrediente está sem custo', /sem custo no estoque: .*Carne 300g/.test(txt), (txt.match(/[^\n]*sem custo no estoque[^\n]*/) || ['(só disse "algum")'])[0]);
 cobra('e avisa que o preço sai por baixo', /sai por baixo/.test(txt));
 
+console.log('\n### SACO PORCIONADO CUJO PACOTE NÃO CONVERTE: não inventa custo');
+// O caso real dela: "Batata 400g" é saco de 400 g tirado de um pacote
+// cadastrado em SACO — sem dizer quantos gramas tem o saco. A conversão de
+// "400 g" pra "saco" cai no chute do fim da função e devolve 400. O saco
+// porcionado passava a custar 400 SACOS, e a Batata Frita Clássica apareceu
+// com R$ 2.484,36 de ingrediente numa porção de R$ 29,99.
+//
+// Quando não dá pra converter, o certo é NÃO derivar: fica o custo que o saco
+// já tinha. Velho é consertável; mil vezes maior não é.
+const pB = await painel();
+await gravar({ ...pB,
+  estoque: [
+    // Pacote em SACO, sem conteúdo — não dá pra saber quantos gramas tem.
+    { id: 'pacote', nome: 'Batata pacote', custo: '6,20', unidade: 'saco', saldo: '10', categoria: 'Cozinha' },
+    { id: 'bat400', nome: 'Batata 400g', custo: '3,22', unidade: 'un', saldo: '20', categoria: 'Cozinha', separar: { brutoId: 'pacote', gramas: 400, unidade: 'g' } },
+  ],
+  cardapio: [{ id: 'c2', nome: 'Batata Frita Clássica', categoria: 'Porções', preco: '29,99', ativo: true }],
+  fichas: [{ cardapioId: 'c2', itens: [{ estoqueId: 'bat400', qtd: '1', unidade: 'un' }] }],
+  compras: [],
+});
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Preço certo');
+await pg.evaluate(() => {
+  const s2 = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => /Batata Frita/.test(o.textContent)));
+  const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+  if (s2) { set.call(s2, 'c2'); s2.dispatchEvent(new Event('change', { bubbles: true })); }
+});
+await pg.waitForTimeout(1500);
+const l2 = await linha('Custo de uma unidade');
+cobra('NÃO virou 400 sacos (R$ 2.480,00)', !/2\.480|2\.484/.test(l2), l2);
+cobra('ficou com o custo que o saco já tinha: R$ 3,22', /⇢ R\$ 3,22/.test(l2), l2);
+
+console.log('\n### e a tela mostra o custo LINHA A LINHA');
+// Um número só não dá pra conferir. Com a lista, o ingrediente absurdo salta
+// aos olhos — foram 40 minutos de caça pra achar o que isto mostra num relance.
+txt = await texto();
+cobra('tem a lista "de onde vem esse custo"', /De onde vem esse custo/i.test(txt), (txt.match(/[^\n]*De onde vem esse custo[^\n]*/i) || ['(não mostra)'])[0]);
+cobra('com o ingrediente e o quanto ele pesa', /Batata 400g[\s\S]{0,60}R\$ 3,22/.test(txt), (txt.match(/[^\n]*Batata 400g[^\n]*/) || [''])[0]);
+
+console.log('\n### conversão no chute é apontada em vermelho');
+// Ficha pedindo "300 g" de um item cadastrado em pote, sem dizer quantos
+// gramas tem o pote: o sistema usaria 300 POTES.
+const pC = await painel();
+await gravar({ ...pC,
+  estoque: [{ id: 'pote', nome: 'Molho pote', custo: '18', unidade: 'pote', saldo: '5', categoria: 'Cozinha' }],
+  fichas: [{ cardapioId: 'c2', itens: [{ estoqueId: 'pote', qtd: '300', unidade: 'g' }] }],
+});
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Preço certo');
+await pg.evaluate(() => {
+  const s3 = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => /Batata Frita/.test(o.textContent)));
+  const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+  if (s3) { set.call(s3, 'c2'); s3.dispatchEvent(new Event('change', { bubbles: true })); }
+});
+await pg.waitForTimeout(1500);
+txt = await texto();
+cobra('avisa "conversão no chute"', /Conversão no chute/i.test(txt), (txt.match(/[^\n]*onversão no chute[^\n]*/) || ['(passou calado)'])[0]);
+cobra('e nomeia o ingrediente', /Molho pote/.test(txt));
+cobra('explicando o conserto (preencher o conteúdo)', /preenche o conteúdo da embalagem/.test(txt));
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);

@@ -108,7 +108,7 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], c
       const b = custoDaFicha(ficha, estoqueCusteado);
       const sab = custoDosSabores(item.sabores, estoqueCusteado, item.saboresTotal);
       const v = Math.round((b.custo + sab.medio + num(embalagem) + num(rateio)) * 100) / 100;
-      return { valor: v, pronto: v > 0, completo: b.completo, faltando: b.faltando || [], motivo: v > 0 ? '' : 'sem-custo' };
+      return { valor: v, pronto: v > 0, completo: b.completo, faltando: b.faltando || [], chutes: b.chutes || [], detalhe: b.detalhe || [], motivo: v > 0 ? '' : 'sem-custo' };
     }
     const soma = ingredientes.reduce((s, i) => s + num(i.valor), 0);
     const n = Math.max(0, num(rende));
@@ -323,10 +323,42 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], c
         </div>
 
         {custo.pronto && (
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}`, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: C.muted }}>Custo de uma unidade</span>
-            <span style={{ fontSize: 20, fontWeight: 900, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{brl(custo.valor)}</span>
-          </div>
+          <>
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}`, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: C.muted }}>Custo de uma unidade</span>
+              <span style={{ fontSize: 20, fontWeight: 900, color: C.amber, fontVariantNumeric: 'tabular-nums' }}>{brl(custo.valor)}</span>
+            </div>
+
+            {/* DE ONDE VEM O CUSTO, linha a linha.
+                Um número só não dá pra conferir: quando a batata apareceu
+                custando R$ 2.484,36, nem ela nem eu tínhamos como ver qual
+                ingrediente trouxe o absurdo. Com a lista, salta aos olhos. */}
+            {custo.detalhe && custo.detalhe.length > 0 && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.hair}` }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.07em', color: C.faint, fontWeight: 800, marginBottom: 6 }}>
+                  De onde vem esse custo
+                </div>
+                {custo.detalhe.map((d) => (
+                  <div key={d.nome} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '3px 0', fontSize: 12.5 }}>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.muted }}>
+                      {d.nome} <span style={{ color: C.faint }}>· {d.qtd} {d.unidade}</span>
+                      {d.chute && <b style={{ color: C.red }}> · conversão no chute</b>}
+                    </span>
+                    <b style={{ flexShrink: 0, color: d.chute ? C.red : C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(d.custo)}</b>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {custo.chutes && custo.chutes.length > 0 && (
+              <div style={{ marginTop: 11, borderRadius: 11, padding: '11px 13px', background: `color-mix(in srgb, ${C.red} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${C.red} 45%, transparent)`, fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
+                <b style={{ color: C.red }}>Conversão no chute:</b> {custo.chutes.join(', ')}. A ficha pede uma unidade
+                que não dá pra converter pra do estoque — por exemplo "300 g" de um item cadastrado em pote, sem dizer
+                quantos gramas tem o pote. Nesses casos o sistema usa o número como se fosse a unidade do item, e o
+                custo sai <b>muitas vezes maior</b>. Abre o item em Estoque e preenche o conteúdo da embalagem.
+              </div>
+            )}
+          </>
         )}
       </Card>
 
