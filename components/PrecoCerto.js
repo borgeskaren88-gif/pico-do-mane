@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, PageTitle, Label } from './ui';
 import { brl, num, todayISO, ymOf, uid } from '../lib/util';
-import { custoDaFicha, custoDosSabores } from '../lib/estoque';
+import { custoDaFicha, custoDosSabores, tamanhoQueResolve } from '../lib/estoque';
 import { CMV_BOM, CMV_ATENCAO, estoqueNoMes} from '../lib/cmv';
 import { rateioDoMes, mesFechadoAnterior } from '../lib/rateio';
 
@@ -42,7 +42,9 @@ const redondo = (v) => Math.ceil(v * 2 - 1e-9) / 2;
 
 const pct = (v) => Math.max(0, num(v));
 
-export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], compras = [], despesas = [], vendas = [], base, onBase, onCardapio }) {
+const fmtNum = (v) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+
+export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], compras = [], despesas = [], vendas = [], base, onBase, onCardapio, onAcao }) {
   const [modo, setModo] = useState('cardapio'); // 'cardapio' | 'zero'
   const [itemId, setItemId] = useState('');
   const [taxas, setTaxas] = useState(() => ({ ...PADRAO, ...(base || {}) }));
@@ -117,6 +119,33 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], c
     const v = Math.round((soma / n + num(embalagem) + num(rateio)) * 100) / 100;
     return { valor: v, pronto: v > 0, motivo: '' };
   }, [modo, item, fichaPorId, estoqueCusteado, ingredientes, rende, embalagem, rateio]);
+
+  // Dos chutes, quais o NOME DO ITEM já resolve. Só entra aqui o que conserta
+  // de verdade: nome em ml não arruma ficha que pede grama.
+  const [consertando, setConsertando] = useState(null);
+  const consertaveis = useMemo(() => {
+    const saida = [];
+    for (const c of (custo.chutes || [])) {
+      const it = estoque.find((e) => e && e.id === c.id);
+      if (!it) continue;
+      const tam = tamanhoQueResolve(c.unidadeReceita, it);
+      if (tam) saida.push({ item: it, tam });
+    }
+    return saida;
+  }, [custo, estoque]);
+
+  const porConteudo = async (it, tam) => {
+    if (!onAcao || consertando) return;
+    setConsertando(it.id);
+    // Manda os campos do item inteiro porque é assim que o `edit` do estoque
+    // recebe — mandar só o conteúdo apagaria o resto.
+    await onAcao({ acao: 'edit', id: it.id, campos: {
+      nome: it.nome, categoria: it.categoria, unidade: it.unidade || 'un',
+      minimo: num(it.minimo), custo: num(it.custo),
+      conteudo: tam.qtd, conteudoUnid: tam.unid, validade: it.validade || '',
+    } });
+    setConsertando(null);
+  };
 
   // ---- a conta ----
   const conta = useMemo(() => {
@@ -352,10 +381,33 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], c
 
             {custo.chutes && custo.chutes.length > 0 && (
               <div style={{ marginTop: 11, borderRadius: 11, padding: '11px 13px', background: `color-mix(in srgb, ${C.red} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${C.red} 45%, transparent)`, fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
-                <b style={{ color: C.red }}>Conversão no chute:</b> {custo.chutes.join(', ')}. A ficha pede uma unidade
-                que não dá pra converter pra do estoque — por exemplo "300 g" de um item cadastrado em pote, sem dizer
-                quantos gramas tem o pote. Nesses casos o sistema usa o número como se fosse a unidade do item, e o
-                custo sai <b>muitas vezes maior</b>. Abre o item em Estoque e preenche o conteúdo da embalagem.
+                <b style={{ color: C.red }}>Conversão no chute:</b> {custo.chutes.map((c) => c.nome).join(', ')}. A ficha
+                pede uma unidade que não dá pra converter pra do estoque — por exemplo "300 g" de um item cadastrado em
+                pote, sem dizer quantos gramas tem o pote. Nesses casos o sistema usa o número como se fosse a unidade
+                do item, e o custo sai <b>muitas vezes maior</b>.
+                {/* O CONSERTO AQUI, NÃO "VAI LÁ NO ESTOQUE".
+                    O Monin dela virou R$ 1.797,00 — trinta garrafas — e o aviso
+                    mandava ela abrir outra tela e preencher um campo. Só que o
+                    tamanho está escrito no nome do item, na mesma linha de
+                    cima: "Xarope Monin 700ml". Pedir que ela digite num campo
+                    o que ela já digitou no nome é o app empurrando o serviço
+                    dele pra ela. */}
+                {consertaveis.length > 0 ? (
+                  <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid color-mix(in srgb, ${C.red} 30%, transparent)` }}>
+                    {consertaveis.map(({ item, tam }) => (
+                      <div key={item.id} style={{ marginBottom: 7 }}>
+                        <div style={{ fontSize: 12.5, marginBottom: 5 }}>
+                          O nome <b>{item.nome}</b> já diz <b>{tam.comoEstaEscrito}</b>. Posso usar isso.
+                        </div>
+                        <Btn small onClick={() => porConteudo(item, tam)} disabled={consertando === item.id}>
+                          {consertando === item.id ? 'Gravando…' : `Usar ${fmtNum(tam.qtd)} ${tam.unid}`}
+                        </Btn>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <> Abre o item em Estoque e preenche o conteúdo da embalagem.</>
+                )}
               </div>
             )}
           </>
