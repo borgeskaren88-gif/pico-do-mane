@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { C, Card, Btn, Label, NumInput, Select } from './ui';
 import { brl, num, numQtd, fmtDate } from '../lib/util';
-import { fatorEntre } from '../lib/estoque';
+import { fatorEntre, chaveNome } from '../lib/estoque';
 import { porcoesFritasPorDia, contaDoOleo, litrosParaMl, duracaoDoGalao } from '../lib/fritadeira';
 import ListaDePratos from './ListaDePratos';
 
@@ -38,7 +38,7 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
   // errou duas vezes por ser ambígua no balcão, e que as notas respondem sem
   // depender de memória nenhuma.
   const duracao = useMemo(
-    () => duracaoDoGalao({ compras, oleo, conteudoMl, fatorEntre }),
+    () => duracaoDoGalao({ compras, oleo, conteudoMl, fatorEntre, chaveNome }),
     [compras, oleo, conteudoMl],
   );
 
