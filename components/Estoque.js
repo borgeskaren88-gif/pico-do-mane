@@ -432,8 +432,12 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   // Conteúdo que briga com a própria unidade do item, conferido enquanto ela
   // digita — o campo é opcional e errá-lo não dá erro nenhum na hora.
   const contradiz = useMemo(() => {
-    const r = conteudoContradiz({ unidade: novo.unidade, conteudo: numQtd(novo.conteudo), conteudoUnid: novo.conteudoUnid });
-    return r ? { ...r, conteudo: numQtd(novo.conteudo) } : null;
+    // Com a MESMA régua do save (`num`), senão o aviso descreve um número e
+    // o botão grava outro: ela digita "1.500" e a caixa vermelha fala de 1,5
+    // enquanto o banco guarda 1500. Aqui mil é o normal — garrafa de 1000 ml,
+    // saco de 5000 g — então quem está certo é o `num`, e o aviso que seguia.
+    const r = conteudoContradiz({ unidade: novo.unidade, conteudo: num(novo.conteudo), conteudoUnid: novo.conteudoUnid });
+    return r ? { ...r, conteudo: num(novo.conteudo) } : null;
   }, [novo.unidade, novo.conteudo, novo.conteudoUnid]);
 
   // Itens onde a NOTA diz um custo e o item diz outro. O CMV usa o da nota, e
