@@ -108,6 +108,12 @@ const marcar = async (nome) => pg.evaluate((n) => {
   if (cb && !cb.checked) { cb.click(); return true; }
   return false;
 }, nome);
+const toque = async (t) => pg.evaluate((x) => {
+  const lim = (s) => String(s || '').replace(/ /g, ' ').trim().toLowerCase();
+  const b2 = [...document.querySelectorAll('button')].find((e) => lim(e.innerText).startsWith(x.toLowerCase()));
+  if (b2) { b2.click(); return true; }
+  return false;
+}, t);
 
 await irPara('Abastecimento');
 await irPara('Estoque');
@@ -260,6 +266,91 @@ cobra('não diz "agora o CMV conta o óleo"', !/agora o CMV do relatório conta 
 cobra('avisa que aplicou fora da faixa', /Apliquei, mas com o número fora da faixa/.test(txt), (txt.match(/[^\n]*fora da faixa[^\n]*/) || ['(comemorou assim mesmo)'])[0]);
 cobra('diz que a ficha é substituída se refizer', /a ficha é substituída/.test(txt));
 cobra('e manda não decidir preço com isso', /não usa o preço desses pratos/.test(txt));
+
+console.log('\n### NOVENTA E DOIS PRATOS NUMA CAIXA DE 260 PIXELS');
+// No print dela o ajudante abriu em "Shot / Tilápia ao Molho de Laranja /
+// Parmegiana de Carne", todos desmarcados — e os nove pratos que ela marcou
+// estavam lá embaixo, fora da vista. Sem ver o que escolheu ela não consegue
+// conferir nem corrigir: só marcar de novo e torcer.
+const pL = await painel();
+const enche = [];
+for (let i = 1; i <= 40; i++) enche.push({ id: `x${i}`, nome: `Prato de Enchimento ${i}`, categoria: 'Porções', preco: '10,00', ativo: true });
+await gravar({ ...pL,
+  cardapio: [...enche,
+    { id: 'c1', nome: 'Batata Frita Clássica', categoria: 'Porções', preco: '29,99', ativo: true },
+    { id: 'c2', nome: 'Polenta Frita', categoria: 'Porções', preco: '24,00', ativo: true },
+  ],
+  fichas: [{ cardapioId: 'c1', itens: [{ estoqueId: 'bat', qtd: '0,4', unidade: 'kg' }] }],
+  fritadeira: { oleoId: 'oleo', litros: '14,5', dias: '7', pratos: ['c1', 'c2'] },
+});
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Estoque');
+await irPara('Fichas técnicas');
+await pg.evaluate(() => { const x = [...document.querySelectorAll('button')].find((e) => /Ajudante da fritadeira/.test(e.innerText || '')); if (x) x.click(); });
+await pg.waitForTimeout(1200);
+
+// A caixa da lista, achada pelo próprio jeito dela: rolagem com 260px de teto.
+const caixa = async () => pg.evaluate(() => {
+  const el = [...document.querySelectorAll('div')].find((d) => {
+    const s = getComputedStyle(d);
+    return s.overflowY === 'auto' && s.maxHeight === '260px';
+  });
+  if (!el) return { txt: '(não achou a caixa da lista)', n: -1 };
+  return { txt: String(el.innerText || '').replace(/ /g, ' '), n: el.querySelectorAll('input[type="checkbox"]').length };
+});
+const buscar = async (v) => pg.evaluate((x) => {
+  const i = [...document.querySelectorAll('input')].find((e) => /Buscar prato/.test(e.placeholder || ''));
+  if (!i) return false;
+  const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  set.call(i, x); i.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}, v);
+
+txt = await texto();
+let cx = await caixa();
+cobra('a lista tem os 42 pratos', cx.n === 42, JSON.stringify({ n: cx.n }));
+cobra('diz quantos estão marcados: 2', /\b2 marcados\b/i.test(txt), (txt.match(/[^\n]*marcados?[^\n]*/) || ['(não conta)'])[0]);
+
+console.log('\n### "ver só os marcados" mostra o que ela escolheu, sem rolar 42 linhas');
+cobra('tocou no filtro', await toque('ver só os marcados'));
+await pg.waitForTimeout(700);
+cx = await caixa();
+cobra('sobraram só os 2 marcados', cx.n === 2, JSON.stringify({ n: cx.n, txt: cx.txt.slice(0, 120) }));
+cobra('com a batata', /Batata Frita Clássica/.test(cx.txt), cx.txt.slice(0, 120));
+cobra('e a polenta', /Polenta Frita/.test(cx.txt));
+cobra('e nenhum enchimento no meio', !/Prato de Enchimento/.test(cx.txt));
+cobra('o botão diz que o filtro está ligado', /vendo só os marcados/i.test(await texto()));
+cobra('tocou de novo pra desligar', await toque('vendo só os marcados'));
+await pg.waitForTimeout(700);
+cx = await caixa();
+cobra('voltaram os 42', cx.n === 42, JSON.stringify({ n: cx.n }));
+
+console.log('\n### e dá pra achar prato pelo nome');
+cobra('digitou "polenta"', await buscar('polenta'));
+await pg.waitForTimeout(700);
+cx = await caixa();
+cobra('achou só a Polenta Frita', cx.n === 1 && /Polenta Frita/.test(cx.txt), JSON.stringify({ n: cx.n, txt: cx.txt.slice(0, 80) }));
+cobra('digitou um nome que não existe', await buscar('zzzz'));
+await pg.waitForTimeout(700);
+cobra('e avisa em vez de mostrar caixa vazia', /Nenhum prato com esse nome/i.test(await texto()), (await caixa()).txt.slice(0, 80));
+
+console.log('\n### marcar de dentro da busca funciona, e o item NÃO foge do dedo');
+// Se a lista reordenasse no clique, o prato pularia debaixo do dedo e o toque
+// seguinte desmarcaria o vizinho sem querer.
+cobra('buscou "Enchimento 7"', await buscar('Enchimento 7'));
+await pg.waitForTimeout(700);
+cobra('marcou ele', await marcar('Prato de Enchimento 7'));
+await pg.waitForTimeout(900);
+cx = await caixa();
+cobra('agora são 3 marcados', /\b3 marcados\b/i.test(await texto()), (((await texto()).match(/[^\n]*marcados?[^\n]*/)) || [''])[0]);
+cobra('e ele continua ali, na mesma linha', cx.n === 1 && /Prato de Enchimento 7/.test(cx.txt), JSON.stringify({ n: cx.n, txt: cx.txt.slice(0, 80) }));
+cobra('com a caixinha marcada', await pg.evaluate(() => {
+  const l = [...document.querySelectorAll('label')].find((x) => /Prato de Enchimento 7/.test(x.textContent || ''));
+  const cb = l && l.querySelector('input[type="checkbox"]');
+  return !!(cb && cb.checked);
+}));
 
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
