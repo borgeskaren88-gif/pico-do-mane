@@ -113,6 +113,19 @@ cobra(`o menor por unidade é ${CERTO}`, txt.includes(CERTO), (txt.match(/[^\n]*
 cobra(`e NÃO ${MENTIRA} (o ponto lido como milhar)`, !txt.includes(MENTIRA));
 cobra('o concorrente de 2 kg sai a R$ 60,00', txt.includes('R$ 60,00'), (txt.match(/[^\n]*60,00[^\n]*/) || [''])[0]);
 
+console.log('\n### a lista de medidas tem ml e g — meio bar é vendido assim');
+// Ela foi cotar o "Xarope Monin 700ml" e só havia kg e L. Sem ml, a saída à
+// mão é digitar 700 e escolher L: a cotação passa a dizer setecentos LITROS e
+// o preço por unidade vira preço ÷ 700.000 ml. O fornecedor fica eternamente
+// "o mais barato". A lista de Compras já tinha os dois; esta ficou pra trás.
+const medidas = await pg.evaluate(() => {
+  const s2 = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => o.value === 'fardo'));
+  return s2 ? [...s2.options].map((o) => o.value).filter(Boolean) : [];
+});
+cobra('tem ml', medidas.includes('ml'), medidas.join(' '));
+cobra('tem g', medidas.includes('g'), medidas.join(' '));
+cobra('e não perdeu as que já tinha', ['un', 'cx', 'fardo', 'pct', 'saco', 'grf', 'kg', 'L'].every((u) => medidas.includes(u)), medidas.join(' '));
+
 console.log('\n### e o campo mostra a vírgula enquanto ela digita');
 // O teclado do iPad só tem ponto. Se a tela deixa "3.500" na cara dela, ela
 // não tem como saber que o sistema vai ler outra coisa.
