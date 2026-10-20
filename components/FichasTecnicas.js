@@ -46,7 +46,7 @@ const MODELO_FICHAS = [
 // ESTOQUE (com quantidade e unidade). É isso que faz a venda de um prato baixar
 // os insumos sozinha. `fichas` é uma lista de { cardapioId, itens:[{estoqueId,
 // qtd, unidade}] }.
-export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [], vendas = [], fritadeira, onFritadeira, onAcao }) {
+export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [], vendas = [], compras = [], fritadeira, onFritadeira, onAcao }) {
   const [importando, setImportando] = useState(false);
   const [report, setReport] = useState(null);
 
@@ -123,7 +123,7 @@ export default function FichasTecnicas({ cardapio = [], estoque = [], fichas = [
           Fica aqui em cima, antes do modelo: é o buraco de custo que ela tem
           hoje em TODOS os fritos, não um detalhe de um prato. */}
       <AjudanteFritadeira
-        cardapio={cardapio} estoque={estoque} fichas={fichas} vendas={vendas}
+        cardapio={cardapio} estoque={estoque} fichas={fichas} vendas={vendas} compras={compras}
         config={fritadeira} onConfig={onFritadeira} onAcao={onAcao}
       />
 

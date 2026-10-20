@@ -1070,7 +1070,7 @@ export default function Dashboard() {
                   ))}
                 </div>
                 {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} cotacoes={cotacoes} fichas={fichas} cardapio={cardapio} duplicadosIgnorados={dupIgnorados} onRepor={reporLista} onLevarPraCompras={levarPraCompras} />}
-                {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} vendas={vendas} fritadeira={fritadeira} onFritadeira={upd.fritadeira} onAcao={estoqueAcao} />}
+                {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} vendas={vendas} compras={compras} fritadeira={fritadeira} onFritadeira={upd.fritadeira} onAcao={estoqueAcao} />}
                 {subEstoque === 'conferencia' && (<>
                   {/* A conferência que não pede contagem nenhuma vem antes da
                       que pede: se a mercadoria comprada já não bate com as
