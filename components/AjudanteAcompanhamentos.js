@@ -54,7 +54,7 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
   }, [estoque]);
 
   // Quantas porções desses pratos saem por dia — a parte que ela não conta.
-  const contagem = useMemo(() => porcoesFritasPorDia(vendas, pratos, 30), [vendas, pratos]);
+  const contagem = useMemo(() => porcoesFritasPorDia(vendas, pratos, 30, cardapio), [vendas, pratos, cardapio]);
   // No modo "dura tantos dias", o rendimento sai da conta: dias × porções/dia.
   const rende = modo === 'duracao' ? numQtd(dias) * contagem.porDia : 0;
 
@@ -217,6 +217,34 @@ export default function AjudanteAcompanhamentos({ cardapio = [], estoque = [], f
                             ? `Nos últimos 30 dias saíram ${contagem.total} porções desses pratos — ${contagem.porDia} por dia. É isso que eu uso pra dividir a embalagem.`
                             : 'Ainda não tenho venda desses pratos pra contar. Usa um dos outros dois jeitos por enquanto.'}
                       </div>
+
+                      {/* A MESMA LISTA QUE O AJUDANTE DO ÓLEO GANHOU.
+                          O ketchup dela saiu em 90 g por porção — num potinho
+                          que leva uns 25 — pela MESMA causa do óleo: a contagem
+                          de porções por dia saindo baixa. Lá a lista existia;
+                          aqui não, e o número errado passou calado de novo.
+                          Defeito consertado num lugar e não no irmão continua
+                          sendo o mesmo defeito. */}
+                      {contagem.porPrato && contagem.porPrato.length > 0 && (
+                        <div style={{ marginTop: 9, paddingTop: 8, borderTop: `1px solid ${C.hair}` }}>
+                          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.07em', color: C.faint, fontWeight: 800, marginBottom: 5 }}>
+                            De onde vem essa conta
+                          </div>
+                          {contagem.porPrato.slice(0, 12).map((pp) => (
+                            <div key={pp.nome} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '2px 0', fontSize: 12 }}>
+                              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: pp.qtd > 0 ? C.muted : C.faint }}>{pp.nome}</span>
+                              <b style={{ flexShrink: 0, color: pp.qtd > 0 ? C.text : C.amber, fontVariantNumeric: 'tabular-nums' }}>
+                                {pp.qtd > 0 ? `${pp.qtd} em 30 dias` : 'nenhuma venda'}
+                              </b>
+                            </div>
+                          ))}
+                          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6, lineHeight: 1.5 }}>
+                            Se isso estiver bem abaixo do que sai de verdade, a embalagem inteira cai em cima de poucas
+                            porções e a quantidade sai grande demais. Nesse caso usa "Sei a quantidade" e põe o que vai
+                            no potinho.
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -218,6 +218,13 @@ await pg.waitForTimeout(700);
 txt = await texto();
 cobra('pergunta quantos dias dura um galão', /quantos dias dura 1 un de ketchup galão/i.test(txt), (txt.match(/[^\n]*DIAS DURA[^\n]*/i) || ['(não perguntou)'])[0]);
 cobra('e já diz quantas porções contou por dia', /20 por dia/.test(txt), (txt.match(/[^\n]*por dia[^\n]*/) || [''])[0]);
+// A MESMA LISTA DO AJUDANTE DO ÓLEO.
+// O ketchup dela saiu em 90 g por porção — num potinho que leva uns 25 — pela
+// mesma causa do óleo: a contagem por dia saindo baixa. Lá a lista de
+// diagnóstico existia; aqui não, e o número errado passou calado de novo.
+cobra('tem a lista "de onde vem essa conta"', /De onde vem essa conta/i.test(txt), (txt.match(/[^\n]*De onde vem essa conta[^\n]*/i) || ['(não mostra)'])[0]);
+cobra('com os pratos marcados e quanto saiu', /em 30 dias/.test(txt), (txt.match(/[^\n]*em 30 dias[^\n]*/) || [''])[0]);
+cobra('e diz o que fazer se a contagem estiver baixa', /usa "Sei a quantidade"/.test(txt));
 cobra('respondeu 10 dias', await campo('Quantos dias dura 1 un de Ketchup galão?', '10'));
 await pg.waitForTimeout(900);
 txt = await texto();
