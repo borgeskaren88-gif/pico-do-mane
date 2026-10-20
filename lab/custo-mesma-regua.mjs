@@ -190,6 +190,78 @@ txt = await texto();
 cobra('avisa "conversão no chute"', /Conversão no chute/i.test(txt), (txt.match(/[^\n]*onversão no chute[^\n]*/) || ['(passou calado)'])[0]);
 cobra('e nomeia o ingrediente', /Molho pote/.test(txt));
 cobra('explicando o conserto (preencher o conteúdo)', /preenche o conteúdo da embalagem/.test(txt));
+cobra('e NÃO oferece botão: "Molho pote" não diz tamanho nenhum', !/Usar \d/.test(txt), (txt.match(/[^\n]*Usar \d[^\n]*/) || [''])[0]);
+
+console.log('\n### MAS QUANDO O NOME DIZ O TAMANHO, O BOTÃO CONSERTA NA HORA');
+// "Xarope Monin 700ml" numa ficha que pede 30 ml virou R$ 1.797,00 na tela
+// dela — TRINTA GARRAFAS — porque o cadastro não dizia que a garrafa tem 700
+// ml. E o aviso mandava ela abrir outra tela e preencher um campo com a
+// informação que já está escrita no nome do item, na linha de cima.
+//
+// A CONTA FEITA NA MÃO:
+//   garrafa de Monin ..... R$ 59,90
+//   a ficha pede ......... 30 ml
+//   sem o conteúdo ....... 30 × 59,90 = R$ 1.797,00  (trinta garrafas)
+//   com o conteúdo ....... 30/700 × 59,90 = R$ 2,57
+const QUEBRADO = 'R$ 1.797,00';
+const CERTO = 'R$ 2,57';
+const pM = await painel();
+await gravar({ ...pM,
+  estoque: [{ id: 'mon', nome: 'Xarope Monin 700ml', custo: '59,90', unidade: 'un', saldo: '4', categoria: 'Bar' }],
+  fichas: [{ cardapioId: 'c2', itens: [{ estoqueId: 'mon', qtd: '30', unidade: 'ml' }] }],
+});
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Preço certo');
+await pg.evaluate(() => {
+  const s4 = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => /Batata Frita/.test(o.textContent)));
+  const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+  if (s4) { set.call(s4, 'c2'); s4.dispatchEvent(new Event('change', { bubbles: true })); }
+});
+await pg.waitForTimeout(1500);
+txt = await texto();
+cobra(`o estrago aparece: ${QUEBRADO}`, txt.includes(QUEBRADO), (txt.match(/[^\n]*Xarope Monin[^\n]*/) || ['(não achou a linha)'])[0]);
+cobra('a tela leu o tamanho do próprio nome', /já diz 700ml/.test(txt), (txt.match(/[^\n]*já diz[^\n]*/) || ['(não leu)'])[0]);
+cobra('e oferece o conserto num toque', /Usar 700 ml/.test(txt), (txt.match(/[^\n]*Usar 700[^\n]*/) || ['(sem botão)'])[0]);
+cobra('sem mandar ela pra outra tela', !/preenche o conteúdo da embalagem/.test(txt));
+
+cobra('tocou em "Usar 700 ml"', await pg.evaluate(() => {
+  const x = [...document.querySelectorAll('button')].find((e) => /Usar 700 ml/.test(e.innerText || ''));
+  if (x) { x.click(); return true; }
+  return false;
+}));
+await pg.waitForTimeout(2600);
+const mon = (await painel()).estoque.find((e) => e.id === 'mon');
+cobra('gravou 700 ml no item', mon && Number(mon.conteudo) === 700 && mon.conteudoUnid === 'ml', JSON.stringify(mon && { c: mon.conteudo, u: mon.conteudoUnid }));
+cobra('e não estragou o resto do cadastro', mon && mon.nome === 'Xarope Monin 700ml' && Number(mon.custo) === 59.9, JSON.stringify(mon && { n: mon.nome, c: mon.custo }));
+txt = await texto();
+cobra(`o custo caiu pra ${CERTO}`, txt.includes(CERTO), (txt.match(/[^\n]*Xarope Monin[^\n]*/) || [''])[0]);
+cobra(`e sumiu o ${QUEBRADO}`, !txt.includes(QUEBRADO));
+cobra('o aviso vermelho foi embora junto', !/Conversão no chute/i.test(txt), (txt.match(/[^\n]*onversão no chute[^\n]*/) || [''])[0]);
+
+console.log('\n### e NÃO oferece quando a grandeza não casa');
+// Nome em mililitro não conserta ficha que pede GRAMA: peso e volume são
+// coisas diferentes, e preencher ali trocaria um custo errado por outro.
+const pG = await painel();
+await gravar({ ...pG,
+  estoque: [{ id: 'mon2', nome: 'Xarope Monin 700ml', custo: '59,90', unidade: 'un', saldo: '4', categoria: 'Bar' }],
+  fichas: [{ cardapioId: 'c2', itens: [{ estoqueId: 'mon2', qtd: '30', unidade: 'g' }] }],
+});
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Preço certo');
+await pg.evaluate(() => {
+  const s5 = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => /Batata Frita/.test(o.textContent)));
+  const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+  if (s5) { set.call(s5, 'c2'); s5.dispatchEvent(new Event('change', { bubbles: true })); }
+});
+await pg.waitForTimeout(1500);
+txt = await texto();
+cobra('ainda aponta o chute', /Conversão no chute/i.test(txt));
+cobra('mas não oferece os 700 ml pra uma ficha em grama', !/Usar 700 ml/.test(txt), (txt.match(/[^\n]*Usar 700[^\n]*/) || [''])[0]);
+cobra('e volta a mandar preencher no Estoque', /preenche o conteúdo da embalagem/.test(txt));
 
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
