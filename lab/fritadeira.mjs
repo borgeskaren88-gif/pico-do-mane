@@ -267,6 +267,64 @@ cobra('avisa que aplicou fora da faixa', /Apliquei, mas com o número fora da fa
 cobra('diz que a ficha é substituída se refizer', /a ficha é substituída/.test(txt));
 cobra('e manda não decidir preço com isso', /não usa o preço desses pratos/.test(txt));
 
+console.log('\n### QUANTO DURA O GALÃO: AS NOTAS RESPONDEM, NÃO A MEMÓRIA');
+// Ela respondeu 10 duas vezes — é de quanto em quanto tempo troca a
+// FRITADEIRA, não quanto dura o galão. Reescrevi o rótulo, pus a explicação
+// embaixo, mandei olhar em Compras: respondeu 10 de novo. Quando a pessoa erra
+// a mesma pergunta duas vezes, o problema é a pergunta — e a resposta estava
+// nas notas o tempo todo.
+//
+// A CONTA FEITA NA MÃO:
+//   comprou 1 galão em 01/08, 1 em 31/08 e 1 em 30/09
+//   janela ................. 01/08 → 30/09 = 60 dias
+//   gastos nessa janela .... os dois primeiros (o terceiro ainda está em uso)
+//   um galão dura .......... 60 ÷ 2 = 30 dias
+// Com dias=10 (a resposta dela) o sistema achava 3 galões por mês. É um.
+const DURACAO = '30 dias';
+const diaISO = (d) => d.toISOString().slice(0, 10);
+const hojeD = new Date();
+const d1 = new Date(hojeD); d1.setDate(d1.getDate() - 60);
+const d2 = new Date(hojeD); d2.setDate(d2.getDate() - 30);
+const d3 = new Date(hojeD);
+const pD = await painel();
+await gravar({ ...pD,
+  fritadeira: { oleoId: 'oleo', litros: '14,5', dias: '10', pratos: ['c1'] },
+  fichas: [{ cardapioId: 'c1', itens: [{ estoqueId: 'bat', qtd: '0,4', unidade: 'kg' }] }],
+  compras: [
+    { id: 'k1', data: diaISO(d1), produto: 'Óleo de algodão 14,5L Elogiata', estoqueId: 'oleo', quantidade: '1', valorUnit: '189,09', categoria: 'Fornecedores de insumo' },
+    { id: 'k2', data: diaISO(d2), produto: 'Óleo de algodão 14,5L Elogiata', estoqueId: 'oleo', quantidade: '1', valorUnit: '189,09', categoria: 'Fornecedores de insumo' },
+    { id: 'k3', data: diaISO(d3), produto: 'Óleo de algodão 14,5L Elogiata', estoqueId: 'oleo', quantidade: '1', valorUnit: '189,09', categoria: 'Fornecedores de insumo' },
+    // Compra de OUTRA coisa no meio: não pode entrar na conta do óleo.
+    { id: 'k4', data: diaISO(d2), produto: 'Batata congelada', estoqueId: 'bat', quantidade: '10', valorUnit: '20', categoria: 'Fornecedores de insumo' },
+  ],
+});
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Estoque');
+await irPara('Fichas técnicas');
+await pg.evaluate(() => { const x = [...document.querySelectorAll('button')].find((e) => /Ajudante da fritadeira/.test(e.innerText || '')); if (x) x.click(); });
+await pg.waitForTimeout(1200);
+txt = await texto();
+cobra(`descobriu sozinho que o galão dura ${DURACAO}`, /um galão dura 30 dias/i.test(txt), (txt.match(/[^\n]*Pelas tuas notas[^\n]*/i) || ['(não calculou)'])[0]);
+cobra('mostra de onde tirou: 3 compras', /3 compras de óleo/.test(txt), (txt.match(/[^\n]*compras de óleo[^\n]*/) || [''])[0]);
+cobra('e que foram 2 galões gastos em 60 dias', /2 galões gastos em 60 dias/.test(txt));
+cobra('não contou a compra de batata como óleo', !/4 compras de óleo/.test(txt));
+const valorDoCampo = async (rotulo) => pg.evaluate((r) => {
+  const lim = (x) => String(x || '').replace(/\u00A0/g, ' ').trim();
+  const lab = [...document.querySelectorAll('div')].find((d) => lim(d.textContent) === r && d.children.length === 0);
+  const c = lab && lab.parentElement && lab.parentElement.querySelector('input');
+  return c ? c.value : '(não achou o campo)';
+}, rotulo);
+cobra('o campo ainda está com os 10 que ela digitou', (await valorDoCampo('Quantos dias dura UM GALÃO inteiro?')) === '10', await valorDoCampo('Quantos dias dura UM GALÃO inteiro?'));
+cobra('tocou em "Usar 30 dias"', await toque('Usar 30 dias'));
+await pg.waitForTimeout(1000);
+txt = await texto();
+cobra('o campo recebeu os 30 dias', (await valorDoCampo('Quantos dias dura UM GALÃO inteiro?')) === '30', await valorDoCampo('Quantos dias dura UM GALÃO inteiro?'));
+cobra('e o galão passa a render 30 dias de fritura', /\(30 dias × 20 por dia\)/.test(txt), (txt.match(/[^\n]*porções antes da troca[^\n]*/) || [''])[0]);
+cobra('e o óleo por porção caiu pra faixa normal', !/parece grande demais/i.test(txt), (txt.match(/[^\n]*ml[^\n]*/) || [''])[0]);
+cobra('sumiu o botão de usar, que o número já está lá', !(await toque('Usar 30 dias')));
+
 console.log('\n### NOVENTA E DOIS PRATOS NUMA CAIXA DE 260 PIXELS');
 // No print dela o ajudante abriu em "Shot / Tilápia ao Molho de Laranja /
 // Parmegiana de Carne", todos desmarcados — e os nove pratos que ela marcou

@@ -1,8 +1,9 @@
 'use client';
 import React, { useMemo, useState } from 'react';
 import { C, Card, Btn, Label, NumInput, Select } from './ui';
-import { brl, num, numQtd } from '../lib/util';
-import { porcoesFritasPorDia, contaDoOleo, litrosParaMl } from '../lib/fritadeira';
+import { brl, num, numQtd, fmtDate } from '../lib/util';
+import { fatorEntre } from '../lib/estoque';
+import { porcoesFritasPorDia, contaDoOleo, litrosParaMl, duracaoDoGalao } from '../lib/fritadeira';
 import ListaDePratos from './ListaDePratos';
 
 // "EU PAGO ISSO EM ÓLEO PORÉM EU NÃO COLOCO ÓLEO NA FICHA TÉCNICA."
@@ -14,7 +15,7 @@ import ListaDePratos from './ListaDePratos';
 // Este ajudante faz as perguntas que ELA sabe responder, conta o resto sozinho,
 // e põe o óleo na ficha de todos os fritos de uma vez.
 
-export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas = [], vendas = [], config, onConfig, onAcao }) {
+export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas = [], vendas = [], compras = [], config, onConfig, onAcao }) {
   const [aberto, setAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [feito, setFeito] = useState(null);
@@ -32,6 +33,14 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
   const contagem = useMemo(() => porcoesFritasPorDia(vendas, fritos, 30, cardapio), [vendas, fritos, cardapio]);
   // A contagem manda; ela pode corrigir se achar que o mês foi atípico.
   const porDia = cfg.porDiaManual != null && cfg.porDiaManual !== '' ? numQtd(cfg.porDiaManual) : contagem.porDia;
+
+  // Quanto dura um galão, tirado das notas de compra — a pergunta que ela
+  // errou duas vezes por ser ambígua no balcão, e que as notas respondem sem
+  // depender de memória nenhuma.
+  const duracao = useMemo(
+    () => duracaoDoGalao({ compras, oleo, conteudoMl, fatorEntre }),
+    [compras, oleo, conteudoMl],
+  );
 
   const conta = useMemo(
     () => contaDoOleo({ conteudoMl, precoGalao: oleo ? num(oleo.custo) : 0, diasAteTrocar: cfg.dias, porcoesPorDia: porDia }),
@@ -133,12 +142,39 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
                 e a nota brigam, ganha o rótulo. */}
             <Label>Quantos dias dura UM GALÃO inteiro?</Label>
             <NumInput value={cfg.dias || ''} onChange={(v) => set({ dias: v })} placeholder="ex.: 30" />
-            <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.5 }}>
-              Do galão novo até acabar o galão — <b style={{ color: C.muted }}>não</b> é de quanto em quanto tempo tu
-              troca a fritadeira. Se a fritadeira leva 5 L, tu troca a cada 10 dias e o galão tem 14 L, então o galão
-              dura uns <b style={{ color: C.muted }}>28 dias</b>. Na dúvida, olha em Compras de quanto em quanto tempo
-              tu compra óleo.
-            </div>
+            {/* A PERGUNTA ERRADA DUAS VEZES É PROBLEMA DA PERGUNTA.
+                Eu reescrevi o rótulo, pus a explicação embaixo e mandei ela
+                olhar em Compras — e ela respondeu 10 de novo, que é a troca da
+                fritadeira. Mandar a dona do bar folhear as próprias notas pra
+                achar uma data é trabalho meu, não dela: as notas estão aqui. */}
+            {duracao && duracao.ok ? (
+              <div style={{ marginTop: 8, borderRadius: 11, padding: '10px 12px', background: C.panel2, border: `1px solid ${C.hair}` }}>
+                <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
+                  Pelas tuas notas, um galão dura{' '}
+                  <b style={{ color: C.accent }}>{duracao.diasPorGalao} dias</b>.
+                  <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4 }}>
+                    {duracao.compras} compras de óleo entre {fmtDate(duracao.de)} e {fmtDate(duracao.ate)} —{' '}
+                    {duracao.galoes} {duracao.galoes === 1 ? 'galão gasto' : 'galões gastos'} em {duracao.dias} dias.
+                    {duracao.magro && ' Com só duas compras isso ainda é um esboço; vai ficando melhor a cada nota que tu lança.'}
+                  </div>
+                </div>
+                {numQtd(cfg.dias) !== duracao.diasPorGalao && (
+                  <div style={{ marginTop: 8 }}>
+                    <Btn small onClick={() => set({ dias: String(duracao.diasPorGalao).replace('.', ',') })}>
+                      Usar {duracao.diasPorGalao} dias
+                    </Btn>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.5 }}>
+                Do galão novo até acabar o galão — <b style={{ color: C.muted }}>não</b> é de quanto em quanto tempo tu
+                troca a fritadeira. Se a fritadeira leva 5 L, tu troca a cada 10 dias e o galão tem 14 L, então o galão
+                dura uns <b style={{ color: C.muted }}>28 dias</b>.
+                {duracao && duracao.motivo === 'uma-compra' && ' Quando tu lançar a próxima compra de óleo eu calculo isso sozinho.'}
+                {duracao && duracao.motivo === 'sem-compra' && ' Lançando as compras de óleo em Compras, eu passo a calcular isso sozinho.'}
+              </div>
+            )}
           </div>
 
           {/* 3 — QUAIS PRATOS VÃO NA FRITADEIRA */}
