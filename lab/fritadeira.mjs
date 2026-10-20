@@ -286,13 +286,21 @@ const hojeD = new Date();
 const d1 = new Date(hojeD); d1.setDate(d1.getDate() - 60);
 const d2 = new Date(hojeD); d2.setDate(d2.getDate() - 30);
 const d3 = new Date(hojeD);
+const dP2 = new Date(hojeD); dP2.setDate(dP2.getDate() - 20);
+const dP3 = new Date(hojeD); dP3.setDate(dP3.getDate() - 10);
 const pD = await painel();
 await gravar({ ...pD,
   fritadeira: { oleoId: 'oleo', litros: '14,5', dias: '10', pratos: ['c1'] },
   fichas: [{ cardapioId: 'c1', itens: [{ estoqueId: 'bat', qtd: '0,4', unidade: 'kg' }] }],
   compras: [
     { id: 'k1', data: diaISO(d1), produto: 'Óleo de algodão 14,5L Elogiata', estoqueId: 'oleo', quantidade: '1', valorUnit: '189,09', categoria: 'Fornecedores de insumo' },
-    { id: 'k2', data: diaISO(d2), produto: 'Óleo de algodão 14,5L Elogiata', estoqueId: 'oleo', quantidade: '1', valorUnit: '189,09', categoria: 'Fornecedores de insumo' },
+    // SEM estoqueId: casa pelo NOME, que é como a maior parte das notas dela
+    // entra — ela digita o produto e não liga a mão no item do estoque.
+    { id: 'k2', data: diaISO(d2), produto: 'Óleo de algodão 14,5L Elogiata', estoqueId: '', quantidade: '1', valorUnit: '189,09', categoria: 'Fornecedores de insumo' },
+    // Parcelas 2/3 e 3/3 da MESMA nota: datas diferentes, estoqueId 'nenhum'.
+    // Se entrassem, uma compra viraria três e o galão "duraria" um terço.
+    { id: 'k2b', data: diaISO(dP2), produto: 'Óleo de algodão 14,5L Elogiata', estoqueId: 'nenhum', quantidade: '1', valorUnit: '63,03', parcela: '2/3', categoria: 'Fornecedores de insumo' },
+    { id: 'k2c', data: diaISO(dP3), produto: 'Óleo de algodão 14,5L Elogiata', estoqueId: 'nenhum', quantidade: '1', valorUnit: '63,03', parcela: '3/3', categoria: 'Fornecedores de insumo' },
     { id: 'k3', data: diaISO(d3), produto: 'Óleo de algodão 14,5L Elogiata', estoqueId: 'oleo', quantidade: '1', valorUnit: '189,09', categoria: 'Fornecedores de insumo' },
     // Compra de OUTRA coisa no meio: não pode entrar na conta do óleo.
     { id: 'k4', data: diaISO(d2), produto: 'Batata congelada', estoqueId: 'bat', quantidade: '10', valorUnit: '20', categoria: 'Fornecedores de insumo' },
@@ -310,6 +318,8 @@ cobra(`descobriu sozinho que o galão dura ${DURACAO}`, /um galão dura 30 dias/
 cobra('mostra de onde tirou: 3 compras', /3 compras de óleo/.test(txt), (txt.match(/[^\n]*compras de óleo[^\n]*/) || [''])[0]);
 cobra('e que foram 2 galões gastos em 60 dias', /2 galões gastos em 60 dias/.test(txt));
 cobra('não contou a compra de batata como óleo', !/4 compras de óleo/.test(txt));
+cobra('nem contou a parcela 2/3 como outra compra', !/[456] compras de óleo/.test(txt), (txt.match(/[^\n]*compras de óleo[^\n]*/) || [''])[0]);
+cobra('e pegou a nota que não tinha ligação com o estoque', /3 compras de óleo/.test(txt));
 const valorDoCampo = async (rotulo) => pg.evaluate((r) => {
   const lim = (x) => String(x || '').replace(/\u00A0/g, ' ').trim();
   const lab = [...document.querySelectorAll('div')].find((d) => lim(d.textContent) === r && d.children.length === 0);
