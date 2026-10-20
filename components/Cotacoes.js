@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle, Sugestoes } from './ui';
+import { C, Card, Btn, KPI, Field, TextInput, NumInput, QtdInput, Select, Area, Empty, Resumo, SecTitle, PageTitle, inputStyle, Sugestoes } from './ui';
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, limparNome, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import MicBtn from './MicBtn';
 import { EMBALAGENS, melhorCompra, precoUnitario, descreveEmbalagem } from '../lib/cotacao';
@@ -100,7 +100,7 @@ export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }
             quando um deles queria 1 barril. Duas perguntas diferentes pra um
             campo só é pedir pra errar. */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Cada um tem"><NumInput value={form.conteudo} onChange={set('conteudo')} placeholder="ex: 30" /></Field>
+          <Field label="Cada um tem"><QtdInput value={form.conteudo} onChange={set('conteudo')} placeholder="ex: 30" /></Field>
           <Field label="De quê"><Select value={form.embalagem} onChange={set('embalagem')} options={EMBALAGENS} /></Field>
         </div>
         <div style={{ fontSize: 11, color: C.faint, margin: '-6px 0 12px', lineHeight: 1.45 }}>

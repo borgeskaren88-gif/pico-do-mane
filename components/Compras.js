@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
+import { C, Card, Btn, KPI, Field, TextInput, NumInput, QtdInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
 import { brl, num, numQtd, totalCompra, todayISO, ymOf, fmtDate, addDays, uid, limparNome, montarParcelas, ratearParcelas, CATEGORIAS_PRODUTO, CATEGORIAS_DESPESA } from '../lib/util';
 import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, fatorEntre, UNIDADES } from '../lib/estoque';
 import { efeitoDaEdicaoNaDespesa } from '../lib/despesaDaCompra';
@@ -758,9 +758,15 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
         <DestinoEstoque item={item} estoque={estoque} onLigar={setI('estoqueId')} />
         {/* O que vem DENTRO de cada um. Sem isso, "3 x Polenta 2kg" soma 3 no
             estoque em vez de 6 kg, e grava o custo do pacote como se fosse o do
-            quilo — o dobro em cada prato que usa polenta. */}
+            quilo — o dobro em cada prato que usa polenta.
+
+            QtdInput e não NumInput: aqui a embalagem é "pacote de 2 kg",
+            "galão de 3,5 kg" — fração é o comum. O teclado do iPad só tem
+            ponto, e quem lê isto (porUnidadeDaCompra) trata ponto como
+            decimal. Com QtdInput o ponto vira vírgula na hora, então ela VÊ
+            "3,5" e não um "3.500" que seria lido como três e meio. */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <Field label="Cada um tem"><NumInput value={item.conteudo} onChange={setI('conteudo')} placeholder="ex: 30" /></Field>
+          <Field label="Cada um tem"><QtdInput value={item.conteudo} onChange={setI('conteudo')} placeholder="ex: 30" /></Field>
           <Field label="De quê"><Select value={item.conteudoUnid} onChange={setI('conteudoUnid')} options={UNIDADES} placeholder="kg, g, L, ml…" /></Field>
         </div>
         {/* Mesma pergunta e mesmo exemplo da tela de Cotações — veja a nota lá. */}
