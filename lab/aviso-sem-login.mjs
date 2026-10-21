@@ -92,5 +92,20 @@ for (const tela of telas) {
     chamaDireto ? 'ainda chama /api/logout direto' : '');
 }
 
+console.log('\n### A PÁGINA DE VENDA ABRE SEM SENHA — e tem que continuar abrindo');
+// É a primeira coisa que o dono do outro bar vê. Se um dia o porteiro ficar
+// mais rígido e passar a cobrar senha aqui, a página de venda vira tela de
+// login e ninguém descobre: quem levou o link não volta pra avisar.
+const resp = await fetch(`${BASE}/conheca`, { redirect: 'manual' });
+cobra('responde 200, sem redirecionar pro login', resp.status === 200, `status ${resp.status}`);
+const htmlVenda = resp.status === 200 ? await resp.text() : '';
+cobra('e é a página de venda mesmo', /avisa quando ele está errado/.test(htmlVenda), htmlVenda ? '(veio outra coisa)' : '(sem corpo)');
+cobra('não é a tela de senha', !/type="password"/.test(htmlVenda));
+// Telefone inventado numa página de venda manda o cliente dela pra casa de
+// estranho. Enquanto o contato não for real, não pode haver botão nenhum.
+const temContato = /wa\.me\/\d|mailto:[^"]+@/.test(htmlVenda);
+const dizQueFalta = /falta pôr o contato aqui/.test(htmlVenda);
+cobra('ou tem contato de verdade, ou nenhum — nunca um inventado', temContato !== dizQueFalta, temContato ? 'tem contato' : 'avisa que falta');
+
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
