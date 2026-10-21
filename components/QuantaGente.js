@@ -99,6 +99,32 @@ export default function QuantaGente({ vendas = [] }) {
         </div>
       ) : (
         <>
+          {/* O QUE ESTA CONTA NÃO ESTÁ VENDO — antes da conclusão, não depois.
+              Ela viu "O aperto é domingo" em negrito e, lá no rodapé em letra
+              clara, que 208 comandas tinham ficado de fora. Quem lê decide
+              pelo negrito. */}
+          {!carga.confiavel && (
+            <div style={{ borderRadius: 12, padding: '12px 14px', marginBottom: 12, background: `color-mix(in srgb, ${C.red} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${C.red} 42%, transparent)` }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: C.red }}>Esta conta está vendo pouco do teu salão</div>
+              <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.65, marginTop: 5 }}>
+                Dos {carga.comandasNosDias} atendimentos desses dias, só <b>{carga.comandasVistas}</b> guardaram a hora
+                em que a mesa sentou — os outros {carga.comandasSemHoraNosDias} não entram, porque sem essa hora não dá
+                pra saber quantas mesas estavam abertas juntas.
+                <div style={{ marginTop: 6 }}>
+                  Então <b>usa o que está abaixo como pista, não como decisão</b>. Conforme as comandas novas forem
+                  abrindo pelo app, isto se corrige sozinho.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {carga.diasDaSemanaComDado === 1 && (
+            <div style={{ borderRadius: 12, padding: '11px 13px', marginBottom: 12, background: C.panel2, border: `1px solid ${C.hair}`, fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
+              <b style={{ color: C.amber }}>Só um dia da semana tem ponto batido no período.</b> Com um dia só não há
+              com o que comparar — o que aparece abaixo é esse dia, não o pior dia da tua semana.
+            </div>
+          )}
+
           {/* A RESPOSTA, ANTES DA GRADE. */}
           {aperto && (
             <div style={{ borderRadius: 12, padding: '12px 14px', marginBottom: 14, background: `color-mix(in srgb, ${C.amber} 13%, transparent)`, border: `1px solid color-mix(in srgb, ${C.amber} 42%, transparent)` }}>
@@ -120,7 +146,7 @@ export default function QuantaGente({ vendas = [] }) {
                   {/* Honestidade: garçom não gera venda, ele evita perder. */}
                   <div style={{ fontSize: 11.5, color: C.faint, marginTop: 5 }}>
                     Ninguém garante que o reforço se paga — garçom não vende sozinho, ele evita a mesa que desiste e
-                    espera. O que dá pra afirmar é o custo; se vale, quem olha o salão no sábado é que sabe.
+                    espera. O que dá pra afirmar é o custo; se vale, quem olha o salão no {aperto.dia} é que sabe.
                   </div>
                 </div>
               ) : (
@@ -166,8 +192,11 @@ export default function QuantaGente({ vendas = [] }) {
           <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.55, marginTop: 10 }}>
             Mesas por pessoa do salão. Quadrado vazio é hora sem ninguém batendo ponto — não é hora tranquila,
             é hora que não dá pra julgar. Conta com {carga.diasAnalisados} dia(s) que tinham venda e ponto.
-            {carga.comandasSemAbertura > 0 && (
-              <> {carga.comandasSemAbertura} comanda(s) do período não guardaram a hora em que a mesa sentou e ficaram de fora.</>
+            {carga.comandasSemHoraNosDias > 0 && (
+              <> {carga.comandasSemHoraNosDias} atendimento(s) desses dias não guardaram a hora em que a mesa sentou e ficaram de fora.</>
+            )}
+            {carga.turnosSemSetor > 0 && (
+              <> {carga.turnosSemSetor} turno(s) antigo(s) não dizem se eram do salão ou da cozinha, e também ficaram de fora.</>
             )}
           </div>
         </>
