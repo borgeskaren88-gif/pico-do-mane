@@ -1,6 +1,7 @@
 'use client';
 import React, { useMemo, useState, useEffect } from 'react';
 import { C, Card, Empty, SecTitle } from './ui';
+import QuantaGente from './QuantaGente';
 import { brl } from '../lib/util';
 import { vendasDoPeriodo, porHora, porDiaSemana, faixasDoDia, leituraDoHorario, ordemDaNoite, comAbertura } from '../lib/movimento';
 
@@ -195,6 +196,11 @@ export default function Movimento({ vendas = [] }) {
           </>
         )}
       </Card>
+
+      {/* O gráfico acima diz a que horas o bar enche. Encher é bom — a
+          pergunta dela é outra: "no sábado uma pessoa sozinha não dá conta".
+          Isso só se responde cruzando o movimento com quem estava de plantão. */}
+      <QuantaGente vendas={vendas} />
 
       <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.5 }}>
         Tudo aqui vem das <b>comandas fechadas</b>. Venda que não passou por comanda (ou comanda que ficou aberta) não entra.
