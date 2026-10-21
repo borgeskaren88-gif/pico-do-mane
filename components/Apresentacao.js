@@ -17,8 +17,8 @@ import { C, pageBg, LogoMark } from './ui';
 // WhatsApp eu troco aqui e pronto. Não invento número de telefone numa página
 // que vai pro ar — telefone errado numa página de venda manda o cliente dela
 // pra casa de estranho.
-const WHATSAPP = '';      // ex.: '5548999999999'
-const EMAIL = '';         // ex.: 'karen@picoos.app'
+const WHATSAPP = '5548988784016';   // (48) 98878-4016 — com o 55 do Brasil na frente
+const EMAIL = '';
 
 const avisos = [
   {
