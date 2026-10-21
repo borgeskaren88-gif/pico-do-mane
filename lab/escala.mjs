@@ -170,6 +170,52 @@ cobra('avisa que ainda não dá pra fazer a conta', /Ainda não dá pra fazer es
 cobra('e diz o que falta: bater ponto', /precisa bater ponto/.test(txt));
 cobra('sem apontar aperto nenhum', !/O aperto é/.test(txt));
 
+console.log('\n### O CENÁRIO DO PRINT DELA: metade das comandas sem hora, e um dia só');
+// A tela dela disse "O aperto é domingo" em negrito — e lá no rodapé, em letra
+// clara, que 208 comandas tinham ficado de fora. Quem lê decide pelo negrito.
+// Pior: a frase do custo terminava em "quem olha o salão no SÁBADO é que
+// sabe", escrito na mão por mim, brigando com o domingo do título logo acima.
+for (const r of pontos) await por(`ponto:${r.id}`, r);
+// Em metade dos sábados as comandas não guardaram a hora de abertura.
+for (const d of [SABADOS[0], SABADOS[1]]) {
+  for (let i = 0; i < 6; i++) {
+    await fetch(`${BANCO}?chave=eq.${MARCA}venda:s${SABADOS.indexOf(d) * 6 + i}`, { method: 'DELETE' });
+    await por(`venda:cega-${d}-${i}`, { id: `cega-${d}-${i}`, data: d, pessoas: 2, total: 180, fechadaEm: iso(d, 23) });
+  }
+}
+// E um DOMINGO mais apertado que o sábado, de propósito: com o aperto caindo
+// noutro dia, um nome de dia escrito na mão na tela fica visivelmente errado.
+// Sem isto o teste não distingue "{aperto.dia}" de "sábado" chumbado.
+const DOMINGOS = ['2026-09-27', '2026-10-04', '2026-10-11'];
+for (const d of DOMINGOS) {
+  for (let i = 0; i < 10; i++) {
+    await por(`venda:d${d}-${i}`, { id: `d${d}-${i}`, data: d, pessoas: 2, total: 90, abertaEm: iso(d, 17), fechadaEm: iso(d, 20) });
+  }
+  // E comandas cegas também no domingo, pra a proporção continuar ruim: o
+  // aviso de "estou vendo pouco" tem que seguir aparecendo.
+  for (let i = 0; i < 9; i++) {
+    await por(`venda:dc${d}-${i}`, { id: `dc${d}-${i}`, data: d, pessoas: 2, total: 90, fechadaEm: iso(d, 20) });
+  }
+  await por(`ponto:pd${d}`, { id: `pd${d}`, nome: 'Bruna', papel: 'garcom', data: d, entrada: iso(d, 16), saida: iso(d, 23) });
+}
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3800);
+await irPara('Log Operacional');
+await irPara('Movimento');
+await pg.waitForTimeout(2200);
+txt = await texto();
+cobra('o aperto mudou pro domingo, que está pior', /O aperto é domingo/.test(txt), (txt.match(/[^\n]*O aperto é[^\n]*/) || ['(sem título)'])[0]);
+cobra('avisa ANTES que está vendo pouco', /Esta conta está vendo pouco do teu salão/.test(txt), (txt.match(/[^\n]*vendo pouco[^\n]*/) || ['(só avisou no rodapé)'])[0]);
+cobra('diz quantos atendimentos entraram e quantos não', /só \d+ guardaram a hora/.test(txt), (txt.match(/[^\n]*Dos \d+ atendimentos[^\n]*/) || ['(não achou a minha frase)'])[0]);
+cobra('e manda usar como pista, não como decisão', /pista, não como decisão/.test(txt));
+
+console.log('\n### E A FRASE DO CUSTO FALA DO MESMO DIA DO TÍTULO');
+// Duas frases brigando na mesma tela é o que eu passei o dia tirando daqui.
+const dia = (txt.match(/O aperto é ([^,\n]+),/) || [])[1] || '';
+cobra('achou o dia do título', !!dia, dia || '(sem título)');
+cobra(`a frase do custo também diz "${dia}"`, new RegExp(`quem olha o salão no ${dia} é que sabe`).test(txt), (txt.match(/[^\n]*quem olha o salão[^\n]*/) || [''])[0]);
+cobra('e não um dia escrito na mão', !/quem olha o salão no sábado é que sabe/.test(txt) || dia === 'sábado');
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
