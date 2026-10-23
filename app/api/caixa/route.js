@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { notificarCaixa, notificarConferencia } from '../../../lib/push';
-import { diaOperacional } from '../../../lib/util';
+import { diaOperacional, num } from '../../../lib/util';
 import { conferirFechamento, movimentoDoDia } from '../../../lib/fechamento';
 
 export const dynamic = 'force-dynamic';
@@ -115,10 +115,11 @@ function conferenciaSegura(c) {
   };
 }
 
-const n2 = (n) => {
-  const v = typeof n === 'string' ? parseFloat(n.replace(/\./g, '').replace(',', '.')) : Number(n);
-  return Math.round((Number.isFinite(v) ? v : 0) * 100) / 100;
-};
+// Pelo `num` da casa, e não por uma régua própria: a antiga apagava TODO ponto
+// antes de ler, então "150.50" — do teclado do iPad, que só tem ponto — virava
+// quinze mil e cinquenta no caixa. Foi assim que um combo de R$ 299,99 fechou
+// comanda em R$ 32.998,90.
+const n2 = (n) => Math.round(num(n) * 100) / 100;
 
 // Soma as entradas de um caixa, separadas por forma. Duas origens:
 //  - Comandas fechadas no turno (vendas ligadas ao caixa) — venda de hoje.

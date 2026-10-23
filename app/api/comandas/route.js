@@ -95,7 +95,17 @@ function montarItem(cardapio, pedido) {
   const saborNome = txt(pedido?.sabor, 40);
   const prod = (cardapio || []).find((x) => x && x.id === cardapioId);
   if (!prod) return { erro: 'Item não está no cardápio.', status: 400 };
-  const preco = Number(String(prod.preco).replace(/\./g, '').replace(',', '.')) || 0;
+  // O MESMO `num` DA TELA, E NÃO UMA RÉGUA PRÓPRIA.
+  //
+  // Aqui morava uma conta à mão que apagava TODO ponto antes de ler, tratando
+  // ponto como separador de milhar. Preço digitado no teclado do iPad — que só
+  // tem ponto — chegava como "299.99" e virava 29999. Cem vezes.
+  //
+  // E a tela não via nada: ela lê com `num`, que entende ponto com duas casas
+  // como decimal. Então o garçom via "R$ 299,99" na lista, tocava, e a comanda
+  // fechava em R$ 32.998,90. Duas réguas pro mesmo preço, cada uma numa ponta
+  // do mesmo toque.
+  const preco = num(prod.preco);
   // Sabor/variação: se o item tem sabores, guarda a escolha em "extras" pra
   // baixar do estoque no fechamento. Dois modos:
   //  - Combo com saboresTotal > 0: o garçom distribui N unidades entre os
@@ -135,7 +145,7 @@ function montarItem(cardapio, pedido) {
     if (!a || !a.nome) continue;
     const n = Math.max(0, Math.floor(Number(pedidos[a.nome]) || 0));
     if (!n) continue;
-    const pu = Number(String(a.preco == null ? 0 : a.preco).replace(/\./g, '').replace(',', '.')) || 0;
+    const pu = num(a.preco);  // mesma régua do preço do item, pelo mesmo motivo
     precoAdd += pu * n;
     nomesAdd.push(n > 1 ? `${n}x ${a.nome}` : a.nome);
     if (a.estoqueId && num(a.qtd) > 0) extrasAdd.push({ estoqueId: String(a.estoqueId), qtd: qStr(num(a.qtd) * n), unidade: String(a.unidade || '') });
@@ -243,7 +253,9 @@ async function fecharComanda(sb, c, body, p) {
     // barra o novo fiado que passaria do limite (soma o que já está em aberto).
     if (fiado > 0.005 && nomeCli) {
       const norm = (s) => (s || '').trim().toLowerCase();
-      const numBR = (s) => { const v = parseFloat(String(s).replace(/\./g, '').replace(',', '.')); return isFinite(v) ? v : 0; };
+      // Limite de fiado lido com a mesma régua: limite "1.500" tem que valer
+      // o mesmo aqui e na tela onde ela digitou.
+      const numBR = (s) => num(s);
       const fmt = (n) => 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
       const fiadoDe = (v) => { const base = v.fiado != null ? (Number(v.fiado) || 0) : (v.pagamento === 'Fiado' ? (Number(v.total) || 0) : 0); return Math.max(0, base - (Number(v.abatido) || 0)); };
       const blob = await lerPainel(sb);

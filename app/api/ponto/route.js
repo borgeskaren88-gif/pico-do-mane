@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { notificarPonto } from '../../../lib/push';
+import { num } from '../../../lib/util';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,10 +102,10 @@ export async function POST(request) {
         // Valor da hora do setor, pra traduzir o banco de horas em dinheiro.
         // Aceita "35" e "35,50"; zero (ou vazio) significa "não informado", e aí
         // a tela mostra só as horas em vez de fingir um valor.
-        const dinheiro = (v) => {
-          const n = parseFloat(String(v == null ? '' : v).replace(/\./g, '').replace(',', '.'));
-          return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
-        };
+        // Pelo `num` da casa: a régua própria apagava todo ponto antes de
+        // ler, e salário digitado no iPad como "1800.50" virava cento e
+        // oitenta mil. Mesma família do combo que fechou comanda em R$ 32.998,90.
+        const dinheiro = (v) => { const n = num(v); return n > 0 ? Math.round(n * 100) / 100 : 0; };
         const salarioMes = dinheiro(j.salarioMes);
         const vh = dinheiro(j.valorHora);
         const temJornada = dias.length && entrada && saida;
