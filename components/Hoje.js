@@ -7,7 +7,7 @@ import { brl, num, totalCompra, todayISO, ymOf, weekday, fmtDate, mesLabel, addD
 
 const TAB = { fontVariantNumeric: 'tabular-nums' };
 
-export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], estoque = [], vendas = [], setTab, darci = null, resumo = null, metas = null, onMetas, dona = '' }) {
+export default function Hoje({ diario, receitas, despesas, compras, garrafas, tarefas = [], estoque = [], vendas = [], setTab, darci = null, resumo = null, metas = null, onMetas, dona = '', fotoDona = '' }) {
   const [mostrarValores, setMostrarValores] = useState(true);
   const oculto = (texto) => (mostrarValores ? texto : 'R$ ••••');
   const [caixaAberto, setCaixaAberto] = useState(null);
@@ -89,10 +89,19 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
     <div>
       {/* Cabeçalho */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 12, color: C.faint, textTransform: 'uppercase', letterSpacing: '.06em' }}>{weekday(hoje)}, {fmtDate(hoje)}</div>
-          <div style={{ fontSize: 26, fontWeight: 900, marginTop: 2 }}>Dashboard</div>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{saudacao}{dona ? `, ${dona}` : ''} · resumo de {mesLabel(mes)}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          {/* A foto só aparece quando existe: sem ela o cabeçalho fica
+              exatamente como sempre foi, sem círculo vazio pedindo pra ser
+              preenchido. */}
+          {fotoDona && (
+            <img src={fotoDona} alt=""
+              style={{ width: 46, height: 46, borderRadius: 999, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.line}` }} />
+          )}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12, color: C.faint, textTransform: 'uppercase', letterSpacing: '.06em' }}>{weekday(hoje)}, {fmtDate(hoje)}</div>
+            <div style={{ fontSize: 26, fontWeight: 900, marginTop: 2 }}>Dashboard</div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{saudacao}{dona ? `, ${dona}` : ''} · resumo de {mesLabel(mes)}</div>
+          </div>
         </div>
         {/* O Darci fica aqui, do lado do Ocultar: os dois no mesmo formato. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
