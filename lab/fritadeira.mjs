@@ -244,6 +244,21 @@ cobra('avisa que o número é grande demais', /parece grande demais/i.test(txt),
 cobra('diz a faixa normal (10 a 30 ml)', /10 a 30 ml/.test(txt));
 cobra('e lembra que é o GALÃO, não a fritadeira', /não de quanto em quanto tempo tu troca a fritadeira/i.test(txt));
 
+console.log('\n### E VIRA A CONTA DO AVESSO: o óleo diz quantas porções saem de verdade');
+// "Troco o óleo a cada 10 dias, porém um galão de 14,5 L rende uns 30 dias."
+// Com a duração resolvida, o óleo que ela QUEIMA no mês vira fato — vem da
+// compra. Se cada porção leva os 25 ml de sempre, dá pra dizer quantas porções
+// esse óleo implica, e comparar com o que o app contou.
+//
+// A CONTA FEITA NA MÃO (cenário deste teste: galão 14,5 L, 10 dias, 3/dia):
+//   14.500 ml ÷ 25 ml = 580 porções por galão
+//   580 ÷ 10 dias ..... 58 porções por dia
+//   o app contou ...... 3 por dia  →  19,3× menos
+cobra('diz quantas porções o óleo implica', /58 porções fritas por dia/.test(txt), (txt.match(/[^\n]*porções fritas por dia[^\n]*/) || ['(não vira a conta)'])[0]);
+cobra('e quantas vezes é o que o app contou', /19\.3× o que o app contou/.test(txt), (txt.match(/[^\n]*o que o app contou[^\n]*/) || [''])[0]);
+cobra('aponta pra venda que não passa pelo app', /sem passar pelo app/.test(txt));
+cobra('e diz o que fazer com esse número', /põe ele no campo de cima/.test(txt));
+
 console.log('\n### mostra DE ONDE vem a contagem, prato a prato');
 // Ela olhou "2,73 por dia" e não tinha como julgar — mas sabe de cor que num
 // sábado saem 20 a 30 batatas. Com a lista aberta ela vê num segundo o que eu
