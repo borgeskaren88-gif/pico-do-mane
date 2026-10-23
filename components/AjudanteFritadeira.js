@@ -253,6 +253,27 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
                       Se vocês vendem mais que isso, pode ser comanda que não passou pelo app — ou prato frito que
                       faltou marcar aí em cima.
                     </div>
+                    {/* O NÚMERO ABSURDO VIRADO DO AVESSO.
+                        Ela confirmou que o galão dura uns 30 dias. Então o
+                        óleo que ela QUEIMA no mês é fato, vem da compra. Se
+                        cada porção leva os 25 ml de sempre, dá pra dizer
+                        quantas porções esse óleo implica — e comparar com o
+                        que o app conseguiu contar. É o único lugar do sistema
+                        que estima venda não registrada a partir de uma coisa
+                        física que ela compra e queima. */}
+                    {conta.porDiaQueExplicaria > 0 && (
+                      <div style={{ marginTop: 9, paddingTop: 8, borderTop: `1px solid color-mix(in srgb, ${C.amber} 35%, transparent)` }}>
+                        <b style={{ color: C.text }}>E dá pra virar essa conta do avesso:</b> se o galão dura {cfg.dias} dias
+                        e cada porção leva os {conta.mlTipico} ml de sempre, então estariam saindo umas{' '}
+                        <b style={{ color: C.amber }}>{conta.porDiaQueExplicaria} porções fritas por dia</b> —{' '}
+                        {conta.vezesMaisQueOContado && <>{conta.vezesMaisQueOContado}× o que o app contou. </>}
+                        O óleo que tu compra e queima é coisa física; ele não mente. Essa diferença é porção saindo da
+                        cozinha sem passar pelo app.
+                        <div style={{ fontSize: 11.5, color: C.faint, marginTop: 5 }}>
+                          Se esse número te parecer certo, põe ele no campo de cima e o óleo sai na faixa normal.
+                        </div>
+                      </div>
+                    )}
                     <div style={{ fontSize: 11.5, color: C.faint, marginTop: 8 }}>
                       Dá pra aplicar assim mesmo, mas o custo de todo frito vai sair inflado — e o preço, junto.
                     </div>
