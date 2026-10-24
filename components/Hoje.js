@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
-import { C, Card, Btn, KPI, Empty, Segredo } from './ui';
+import { C, Card, Btn, KPI, Empty } from './ui';
 import MetaMes from './MetaMes';
 import { brl, num, totalCompra, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_NAO_OPERACIONAL, DESPESA_NAO_OPERACIONAL } from '../lib/util';
 
@@ -108,7 +108,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
         {/* O Darci fica aqui, do lado do Ocultar: os dois no mesmo formato. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {darci}
-          <button onClick={() => setMostrarValores((v) => !v)} title={mostrarValores ? 'Esconder a tela inteira' : 'Mostrar a tela de novo'}
+          <button onClick={() => setMostrarValores((v) => !v)} title={mostrarValores ? 'Ocultar valores' : 'Mostrar valores'}
             style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
             {mostrarValores ? 'Ocultar' : 'Mostrar'}
           </button>
@@ -131,12 +131,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           ocupa tudo. Um valor só resolve os dois casos, sem perguntar a
           largura da tela pra ninguém. */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', flexWrap: 'wrap', marginBottom: 2 }}>
-        {/* O "Ocultar" mora aqui, e o resumo vem pronto do Dashboard — então
-            o aviso de escondido vai por cloneElement. Subir o estado pro
-            Dashboard só pra isso mexeria em tela que está funcionando. */}
-        <div style={{ flex: '999 1 260px', minWidth: 0 }}>
-          {React.isValidElement(resumo) ? React.cloneElement(resumo, { escondido: !mostrarValores }) : resumo}
-        </div>
+        <div style={{ flex: '999 1 260px', minWidth: 0 }}>{resumo}</div>
         {onMetas && (
           <MetaMes canto metas={metas} receitas={receitas} realizado={rec} oculto={oculto} onSalvar={onMetas} />
         )}
@@ -207,10 +202,6 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
       {temAviso ? (
         <Card style={{ marginBottom: 14, borderColor: avisoUrgente ? C.red : C.amber, background: C.raised }}>
           <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: avisoUrgente ? C.red : C.amber, fontWeight: 700, marginBottom: 8 }}>Avisos de hoje</div>
-          {/* O corpo inteiro, e não linha por linha: assim a linha que eu
-              criar mês que vem já nasce coberta. Os "Ver" ficam sem clique
-              enquanto escondido — ela não tem o que ler ali mesmo. */}
-          <Segredo on={!mostrarValores}>
           {boletosHoje.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
               <div style={{ fontSize: 14 }}><b>{boletosHoje.length} boleto{boletosHoje.length > 1 ? 's' : ''}</b> vence{boletosHoje.length > 1 ? 'm' : ''} hoje — <b style={{ color: C.red, ...TAB }}>{oculto(brl(totalBoletosHoje))}</b></div>
@@ -241,7 +232,6 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
               <Btn kind="ghost" small onClick={() => setTab('diario')}>Ver</Btn>
             </div>
           )}
-          </Segredo>
         </Card>
       ) : null}
 
@@ -249,7 +239,6 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
       {topProdutos.length > 0 && (
         <Card style={{ marginBottom: 14 }}>
           <div style={lbl}>Mais vendidos · 7 dias</div>
-          <Segredo on={!mostrarValores}>
           {topProdutos.map((p) => (
             <div key={p.nome} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 0' }}>
               <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</span>
@@ -257,7 +246,6 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
               <b style={{ flex: '0 0 34px', textAlign: 'right', fontSize: 15, fontWeight: 800, ...TAB }}>{p.qtd}</b>
             </div>
           ))}
-          </Segredo>
         </Card>
       )}
 

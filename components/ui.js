@@ -185,31 +185,6 @@ export function Card({ children, style, className }) {
   return <div className={['nao-partir', className].filter(Boolean).join(' ')} style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 18, boxShadow: C.cardShadow, ...style }}>{children}</div>;
 }
 
-// ESCONDER O CORPO, NÃO O CARTÃO.
-//
-// "Não precisa ocultar minha foto e nome e nem os títulos, somente os
-// conteúdos."
-//
-// É o jeito do aplicativo de banco: o rótulo continua lá ("SALDO"), o número
-// que some. Assim ela sabe o que está olhando e quem está do lado não lê o
-// quanto.
-//
-// Borrão e não "display: none": sumir com o conteúdo faz o cartão encolher e a
-// tela pular toda vez que ela liga e desliga. Borrado, cada coisa fica no
-// lugar — e dá pra VER que está escondido, em vez de parecer que o app
-// esqueceu de carregar.
-//
-// `userSelect: none` junto, porque num tablet que passa de mão em mão texto
-// borrado que se arrasta e copia é texto que não foi escondido.
-export function Segredo({ on, children, style }) {
-  if (!on) return <>{children}</>;
-  return (
-    <div aria-hidden="true" style={{ filter: 'blur(7px)', userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none', ...style }}>
-      {children}
-    </div>
-  );
-}
-
 export function Field({ label, children }) {
   return <div style={{ marginBottom: 14 }}><Label>{label}</Label>{children}</div>;
 }
