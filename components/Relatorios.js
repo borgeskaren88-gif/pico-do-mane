@@ -73,7 +73,10 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   const [verCMVDetalhe, setVerCMVDetalhe] = useState(false);
   const [verHistorico, setVerHistorico] = useState(false);
   const mesesDisp = [...new Set([...receitas, ...despesas].map((d) => ymOf(d.data)))].sort().reverse();
-  const opts = mesesDisp.length ? mesesDisp : [ymOf(todayISO())];
+  // Com rótulo em português. O seletor mostrava "2026-09" enquanto a página
+  // inteira escreve "Set/2026" — mesmo mês em duas línguas, e a crua logo no
+  // campo que ela usa pra ESCOLHER.
+  const opts = (mesesDisp.length ? mesesDisp : [ymOf(todayISO())]).map((m) => ({ value: m, label: mesLabel(m) }));
   const recMes = receitas.filter((r) => ymOf(r.data) === mes);
   const despMes = despesas.filter((d) => ymOf(d.data) === mes);
   // O lucro OPERACIONAL usa só a operação: exclui investimento, empréstimo/dívida
@@ -230,9 +233,38 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   const pizza = porCategoria.map((c, i) => ({ ...c, cor: PIZZA[i % PIZZA.length], pct: totalDesp ? (c.val / totalDesp) * 100 : 0 }));
 
   return (
-    <div>
-      <PageTitle sub="Resultado do mês">Relatórios</PageTitle>
-      <div style={{ marginBottom: 14 }}><Label>Mês do relatório</Label><Select value={mes} onChange={setMes} options={opts} /></div>
+    <div className="imprimivel">
+      <div className="nao-imprimir"><PageTitle sub="Resultado do mês">Relatórios</PageTitle></div>
+
+      {/* LEVAR PRO CONTADOR.
+          A planilha CSV (Configurações) entrega os lançamentos crus; o que
+          faltava era o relatório MONTADO — o resultado, a escada do dinheiro,
+          o CMV, a margem. Quem imprime é o navegador: "Imprimir" no iPad e no
+          iPhone já oferece "Salvar em PDF", e assim o papel é a MESMA tela que
+          ela conferiu. Gerador próprio de PDF seria mais um lugar pra conta
+          discordar — e algumas centenas de KB baixadas no 4G do bar. */}
+      <div className="nao-imprimir" style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+          <Label>Mês do relatório</Label>
+          <Select value={mes} onChange={setMes} options={opts} />
+        </div>
+        <Btn kind="ghost" onClick={() => { if (typeof window !== 'undefined') window.print(); }}>
+          Baixar / imprimir
+        </Btn>
+      </div>
+      <div className="nao-imprimir" style={{ fontSize: 11.5, color: C.faint, margin: '-8px 0 14px', lineHeight: 1.5 }}>
+        Abre a janela de impressão. Pra guardar em arquivo, escolhe <b style={{ color: C.muted }}>Salvar em PDF</b> —
+        no iPad e no iPhone a opção está na mesma tela.
+      </div>
+
+      {/* SÓ NO PAPEL. Folha sem nome e sem data em cima da mesa do contador é
+          folha de ninguém: ele não sabe de qual bar é nem de que mês. */}
+      <div className="so-impressao" style={{ marginBottom: 16, borderBottom: '1px solid #D7E0EC', paddingBottom: 10 }}>
+        <div style={{ fontSize: 19, fontWeight: 800 }}>{negocio || 'Relatório'} — {mesLabel(mes)}</div>
+        <div style={{ fontSize: 11.5, color: '#43536B', marginTop: 3 }}>
+          Resultado do mês · emitido em {fmtDate(todayISO())} pelo PicoOS
+        </div>
+      </div>
 
       {/* ==================================================================
           O VEREDITO — a primeira coisa da página.
