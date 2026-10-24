@@ -1,4 +1,5 @@
 import './globals.css';
+import Abriu from '../components/Abriu';
 
 export const metadata = {
   title: 'PicoOS — Central de Gestão',
@@ -96,6 +97,64 @@ window.addEventListener('unhandledrejection',function(ev){var r=ev&&ev.reason;if
         />
       </head>
       <body style={{ margin: 0 }}>
+        {/* A TELA BRANCA DE QUEM ESTÁ NO 3G.
+            ============================================================
+            Ela mandou print do celular: branco puro, nada escrito. O socorro
+            logo acima não tinha disparado — e não tinha mesmo por que: ele
+            cuida de PEDAÇO QUE FALTOU, e pinta a tela de escuro quando age.
+            Branco puro é outra coisa: é o HTML que chegou e o programa que
+            ainda está vindo. No 3G do bar isso leva segundos, e nesses
+            segundos o app não dizia uma palavra.
+
+            Então aqui fica o que aparece ANTES de tudo, escrito dentro da
+            própria página. Some sozinho quando o React monta (components/
+            Abriu.js). E se demorar demais, para de dizer "abrindo" e passa a
+            dizer a verdade: está devagar, pode ser a internet, toca aqui pra
+            tentar de novo.
+
+            Oito segundos pro aviso mudar. Menos que isso acusa internet ruim
+            de um aparelho que ia abrir normal; muito mais e ela já desistiu e
+            foi fazer outra coisa. */}
+        <div id="picoos-abrindo" style={{
+          position: 'fixed', inset: 0, zIndex: 2147483646,
+          background: 'var(--c-bg-bottom, #080D18)', color: 'var(--c-text, #E9F0FB)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24, textAlign: 'center',
+          font: '16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+        }}>
+          <div style={{ maxWidth: 360 }}>
+            <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-.01em' }}>PicoOS</div>
+            <div id="picoos-abrindo-txt" style={{ marginTop: 8, fontSize: 14, color: 'var(--c-muted, #94A8C7)' }}>
+              abrindo…
+            </div>
+          </div>
+        </div>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=setTimeout(function(){
+if(window.__picoosAbriu)return;
+var d=document.getElementById('picoos-abrindo-txt');if(!d)return;
+d.innerHTML='Est\u00e1 demorando mais que o normal.<br>Pode ser a internet deste aparelho.<div style="margin-top:14px"><button id="picoos-abrindo-bt" style="background:#4FC3F7;border:none;color:#06101F;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:800;cursor:pointer">Tentar de novo</button></div><div style="margin-top:12px;font-size:12.5;opacity:.7">Teus dados est\u00e3o salvos no servidor \u2014 n\u00e3o se perde nada.</div>';
+var b=document.getElementById('picoos-abrindo-bt');if(b)b.onclick=function(){
+// LIMPA ANTES DE RECARREGAR.
+//
+// Recarregar puro cai no mesmo buraco: o aparelho guarda a p\u00e1gina pra abrir
+// r\u00e1pido, e se ela aponta pra um peda\u00e7o do app que n\u00e3o chega, abrir de novo
+// aponta pro mesmo peda\u00e7o. Jogando fora a c\u00f3pia guardada, a pr\u00f3xima vez busca
+// tudo do zero.
+//
+// N\u00e3o apaga dado nenhum: venda, compra e estoque moram no servidor. O que se
+// limpa \u00e9 s\u00f3 a c\u00f3pia dos arquivos do app neste aparelho.
+d.innerHTML='<div style="font-size:14px">Limpando e abrindo de novo\u2026</div>';
+var fim=false,vai=function(){if(fim)return;fim=true;try{location.reload();}catch(e){}};
+setTimeout(vai,2500);
+try{if(window.caches&&caches.keys){caches.keys().then(function(n){return Promise.all(n.map(function(x){return caches.delete(x);}));}).then(vai,vai);}else{vai();}}catch(e){vai();}
+};},8000);
+// Se o app montar antes, nem chega a contar.
+window.addEventListener('pagehide',function(){clearTimeout(t);});})();`,
+          }}
+        />
+        <Abriu />
         {children}
         <script
           dangerouslySetInnerHTML={{
