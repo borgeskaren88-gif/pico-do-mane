@@ -38,7 +38,7 @@ const ESTADOS = {
 //
 // O risco no anel é a parte que ninguém pede e todo mundo usa: estar com a
 // cor passando do risco é estar adiantada, sem precisar entender conta nenhuma.
-function Relogio({ pct, pace, cor, tamanho = 76 }) {
+function Relogio({ pct, pace, cor, tamanho = 76, escondido = false }) {
   const r = (tamanho - 10) / 2;
   const volta = 2 * Math.PI * r;
   const cheio = Math.max(0, Math.min(1, pct));
@@ -62,8 +62,10 @@ function Relogio({ pct, pace, cor, tamanho = 76 }) {
       {pace > 0 && pace < 1 && (
         <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={C.text} strokeWidth="2" strokeLinecap="round" opacity="0.5" />
       )}
+      {/* A porcentagem é conteúdo: diz quanto do mês já entrou. Escondida,
+          sobra o anel — que mostra que existe uma meta sem contar qual. */}
       <text x={c} y={c + 5} textAnchor="middle" fill={cor} fontSize="16" fontWeight="900" fontFamily="system-ui, sans-serif">
-        {Math.round(cheio * 100)}%
+        {escondido ? '•••' : `${Math.round(cheio * 100)}%`}
       </text>
     </svg>
   );
@@ -72,6 +74,10 @@ function Relogio({ pct, pace, cor, tamanho = 76 }) {
 // canto: o relógio encaixado no canto do cabeçalho, embaixo do Darci. Um
 // quadrado pequeno, e o detalhe abre por cima — em vez de ocupar meia tela.
 export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = (t) => t, onSalvar, canto = false }) {
+  // `oculto` é a mesma função do Dashboard: se ela mascara, é porque a tela
+  // está escondida. Assim não preciso de mais um prop viajando pelo mesmo
+  // caminho pra dizer a mesma coisa.
+  const escondido = oculto('x') !== 'x';
   const hoje = todayISO();
   const mes = ymOf(hoje);
   const [editando, setEditando] = useState(false);
@@ -331,7 +337,7 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
             // tamanho leem como um só; um alto e um baixo leem como sobra.
             justifyContent: 'center', gap: 6, alignSelf: 'stretch', marginBottom: 14,
           }}>
-          <Relogio pct={m.pct} pace={pctLinha} cor={m.poucasNoites ? C.amber : est.cor} tamanho={62} />
+          <Relogio pct={m.pct} pace={pctLinha} cor={m.poucasNoites ? C.amber : est.cor} tamanho={62} escondido={escondido} />
           {/* QUANDO A MARCAÇÃO DOS DIAS ESTÁ ERRADA, É ISSO QUE PRECISA SER
               LIDO — não o valor. Foi assim que um mês virou "4 noites" e a tela
               passou a pedir R$ 6.161 por noite sem ninguém perceber. */}
@@ -375,7 +381,7 @@ export default function MetaMes({ metas, receitas = [], realizado = 0, oculto = 
         aria-expanded={aberto}
         style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.text }}
       >
-        <Relogio pct={m.pct} pace={pctLinha} cor={est.cor} />
+        <Relogio pct={m.pct} pace={pctLinha} cor={est.cor} escondido={escondido} />
         <span style={{ minWidth: 0, flex: 1 }}>
           <span style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700 }}>
             Meta · {mesLabel(mes)}

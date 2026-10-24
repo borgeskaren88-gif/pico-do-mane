@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { C, Card } from './ui';
+import { C, Card, Segredo } from './ui';
 import { alertas, analisarBar, faz, lerVisto, marcarVisto } from '../lib/darci';
 import { todayISO, addDays } from '../lib/util';
 import useReservas from '../lib/useReservas';
@@ -20,7 +20,7 @@ const QUANTAS = 3;
 // As props do Darci chegam soltas (receitas, despesas, vendas…), não dentro de
 // um objeto `dados` — é assim que o painel as passa. O `...dados` recolhe todas
 // e deixa de fora só o que é função.
-export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }) {
+export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, escondido = false, ...dados }) {
   const reservas = useReservas();
   const [desdeMs, setDesdeMs] = useState(0);
   const [tudo, setTudo] = useState(false);
@@ -60,12 +60,19 @@ export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 2 }}>
             <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.09em', color: C.faint }}>PRA OLHAR AGORA</span>
             {urgentes > 0 && (
-              <span style={{ fontSize: 11, fontWeight: 900, color: C.red }}>
-                {urgentes} {urgentes === 1 ? 'urgente' : 'urgentes'}
-              </span>
+              <Segredo on={escondido}>
+                <span style={{ fontSize: 11, fontWeight: 900, color: C.red }}>
+                  {urgentes} {urgentes === 1 ? 'urgente' : 'urgentes'}
+                </span>
+              </Segredo>
             )}
           </div>
 
+          {/* Este era o buraco do "Ocultar": o dinheiro dos cartões virava
+              pontinhos, e aqui continuava escrito em vermelho quantas contas
+              venceram e quanto somam. Justamente o que ela quer esconder
+              quando tem alguém do lado do balcão. */}
+          <Segredo on={escondido}>
           {mostrados.map((av) => {
             const cor = corDe(av.nivel);
             const aberto = abertoId === av.id;
@@ -102,6 +109,7 @@ export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }
               </div>
             );
           })}
+          </Segredo>
 
           {(sobram > 0 || tudo) && (
             <button onClick={() => setTudo((v) => !v)} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12, fontWeight: 800, padding: '6px 0 0', cursor: 'pointer' }}>
@@ -115,10 +123,13 @@ export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }
       {proximas.length > 0 && (
         <div style={{ padding: '10px 14px', borderTop: `1px solid ${C.hair}`, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 13, flexShrink: 0 }} aria-hidden="true">📅</span>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.muted, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            <b style={{ color: C.text }}>{quando(proximas[0])}{proximas[0].hora ? ` ${proximas[0].hora}` : ''}</b>
-            {' · '}{proximas[0].nome} · {Number(proximas[0].pessoas) || 1} {(Number(proximas[0].pessoas) || 1) === 1 ? 'pessoa' : 'pessoas'}
-          </span>
+          {/* Nome de cliente é conteúdo, e dos mais pessoais que a tela mostra. */}
+          <Segredo on={escondido} style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', minWidth: 0, fontSize: 13, color: C.muted, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <b style={{ color: C.text }}>{quando(proximas[0])}{proximas[0].hora ? ` ${proximas[0].hora}` : ''}</b>
+              {' · '}{proximas[0].nome} · {Number(proximas[0].pessoas) || 1} {(Number(proximas[0].pessoas) || 1) === 1 ? 'pessoa' : 'pessoas'}
+            </span>
+          </Segredo>
           {proximas.length > 1 && (
             <span style={{ flexShrink: 0, fontSize: 11.5, color: C.faint, fontWeight: 700 }}>+{proximas.length - 1}</span>
           )}
@@ -135,9 +146,11 @@ export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }
           </button>
           {verMudou && (
             <div style={{ padding: '0 14px 12px 31px' }}>
+              <Segredo on={escondido}>
               {novidades.map((linha, i) => (
                 <div key={i} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>· {linha}</div>
               ))}
+              </Segredo>
               <button onClick={jaVi} style={{ background: 'none', border: 'none', color: C.faint, fontSize: 12, fontWeight: 800, padding: '4px 0 0', cursor: 'pointer' }}>já vi</button>
             </div>
           )}
