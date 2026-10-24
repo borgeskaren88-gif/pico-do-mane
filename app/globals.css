@@ -145,3 +145,72 @@ html, body {
    texto e a dica precisam ser claros pra ler em cima do azul. */
 .caderno-input::placeholder { color: rgba(255, 255, 255, 0.72); }
 .caderno-input:focus { border-color: rgba(255, 255, 255, 0.75); }
+
+/* ===================================================================
+   IMPRIMIR O RELATÓRIO — "levar pro contador".
+   ===================================================================
+   Ela já tinha como baixar os lançamentos crus (a planilha CSV, em
+   Configurações). O que faltava era o relatório MONTADO: o resultado do
+   mês, a escada do dinheiro, o CMV, a margem — do jeito que ela vê na
+   tela. CSV não serve pra isso: entrega dado, não conclusão.
+
+   Sem biblioteca de PDF, de propósito. O navegador já sabe virar página
+   em PDF ("Imprimir → Salvar em PDF", que no iPad e no iPhone é o mesmo
+   botão de sempre), e uma biblioteca aqui custaria algumas centenas de
+   KB baixados no 4G do bar pra fazer o que o Safari faz de graça. E,
+   como é a MESMA tela, o papel nunca diverge do que ela conferiu —
+   gerador próprio é mais um lugar pra conta discordar.
+
+   A regra abaixo é o truque clássico: some com tudo e devolve só o
+   bloco marcado. Assim não preciso conhecer o menu, a barra de cima nem
+   o que vier a existir depois — o que for novo já nasce escondido no
+   papel, que é o lado certo pra errar. */
+@media print {
+  /* PAPEL É BRANCO. O tema escuro no papel é ilegível e ainda torra a
+     tinta do cartucho dela. Aqui o claro é obrigatório, venha de onde
+     vier o tema da tela. */
+  :root, :root[data-theme="claro"] {
+    color-scheme: light;
+    --c-ink: #FFFFFF;
+    --c-panel: #FFFFFF;
+    --c-panel2: #F4F7FC;
+    --c-raised: #FFFFFF;
+    --c-line: #D7E0EC;
+    --c-hair: #E8EEF6;
+    --c-text: #10192B;
+    --c-muted: #43536B;
+    --c-faint: #6B7A90;
+    --c-card-border: #D7E0EC;
+    --c-card-shadow: none;
+    --c-bg-top: #FFFFFF;
+    --c-bg-bottom: #FFFFFF;
+    --c-glow-a: transparent;
+    --c-glow-b: transparent;
+  }
+
+  html, body { background: #fff !important; }
+
+  body * { visibility: hidden; }
+  .imprimivel, .imprimivel * { visibility: visible; }
+  .imprimivel {
+    position: absolute;
+    left: 0; top: 0; width: 100%;
+    padding: 0;
+  }
+
+  /* Botão, seletor de mês, Darci: controle não vai pra papel. */
+  .nao-imprimir, .nao-imprimir * { display: none !important; }
+
+  /* Só no papel: o cabeçalho que diz de quem é e de quando. Folha sem
+     isso em cima da mesa do contador é folha de ninguém. */
+  .so-impressao { display: block !important; }
+
+  /* Cartão partido no meio da página fica ilegível — a conta começa numa
+     folha e termina na outra. */
+  .nao-partir { break-inside: avoid; page-break-inside: avoid; }
+
+  @page { margin: 14mm 12mm; }
+}
+
+/* Na tela, o cabeçalho de papel não existe. */
+.so-impressao { display: none; }

@@ -179,8 +179,10 @@ export function Btn({ children, onClick, kind = 'primary', small, type = 'button
   );
 }
 
-export function Card({ children, style }) {
-  return <div style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 18, boxShadow: C.cardShadow, ...style }}>{children}</div>;
+export function Card({ children, style, className }) {
+  // `nao-partir` só faz efeito no papel (ver @media print): impede que um
+  // cartão comece numa folha e termine na outra, partindo a conta no meio.
+  return <div className={['nao-partir', className].filter(Boolean).join(' ')} style={{ background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 16, padding: 18, boxShadow: C.cardShadow, ...style }}>{children}</div>;
 }
 
 export function Field({ label, children }) {
