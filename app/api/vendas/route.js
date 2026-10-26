@@ -2,6 +2,9 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
+// `limparNome` e `abertoDaVenda` entram aqui pelo 'juntar'. O build NÃO acusa
+// identificador solto — só quebra na hora de rodar, com ela na frente.
+import { limparNome, abertoDaVenda } from '../../../lib/util';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +101,103 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, aplicado, sobra: Math.max(0, resta), quitados: alterados.filter((v) => v.pago).length, ref: ref || null });
     } catch (e) {
       return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao receber o fiado.' }, { status: 500 });
+    }
+  }
+
+  // JUNTAR DUAS CONTAS DE FIADO QUE SÃO A MESMA PESSOA.
+  //
+  // A lista dela tinha "igor" e "Igor Bittencourt"; "Gabreil" e "Gabriel
+  // Bittencourt". Travar a criação de conta nova (ver api/comandas) impede que
+  // apareçam mais; não conserta as que já estão lá.
+  //
+  // E elas fazem estrago enquanto existirem: o Gabriel tem limite de R$ 600 e
+  // está em R$ 504, mas os R$ 47,30 do "Gabreil" não contam pro limite dele.
+  // Na prática já passou, e o sistema não sabe.
+  //
+  // JUNTAR É RENOMEAR, NÃO SOMAR.
+  //
+  // Cada venda continua inteira, com a data e o que foi consumido — só passa a
+  // responder pelo nome certo. Somar os totais numa dívida só apagaria o
+  // histórico, e aí ela nunca mais saberia o que aquela pessoa consumiu.
+  //
+  // Guarda o nome de antes em `nomeAntes`. Se eu errar — ou se ela escolher as
+  // duas contas trocadas — dá pra achar e voltar. Operação que mexe em dívida
+  // de gente sem deixar rastro é operação que eu não escrevo.
+  if (acao === 'juntar') {
+    const de = limparNome(txt(body?.de, 60));
+    const para = limparNome(txt(body?.para, 60));
+    const norm = (x) => limparNome(x).toLowerCase();
+    if (!de || !para) return NextResponse.json({ ok: false, erro: 'Diz as duas contas.' }, { status: 400 });
+    if (norm(de) === norm(para)) return NextResponse.json({ ok: false, erro: 'São a mesma conta.' }, { status: 400 });
+    try {
+      const sb = bancoDaSessao();
+      const { data, error } = await sb.from('pdm_dados').select('chave, valor').like('chave', PREFIXO + '%');
+      if (error) throw error;
+      let movidas = 0, total = 0;
+      for (const linha of (data || [])) {
+        const v = linha?.valor;
+        if (!v || norm(v.nome) !== norm(de)) continue;
+        // O nome ORIGINAL só se grava uma vez: juntar duas vezes seguidas não
+        // pode apagar de onde a venda veio de verdade.
+        if (!v.nomeAntes) v.nomeAntes = v.nome;
+        v.nome = para;
+        total += Number(abertoDaVenda(v)) || 0;
+        movidas += 1;
+        const { error: e2 } = await sb.from('pdm_dados').upsert({ chave: linha.chave, valor: v, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+        if (e2) throw e2;
+      }
+      // O nome errado sai do cadastro de clientes, senão ela torna a escolher
+      // ele na próxima conta e o problema volta na semana que vem.
+      const { data: pr } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
+      const blob = pr?.valor || {};
+      const antes = Array.isArray(blob.clientes) ? blob.clientes : [];
+      const ficam = antes.filter((c) => norm(c && c.nome) !== norm(de));
+      let tirouDoCadastro = false;
+      if (ficam.length !== antes.length) {
+        await sb.from('pdm_dados').upsert({ chave: 'painel', valor: { ...blob, clientes: ficam }, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+        tirouDoCadastro = true;
+      }
+      return NextResponse.json({ ok: true, movidas, total: Math.round(total * 100) / 100, tirouDoCadastro });
+    } catch (e) {
+      return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao juntar as contas.' }, { status: 500 });
+    }
+  }
+
+  // DESFAZER UM JUNTAR.
+  //
+  // "E caso uma hora eu erre também."
+  //
+  // Eu guardava o nome de antes em `nomeAntes` e não dava a ela nenhum jeito
+  // de usar isso — rastro que só eu consigo ler não serve pra quem está com o
+  // bar aberto. Se ela juntar as duas contas trocadas, tem que conseguir
+  // voltar sozinha, na hora, sem me chamar.
+  //
+  // Desfaz PELO PAR, não por nome solto: devolve só as vendas que estão em
+  // `para` e vieram de `de`. Assim um juntar antigo, certo e já esquecido não
+  // se desfaz junto com o errado de agora.
+  if (acao === 'desjuntar') {
+    const de = limparNome(txt(body?.de, 60));
+    const para = limparNome(txt(body?.para, 60));
+    const norm = (x) => limparNome(x).toLowerCase();
+    if (!de || !para) return NextResponse.json({ ok: false, erro: 'Diz as duas contas.' }, { status: 400 });
+    try {
+      const sb = bancoDaSessao();
+      const { data, error } = await sb.from('pdm_dados').select('chave, valor').like('chave', PREFIXO + '%');
+      if (error) throw error;
+      let voltaram = 0;
+      for (const linha of (data || [])) {
+        const v = linha?.valor;
+        if (!v || norm(v.nome) !== norm(para) || norm(v.nomeAntes) !== norm(de)) continue;
+        v.nome = v.nomeAntes;
+        delete v.nomeAntes;
+        voltaram += 1;
+        const { error: e2 } = await sb.from('pdm_dados').upsert({ chave: linha.chave, valor: v, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+        if (e2) throw e2;
+      }
+      if (!voltaram) return NextResponse.json({ ok: false, erro: 'Não achei compras pra devolver.' }, { status: 404 });
+      return NextResponse.json({ ok: true, voltaram });
+    } catch (e) {
+      return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao desfazer.' }, { status: 500 });
     }
   }
 

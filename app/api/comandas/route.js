@@ -249,6 +249,33 @@ async function fecharComanda(sb, c, body, p) {
     const nomeCli = txt(body?.nome, 60) || c.nome || '';
     // Trava: fiado SEM nome não pode — senão a dívida vira uma "Mesa X" sem dono.
     if (fiado > 0.005 && !nomeCli) return { falhou: true, erro: 'Fiado precisa do nome de quem ficou devendo.', status: 400 };
+
+    // SÓ A DONA ABRE CONTA NOVA DE FIADO.
+    //
+    // "Meu atendente não está se dando bem com o fiado, ele acaba criando
+    // novas contas sendo que são contas antigas."
+    //
+    // A lista dela tinha "igor" e "Igor Bittencourt"; "Gabreil" e "Gabriel
+    // Bittencourt" — a mesma pessoa duas vezes, uma delas com o nome escrito
+    // errado. Cada nome novo abre uma dívida própria: o limite de fiado não
+    // vale, a cobrança some, e o total que ela acha que tem a receber está
+    // repartido em dois lugares.
+    //
+    // A trava mora AQUI, e não só na tela, porque é regra de dinheiro. Tela é
+    // sugestão: some num celular com a página velha em cache, numa tela que
+    // eu mexer amanhã, ou em quem souber mandar o pedido direto. Regra de
+    // quem pode criar dívida tem que estar onde o dado é gravado.
+    if (fiado > 0.005 && p !== 'dona') {
+      const blobCli = await lerPainel(sb);
+      const nomes = (Array.isArray(blobCli.clientes) ? blobCli.clientes : [])
+        .map((x) => limparNome(x && x.nome).toLowerCase()).filter(Boolean);
+      if (!nomes.includes(limparNome(nomeCli).toLowerCase())) {
+        return {
+          falhou: true, status: 400,
+          erro: `"${nomeCli}" não está na lista de clientes. Escolhe um nome da lista — quem cadastra cliente novo é a dona.`,
+        };
+      }
+    }
     // Limite de fiado: se o cliente está cadastrado com limite e "bloquear",
     // barra o novo fiado que passaria do limite (soma o que já está em aberto).
     if (fiado > 0.005 && nomeCli) {

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { acharCliente, telefoneDoCliente } from '../lib/clientes';
-import { C, Card, Btn, KPI, Empty, SecTitle, PageTitle } from './ui';
+import { C, Card, Btn, KPI, Empty, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, fmtDate, uid, diaOperacional, fiadoDaVenda, abertoDaVenda, classificarFiado } from '../lib/util';
 
 const norm = (s) => (s || '').trim().toLowerCase();
@@ -72,6 +72,9 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
   const [forma, setForma] = useState({}); // { [chave]: 'Pix' } — como o cliente pagou
   const [recebendo, setRecebendo] = useState({}); // { [vendaId]: true } — escolhendo a forma de uma compra
   const [semAberto, setSemAberto] = useState({}); // { [chave]: true } — painel "baixar sem dinheiro"
+  const [juntarAberto, setJuntarAberto] = useState({}); // { [chave]: true } — painel "juntar com outra conta"
+  const [juntarCom, setJuntarCom] = useState({});       // { [chave]: nome escolhido }
+  const [ultimoJuntar, setUltimoJuntar] = useState(null); // pra poder voltar atrás na hora
   const [motivoSem, setMotivoSem] = useState({}); // { [chave]: 'Desconto no salário' }
   const [valorSem, setValorSem] = useState({}); // { [chave]: 'texto do valor' }
 
@@ -124,6 +127,55 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
       descricao: `Fiado recebido — ${nome}${comoPagou ? ` (${comoPagou})` : ''}`,
       valor: Math.round(valor * 100) / 100, obs: '', refFiado: ref, forma: comoPagou || 'Dinheiro',
     }, ...receitas]);
+  };
+
+  // JUNTAR DUAS CONTAS QUE SÃO A MESMA PESSOA.
+  //
+  // "igor" e "Igor Bittencourt"; "Gabreil" e "Gabriel Bittencourt". Travar a
+  // criação de conta nova impede que apareçam mais; não conserta as que já
+  // estão lá — e elas fazem estrago enquanto existirem: o limite de fiado da
+  // pessoa não conta a dívida que ficou na conta errada.
+  //
+  // Juntar é RENOMEAR, não somar: cada venda continua inteira, com data e o
+  // que foi consumido, só passa a responder pelo nome certo.
+  const juntar = async (g) => {
+    const para = (juntarCom[g.chave] || '').trim();
+    if (!para || busy) return;
+    // Confirmação com os números na frente. Mexer em dívida de gente sem
+    // mostrar o tamanho do que vai mexer é pedir pra ela errar o alvo.
+    if (typeof window !== 'undefined'
+      && !window.confirm(`Juntar a conta de "${g.nome}" (${brl(g.total)}) na conta de "${para}"?\n\n`
+        + `As ${g.vendas.length} compra(s) passam a ser de "${para}", com as datas e os itens intactos.\n`
+        + `"${g.nome}" sai da lista de clientes.`)) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/vendas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'juntar', de: g.nome, para }) });
+      const j = await r.json();
+      if (!j.ok) { setErro(j.erro || 'Não consegui juntar.'); return; }
+      setJuntarAberto((m) => ({ ...m, [g.chave]: false }));
+      // O DESFAZER FICA À MÃO, NA HORA.
+      //
+      // É neste segundo que ela percebe se escolheu a conta trocada — a lista
+      // se redesenha na frente dela. Guardar o desfazer noutra tela seria
+      // guardá-lo pra quando ela já não lembra os dois nomes.
+      setUltimoJuntar({ de: g.nome, para, movidas: j.movidas });
+      await carregar();
+      if (onMudou) onMudou();
+    } catch { setErro('Não consegui juntar.'); } finally { setBusy(false); }
+  };
+
+  const desfazerJuntar = async () => {
+    if (!ultimoJuntar || busy) return;
+    const { de, para } = ultimoJuntar;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/vendas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'desjuntar', de, para }) });
+      const j = await r.json();
+      if (!j.ok) { setErro(j.erro || 'Não consegui desfazer.'); return; }
+      setUltimoJuntar(null);
+      await carregar();
+      if (onMudou) onMudou();
+    } catch { setErro('Não consegui desfazer.'); } finally { setBusy(false); }
   };
 
   const desfazerUltima = async () => {
@@ -298,6 +350,26 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
     <div>
       <PageTitle sub="Quem está devendo (contas fechadas no fiado)">Fiados</PageTitle>
 
+      {/* O caminho de volta, no segundo em que ela percebe que escolheu a
+          conta trocada. Fica no topo porque a lista acabou de se redesenhar e
+          é pra cá que o olho vai. */}
+      {ultimoJuntar && (
+        <Card style={{ marginBottom: 14, borderColor: C.accent }}>
+          <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>
+            Juntei <b>{ultimoJuntar.movidas} compra(s)</b> de <b>"{ultimoJuntar.de}"</b> na conta de{' '}
+            <b>"{ultimoJuntar.para}"</b>.
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+            <Btn kind="ghost" small onClick={desfazerJuntar} disabled={busy}>Não era essa — desfazer</Btn>
+            <Btn kind="ghost" small onClick={() => setUltimoJuntar(null)} disabled={busy}>Está certo</Btn>
+          </div>
+          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 8, lineHeight: 1.5 }}>
+            Desfazer devolve as compras pro nome de antes, com as datas e os valores intactos. O nome volta pra lista
+            de clientes quando tu cadastrar de novo.
+          </div>
+        </Card>
+      )}
+
       {/* O fiado tem duas idades: o que já venceu (consumo dos meses passados,
           que se paga até o dia 10) e o que ainda está correndo neste mês. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 9 }}>
@@ -407,7 +479,32 @@ export default function Fiados({ onMudou, clientes = [], receitas = null, onRece
                           })()}
                           {/* Tirar da lista sem entrar dinheiro (desconto no salário, cortesia…). */}
                           <Btn kind="ghost" small onClick={() => setSemAberto((m) => ({ ...m, [g.chave]: true }))} disabled={busy}>Baixar sem dinheiro</Btn>
+                          {grupos.length > 1 && (
+                            <Btn kind="ghost" small onClick={() => setJuntarAberto((m) => ({ ...m, [g.chave]: !m[g.chave] }))} disabled={busy}>
+                              É a mesma pessoa de outra conta
+                            </Btn>
+                          )}
                         </div>
+                        {juntarAberto[g.chave] && (
+                          <div style={{ marginTop: 10, background: C.panel2, borderRadius: 12, padding: '12px 14px' }}>
+                            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Juntar "{g.nome}" com qual conta?</div>
+                            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
+                              As {g.vendas.length} compra(s) passam pra conta escolhida, com as datas e os itens
+                              intactos. Nada é somado nem apagado — só muda de dono.
+                            </div>
+                            <select value={juntarCom[g.chave] || ''} onChange={(e) => setJuntarCom((m) => ({ ...m, [g.chave]: e.target.value }))}
+                              style={{ ...inputStyle, appearance: 'none', marginBottom: 10 }}>
+                              <option value="">Escolhe a conta certa…</option>
+                              {grupos.filter((x) => x.chave !== g.chave).map((x) => (
+                                <option key={x.chave} value={x.nome}>{x.nome} · {brl(x.total)}</option>
+                              ))}
+                            </select>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <Btn kind="ok" small onClick={() => juntar(g)} disabled={busy || !(juntarCom[g.chave] || '').trim()}>Juntar</Btn>
+                              <Btn kind="ghost" small onClick={() => setJuntarAberto((m) => ({ ...m, [g.chave]: false }))}>Cancelar</Btn>
+                            </div>
+                          </div>
+                        )}
                         {recado[g.chave] && (
                           <div style={{ fontSize: 12, color: C.accent, fontWeight: 700, marginTop: 8, lineHeight: 1.45 }}>
                             {recado[g.chave]}
