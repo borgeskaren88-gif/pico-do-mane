@@ -282,6 +282,9 @@ export default function Comandas({ papel = 'dona' }) {
   const [fecharForm, setFecharForm] = useState(null); // { pagamento, pessoas } quando fechando
   const [abrindo, setAbrindo] = useState(null); // { mesa, pessoas } enquanto pergunta quantos sentaram
   const [outroCliente, setOutroCliente] = useState(false); // digitar nome fora da lista de clientes
+  // Quem pode abrir conta de fiado nova. O servidor confere de novo (ver
+  // fecharComanda): isto aqui é pra ele não ver a porta, não é a tranca.
+  const podeCriarCliente = papel === 'dona';
   const [busca, setBusca] = useState('');
   const [picker, setPicker] = useState(false); // tela de adicionar produtos (carrinho)
   const [balcao, setBalcao] = useState(false); // tela de venda de balcão (sem mesa)
@@ -469,7 +472,7 @@ export default function Comandas({ papel = 'dona' }) {
       // Ficou fiado com um nome que não está cadastrado? Oferece salvar como cliente,
       // pra da próxima ser só clicar no nome (e poder definir um limite depois).
       const norm = (s) => (s || '').trim().toLowerCase();
-      if (fiadoVal > 0.005 && nomeCli && !clientes.some((n) => norm(n) === norm(nomeCli))) {
+      if (podeCriarCliente && fiadoVal > 0.005 && nomeCli && !clientes.some((n) => norm(n) === norm(nomeCli))) {
         if (typeof window !== 'undefined' && window.confirm(`Salvar "${nomeCli}" na sua lista de clientes?\n\nAssim, da próxima vez é só clicar no nome — e dá pra definir um limite de fiado pra ele na aba Clientes.`)) {
           try { await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'novoCliente', nome: nomeCli }) }); } catch { /* se falhar, a venda já está salva; ela cadastra depois */ }
         }
@@ -933,7 +936,24 @@ export default function Comandas({ papel = 'dona' }) {
                 {fiadoVal > 0 && (
                   <div style={{ marginBottom: 10 }}>
                     <Field label="Quem ficou devendo? (obrigatório)">
-                      {clientes.length > 0 ? (
+                      {/* SÓ A DONA ABRE CONTA NOVA.
+                          O atendimento escolhe da lista e pronto: sem "Outro
+                          (digitar)", sem campo livre. Era por ali que "igor" e
+                          "Gabreil" viravam dívidas separadas das do "Igor
+                          Bittencourt" e do "Gabriel Bittencourt". */}
+                      {!podeCriarCliente ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <Select
+                            value={fecharForm.nome}
+                            onChange={(v) => setFecharForm((s) => ({ ...s, nome: v }))}
+                            options={clientes} placeholder="Selecionar cliente" />
+                          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
+                            Não achou o nome na lista? <b style={{ color: C.text }}>Não escreve parecido</b> — vira
+                            outra conta e a dívida se parte em duas. Chama a dona pra cadastrar, ou recebe de outro
+                            jeito agora.
+                          </div>
+                        </div>
+                      ) : clientes.length > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                           <Select
                             value={outroCliente ? 'Outro (digitar)' : fecharForm.nome}
