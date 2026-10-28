@@ -203,11 +203,11 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
             {/* Folha do caderno */}
             <div style={{ padding: 14 }}>
               {/* Peneira: mostra tudo ou só um estado */}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
                 <button onClick={() => setFiltro('todos')} style={chip(filtro === 'todos', C.text)}>Tudo <span style={{ opacity: 0.6 }}>{ideias.length}</span></button>
                 {COLS.map(([status, rot, cor]) => (
                   <button key={status} onClick={() => setFiltro(filtro === status ? 'todos' : status)} style={chip(filtro === status, cor)}>
-                    <span style={{ width: 7, height: 7, borderRadius: 999, background: cor, display: 'inline-block', marginRight: 6 }} />
+                    <span style={{ width: 7, height: 7, borderRadius: 999, background: cor, display: 'inline-block' }} />
                     {rot} <span style={{ opacity: 0.6 }}>{contaDe(status)}</span>
                   </button>
                 ))}
@@ -228,39 +228,40 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
                 const aberta = !!notaAberta[i.id];
                 const feita = i.status === 'feito';
                 return (
-                  <div key={i.id} style={{ borderTop: `1px solid ${C.hair}`, padding: '11px 0 10px' }}>
-                    {editando ? (
-                      <div style={{ paddingLeft: 2 }}>
-                        <input value={editTexto} onChange={(e) => setEditTexto(e.target.value)} placeholder="A anotação" style={{ ...inputStyle, fontSize: 14, fontWeight: 700, padding: '9px 11px', marginBottom: 8 }} />
-                        <textarea value={editNota} onChange={(e) => setEditNota(e.target.value)} rows={4} placeholder="O texto de dentro… (fica escondido até você tocar na linha)" style={{ ...inputStyle, fontSize: 13.5, padding: '9px 11px', marginBottom: 8, resize: 'vertical', lineHeight: 1.5 }} />
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <Btn small onClick={salvarEdit}>Salvar</Btn>
-                          <Btn kind="ghost" small onClick={cancelarEdit}>Cancelar</Btn>
+                  // Cada anotação é um cartão seu, com uma faixa colorida na
+                  // lateral: o estado se enxerga de longe, sem precisar ler.
+                  <div key={i.id} style={{ display: 'flex', background: C.panel2, border: `1px solid ${C.hair}`, borderRadius: 13, overflow: 'hidden', marginTop: 8 }}>
+                    <div aria-hidden="true" style={{ width: 4, flexShrink: 0, background: cor }} />
+                    <div style={{ flex: 1, minWidth: 0, padding: '10px 12px 11px' }}>
+                      {editando ? (
+                        <div>
+                          <input value={editTexto} onChange={(e) => setEditTexto(e.target.value)} placeholder="A anotação" style={{ ...inputStyle, fontSize: 14, fontWeight: 700, padding: '9px 11px', marginBottom: 8 }} />
+                          <textarea value={editNota} onChange={(e) => setEditNota(e.target.value)} rows={4} placeholder="O texto de dentro… (fica escondido até você tocar na linha)" style={{ ...inputStyle, fontSize: 13.5, padding: '9px 11px', marginBottom: 8, resize: 'vertical', lineHeight: 1.5 }} />
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <Btn small onClick={salvarEdit}>Salvar</Btn>
+                            <Btn kind="ghost" small onClick={cancelarEdit}>Cancelar</Btn>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
-                        {/* A bolinha é o estado: um toque e a nota anda um passo. */}
-                        <button
-                          onClick={() => avancar(i)}
-                          title={`${rot} — toque pra mudar`}
-                          style={{
-                            marginTop: 2, flexShrink: 0, width: 17, height: 17, borderRadius: 999, cursor: 'pointer',
-                            border: `2.5px solid ${cor}`, background: feita ? cor : 'transparent', padding: 0,
-                          }}
-                        />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <button onClick={() => setNotaAberta((m) => ({ ...m, [i.id]: !m[i.id] }))} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-                            <div style={{ fontSize: 14.5, color: feita ? C.faint : C.text, lineHeight: 1.4, fontWeight: 600, overflowWrap: 'anywhere', textDecoration: feita ? 'line-through' : 'none' }}>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {/* A etiqueta é o estado: um toque e a nota anda um
+                                passo. Virou etiqueta no lugar da bolinha porque
+                                diz o nome do estado e é bem maior de acertar
+                                com o dedo. */}
+                            <button onClick={() => avancar(i)} title={`${rot} — toque pra mudar`} style={etiqueta(cor)}>
+                              {feita ? `✓ ${rot}` : rot}
+                            </button>
+                            <span style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.faint }}>{quandoFoi(i.criadoEm)}</span>
+                          </div>
+                          <button onClick={() => setNotaAberta((m) => ({ ...m, [i.id]: !m[i.id] }))} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginTop: 7 }}>
+                            <div style={{ fontSize: 15, color: feita ? C.faint : C.text, lineHeight: 1.35, fontWeight: 800, letterSpacing: '-.01em', overflowWrap: 'anywhere', textDecoration: feita ? 'line-through' : 'none' }}>
                               {i.texto}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                              <span style={{ fontSize: 10.5, fontWeight: 800, color: cor, letterSpacing: '.03em' }}>{rot}</span>
-                              {i.nota && !aberta && <span style={{ fontSize: 10.5, color: C.faint, fontWeight: 700 }}>· tem recado escondido</span>}
-                            </div>
+                            {i.nota && !aberta && <div style={{ fontSize: 11.5, color: C.faint, fontWeight: 700, marginTop: 4 }}>tem recado escondido — toca pra ver</div>}
                           </button>
                           {aberta && (
-                            <div style={{ marginTop: 8 }}>
+                            <div style={{ marginTop: 9 }}>
                               {i.nota
                                 ? <div style={{ fontSize: 13.5, color: C.muted, lineHeight: 1.55, whiteSpace: 'pre-wrap', borderLeft: `2px solid ${C.line}`, paddingLeft: 10 }}>{i.nota}</div>
                                 : <div style={{ fontSize: 12.5, color: C.faint }}>Sem texto por dentro. Toque em “escrever”.</div>}
@@ -271,9 +272,9 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
                               </div>
                             </div>
                           )}
-                        </div>
-                      </div>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -295,9 +296,34 @@ const chip = (ativo, cor) => ({
   border: `1px solid ${ativo ? cor : C.line}`, cursor: 'pointer', borderRadius: 999,
   background: ativo ? `color-mix(in srgb, ${cor} 16%, transparent)` : 'transparent',
   color: ativo ? cor : C.muted, padding: '5px 11px', fontSize: 11.5, fontWeight: 800, whiteSpace: 'nowrap',
-  display: 'inline-flex', alignItems: 'center',
+  // inline-flex come os espaços entre os pedaços, e a peneira saía escrita
+  // "Tudo4", "Ideia1". O gap devolve o espaço que o espaço em branco perdeu.
+  display: 'inline-flex', alignItems: 'center', gap: 5,
 });
 const acaoBtn = {
   background: 'none', border: `1px solid ${C.line}`, color: C.muted, cursor: 'pointer',
   fontSize: 11.5, fontWeight: 700, padding: '5px 11px', borderRadius: 8,
+};
+// A etiqueta de estado no cartão: fundo na cor do estado bem diluído, letra na
+// cor cheia. Mesma receita das peneiras ali de cima, pra lista e peneira
+// falarem a mesma língua de cor.
+const etiqueta = (cor) => ({
+  flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 7,
+  background: `color-mix(in srgb, ${cor} 18%, transparent)`, color: cor,
+  padding: '4px 9px', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
+});
+// "há 4 min", "ontem", "12/10" — tempo de gente, não data de computador. Em
+// nota de hoje a hora cheia não diz nada; o que ela quer saber é se é recente.
+const quandoFoi = (ms) => {
+  if (!ms) return '';
+  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (s < 60) return 'agora';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `há ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return 'ontem';
+  if (d < 7) return `há ${d} dias`;
+  try { return new Date(ms).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); } catch { return ''; }
 };
