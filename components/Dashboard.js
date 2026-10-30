@@ -1027,7 +1027,7 @@ export default function Dashboard() {
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
             ficha técnica de prato e de drink. As duas leem e escrevem. */}
         {tab === 'pasta' && <Pasta />}
-        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onAbrir={irParaTab} onPerguntar={temDarci ? () => setTab('darci') : null} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={temDarci ? <DarciFlutuante {...propsDarci} /> : null} metas={metas} onMetas={upd.metas} dona={(negocio && (negocio.dona || (negocio.papeis && negocio.papeis.dona))) || ''} fotoDona={(negocio && negocio.fotoDona) || ''} />}
+        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onIrPara={irParaTab} onPerguntar={temDarci ? () => setTab('darci') : null} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={temDarci ? <DarciFlutuante {...propsDarci} /> : null} metas={metas} onMetas={upd.metas} dona={(negocio && (negocio.dona || (negocio.papeis && negocio.papeis.dona))) || ''} fotoDona={(negocio && negocio.fotoDona) || ''} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} vendas={vendas} />}
         {tab === 'financas' && (
           <>

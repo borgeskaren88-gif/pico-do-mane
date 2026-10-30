@@ -73,7 +73,17 @@ const p0 = await painel();
 await gravar({ ...p0, compras: COMPRAS, despesas: [], receitas: [], diario: [], cardapio: [], fichas: [], tarefas: [],
   // Um item zerado faz nascer um aviso de ESTOQUE lá no topo — assim dá pra
   // cobrar que cada aviso vá pra SUA tela, e não todos pro mesmo lugar.
-  estoque: [{ id: 'x1', nome: 'Cerveja Original', unidade: 'un', saldo: '0', minimo: '10', categoria: 'Bebidas' }] });
+  // E um estoque que separa "acabou" de "nunca foi contado":
+  //   x1  mínimo 10, saldo 0  -> zerado DE VERDADE, e abaixo do mínimo
+  //   x2  mínimo  5, saldo 2  -> abaixo do mínimo, mas ainda tem
+  //   x3  x4      sem mínimo, saldo 0 -> ela não pediu pro app vigiar isso;
+  //                               saldo 0 aqui quer dizer "nunca contei"
+  estoque: [
+    { id: 'x1', nome: 'Cerveja Original', unidade: 'un', saldo: '0', minimo: '10', categoria: 'Bebidas' },
+    { id: 'x2', nome: 'Limão', unidade: 'kg', saldo: '2', minimo: '5', categoria: 'Cozinha' },
+    { id: 'x3', nome: 'Guardanapo', unidade: 'pct', saldo: '0', minimo: '', categoria: 'Descartáveis/Apoio' },
+    { id: 'x4', nome: 'Palito', unidade: 'cx', saldo: '0', minimo: '', categoria: 'Descartáveis/Apoio' },
+  ] });
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 // Tela de celular: a rolagem só atrapalha quando a tela é pequena, que é a
@@ -258,6 +268,47 @@ await pg.waitForTimeout(1800);
 txt = await texto();
 const noKPI = (txt.match(/(\d+) vencida\(s\)/) || [])[1];
 cobra('e a tela de Contas a Pagar fecha com o mesmo 3', noKPI === '3', `disse ${noKPI}`);
+
+console.log('\n### E O ESTOQUE CONTA IGUAL EM TODA TELA');
+// "Ali fala que tem 34 itens faltantes, entro no estoque e diz que tem 18."
+//
+// "Zerado" era qualquer item com saldo 0, inclusive os sem mínimo — os que
+// ela nem pediu pro app vigiar. Saldo 0 num item sem mínimo quase sempre quer
+// dizer "nunca foi contado", não "acabou". Aqui, só a Cerveja está zerada de
+// verdade; Guardanapo e Palito nunca foram contados.
+await pg.evaluate(() => {
+  const x = [...document.querySelectorAll('button')].find((e) => (e.innerText || '').trim() === 'Dashboard');
+  if (x) x.click();
+});
+await pg.waitForTimeout(1800);
+const linhaEstoque = await pg.evaluate(() => {
+  const lim = (s) => String(s || '').replace(/\u00a0/g, ' ');
+  const bt = [...document.querySelectorAll('button')].find((x) => /\d+ ite(?:m|ns) zerad/i.test(lim(x.innerText)));
+  return bt ? lim(bt.innerText).replace(/\n/g, ' | ') : '(não achou)';
+});
+cobra('o aviso diz 1 item zerado', /\b1 item zerado\b/.test(linhaEstoque), linhaEstoque);
+cobra('e NÃO 3 (que é contar o que nunca foi contado)', !/\b3 itens zerados\b/.test(linhaEstoque), linhaEstoque);
+
+txt = await texto();
+const linhaMin = (txt.match(/[^\n]*no estoque mínimo[^\n]*/) || ['(não achou)'])[0];
+const noMinimo = (linhaMin.match(/(\d+) iten?s? /) || [])[1];
+cobra('e os "Avisos de hoje" dizem 2 abaixo do mínimo', noMinimo === '2', linhaMin);
+// "item" faz plural "itens". O app escrevia "2 items".
+cobra('e escreve "itens", não "items"', !/\bitems\b/.test(txt), linhaMin);
+// Guardanapo e Palito não podem estar na lista de quem falta.
+cobra('Guardanapo não entra na lista do que falta', !/Guardanapo/.test(txt), (txt.match(/[^\n]*Guardanapo[^\n]*/) || [''])[0]);
+
+await pg.evaluate(() => {
+  const x = [...document.querySelectorAll('button')].find((e) => (e.innerText || '').trim() === 'Abastecimento');
+  if (x) x.click();
+});
+await pg.waitForTimeout(2000);
+txt = await texto();
+cobra('a tela de Estoque abriu', /Quanto você tem, o que está acabando/.test(txt), txt.replace(/\n/g, ' | ').slice(0, 120));
+// O cartão "Acabando" é a lista que ela usa pra repor. Ele e o aviso do topo
+// têm que estar falando do mesmo conjunto de itens.
+const noAcabando = (txt.match(/Acabando \((\d+)\)/i) || [])[1];
+cobra('o "Acabando" do Estoque diz os mesmos 2', noAcabando === '2', `disse ${noAcabando}`);
 
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);

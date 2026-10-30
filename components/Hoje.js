@@ -212,7 +212,7 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           )}
           {estoqueBaixo.length > 0 && (
             <Leva onClick={() => setTab('abastecimento')} style={{ padding: '5px 0' }}>
-              <div style={{ fontSize: 14, minWidth: 0 }}><b>{estoqueBaixo.length} item{estoqueBaixo.length > 1 ? 's' : ''}</b> no estoque mínimo <span style={{ color: C.faint }}>· {estoqueBaixo.slice(0, 3).map((it) => it.nome).join(', ')}{estoqueBaixo.length > 3 ? '…' : ''}</span></div>
+              <div style={{ fontSize: 14, minWidth: 0 }}><b>{estoqueBaixo.length} {estoqueBaixo.length === 1 ? 'item' : 'itens'}</b> no estoque mínimo <span style={{ color: C.faint }}>· {estoqueBaixo.slice(0, 3).map((it) => it.nome).join(', ')}{estoqueBaixo.length > 3 ? '…' : ''}</span></div>
             </Leva>
           )}
           {tarefasHoje.length > 0 && (

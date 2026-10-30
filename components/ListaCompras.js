@@ -222,7 +222,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
         grupos.map((g) => (
           <Card key={g.fornecedor} style={{ marginBottom: 10, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-              <div style={{ fontWeight: 800, fontSize: 14 }}>{g.fornecedor}<span style={{ fontSize: 12, color: C.faint, fontWeight: 400 }}> · {g.itens.length} item{g.itens.length > 1 ? 's' : ''}</span></div>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>{g.fornecedor}<span style={{ fontSize: 12, color: C.faint, fontWeight: 400 }}> · {g.itens.length} {g.itens.length === 1 ? 'item' : 'itens'}</span></div>
               {g.temPreco && <div style={{ fontSize: 12, color: C.muted }}>~ <b style={{ color: C.text }}>{brl(g.estimativa)}</b></div>}
             </div>
             {g.itens.length > 1 && selForn !== g.fornecedor && (
@@ -263,7 +263,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
                   </div>
                   <div style={{ fontSize: 14, margin: '2px 0 10px' }}>
                     Total do boleto: <b style={{ color: C.text }}>{brl(totalBoleto)}</b>
-                    <span style={{ fontSize: 12, color: C.faint }}> · {qtdeSel} item{qtdeSel !== 1 ? 's' : ''}</span>
+                    <span style={{ fontSize: 12, color: C.faint }}> · {qtdeSel} {qtdeSel === 1 ? 'item' : 'itens'}</span>
                   </div>
                   <div style={{ fontSize: 11, color: C.faint, marginBottom: 10 }}>
                     {aVista ? 'Vira uma despesa paga hoje.' : 'Vira uma conta a pagar única (todos os itens juntos) com esse vencimento.'} Os preços também entram nas Cotações.
@@ -349,7 +349,7 @@ export default function ListaCompras({ itens = [], modelos = [], cotacoes = [], 
               <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, padding: '9px 0' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{m.nome}</div>
-                  <div style={{ fontSize: 12, color: C.faint }}>{m.itens.length} item{m.itens.length > 1 ? 's' : ''}: {m.itens.map((i) => i.nome).slice(0, 4).join(', ')}{m.itens.length > 4 ? '…' : ''}</div>
+                  <div style={{ fontSize: 12, color: C.faint }}>{m.itens.length} {m.itens.length === 1 ? 'item' : 'itens'}: {m.itens.map((i) => i.nome).slice(0, 4).join(', ')}{m.itens.length > 4 ? '…' : ''}</div>
                 </div>
                 <Btn kind="ghost" small onClick={() => carregarModelo(m)}>Carregar</Btn>
                 <button onClick={() => excluirModelo(m.id)} title="Excluir modelo" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}>×</button>
