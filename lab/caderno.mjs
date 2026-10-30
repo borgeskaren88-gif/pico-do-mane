@@ -28,7 +28,7 @@ let ruim = 0;
 const cobra = (r, ok, e = '') => { if (!ok) ruim++; console.log(`  ${ok ? 'ok  ' : 'RUIM'}  ${r}${e ? `  [${e}]` : ''}`); };
 const painel = async () => (await (await fetch(`${BANCO}?select=valor&chave=eq.${MARCA}painel`)).json())[0]?.valor || {};
 const gravar = (v) => fetch(BANCO, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify([{ chave: `${MARCA}painel`, valor: v }]) });
-const limpa = (s) => String(s || '').replace(/ /g, ' ');
+const limpa = (s) => String(s || '').replace(/\u00a0/g, ' ');
 
 const MIN = 60 * 1000, HORA = 60 * MIN, DIA = 24 * HORA;
 const agora = Date.now();

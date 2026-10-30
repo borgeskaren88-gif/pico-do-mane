@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle } from './ui';
-import { brl, num, totalCompra, todayISO, fmtDate, addDays, uid, limparNome, montarParcelas, agruparContasAbertas, CATEGORIAS_PRODUTO } from '../lib/util';
+import { brl, num, totalCompra, todayISO, fmtDate, addDays, daysBetween, uid, limparNome, montarParcelas, agruparContasAbertas, CATEGORIAS_PRODUTO, JUROS_ATRASO } from '../lib/util';
 import CalendarioFluxo from './CalendarioFluxo';
 
 const formVazio = () => ({ fornecedor: '', descricao: '', categoria: '', valorTotal: '', parcelas: '1' });
@@ -70,12 +70,35 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
   const totalVenc = vencidasGrupos.reduce((s, g) => s + g.total, 0);
   const proximas = grupos.filter((g) => g.vencimento && g.vencimento >= hoje && g.vencimento <= addDays(hoje, 7));
 
+  // BOLETO ATRASADO SAI MAIS CARO QUE O BOLETO.
+  //
+  // "Estou pagando uns boletos atrasados e queria pôr os juros que estou
+  // pagando e não temos essa opção." Não tinha mesmo: a baixa lançava sempre o
+  // valor registrado, e o que o banco cobrou a mais ficava fora do sistema —
+  // dinheiro saindo do caixa dela sem aparecer em lugar nenhum.
+  //
+  // O extra vira uma SEGUNDA despesa, na categoria de juros, em vez de engordar
+  // a linha do fornecedor. Somado lá dentro, R$ 1.200 de mercadoria com R$ 80
+  // de juros viram R$ 1.280 de "Fornecedores de insumo" — e aí o custo da
+  // mercadoria aparece maior do que é, bem no número que ela usa pra conferir
+  // preço de compra. Separado, ela enxerga quanto o atraso está custando.
+  const [pagando, setPagando] = useState(null); // chave do grupo em confirmação
+  const [jurosTxt, setJurosTxt] = useState('');
+  const abrirPagamento = (g) => {
+    // Só pede os juros quando faz sentido pedir: conta vencida. Nas que estão
+    // no prazo, "Marcar pago" continua sendo um toque só.
+    if (g.vencimento && g.vencimento < hoje) { setPagando(g.chave); setJurosTxt(''); }
+    else pagarGrupo(g, '');
+  };
+
   // Marcar como pago: baixa a conta E lança a despesa automaticamente (pra não
   // esquecer de anotar). Guarda o id da despesa em cada item, pra permitir
   // desfazer depois removendo exatamente essa despesa.
-  const pagarGrupo = (g) => {
+  const pagarGrupo = (g, jurosEntrada = '') => {
     const ids = new Set(g.itens.map((x) => x.id));
     const despId = uid();
+    const juros = num(jurosEntrada);
+    const atraso = g.vencimento && g.vencimento < hoje ? daysBetween(g.vencimento, hoje) : 0;
     const despesa = {
       // O TIPO DE CONTA VEM DA COMPRA, não é mais chutado.
       //
@@ -89,16 +112,32 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
       obs: 'Baixa de conta a pagar' + (g.itens.length > 1 ? ` · ${g.itens.length} itens` : ''),
       origem: 'conta-a-pagar',
     };
+    const lancar = [despesa];
+    let jurosId = '';
+    if (juros > 0.005) {
+      jurosId = uid();
+      lancar.push({
+        id: jurosId, data: hoje, categoria: JUROS_ATRASO,
+        descricao: `Juros/multa · ${g.fornecedor || g.itens[0].produto || 'boleto'}`,
+        valor: juros.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        obs: [atraso > 0 ? `${atraso} dia(s) de atraso` : '', `boleto de ${brl(g.total)}`].filter(Boolean).join(' · '),
+        origem: 'conta-a-pagar-juros',
+      });
+    }
     // Manda a INTENÇÃO (quais contas pagar + a despesa a lançar); o pai aplica
     // no estado mais recente, sem risco de apagar algo lançado no meio.
-    onPagamento({ pagarIds: [...ids], hoje, despId, despesaNova: despesa });
+    onPagamento({ pagarIds: [...ids], hoje, despId, jurosId, despesaNova: lancar });
+    setPagando(null);
+    setJurosTxt('');
   };
 
-  // Desfazer: volta a conta pra "em aberto" e remove a despesa lançada
-  // automaticamente (se houver).
+  // Desfazer: volta a conta pra "em aberto" e remove as despesas lançadas
+  // automaticamente (a do boleto e, se teve, a dos juros). Esquecer a dos juros
+  // deixaria a conta voltar pra aberta com o juros ainda lançado — ela pagaria
+  // de novo e o mês ficaria com juros em dobro.
   const desfazerGrupo = (g) => {
     const ids = new Set(g.itens.map((x) => x.id));
-    const despIds = [...new Set(g.itens.map((x) => x.despesaId).filter(Boolean))];
+    const despIds = [...new Set(g.itens.flatMap((x) => [x.despesaId, x.jurosDespesaId]).filter(Boolean))];
     onPagamento({ estornarIds: [...ids], removerDespesaIds: despIds });
   };
 
@@ -139,10 +178,11 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
       if (d.pago !== 'Sim') continue;
       const chave = d.despesaId ? `d:${d.despesaId}` : `p:${d.dataPagamento || ''}|${(d.fornecedor || '').trim().toLowerCase()}|${(d.nota || '').trim()}`;
       let g = map.get(chave);
-      if (!g) { g = { chave, fornecedor: d.fornecedor, nota: (d.nota || '').trim(), dataPagamento: d.dataPagamento, itens: [], total: 0, despesaIds: new Set(), auto: false }; map.set(chave, g); }
+      if (!g) { g = { chave, fornecedor: d.fornecedor, nota: (d.nota || '').trim(), dataPagamento: d.dataPagamento, itens: [], total: 0, despesaIds: new Set(), jurosIds: new Set(), auto: false }; map.set(chave, g); }
       g.itens.push(d);
       g.total += totalCompra(d);
       if (d.despesaId) { g.despesaIds.add(d.despesaId); g.auto = true; }
+      if (d.jurosDespesaId) g.jurosIds.add(d.jurosDespesaId);
       if (d.dataPagamento && (!g.dataPagamento || d.dataPagamento > g.dataPagamento)) g.dataPagamento = d.dataPagamento;
     }
     return [...map.values()].sort((a, b) => (b.dataPagamento || '').localeCompare(a.dataPagamento || ''));
@@ -271,11 +311,33 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
                 </div>
                 <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(g.total)}</div>
               </div>
-              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 10 }}>
-                <Btn kind="ghost" small onClick={() => abrirEdicao(g)}>Editar</Btn>
-                <Btn kind="ok" small onClick={() => pagarGrupo(g)}>Marcar pago</Btn>
-                <Btn kind="danger" small onClick={() => excluirGrupo(g)}>Excluir</Btn>
-              </div>
+              {pagando === g.chave ? (
+                <div style={{ marginTop: 10, borderTop: `1px solid ${C.line}`, paddingTop: 11 }}>
+                  <div style={{ fontSize: 13, color: C.muted, marginBottom: 9, lineHeight: 1.5 }}>
+                    Venceu há {daysBetween(g.vencimento, hoje)} dia(s). Se veio juros ou multa junto, põe aqui.
+                    Se pagou só o valor do boleto, deixa em branco.
+                  </div>
+                  <Field label="Juros e multa (R$)"><NumInput value={jurosTxt} onChange={setJurosTxt} /></Field>
+                  <div style={{ fontSize: 14, marginBottom: 11 }}>
+                    Sai do caixa: <b style={{ color: C.text }}>{brl(g.total + num(jurosTxt))}</b>
+                    {num(jurosTxt) > 0.005 && (
+                      <div style={{ fontSize: 12, color: C.amber, marginTop: 3, fontWeight: 700 }}>
+                        boleto {brl(g.total)} + juros {brl(num(jurosTxt))} — {(num(jurosTxt) / g.total * 100).toFixed(1).replace('.', ',')}% a mais
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <Btn kind="ghost" small onClick={() => setPagando(null)}>Cancelar</Btn>
+                    <Btn kind="ok" small onClick={() => pagarGrupo(g, jurosTxt)}>Confirmar pagamento</Btn>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 10 }}>
+                  <Btn kind="ghost" small onClick={() => abrirEdicao(g)}>Editar</Btn>
+                  <Btn kind="ok" small onClick={() => abrirPagamento(g)}>Marcar pago</Btn>
+                  <Btn kind="danger" small onClick={() => excluirGrupo(g)}>Excluir</Btn>
+                </div>
+              )}
             </Card>
           );
         })}
@@ -286,7 +348,12 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
             Contas pagas ({pagosGrupos.length}) — toque para ver / desfazer
           </summary>
           <div style={{ marginTop: 12 }}>
-            {pagosGrupos.slice(0, 30).map((g) => (
+            {pagosGrupos.slice(0, 30).map((g) => {
+              // O juros aparece na linha do boleto que o gerou. Solto lá em
+              // Despesas ele vira um número sem dono, e dois meses depois ela
+              // não saberia mais de qual conta atrasada ele veio.
+              const jurosPago = [...g.jurosIds].reduce((s, id) => s + num((despesas.find((x) => x.id === id) || {}).valor), 0);
+              return (
               <Card key={g.chave} style={{ marginBottom: 8, padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                   <div style={{ minWidth: 0 }}>
@@ -297,14 +364,20 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
                     <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
                       {g.dataPagamento ? `Pago em ${fmtDate(g.dataPagamento)}` : 'Pago'}{g.auto ? ' · lançado em Despesas' : ''}
                     </div>
+                    {jurosPago > 0.005 && (
+                      <div style={{ fontSize: 12, color: C.amber, marginTop: 3, fontWeight: 700 }}>
+                        + {brl(jurosPago)} de juros e multa por atraso
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(g.total)}</div>
+                    <div style={{ fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{brl(g.total + jurosPago)}</div>
                     <div style={{ marginTop: 8 }}><Btn kind="ghost" small onClick={() => desfazerGrupo(g)}>Desfazer</Btn></div>
                   </div>
                 </div>
               </Card>
-            ))}
+              );
+            })}
             {pagosGrupos.length > 30 && <div style={{ fontSize: 12, color: C.faint, textAlign: 'center', marginTop: 6 }}>Mostrando as 30 mais recentes.</div>}
           </div>
         </details>
