@@ -139,27 +139,25 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
 
       {caixaAlerta && (
         <Card style={{ marginBottom: 12, borderColor: C.red }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <Leva onClick={() => setTab('caixa')}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.red, fontWeight: 700 }}>Caixa aberto há +24h</div>
               <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.4 }}>Aberto por <b>{papelRot(caixaAberto.abertoPor)}</b> em <b>{dataHoraBR(caixaAberto.abertoEm)}</b> ({Math.floor(caixaHoras)}h atrás)</div>
             </div>
-            <Btn kind="ghost" small onClick={() => setTab('caixa')}>Ver</Btn>
-          </div>
+          </Leva>
         </Card>
       )}
 
       {salaoAgora.mesas > 0 && (
         <Card style={{ marginBottom: 12, borderColor: C.accent2 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <Leva onClick={() => setTab('salao')}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.accent2, fontWeight: 700 }}>Movimento agora</div>
               <div style={{ fontSize: 16, marginTop: 4 }}>
                 {salaoAgora.pessoas > 0 ? <><b>{salaoAgora.pessoas}</b> pessoa{salaoAgora.pessoas === 1 ? '' : 's'} em <b>{salaoAgora.mesas}</b> mesa{salaoAgora.mesas === 1 ? '' : 's'}</> : <><b>{salaoAgora.mesas}</b> mesa{salaoAgora.mesas === 1 ? '' : 's'} aberta{salaoAgora.mesas === 1 ? '' : 's'}</>}
               </div>
             </div>
-            <Btn kind="ghost" small onClick={() => setTab('salao')}>Ver</Btn>
-          </div>
+          </Leva>
         </Card>
       )}
 
@@ -203,34 +201,29 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
         <Card style={{ marginBottom: 14, borderColor: avisoUrgente ? C.red : C.amber, background: C.raised }}>
           <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: avisoUrgente ? C.red : C.amber, fontWeight: 700, marginBottom: 8 }}>Avisos de hoje</div>
           {boletosHoje.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+            <Leva onClick={() => setTab('pagar')} style={{ padding: '5px 0' }}>
               <div style={{ fontSize: 14 }}><b>{boletosHoje.length} boleto{boletosHoje.length > 1 ? 's' : ''}</b> vence{boletosHoje.length > 1 ? 'm' : ''} hoje — <b style={{ color: C.red, ...TAB }}>{oculto(brl(totalBoletosHoje))}</b></div>
-              <Btn kind="ghost" small onClick={() => setTab('pagar')}>Ver</Btn>
-            </div>
+            </Leva>
           )}
           {vencidas.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+            <Leva onClick={() => setTab('pagar')} style={{ padding: '5px 0' }}>
               <div style={{ fontSize: 14 }}><b>{vencidas.length} conta{vencidas.length > 1 ? 's' : ''}</b> vencida{vencidas.length > 1 ? 's' : ''} — <b style={{ color: C.red, ...TAB }}>{oculto(brl(totalVencidas))}</b></div>
-              <Btn kind="ghost" small onClick={() => setTab('pagar')}>Ver</Btn>
-            </div>
+            </Leva>
           )}
           {estoqueBaixo.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+            <Leva onClick={() => setTab('abastecimento')} style={{ padding: '5px 0' }}>
               <div style={{ fontSize: 14, minWidth: 0 }}><b>{estoqueBaixo.length} item{estoqueBaixo.length > 1 ? 's' : ''}</b> no estoque mínimo <span style={{ color: C.faint }}>· {estoqueBaixo.slice(0, 3).map((it) => it.nome).join(', ')}{estoqueBaixo.length > 3 ? '…' : ''}</span></div>
-              <Btn kind="ghost" small onClick={() => setTab('abastecimento')}>Ver</Btn>
-            </div>
+            </Leva>
           )}
           {tarefasHoje.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+            <Leva onClick={() => setTab('diario')} style={{ padding: '5px 0' }}>
               <div style={{ fontSize: 14 }}><b>{tarefasHoje.length} tarefa{tarefasHoje.length > 1 ? 's' : ''}</b> para hoje</div>
-              <Btn kind="ghost" small onClick={() => setTab('diario')}>Ver</Btn>
-            </div>
+            </Leva>
           )}
           {tarefasAtrasadas.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+            <Leva onClick={() => setTab('diario')} style={{ padding: '5px 0' }}>
               <div style={{ fontSize: 14 }}><b>{tarefasAtrasadas.length} tarefa{tarefasAtrasadas.length > 1 ? 's' : ''}</b> atrasada{tarefasAtrasadas.length > 1 ? 's' : ''}</div>
-              <Btn kind="ghost" small onClick={() => setTab('diario')}>Ver</Btn>
-            </div>
+            </Leva>
           )}
         </Card>
       ) : null}
@@ -251,26 +244,24 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
 
       {abertas.length > 0 && (
         <Card style={{ marginBottom: 12, borderColor: vencidas.length ? C.red : C.line }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Leva onClick={() => setTab('pagar')}>
             <div>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.faint, fontWeight: 800 }}>Contas a pagar em aberto</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: C.red, marginTop: 6, ...TAB }}>{oculto(brl(totalPagar))}</div>
               <div style={{ fontSize: 12, color: vencidas.length ? C.red : C.faint, marginTop: 2 }}>{gruposAbertos.length} conta(s){vencidas.length ? ` · ${vencidas.length} vencida(s)` : ''}</div>
             </div>
-            <Btn kind="ghost" small onClick={() => setTab('pagar')}>Ver</Btn>
-          </div>
+          </Leva>
         </Card>
       )}
 
       {garrafasEmUso.length > 0 && (
         <Card style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Leva onClick={() => setTab('garrafas')}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.faint, fontWeight: 800 }}>Garrafas abertas agora</div>
               <div style={{ fontSize: 15, color: C.text, marginTop: 4 }}>{garrafasEmUso.map((g) => g.produto).join(', ')}</div>
             </div>
-            <Btn kind="ghost" small onClick={() => setTab('garrafas')}>Ver</Btn>
-          </div>
+          </Leva>
         </Card>
       )}
 
@@ -285,5 +276,34 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
         <Btn kind="ghost" onClick={() => setTab('compras')}>+ Compra</Btn>
       </div>
     </div>
+  );
+}
+
+// A INFORMAÇÃO É O BOTÃO.
+//
+// "Poderia clicar na informação e ele me direcionar pra página certa, né."
+//
+// Tinha um "Ver" miúdo no canto direito, e ela tocava no número — que era
+// texto morto. Dizer "o botão é aquele ali" seria ensinar a pessoa a usar um
+// desenho errado: o alvo óbvio num celular é a informação grande, não a
+// palavra pequena do lado.
+//
+// Agora a linha inteira leva pra tela, e o "›" só serve pra avisar que leva.
+// Vale também como alvo de dedo: a linha toda tem a largura do cartão, contra
+// os poucos milímetros do "Ver".
+function Leva({ onClick, children, style }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+        width: '100%', background: 'none', border: 'none', margin: 0, padding: 0,
+        textAlign: 'left', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit',
+        ...style,
+      }}
+    >
+      {children}
+      <span aria-hidden="true" style={{ flexShrink: 0, color: C.faint, fontSize: 19, fontWeight: 800, lineHeight: 1 }}>›</span>
+    </button>
   );
 }
