@@ -469,12 +469,12 @@ export default function Dashboard() {
 
     if (op.pagarIds && op.pagarIds.length) {
       const ids = new Set(op.pagarIds);
-      nc = nc.map((x) => (ids.has(x.id) ? { ...x, pago: 'Sim', dataPagamento: op.hoje, despesaId: op.despId } : x));
+      nc = nc.map((x) => (ids.has(x.id) ? { ...x, pago: 'Sim', dataPagamento: op.hoje, despesaId: op.despId, jurosDespesaId: op.jurosId || '' } : x));
       mexeuCompras = true;
     }
     if (op.estornarIds && op.estornarIds.length) {
       const ids = new Set(op.estornarIds);
-      nc = nc.map((x) => (ids.has(x.id) ? { ...x, pago: 'Não', dataPagamento: '', despesaId: '' } : x));
+      nc = nc.map((x) => (ids.has(x.id) ? { ...x, pago: 'Não', dataPagamento: '', despesaId: '', jurosDespesaId: '' } : x));
       mexeuCompras = true;
     }
     // A LINHA DE COMPRA EDITADA NA MÃO, vinda da tela de Compras.
@@ -486,7 +486,13 @@ export default function Dashboard() {
     // nenhuma.
     if (Array.isArray(op.comprasSubstituir)) { nc = op.comprasSubstituir; mexeuCompras = true; }
 
-    if (op.despesaNova) { nd = [op.despesaNova, ...nd]; mexeuDespesas = true; }
+    // Uma baixa pode lançar MAIS DE UMA despesa: o boleto e, quando ele foi
+    // pago atrasado, o juros em categoria separada. Aceita as duas formas pra
+    // não quebrar quem manda uma despesa só.
+    if (op.despesaNova) {
+      nd = [...(Array.isArray(op.despesaNova) ? op.despesaNova : [op.despesaNova]), ...nd];
+      mexeuDespesas = true;
+    }
     if (op.removerDespesaIds && op.removerDespesaIds.length) {
       const rm = new Set(op.removerDespesaIds);
       nd = nd.filter((d) => !rm.has(d.id)); mexeuDespesas = true;
