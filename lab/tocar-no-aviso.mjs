@@ -42,9 +42,11 @@ const conta = (id, extra) => ({
 // parcelada (uma conta por vencimento), contas soltas, e duas já pagas que não
 // podem entrar na conta.
 const COMPRAS = [
-  conta('a1', { nota: '111', fornecedor: 'Ambev', vencimento: '2026-10-20' }),
-  conta('a2', { nota: '111', fornecedor: 'Ambev', vencimento: '2026-10-20' }),
-  conta('a3', { nota: '111', fornecedor: 'Ambev', vencimento: '2026-10-20' }),
+  // Uma nota VENCIDA com três itens: é ela que separa quem conta boleto de
+  // quem conta item. São 3 linhas de compra e UM papel com código de barras.
+  conta('a1', { nota: '111', fornecedor: 'Ambev', vencimento: '2026-10-10' }),
+  conta('a2', { nota: '111', fornecedor: 'Ambev', vencimento: '2026-10-10' }),
+  conta('a3', { nota: '111', fornecedor: 'Ambev', vencimento: '2026-10-10' }),
   conta('b1', { nota: '222', fornecedor: 'Coca', vencimento: '2026-10-25' }),
   conta('b2', { nota: '222', fornecedor: 'Coca', vencimento: '2026-11-25' }),
   conta('b3', { nota: '222', fornecedor: 'Coca', vencimento: '2026-12-25' }),
@@ -217,6 +219,45 @@ await pg.waitForTimeout(900);
 txt = await texto();
 cobra('abriu a explicação', /Juro corre todo dia|Venda perdida é a mais cara/.test(txt), (txt.match(/[^\n]*(Juro corre|Venda perdida)[^\n]*/) || ['(não abriu)'])[0]);
 cobra('e continuou no Dashboard', !/Boletos e contas em aberto/.test(txt));
+
+console.log('\n### E OS TRÊS LUGARES CONTAM A MESMA COISA');
+// "Ali diz que tem 16 boletos a pagar, porém no A Pagar diz que tem 4."
+//
+// Os dois estavam certos e contando coisas diferentes: o Darci contava ITEM
+// DE NOTA, as telas contavam BOLETO. A nota da Ambev tem 3 itens vencidos e é
+// UM boleto; com Celesc e Casan dá 3 contas vencidas, nunca 5.
+await pg.evaluate(() => {
+  const x = [...document.querySelectorAll('button')].find((e) => (e.innerText || '').trim() === 'Dashboard');
+  if (x) x.click();
+});
+await pg.waitForTimeout(1800);
+const linhaDarci = await pg.evaluate(() => {
+  const lim = (s) => String(s || '').replace(/\u00a0/g, ' ');
+  const bt = [...document.querySelectorAll('button')].find((x) => /contas? vencidas?/i.test(lim(x.innerText)));
+  return bt ? lim(bt.innerText).replace(/\n/g, ' | ') : '(não achou)';
+});
+cobra('o "Pra olhar agora" diz 3 contas vencidas', /\b3 contas vencidas\b/.test(linhaDarci), linhaDarci);
+cobra('e NÃO 5 (que é contar item de nota)', !/\b5 contas vencidas\b/.test(linhaDarci), linhaDarci);
+
+txt = await texto();
+const noAviso = (txt.match(/(\d+) contas? vencidas?/) || [])[1];
+cobra('o "Avisos de hoje" diz o mesmo 3', noAviso === '3', `disse ${noAviso}`);
+const noCartao = (txt.match(/· (\d+) vencida\(s\)/) || [])[1];
+cobra('e o cartão de contas a pagar também', noCartao === '3', `disse ${noCartao}`);
+
+await pg.evaluate(() => {
+  const x = [...document.querySelectorAll('button')].find((e) => (e.innerText || '').trim() === 'Finanças');
+  if (x) x.click();
+});
+await pg.waitForTimeout(1500);
+await pg.evaluate(() => {
+  const x = [...document.querySelectorAll('button')].find((e) => (e.innerText || '').trim() === 'Contas a Pagar');
+  if (x) x.click();
+});
+await pg.waitForTimeout(1800);
+txt = await texto();
+const noKPI = (txt.match(/(\d+) vencida\(s\)/) || [])[1];
+cobra('e a tela de Contas a Pagar fecha com o mesmo 3', noKPI === '3', `disse ${noKPI}`);
 
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
