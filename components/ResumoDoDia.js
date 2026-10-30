@@ -20,7 +20,11 @@ const QUANTAS = 3;
 // As props do Darci chegam soltas (receitas, despesas, vendas…), não dentro de
 // um objeto `dados` — é assim que o painel as passa. O `...dados` recolhe todas
 // e deixa de fora só o que é função.
-export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }) {
+// `onIrPara` leva pra uma tela; não confundir com o `onAbrir` que o painel
+// passa junto com os dados do Darci, que serve pra RECARREGAR vendas e
+// estoque. Os dois chegavam aqui com o mesmo nome, e o último a entrar
+// apagava o outro calado.
+export default function ResumoDoDia({ onPerguntar, onIrPara, onAbrir, onAnotar, ...dados }) {
   const reservas = useReservas();
   const [desdeMs, setDesdeMs] = useState(0);
   const [tudo, setTudo] = useState(false);
@@ -80,12 +84,12 @@ export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }
             // Agora a linha inteira vai pro lugar. O "por quê" continua a um
             // toque, no botãozinho do lado: quem quer entender abre, quem quer
             // resolver vai direto.
-            const leva = !!(av.tela && onAbrir);
+            const leva = !!(av.tela && onIrPara);
             return (
               <div key={av.id}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <button
-                  onClick={() => (leva ? onAbrir(av.tela) : setAbertoId(aberto ? '' : av.id))}
+                  onClick={() => (leva ? onIrPara(av.tela) : setAbertoId(aberto ? '' : av.id))}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, textAlign: 'left',
                     // Linhas mais justas: o cartão divide a linha com o relógio
