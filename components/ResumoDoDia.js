@@ -69,12 +69,25 @@ export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }
           {mostrados.map((av) => {
             const cor = corDe(av.nivel);
             const aberto = abertoId === av.id;
+            // O AVISO LEVA PRA TELA DO ASSUNTO.
+            //
+            // "Poderia clicar na informação e ele me direcionar pra página
+            // certa, né." Podia e não levava: o toque só abria um parágrafo
+            // cinza. Ela lia "16 contas a pagar" e tinha que achar sozinha o
+            // caminho até a lista — e o parágrafo não era o que ela queria,
+            // era a lista.
+            //
+            // Agora a linha inteira vai pro lugar. O "por quê" continua a um
+            // toque, no botãozinho do lado: quem quer entender abre, quem quer
+            // resolver vai direto.
+            const leva = !!(av.tela && onAbrir);
             return (
               <div key={av.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <button
-                  onClick={() => setAbertoId(aberto ? '' : av.id)}
+                  onClick={() => (leva ? onAbrir(av.tela) : setAbertoId(aberto ? '' : av.id))}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                    display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, textAlign: 'left',
                     // Linhas mais justas: o cartão divide a linha com o relógio
                     // da meta, e o relógio acompanha a altura dele. Cada pixel a
                     // mais aqui vira dois na tela.
@@ -88,7 +101,21 @@ export default function ResumoDoDia({ onPerguntar, onAbrir, onAnotar, ...dados }
                   {av.valor ? (
                     <span style={{ flexShrink: 0, fontSize: 13.5, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums' }}>{av.valor}</span>
                   ) : null}
+                  {leva ? <span aria-hidden="true" style={{ flexShrink: 0, color: C.faint, fontSize: 16, fontWeight: 800, lineHeight: 1 }}>›</span> : null}
                 </button>
+                {leva ? (
+                  <button
+                    onClick={() => setAbertoId(aberto ? '' : av.id)}
+                    aria-label={`Por que "${av.titulo}" apareceu`}
+                    title="Por que isso apareceu"
+                    style={{
+                      flexShrink: 0, width: 22, height: 22, borderRadius: 999, cursor: 'pointer',
+                      border: `1px solid ${aberto ? cor : C.line}`, background: 'none',
+                      color: aberto ? cor : C.faint, fontSize: 11, fontWeight: 900, lineHeight: 1, padding: 0,
+                    }}
+                  >?</button>
+                ) : null}
+                </div>
                 {aberto && (
                   <div style={{ paddingLeft: 17, paddingBottom: 10, marginTop: -4 }}>
                     <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>{av.detalhe}</div>

@@ -771,9 +771,25 @@ export default function Dashboard() {
   };
 
   const irParaTab = (destino) => {
-    if (['estoque', 'lista', 'compras', 'cotacoes'].includes(destino)) { setSubAbast(destino); setTab('abastecimento'); return; }
-    if (['caixa', 'comandas', 'fiados', 'clientes', 'cardapio'].includes(destino)) { setSubSalao(destino); setTab('salao'); return; }
-    if (['receitas', 'despesas', 'pagar', 'relatorios'].includes(destino)) { setSubFinancas(destino); setTab('financas'); return; }
+    // SOBE A PÁGINA JUNTO.
+    //
+    // "No 'pra olhar agora' diz que tenho 16 contas a pagar, mas no Contas a
+    // Pagar não mostra isso." Mostrava — ela é que chegava lá no meio da tela.
+    // O aviso fica lá embaixo no Dashboard; tocando nele o app trocava de tela
+    // e o navegador mantinha a altura da rolagem, despejando ela no meio do
+    // formulário de cadastro, ou no fim da página quando a nova era mais curta.
+    // A lista estava logo acima, fora do campo de visão.
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
+    if (['estoque', 'lista', 'compras', 'cotacoes', 'margem', 'preco', 'fornecedores'].includes(destino)) { setSubAbast(destino); setTab('abastecimento'); return; }
+    if (['caixa', 'comandas', 'vendas', 'fiados', 'clientes', 'cardapio'].includes(destino)) { setSubSalao(destino); setTab('salao'); return; }
+    if (['raiox', 'receitas', 'despesas', 'pagar', 'relatorios'].includes(destino)) { setSubFinancas(destino); setTab('financas'); return; }
+    // DESTINO QUE NÃO EXISTE NÃO TROCA DE TELA.
+    //
+    // `setTab` com um nome desconhecido não dá erro nenhum: simplesmente
+    // nenhum bloco casa, e ela fica olhando pro miolo vazio da página — a
+    // mesma cara de tela quebrada que já a assustou uma vez. Melhor o toque
+    // não fazer nada do que fazer isso.
+    if (!tabs.some(([v]) => v === destino)) return;
     setTab(destino);
   };
 
@@ -792,6 +808,9 @@ export default function Dashboard() {
     if (!bar) return;
     const el = bar.querySelector(`[data-tab="${tab}"]`);
     if (el && el.scrollIntoView) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    // E a página volta pro começo. Trocar de tela e continuar na altura da tela
+    // anterior não ajuda em nada: tela nova, começo da tela nova.
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
   }, [tab]);
 
   // Falha ao carregar: mostra erro e botão de tentar de novo — NUNCA segue pro
@@ -1008,7 +1027,7 @@ export default function Dashboard() {
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
             ficha técnica de prato e de drink. As duas leem e escrevem. */}
         {tab === 'pasta' && <Pasta />}
-        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onPerguntar={temDarci ? () => setTab('darci') : null} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={temDarci ? <DarciFlutuante {...propsDarci} /> : null} metas={metas} onMetas={upd.metas} dona={(negocio && (negocio.dona || (negocio.papeis && negocio.papeis.dona))) || ''} fotoDona={(negocio && negocio.fotoDona) || ''} />}
+        {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onAbrir={irParaTab} onPerguntar={temDarci ? () => setTab('darci') : null} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={temDarci ? <DarciFlutuante {...propsDarci} /> : null} metas={metas} onMetas={upd.metas} dona={(negocio && (negocio.dona || (negocio.papeis && negocio.papeis.dona))) || ''} fotoDona={(negocio && negocio.fotoDona) || ''} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} vendas={vendas} />}
         {tab === 'financas' && (
           <>
