@@ -49,6 +49,7 @@ import Margem from './Margem';
 import PrecoCerto from './PrecoCerto';
 import Fornecedores from './Fornecedores';
 import FichasTecnicas from './FichasTecnicas';
+import FichasArquivo from './FichasArquivo';
 import ConferenciaEstoque from './ConferenciaEstoque';
 import ConferirVendas from './ConferirVendas';
 import Auditoria from './Auditoria';
@@ -1087,7 +1088,7 @@ export default function Dashboard() {
                     inteira pro lado. Aqui elas rolam dentro da própria barra,
                     igual à barra de cima. */}
                 <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-                  {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas'], ['conferencia', 'Conferência'], ['cortesia', 'Cortesia / Consumo']].map(([v, rot]) => (
+                  {[['itens', 'Estoque'], ['fichas', 'Fichas técnicas'], ['arquivos', 'Fichas em PDF'], ['conferencia', 'Conferência'], ['cortesia', 'Cortesia / Consumo']].map(([v, rot]) => (
                     <button key={v} onClick={() => setSubEstoque(v)} style={{
                       flex: '1 0 auto', border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
                       background: subEstoque === v ? C.accent : 'transparent', color: subEstoque === v ? '#06101F' : C.muted,
@@ -1096,6 +1097,7 @@ export default function Dashboard() {
                 </div>
                 {subEstoque === 'itens' && <Estoque itens={estoque} carregado={estCarregado} onAcao={estoqueAcao} compras={compras} cotacoes={cotacoes} fichas={fichas} cardapio={cardapio} duplicadosIgnorados={dupIgnorados} onRepor={reporLista} onLevarPraCompras={levarPraCompras} />}
                 {subEstoque === 'fichas' && <FichasTecnicas cardapio={cardapio} estoque={estoque} fichas={fichas} vendas={vendas} compras={compras} fritadeira={fritadeira} onFritadeira={upd.fritadeira} onAcao={estoqueAcao} />}
+                {subEstoque === 'arquivos' && <FichasArquivo />}
                 {subEstoque === 'conferencia' && (<>
                   {/* A conferência que não pede contagem nenhuma vem antes da
                       que pede: se a mercadoria comprada já não bate com as
