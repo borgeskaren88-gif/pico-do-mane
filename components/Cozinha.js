@@ -8,6 +8,7 @@ import { uid, num, fmtDate } from '../lib/util';
 import BotaoAtualizar from './BotaoAtualizar';
 import PullToRefresh from './PullToRefresh';
 import EstoqueCozinha from './EstoqueCozinha';
+import FichasArquivo from './FichasArquivo';
 import PontoCozinha from './PontoCozinha';
 import PorcoesCozinha from './PorcoesCozinha';
 import AvisoPorcoes from './AvisoPorcoes';
@@ -142,7 +143,7 @@ export default function Cozinha() {
         {/* Mesa reservada hoje/amanhã: a primeira coisa que aparece ao entrar. */}
         <AvisoReservas />
         <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
-          {[['ponto', 'Ponto'], ['compras', 'Compras'], ['reservas', 'Reservas'], ['porcoes', 'Porções'], ['estoque', 'Estoque'], ['garrafas', 'Garrafas']].map(([v, rot]) => (
+          {[['ponto', 'Ponto'], ['compras', 'Compras'], ['reservas', 'Reservas'], ['porcoes', 'Porções'], ['estoque', 'Estoque'], ['fichas', 'Fichas'], ['garrafas', 'Garrafas']].map(([v, rot]) => (
             <button key={v} onClick={() => setAba(v)} style={{
               flex: '1 0 auto', whiteSpace: 'nowrap', border: 'none', cursor: 'pointer', borderRadius: 9, padding: '9px 12px', fontSize: 14, fontWeight: 700,
               background: aba === v ? C.accent : 'transparent', color: aba === v ? '#06101F' : C.muted,
@@ -208,6 +209,10 @@ export default function Cozinha() {
         {aba === 'porcoes' && <PorcoesCozinha />}
 
         {aba === 'estoque' && <EstoqueCozinha />}
+
+        {/* A ficha técnica serve justamente pra quando a dona NÃO está. Aqui a
+            cozinha abre e lê; acrescentar e apagar é só com ela. */}
+        {aba === 'fichas' && <FichasArquivo sub="Abre a ficha do prato na hora de montar" />}
 
         {aba === 'ponto' && <PontoCozinha />}
 
