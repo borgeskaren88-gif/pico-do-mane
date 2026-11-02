@@ -39,7 +39,9 @@ await gravar({ ...p0,
 });
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const ctx = await b.newContext({ viewport: { width: 1280, height: 1000 }, serviceWorkers: 'block' });
+// Permissão de área de transferência: sem ela o navegador recusa o copiar e o
+// teste mediria o bloqueio dele, não o app.
+const ctx = await b.newContext({ viewport: { width: 1280, height: 1000 }, serviceWorkers: 'block', permissions: ['clipboard-read', 'clipboard-write'] });
 const pg = await ctx.newPage();
 await pg.clock.setFixedTime(HOJE);
 pg.on('pageerror', (e) => { console.log('[pageerror]', e.message.slice(0, 160)); ruim++; });
@@ -97,6 +99,58 @@ cobra('tem o botão de baixar/imprimir', /Baixar \/ imprimir/i.test(txt), (txt.m
 cobra('explica onde fica o "Salvar em PDF"', /Salvar em PDF/.test(txt));
 cobra('o cabeçalho de papel está escondido', (await visivel('.so-impressao')) === false);
 cobra('e o relatório aparece normalmente', /Relatórios/.test(txt));
+
+console.log('\n### COPIAR O RELATÓRIO');
+// "Estou tentando copiar o relatório de outubro e não está dando."
+//
+// Não estava mesmo: dava pra imprimir, não pra copiar. Pra mandar o mês no
+// WhatsApp do contador, ou jogar num assistente pra analisar, ela tentava
+// marcar a tela com o dedo — e junto ia menu, aba e botão.
+cobra('tem o botão de copiar', /Copiar o relatório/.test(txt), (txt.match(/[^\n]*Copiar[^\n]*/) || ['(não achou)'])[0]);
+await pg.evaluate(() => {
+  const b2 = [...document.querySelectorAll('button')].find((x) => /Copiar o relatório/i.test(x.innerText || ''));
+  if (b2) b2.click();
+});
+await pg.waitForTimeout(900);
+const colado = limpa(await pg.evaluate(() => navigator.clipboard.readText()));
+cobra('copiou alguma coisa', colado.length > 100, `${colado.length} caracteres`);
+cobra('diz de qual bar é', /Pico do Mané/.test(colado), colado.slice(0, 60));
+cobra('e de qual mês', /Set\/2026/.test(colado), colado.slice(0, 80));
+// Os números do texto têm que ser os MESMOS da tela. Duas contas pro mesmo mês
+// acabam discordando, e aí ela tem dois relatórios e nenhuma certeza.
+cobra('traz o lucro do mês', /Lucro da operação: R\$ 9\.000,00/.test(colado), (colado.match(/[^\n]*Lucro da opera[^\n]*/) || [''])[0]);
+cobra('a escada do dinheiro inteira', /Receita da operação: R\$ 20\.000,00/.test(colado) && /Mercadoria.*R\$ 5\.000,00/.test(colado) && /Despesa de casa.*R\$ 6\.000,00/.test(colado), (colado.match(/[^\n]*Mercadoria[^\n]*/) || [''])[0]);
+cobra('o destino das despesas', /ONDE O DINHEIRO SAIU/.test(colado) && /Salários: R\$ 6\.000,00/.test(colado), (colado.match(/[^\n]*Salários[^\n]*/) || [''])[0]);
+cobra('e o CMV', /CMV/.test(colado), (colado.match(/[^\n]*CMV[^\n]*/) || [''])[0]);
+// O que ela pegava de errado tentando com o dedo: a tela em volta.
+cobra('não leva o menu junto', !/Log Operacional/.test(colado), (colado.match(/[^\n]*Log Operacional[^\n]*/) || [''])[0]);
+cobra('nem a barra de abas', !/Despesa Rápida/.test(colado));
+cobra('nem o próprio botão de copiar', !/Copiar o relatório/.test(colado));
+cobra('o botão avisa que copiou', /Copiado!/.test(limpa(await pg.locator('body').innerText())));
+
+console.log('\n### E QUANDO O APARELHO NÃO DEIXA COPIAR, O TEXTO APARECE NA TELA');
+// Celular velho, navegador esquisito, página sem cadeado: o copiar simplesmente
+// não acontece. "Não deu" sem saída faria ela desistir do relatório.
+await pg.evaluate(() => {
+  Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+  document.execCommand = () => false;
+});
+// O botão fica dizendo "Copiado!" por uns segundos depois do primeiro toque.
+// Sem esperar ele voltar ao normal, o segundo clique não acha botão nenhum e o
+// teste mede o próprio descuido.
+await pg.waitForFunction(() => [...document.querySelectorAll('button')]
+  .some((x) => /Copiar o relatório/i.test(x.innerText || '')), null, { timeout: 8000 });
+await pg.evaluate(() => {
+  const b2 = [...document.querySelectorAll('button')].find((x) => /Copiar o relatório/i.test(x.innerText || ''));
+  if (b2) b2.click();
+});
+await pg.waitForTimeout(800);
+const naTela = await pg.evaluate(() => {
+  const t = [...document.querySelectorAll('textarea')].find((x) => /Lucro da opera/.test(x.value || ''));
+  return t ? t.value.length : 0;
+});
+cobra('o relatório aparece num campo pra copiar com o dedo', naTela > 100, `${naTela} caracteres`);
+cobra('e a tela explica o que houve', /não deixou copiar sozinho/.test(limpa(await pg.locator('body').innerText())));
 
 console.log('\n### NO PAPEL: some o controle, aparece o cabeçalho');
 // É aqui que o teste ganha o dinheiro dele. Erro no CSS de impressão não
