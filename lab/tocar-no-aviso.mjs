@@ -310,6 +310,42 @@ cobra('a tela de Estoque abriu', /Quanto você tem, o que está acabando/.test(t
 const noAcabando = (txt.match(/Acabando \((\d+)\)/i) || [])[1];
 cobra('o "Acabando" do Estoque diz os mesmos 2', noAcabando === '2', `disse ${noAcabando}`);
 
+console.log('\n### O "OCULTAR" ALCANÇA O "PRA OLHAR AGORA"');
+// "Põe uma opção de ocultar no Pra olhar agora."
+//
+// Ela tocava em Ocultar, os cartões de baixo ficavam com bolinha — e o aviso
+// do topo continuava dizendo quanto ela deve. É a parte mais alta da tela, a
+// que qualquer um do outro lado do balcão lê de relance.
+await pg.evaluate(() => {
+  const x = [...document.querySelectorAll('button')].find((e) => (e.innerText || '').trim() === 'Dashboard');
+  if (x) x.click();
+});
+await pg.waitForTimeout(1800);
+const linhaAntes = await pg.evaluate(() => {
+  const lim = (s) => String(s || '').replace(/\u00a0/g, ' ');
+  const bt = [...document.querySelectorAll('button')].find((x) => /contas vencidas/i.test(lim(x.innerText)));
+  return bt ? lim(bt.innerText).replace(/\n/g, ' | ') : '(não achou)';
+});
+cobra('com os valores à mostra, o aviso diz o quanto', /R\$ 500,00/.test(linhaAntes), linhaAntes);
+
+await pg.evaluate(() => {
+  const x = [...document.querySelectorAll('button')].find((e) => (e.innerText || '').trim() === 'Ocultar');
+  if (x) x.click();
+});
+await pg.waitForTimeout(800);
+const linhaDepois = await pg.evaluate(() => {
+  const lim = (s) => String(s || '').replace(/\u00a0/g, ' ');
+  const bt = [...document.querySelectorAll('button')].find((x) => /contas vencidas/i.test(lim(x.innerText)));
+  return bt ? lim(bt.innerText).replace(/\n/g, ' | ') : '(não achou)';
+});
+cobra('depois de ocultar, o valor some', !/R\$ 500,00/.test(linhaDepois), linhaDepois);
+cobra('e vira bolinha', /••••/.test(linhaDepois), linhaDepois);
+// O ASSUNTO FICA. Esconder o aviso inteiro faria ela esquecer da conta — e o
+// que não é da conta de ninguém é o valor, não o fato de existir conta.
+cobra('mas o assunto continua lá', /3 contas vencidas/.test(linhaDepois), linhaDepois);
+const corpoOculto = await texto();
+cobra('e nenhum valor sobrou solto no topo', !/R\$ 500,00/.test(corpoOculto.split('Contas a pagar em aberto')[0] || ''), (corpoOculto.match(/[^\n]*R\$ 500,00[^\n]*/) || [''])[0]);
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);

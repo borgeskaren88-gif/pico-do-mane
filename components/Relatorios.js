@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BarChart, Bar, AreaChart, Area as AreaRecharts, LineChart, Line, Legend, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell,
@@ -79,6 +79,21 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   // marcar a tela com o dedo — e o que ia junto era menu, aba e botão.
   const [copiado, setCopiado] = useState(false);
   const [textoNaTela, setTextoNaTela] = useState('');
+  // "Mas nem baixar funcionou."
+  //
+  // O botão chamava window.print(), e no iPhone COM O APP INSTALADO NA TELA
+  // INICIAL isso não faz nada. Não dá erro, não abre janela, não avisa: o dedo
+  // toca e o mundo não muda. É limitação do iOS em app instalado, e a gente só
+  // descobre caindo nela.
+  //
+  // Então o caminho de guardar o relatório não pode depender de imprimir.
+  const [noApp, setNoApp] = useState(false);
+  useEffect(() => {
+    try {
+      setNoApp(window.navigator.standalone === true
+        || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
+    } catch { /* navegador comum */ }
+  }, []);
   const mesesDisp = [...new Set([...receitas, ...despesas].map((d) => ymOf(d.data)))].sort().reverse();
   // Com rótulo em português. O seletor mostrava "2026-09" enquanto a página
   // inteira escreve "Set/2026" — mesmo mês em duas línguas, e a crua logo no
@@ -302,6 +317,60 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
     return l.join('\n');
   };
 
+  // O RELATÓRIO COMO ARQUIVO, que é o que ela quis dizer com "baixar".
+  //
+  // HTML, não PDF: gerar PDF aqui dentro exigiria baixar um gerador inteiro pro
+  // celular dela, e ainda seria um SEGUNDO desenho do mesmo mês, livre pra
+  // discordar da tela. O arquivo abre em qualquer aparelho, imprime bonito e,
+  // do Safari, vira PDF pelo próprio "Salvar em PDF".
+  const arquivoHTML = () => {
+    const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const titulo = `${negocio || 'Relatório'} — ${mesLabel(mes)}`;
+    const corpo = montarTexto().split('\n').slice(2).join('\n').trim();
+    return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">`
+      + `<meta name="viewport" content="width=device-width,initial-scale=1">`
+      + `<title>${esc(titulo)}</title><style>`
+      + `body{font:14px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#10192b;background:#fff;margin:0;padding:26px 20px;max-width:720px}`
+      + `h1{font-size:20px;margin:0 0 3px;letter-spacing:-.01em}`
+      + `.sub{color:#43536B;font-size:12px;margin-bottom:18px}`
+      + `pre{font:inherit;white-space:pre-wrap;word-wrap:break-word;margin:0}`
+      + `@page{margin:14mm 12mm}`
+      + `</style></head><body><h1>${esc(titulo)}</h1>`
+      + `<div class="sub">Relatório do mês, emitido em ${esc(fmtDate(todayISO()))} pelo PicoOS</div>`
+      + `<pre>${esc(corpo)}</pre></body></html>`;
+  };
+
+  const salvar = async () => {
+    const html = arquivoHTML();
+    const limpo = (negocio || 'relatorio').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const nome = `Relatorio-${limpo || 'bar'}-${mes}.html`;
+    try {
+      const arq = new File([html], nome, { type: 'text/html' });
+      // A folha de compartilhar do iPhone: dali ela salva em Arquivos ou manda
+      // direto pro contador. É o único caminho que funciona com o app
+      // instalado na tela inicial.
+      if (navigator.canShare && navigator.canShare({ files: [arq] })) {
+        try {
+          await navigator.share({ files: [arq], title: `${negocio || 'Relatório'} — ${mesLabel(mes)}` });
+          return;
+        } catch (e) {
+          // Ela fechou a folha: não é erro, e baixar escondido por cima disso
+          // seria o app fazendo o contrário do que ela mandou.
+          if (e && e.name === 'AbortError') return;
+        }
+      }
+    } catch { /* aparelho sem compartilhar: baixa */ }
+    try {
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = nome;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch { setTextoNaTela(montarTexto()); }
+  };
+
   const copiar = () => {
     // O texto é montado ANTES de pedir a área de transferência. No iPhone, o
     // pedido só vale enquanto o toque dela ainda está "quente" — montar depois
@@ -349,18 +418,26 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
           <Label>Mês do relatório</Label>
           <Select value={mes} onChange={setMes} options={opts} />
         </div>
-        <Btn kind="ghost" onClick={() => { if (typeof window !== 'undefined') window.print(); }}>
-          Baixar / imprimir
-        </Btn>
+        <Btn onClick={salvar}>Salvar / enviar</Btn>
         <Btn kind={copiado ? 'ok' : 'ghost'} onClick={copiar}>
           {copiado ? 'Copiado!' : 'Copiar o relatório'}
         </Btn>
+        <Btn kind="ghost" onClick={() => { if (typeof window !== 'undefined') window.print(); }}>
+          Imprimir
+        </Btn>
       </div>
       <div className="nao-imprimir" style={{ fontSize: 11.5, color: C.faint, margin: '-8px 0 14px', lineHeight: 1.5 }}>
-        <b style={{ color: C.muted }}>Baixar / imprimir</b> abre a janela de impressão — pra guardar em arquivo,
-        escolhe <b style={{ color: C.muted }}>Salvar em PDF</b> (no iPad e no iPhone está na mesma tela).
+        <b style={{ color: C.muted }}>Salvar / enviar</b> gera o arquivo do mês — o celular abre a folha de
+        compartilhar, onde dá pra guardar em Arquivos ou mandar direto pro contador.
         {' '}<b style={{ color: C.muted }}>Copiar o relatório</b> põe o mês inteiro em texto, pronto pra colar no
-        WhatsApp do contador ou num assistente pra analisar.
+        WhatsApp ou num assistente pra analisar.
+        {noApp && (
+          <>
+            {' '}<b style={{ color: C.amber }}>Imprimir não funciona com o app instalado na tela inicial</b> — é
+            limitação do iPhone, não do PicoOS. Usa <b style={{ color: C.muted }}>Salvar / enviar</b>; o arquivo
+            abre no Safari e de lá dá pra escolher “Salvar em PDF”.
+          </>
+        )}
       </div>
 
       {/* O PLANO B, quando o aparelho não deixa copiar sozinho. Melhor que um

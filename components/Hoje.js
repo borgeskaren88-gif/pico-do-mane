@@ -131,7 +131,14 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
           ocupa tudo. Um valor só resolve os dois casos, sem perguntar a
           largura da tela pra ninguém. */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', flexWrap: 'wrap', marginBottom: 2 }}>
-        <div style={{ flex: '999 1 260px', minWidth: 0 }}>{resumo}</div>
+        {/* O "Ocultar" vale pro Pra olhar agora também.
+            O resumo chega pronto do painel, então a ordem de esconder entra
+            nele aqui. Sem isso, ela tocava em Ocultar, os cartões ficavam com
+            bolinha — e o aviso do topo continuava mostrando quanto ela deve,
+            bem na parte mais alta da tela, que é a que o salão enxerga. */}
+        <div style={{ flex: '999 1 260px', minWidth: 0 }}>
+          {resumo && React.isValidElement(resumo) ? React.cloneElement(resumo, { ocultar: !mostrarValores }) : resumo}
+        </div>
         {onMetas && (
           <MetaMes canto metas={metas} receitas={receitas} realizado={rec} oculto={oculto} onSalvar={onMetas} />
         )}
