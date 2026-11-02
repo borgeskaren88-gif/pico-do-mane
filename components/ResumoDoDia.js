@@ -24,7 +24,7 @@ const QUANTAS = 3;
 // passa junto com os dados do Darci, que serve pra RECARREGAR vendas e
 // estoque. Os dois chegavam aqui com o mesmo nome, e o último a entrar
 // apagava o outro calado.
-export default function ResumoDoDia({ onPerguntar, onIrPara, onAbrir, onAnotar, ...dados }) {
+export default function ResumoDoDia({ onPerguntar, onIrPara, onAbrir, onAnotar, ocultar = false, ...dados }) {
   const reservas = useReservas();
   const [desdeMs, setDesdeMs] = useState(0);
   const [tudo, setTudo] = useState(false);
@@ -47,6 +47,21 @@ export default function ResumoDoDia({ onPerguntar, onIrPara, onAbrir, onAnotar, 
     [reservas, hoje],
   );
   const jaVi = () => { const agora = Date.now(); marcarVisto(agora); setDesdeMs(agora); };
+
+  // O "Ocultar" do Dashboard vale aqui dentro também.
+  //
+  // Ela pediu: com o botão ligado, o aviso do topo não pode continuar dizendo
+  // quanto ela deve. É a parte mais alta da tela — a que qualquer um do outro
+  // lado do balcão lê de relance.
+  //
+  // Some o NÚMERO, fica o assunto: "2 contas vencidas" continua aparecendo,
+  // porque é o que faz ela agir. O que não é da conta de ninguém é o valor.
+  const semDinheiro = (t) => String(t == null ? '' : t).replace(/R\$\s?[\d.]+,\d{2}/g, 'R$ ••••');
+  const valorDe = (av) => {
+    if (!av.valor) return '';
+    if (!ocultar) return av.valor;
+    return /R\$/.test(av.valor) ? 'R$ ••••' : '••••';
+  };
 
   if (!avisos.length && !proximas.length && !novidades.length) return null;
 
@@ -103,7 +118,7 @@ export default function ResumoDoDia({ onPerguntar, onIrPara, onAbrir, onAnotar, 
                     {av.titulo}
                   </span>
                   {av.valor ? (
-                    <span style={{ flexShrink: 0, fontSize: 13.5, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums' }}>{av.valor}</span>
+                    <span style={{ flexShrink: 0, fontSize: 13.5, fontWeight: 800, color: cor, fontVariantNumeric: 'tabular-nums' }}>{valorDe(av)}</span>
                   ) : null}
                   {leva ? <span aria-hidden="true" style={{ flexShrink: 0, color: C.faint, fontSize: 16, fontWeight: 800, lineHeight: 1 }}>›</span> : null}
                 </button>
@@ -122,7 +137,7 @@ export default function ResumoDoDia({ onPerguntar, onIrPara, onAbrir, onAnotar, 
                 </div>
                 {aberto && (
                   <div style={{ paddingLeft: 17, paddingBottom: 10, marginTop: -4 }}>
-                    <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>{av.detalhe}</div>
+                    <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>{ocultar ? semDinheiro(av.detalhe) : av.detalhe}</div>
                     {onPerguntar && (
                       <button onClick={() => onPerguntar(av.pergunta)} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12, fontWeight: 800, padding: '6px 0 0', cursor: 'pointer' }}>
                         o Darci me explica
@@ -167,7 +182,7 @@ export default function ResumoDoDia({ onPerguntar, onIrPara, onAbrir, onAnotar, 
           {verMudou && (
             <div style={{ padding: '0 14px 12px 31px' }}>
               {novidades.map((linha, i) => (
-                <div key={i} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>· {linha}</div>
+                <div key={i} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>· {ocultar ? semDinheiro(linha) : linha}</div>
               ))}
               <button onClick={jaVi} style={{ background: 'none', border: 'none', color: C.faint, fontSize: 12, fontWeight: 800, padding: '4px 0 0', cursor: 'pointer' }}>já vi</button>
             </div>

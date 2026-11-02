@@ -15,6 +15,7 @@
 // vai imprimir, e um erro ali não aparece pra ninguém até a folha sair errada
 // da impressora — quando ela já está na frente do contador.
 import { chromium } from 'playwright';
+import fs from 'fs';
 
 const BASE = 'http://127.0.0.1:3100';
 const BANCO = 'http://127.0.0.1:54321/rest/v1/pdm_dados';
@@ -95,10 +96,31 @@ cobra('e não como "2026-09"', !rotulos.some((r) => /^2026-09$/.test(String(r).t
 
 console.log('\n### NA TELA: o botão existe e o cabeçalho de papel não atrapalha');
 let txt = await texto();
-cobra('tem o botão de baixar/imprimir', /Baixar \/ imprimir/i.test(txt), (txt.match(/[^\n]*Baixar \/ imprimir[^\n]*/i) || ['(não achou)'])[0]);
-cobra('explica onde fica o "Salvar em PDF"', /Salvar em PDF/.test(txt));
+cobra('tem o botão de salvar/enviar', /Salvar \/ enviar/i.test(txt), (txt.match(/[^\n]*Salvar \/ enviar[^\n]*/i) || ['(não achou)'])[0]);
+cobra('e o de imprimir', /Imprimir/i.test(txt));
 cobra('o cabeçalho de papel está escondido', (await visivel('.so-impressao')) === false);
 cobra('e o relatório aparece normalmente', /Relatórios/.test(txt));
+
+console.log('\n### SALVAR O RELATÓRIO COMO ARQUIVO');
+// "Mas nem baixar funcionou."
+//
+// O botão chamava window.print(), e no iPhone COM O APP INSTALADO NA TELA
+// INICIAL isso não faz nada: não dá erro, não abre janela, não avisa. Guardar
+// o relatório não podia depender de imprimir.
+const [baixado] = await Promise.all([
+  pg.waitForEvent('download', { timeout: 10000 }),
+  pg.evaluate(() => {
+    const b2 = [...document.querySelectorAll('button')].find((x) => /Salvar \/ enviar/i.test(x.innerText || ''));
+    if (b2) b2.click();
+  }),
+]);
+cobra('o arquivo tem nome de relatório, com o mês', /^Relatorio-.*-2026-09\.html$/.test(baixado.suggestedFilename()), baixado.suggestedFilename());
+const caminhoArq = await baixado.path();
+const conteudoArq = caminhoArq ? fs.readFileSync(caminhoArq, 'utf8') : '';
+cobra('o arquivo diz de qual bar e de qual mês', /Pico do Mané/.test(conteudoArq) && /Set\/2026/.test(conteudoArq), conteudoArq.slice(0, 160));
+cobra('e traz o lucro do mês', /R\$\s?9\.000,00/.test(conteudoArq), (conteudoArq.match(/[^\n]*9\.000,00[^\n]*/) || ['(sumiu)'])[0]);
+cobra('é uma página que abre em qualquer aparelho', /^<!doctype html>/i.test(conteudoArq));
+cobra('com margem de papel pronta pra imprimir', /@page\{margin/.test(conteudoArq));
 
 console.log('\n### COPIAR O RELATÓRIO');
 // "Estou tentando copiar o relatório de outubro e não está dando."
