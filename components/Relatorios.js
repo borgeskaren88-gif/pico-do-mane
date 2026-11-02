@@ -72,6 +72,13 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   // nunca tocar não perde nada de decisão.
   const [verCMVDetalhe, setVerCMVDetalhe] = useState(false);
   const [verHistorico, setVerHistorico] = useState(false);
+  // "Estou tentando copiar o relatório de outubro e não está dando."
+  //
+  // Não estava mesmo: dava pra IMPRIMIR, não pra copiar. Pra mandar o mês no
+  // WhatsApp do contador, ou jogar num assistente pra analisar, ela tentava
+  // marcar a tela com o dedo — e o que ia junto era menu, aba e botão.
+  const [copiado, setCopiado] = useState(false);
+  const [textoNaTela, setTextoNaTela] = useState('');
   const mesesDisp = [...new Set([...receitas, ...despesas].map((d) => ymOf(d.data)))].sort().reverse();
   // Com rótulo em português. O seletor mostrava "2026-09" enquanto a página
   // inteira escreve "Set/2026" — mesmo mês em duas línguas, e a crua logo no
@@ -232,6 +239,100 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   const totalDesp = porCategoria.reduce((s, c) => s + c.val, 0);
   const pizza = porCategoria.map((c, i) => ({ ...c, cor: PIZZA[i % PIZZA.length], pct: totalDesp ? (c.val / totalDesp) * 100 : 0 }));
 
+  // O RELATÓRIO EM TEXTO, pra colar em qualquer lugar.
+  //
+  // Sai dos MESMOS números que a tela desenha — não de uma segunda conta. Duas
+  // contas pro mesmo mês acabam discordando, e aí ela tem dois relatórios e
+  // nenhuma certeza.
+  //
+  // Texto puro, sem enfeite de formatação: serve pro WhatsApp do contador e
+  // serve pra colar num assistente que vá analisar o mês. É pra ser lido por
+  // gente e por máquina.
+  const montarTexto = () => {
+    const l = [];
+    l.push(`${negocio || 'Relatório'} — ${mesLabel(mes)}`);
+    l.push(`Relatório do mês, emitido em ${fmtDate(todayISO())} pelo PicoOS. Valores em reais.`);
+    l.push('');
+    l.push('RESULTADO DA OPERAÇÃO');
+    l.push(`Lucro da operação: ${brl(lucro)}`);
+    l.push(`Margem: ${margem.toFixed(1)}%${totalRec > 0 ? ` (cada R$ 100 vendidos deixaram R$ ${margem.toFixed(0)})` : ''}`);
+    if (prev.rec > 0 || prev.desp > 0) {
+      const d = prev.lucro !== 0 ? ((lucro - prev.lucro) / Math.abs(prev.lucro)) * 100 : null;
+      l.push(`Mês anterior (${mesLabel(prevMes)}): ${brl(prev.lucro)}${d == null ? '' : ` (${d >= 0 ? '+' : ''}${d.toFixed(0)}%)`}`);
+    }
+    l.push('');
+    l.push('A ESCADA DO DINHEIRO');
+    l.push(`Receita da operação: ${brl(totalRec)}`);
+    l.push(`(-) Mercadoria, custo variável: ${brl(custoVar)}`);
+    l.push(`(-) Despesa de casa, operacional: ${brl(despOp)}`);
+    if (Math.abs(despOutras) > 0.005) l.push(`(-) Outras despesas: ${brl(despOutras)}`);
+    l.push(`(=) Lucro da operação: ${brl(lucro)}`);
+    l.push('');
+    l.push('O CAIXA');
+    l.push(`Entrou no mês: ${brl(disp.entrou)}`);
+    l.push(`Saiu no mês: ${brl(disp.saiu)}`);
+    l.push(`Contas em aberto a pagar: ${brl(disp.aPagar)} (${disp.nAPagar})`);
+    l.push(`Fiado a receber: ${brl(disp.aReceber)}`);
+    l.push(`Sobrou de verdade: ${brl(disp.disponivel)}`);
+    l.push(disp.recado);
+    if (temForaDaOperacao) {
+      l.push('');
+      l.push('FORA DA OPERAÇÃO (mexe no caixa, não no lucro)');
+      if (entradaNaoOp > 0.005) l.push(`Aporte/empréstimo recebido: ${brl(entradaNaoOp)}`);
+      if (investimento > 0.005) l.push(`Investimento: ${brl(investimento)}`);
+      if (dividaPaga > 0.005) l.push(`Pagamento de empréstimo/dívida: ${brl(dividaPaga)}`);
+      if (distribuicao > 0.005) l.push(`Distribuição de lucros: ${brl(distribuicao)}`);
+      l.push(`Resultado final do mês: ${brl(resultadoFinal)}`);
+    }
+    l.push('');
+    l.push('CMV (custo da mercadoria vendida)');
+    l.push(`${lidoCMV.titulo}. ${lidoCMV.texto}`);
+    if (porCategoria.length) {
+      l.push('');
+      l.push('ONDE O DINHEIRO SAIU');
+      const soma = porCategoria.reduce((s, c) => s + c.val, 0) || 1;
+      porCategoria.slice(0, 8).forEach((c, i) => {
+        l.push(`${i + 1}. ${c.cat || 'Sem categoria'}: ${brl(c.val)} (${((c.val / soma) * 100).toFixed(0)}%)`);
+      });
+    }
+    if (emergencia.total > 0.005) {
+      l.push('');
+      l.push(`COMPRA DE EMERGÊNCIA: ${brl(emergencia.total)} em ${emergencia.vezes} compra(s), ${emergencia.pct.toFixed(0)}% do que foi comprado no mês.`);
+    }
+    return l.join('\n');
+  };
+
+  const copiar = () => {
+    // O texto é montado ANTES de pedir a área de transferência. No iPhone, o
+    // pedido só vale enquanto o toque dela ainda está "quente" — montar depois
+    // de um await faz o Safari recusar calado.
+    const t = montarTexto();
+    const avisar = () => { setCopiado(true); setTextoNaTela(''); setTimeout(() => setCopiado(false), 2600); };
+    const naMao = () => {
+      // Último recurso: põe o texto na tela, já selecionado, pra ela copiar com
+      // o dedo. Melhor que um "não deu" sem saída.
+      setTextoNaTela(t);
+      setCopiado(false);
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t).then(avisar, naMao);
+        return;
+      }
+    } catch { /* cai no plano B */ }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = t;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const deu = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (deu) avisar(); else naMao();
+    } catch { naMao(); }
+  };
+
   return (
     <div className="imprimivel">
       <div className="nao-imprimir"><PageTitle sub="Resultado do mês">Relatórios</PageTitle></div>
@@ -251,11 +352,38 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
         <Btn kind="ghost" onClick={() => { if (typeof window !== 'undefined') window.print(); }}>
           Baixar / imprimir
         </Btn>
+        <Btn kind={copiado ? 'ok' : 'ghost'} onClick={copiar}>
+          {copiado ? 'Copiado!' : 'Copiar o relatório'}
+        </Btn>
       </div>
       <div className="nao-imprimir" style={{ fontSize: 11.5, color: C.faint, margin: '-8px 0 14px', lineHeight: 1.5 }}>
-        Abre a janela de impressão. Pra guardar em arquivo, escolhe <b style={{ color: C.muted }}>Salvar em PDF</b> —
-        no iPad e no iPhone a opção está na mesma tela.
+        <b style={{ color: C.muted }}>Baixar / imprimir</b> abre a janela de impressão — pra guardar em arquivo,
+        escolhe <b style={{ color: C.muted }}>Salvar em PDF</b> (no iPad e no iPhone está na mesma tela).
+        {' '}<b style={{ color: C.muted }}>Copiar o relatório</b> põe o mês inteiro em texto, pronto pra colar no
+        WhatsApp do contador ou num assistente pra analisar.
       </div>
+
+      {/* O PLANO B, quando o aparelho não deixa copiar sozinho. Melhor que um
+          "não deu" sem saída: o texto aparece aqui, já marcado, e ela copia
+          com o dedo. */}
+      {textoNaTela && (
+        <Card className="nao-imprimir" style={{ marginBottom: 14, borderColor: C.amber }}>
+          <div style={{ fontSize: 13, color: C.amber, fontWeight: 700, marginBottom: 8 }}>
+            Este aparelho não deixou copiar sozinho. O relatório está aqui embaixo, já marcado — segura em cima e toca em “Copiar”.
+          </div>
+          <textarea
+            readOnly
+            value={textoNaTela}
+            rows={12}
+            onFocus={(e) => e.target.select()}
+            ref={(el) => { if (el) { try { el.focus(); el.select(); } catch { /* ignora */ } } }}
+            style={{ width: '100%', boxSizing: 'border-box', background: C.panel2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 10, padding: 11, fontSize: 12.5, lineHeight: 1.5, resize: 'vertical' }}
+          />
+          <div style={{ marginTop: 8 }}>
+            <Btn kind="ghost" small onClick={() => setTextoNaTela('')}>Fechar</Btn>
+          </div>
+        </Card>
+      )}
 
       {/* SÓ NO PAPEL. Folha sem nome e sem data em cima da mesa do contador é
           folha de ninguém: ele não sabe de qual bar é nem de que mês. */}
