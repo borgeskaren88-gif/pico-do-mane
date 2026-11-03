@@ -50,6 +50,7 @@ import PrecoCerto from './PrecoCerto';
 import Fornecedores from './Fornecedores';
 import FichasTecnicas from './FichasTecnicas';
 import FichasArquivo from './FichasArquivo';
+import SaldoDoBar from './SaldoDoBar';
 import ConferenciaEstoque from './ConferenciaEstoque';
 import ConferirVendas from './ConferirVendas';
 import Auditoria from './Auditoria';
@@ -184,6 +185,10 @@ export default function Dashboard() {
   // A meta de faturamento do mês e os dias em que o bar abre. Não é lista: é
   // um objetinho { padrao, diasSemana, '2026-10': ... }.
   const [metas, setMetas] = useState(null);
+  // As conferências de caixa: "no dia tal eu contei e tinha tanto". É a âncora
+  // do saldo que atravessa os meses (lib/saldo.js). Lista curta, uma por vez
+  // que ela confere — mora no painel junto com as outras listas pequenas.
+  const [conferenciasCaixa, setConferenciasCaixa] = useState([]);
   // O nome do negócio e os nomes dos acessos. Cada um põe o seu — por isso
   // nada disso fica escrito no código.
   const [negocio, setNegocio] = useState(null);
@@ -295,6 +300,7 @@ export default function Dashboard() {
       setListaCozinha(arr(salvo && salvo.listaCozinha));
       setListasModelo(arr(salvo && salvo.listasModelo));
       setMetas((salvo && typeof salvo.metas === 'object' && salvo.metas) || null);
+      setConferenciasCaixa(arr(salvo && salvo.conferenciasCaixa));
       setNegocio(lerNegocio(salvo || {}));
       // NA PRIMEIRA ABERTURA, a configuração é a do seed — que é justamente o
       // que acabou de ser gravado. Lendo de `salvo` (vazio), a tela abria com o
@@ -453,6 +459,7 @@ export default function Dashboard() {
     mei: (v) => { setMei(v); salvarTudo({ mei: v }); },
     fritadeira: (v) => { setFritadeira(v); salvarTudo({ fritadeira: v }); },
     metas: (v) => { setMetas(v); salvarTudo({ metas: v }); },
+    conferenciasCaixa: (v) => { setConferenciasCaixa(v); salvarTudo({ conferenciasCaixa: v }); },
     negocio: (v) => { setNegocio(v); salvarTudo({ negocio: v }); },
     modulos: (v) => { setModulos(v); salvarTudo({ modulos: v }); },
     clientes: (v) => { setClientes(v); salvarTudo({ clientes: v }); },
@@ -783,7 +790,7 @@ export default function Dashboard() {
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
     if (['estoque', 'lista', 'compras', 'cotacoes', 'margem', 'preco', 'fornecedores'].includes(destino)) { setSubAbast(destino); setTab('abastecimento'); return; }
     if (['caixa', 'comandas', 'vendas', 'fiados', 'clientes', 'cardapio'].includes(destino)) { setSubSalao(destino); setTab('salao'); return; }
-    if (['raiox', 'receitas', 'despesas', 'pagar', 'relatorios'].includes(destino)) { setSubFinancas(destino); setTab('financas'); return; }
+    if (['raiox', 'saldo', 'receitas', 'despesas', 'pagar', 'relatorios'].includes(destino)) { setSubFinancas(destino); setTab('financas'); return; }
     // DESTINO QUE NÃO EXISTE NÃO TROCA DE TELA.
     //
     // `setTab` com um nome desconhecido não dá erro nenhum: simplesmente
@@ -1033,7 +1040,7 @@ export default function Dashboard() {
         {tab === 'financas' && (
           <>
             <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
-              {[['raiox', 'Raio-X'], ['receitas', 'Receitas'], ['despesas', 'Despesas'], ['pagar', 'Contas a Pagar'], ['relatorios', 'Relatórios']].map(([v, rot]) => (
+              {[['raiox', 'Raio-X'], ['saldo', 'Quanto eu tenho'], ['receitas', 'Receitas'], ['despesas', 'Despesas'], ['pagar', 'Contas a Pagar'], ['relatorios', 'Relatórios']].map(([v, rot]) => (
                 <button key={v} onClick={() => setSubFinancas(v)} style={{
                   flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
                   background: subFinancas === v ? C.accent : 'transparent', color: subFinancas === v ? '#06101F' : C.muted, whiteSpace: 'nowrap',
@@ -1042,6 +1049,7 @@ export default function Dashboard() {
             </div>
             {subFinancas === 'receitas' && <Lancamentos tipo="receita" dados={receitas} onChange={upd.receitas} />}
             {subFinancas === 'despesas' && <Lancamentos tipo="despesa" dados={despesas} onChange={upd.despesas} />}
+            {subFinancas === 'saldo' && <SaldoDoBar receitas={receitas} despesas={despesas} conferencias={conferenciasCaixa} onConferencias={upd.conferenciasCaixa} />}
             {subFinancas === 'pagar' && <ContasPagar dados={compras} onChange={upd.compras} despesas={despesas} onPagamento={aplicarPagamento} />}
             {subFinancas === 'raiox' && <RaioX receitas={receitas} despesas={despesas} cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} compras={compras} />}
             {subFinancas === 'relatorios' && <><TetoMEI receitas={receitas} config={mei} onConfig={upd.mei} /><Relatorios diario={diario} receitas={receitas} despesas={despesas} mes={mes} setMes={setMes} vendas={vendas} compras={compras} estoque={estoque} fichas={fichas} cardapio={cardapio} negocio={(negocio && negocio.nome) || ''} /></>}
