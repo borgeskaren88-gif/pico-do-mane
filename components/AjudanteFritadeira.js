@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { C, Card, Btn, Label, NumInput, Select } from './ui';
 import { brl, num, numQtd, fmtDate } from '../lib/util';
 import { fatorEntre, chaveNome } from '../lib/estoque';
-import { porcoesFritasPorDia, contaDoOleo, litrosParaMl, duracaoDoGalao } from '../lib/fritadeira';
+import { porcoesFritasPorDia, contaDoOleo, litrosParaMl, duracaoDoGalao, duracaoPelaTroca } from '../lib/fritadeira';
 import ListaDePratos from './ListaDePratos';
 
 // "EU PAGO ISSO EM ÓLEO PORÉM EU NÃO COLOCO ÓLEO NA FICHA TÉCNICA."
@@ -40,6 +40,14 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
   const duracao = useMemo(
     () => duracaoDoGalao({ compras, oleo, conteudoMl, fatorEntre, chaveNome }),
     [compras, oleo, conteudoMl],
+  );
+
+  // A mesma duração, pelo caminho que ela enxerga: o tamanho da fritadeira e
+  // de quanto em quanto tempo ela despeja. Duas contas independentes pro mesmo
+  // número — uma das notas, outra da cozinha.
+  const pelaTroca = useMemo(
+    () => duracaoPelaTroca({ conteudoMl, litrosFritadeira: cfg.litrosFritadeira, diasEntreTrocas: cfg.diasEntreTrocas }),
+    [conteudoMl, cfg.litrosFritadeira, cfg.diasEntreTrocas],
   );
 
   const conta = useMemo(
@@ -169,12 +177,72 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
             ) : (
               <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.5 }}>
                 Do galão novo até acabar o galão — <b style={{ color: C.muted }}>não</b> é de quanto em quanto tempo tu
-                troca a fritadeira. Se a fritadeira leva 5 L, tu troca a cada 10 dias e o galão tem 14 L, então o galão
-                dura uns <b style={{ color: C.muted }}>28 dias</b>.
+                troca a fritadeira.
                 {duracao && duracao.motivo === 'uma-compra' && ' Quando tu lançar a próxima compra de óleo eu calculo isso sozinho.'}
                 {duracao && duracao.motivo === 'sem-compra' && ' Lançando as compras de óleo em Compras, eu passo a calcular isso sozinho.'}
               </div>
             )}
+
+            {/* A CONTA QUE EU PEDIA PRA ELA FAZER DE CABEÇA.
+                Três vezes ela me trouxe a troca da FRITADEIRA no lugar da
+                duração do GALÃO — e está certa em trazer: no balcão só existe
+                uma coisa chamada "trocar o óleo". Reescrever o rótulo não
+                resolveu e não ia resolver. Agora ela responde o que enxerga e
+                a multiplicação é minha. */}
+            <div style={{ marginTop: 10, borderRadius: 11, padding: '11px 12px', background: C.raised, border: `1px solid ${C.line}` }}>
+              <div style={{ fontSize: 12.5, fontWeight: 800, color: C.text, marginBottom: 3 }}>Não sabes? Eu calculo.</div>
+              <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
+                Responde o que tu vê acontecer: o tamanho da tua fritadeira e de quanto em quanto tempo tu despeja ela.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <Label>Litros da fritadeira</Label>
+                  <NumInput value={cfg.litrosFritadeira || ''} onChange={(v) => set({ litrosFritadeira: v })} placeholder="ex.: 3,5" />
+                </div>
+                <div>
+                  <Label>Troco de quantos em quantos dias</Label>
+                  <NumInput value={cfg.diasEntreTrocas || ''} onChange={(v) => set({ diasEntreTrocas: v })} placeholder="ex.: 7" />
+                </div>
+              </div>
+              {pelaTroca && pelaTroca.ok && !pelaTroca.estranho && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
+                    Um galão de {litros} L dá pra <b style={{ color: C.accent }}>{pelaTroca.trocasPorGalao} trocas</b> —
+                    trocando de {numQtd(cfg.diasEntreTrocas)} em {numQtd(cfg.diasEntreTrocas)} dias, ele dura{' '}
+                    <b style={{ color: C.accent }}>{pelaTroca.diasPorGalao} dias</b>.
+                  </div>
+                  {numQtd(cfg.dias) !== pelaTroca.diasPorGalao && (
+                    <div style={{ marginTop: 8 }}>
+                      <Btn small onClick={() => set({ dias: String(pelaTroca.diasPorGalao) })}>
+                        Usar {pelaTroca.diasPorGalao} dias
+                      </Btn>
+                    </div>
+                  )}
+                  {/* DUAS CONTAS INDEPENDENTES DIZENDO A MESMA COISA É
+                      CONFIANÇA; discordando muito, é bandeira. Uma sai das
+                      notas de compra, a outra do que ela vê na cozinha. */}
+                  {duracao && duracao.ok && (
+                    Math.abs(duracao.diasPorGalao - pelaTroca.diasPorGalao) <= Math.max(3, duracao.diasPorGalao * 0.2) ? (
+                      <div style={{ fontSize: 11.5, color: C.green, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
+                        Bate com as tuas notas de compra ({duracao.diasPorGalao} dias). Pode confiar nesse número.
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11.5, color: C.amber, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
+                        As tuas notas dizem {duracao.diasPorGalao} dias e esta conta diz {pelaTroca.diasPorGalao}.
+                        Se a diferença for grande, ou a fritadeira leva mais óleo do que tu pôs aí, ou tem galão
+                        entrando sem nota — vale olhar.
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+              {pelaTroca && pelaTroca.estranho && (
+                <div style={{ fontSize: 11.5, color: C.amber, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
+                  A fritadeira ficou maior que o galão. Confere se os litros estão certos — é pra ser o que ela leva de
+                  óleo, não o tamanho dela por fora.
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 3 — QUAIS PRATOS VÃO NA FRITADEIRA */}
