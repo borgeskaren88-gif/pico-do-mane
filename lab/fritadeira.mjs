@@ -482,36 +482,49 @@ cobra('e em dinheiro', /R\$ 810,39/.test(txt) && /R\$ 189,09/.test(txt), (txt.ma
 
 cobra('tem a calculadora na tela', /Não sabes\? Eu calculo/.test(txt), (txt.match(/[^\n]*Eu calculo[^\n]*/) || ['(não tem)'])[0]);
 
-await campo('Litros da fritadeira', '3,5');
+console.log('\n### ELA NÃO SABE QUANTO A FRITADEIRA LEVA — então o app diz');
+// "Mas eu não sei exatamente a quantidade que vai na fritadeira, ela tem duas
+// bocas pra óleo."
+//
+// Claro que não sabe: ninguém mede o que despeja. Mas as duas pontas que
+// faltam ela tem — as notas dizem quanto dura um galão (30 dias) e ela diz de
+// quanto em quanto troca (7). O tamanho da fritadeira é consequência:
+//   30 ÷ 7 .............. 4,3 trocas por galão
+//   14,5 L ÷ 4,2857 ..... 3,4 L no total
+//   3,383 ÷ 2 bocas ..... 1,7 L em cada boca
 await campo('Troco de quantos em quantos dias', '7');
+await campo('Quantas bocas de óleo', '2');
 await pg.waitForTimeout(700);
 txt = await texto();
-cobra('diz quantas trocas saem de um galão', /4\.1 trocas/.test(txt), (txt.match(/[^\n]*trocas[^\n]*/) || ['(não calculou)'])[0]);
-cobra('e quantos dias o galão dura', /dura 29 dias/.test(txt), (txt.match(/[^\n]*dura \d+ dias[^\n]*/) || [''])[0]);
+cobra('o app diz quanto a fritadeira leva', /fritadeira leva uns 3,4 L no total/.test(txt), (txt.match(/[^\n]*fritadeira leva[^\n]*/) || ['(não disse)'])[0]);
+cobra('e quanto vai em cada boca', /1,7 L\b[\s\S]{0,20}em cada boca/.test(txt), (txt.match(/[^\n]*cada boca[^\n]*/) || [''])[0]);
+cobra('mostra de onde tirou', /Um galão dá pra 4,3 trocas/.test(txt), (txt.match(/[^\n]*trocas, e tu troca[^\n]*/) || [''])[0]);
+// Vale como conferência: se o número for muito diferente do que ela enche, o
+// problema não é a fritadeira — é galão entrando sem nota.
+cobra('e avisa o que significa se não bater', /galão entrando sem nota/.test(txt));
 
-// DUAS CONTAS INDEPENDENTES DIZENDO A MESMA COISA É CONFIANÇA. Uma sai das
-// notas de compra (30 dias), a outra do que ela vê na cozinha (29).
-cobra('confere com as notas de compra', /Bate com as tuas notas de compra \(30 dias\)/.test(txt), (txt.match(/[^\n]*notas de compra[^\n]*/) || ['(não cruzou)'])[0]);
+cobra('tocou em "Usar 3,4 L"', await toque('Usar 3,4 L'));
+await pg.waitForTimeout(1000);
+txt = await texto();
+cobra('os litros entraram no campo', /dura 30 dias/.test(txt), (txt.match(/[^\n]*ele dura \d+ dias[^\n]*/) || ['(não calculou)'])[0]);
+cobra('e bate com as notas', /Bate com as tuas notas de compra \(30 dias\)/.test(txt), (txt.match(/[^\n]*notas de compra[^\n]*/) || ['(não cruzou)'])[0]);
 
-cobra('tocou em "Usar 29 dias"', await toque('Usar 29 dias'));
+cobra('tocou em "Usar 30 dias"', await toque('Usar 30 dias'));
 await pg.waitForTimeout(1200);
 txt = await texto();
 // O número vira o de livro — e é a MESMA cozinha, a mesma semana, os mesmos
 // 7 dias. Só a pergunta mudou.
-cobra('o óleo por porção vira 25 ml', /25 ml/.test(txt), (txt.match(/[^\n]*\d+ ml\b[^\n]*/) || ['(não achou)'])[0]);
-cobra('e o custo por porção, R$ 0,33', /R\$ 0,33/.test(txt), (txt.match(/[^\n]*R\$ 0,3\d[^\n]*/) || [''])[0]);
+cobra('o óleo por porção cai pra 24 ml', /24 ml/.test(txt), (txt.match(/[^\n]*\d+ ml\b[^\n]*/) || ['(não achou)'])[0]);
 cobra('o aviso de número absurdo sumiu', !/parece grande demais/i.test(txt));
-// 29 contra 30 é arredondamento, não briga. Alarme de ruído ensina a ignorar
-// alarme.
 cobra('e o aviso de briga com as notas também', !/não bate com as tuas notas/i.test(txt), (txt.match(/[^\n]*não bate[^\n]*/i) || [''])[0]);
 const pDepois = await painel();
-cobra('a resposta dela ficou guardada', pDepois.fritadeira && pDepois.fritadeira.litrosFritadeira === '3,5' && pDepois.fritadeira.diasEntreTrocas === '7', JSON.stringify(pDepois.fritadeira));
-cobra('e o campo do galão agora tem 29', pDepois.fritadeira && String(pDepois.fritadeira.dias) === '29', String(pDepois.fritadeira && pDepois.fritadeira.dias));
+cobra('a resposta dela ficou guardada', pDepois.fritadeira && pDepois.fritadeira.diasEntreTrocas === '7' && pDepois.fritadeira.bocas === '2', JSON.stringify(pDepois.fritadeira));
+cobra('e o campo do galão agora tem 30', pDepois.fritadeira && String(pDepois.fritadeira.dias) === '30', String(pDepois.fritadeira && pDepois.fritadeira.dias));
 
 console.log('\n### FRITADEIRA MAIOR QUE O GALÃO É ERRO DE DIGITAÇÃO, não conta');
 // Quase sempre é litro trocado por mililitro. "Um galão dura meio dia" calado
 // faria o óleo do mês explodir no CMV sem ninguém entender por quê.
-await campo('Litros da fritadeira', '35');
+await campo('Litros da fritadeira (as duas bocas juntas)', '35');
 await pg.waitForTimeout(700);
 txt = await texto();
 cobra('avisa que a fritadeira ficou maior que o galão', /fritadeira ficou maior que o galão/i.test(txt), (txt.match(/[^\n]*maior que o galão[^\n]*/i) || ['(passou calado)'])[0]);
