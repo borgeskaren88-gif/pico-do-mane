@@ -463,6 +463,23 @@ txt = await texto();
 // Com os 7 dias que ela respondeu — que é a troca da fritadeira — o galão é
 // dividido por um quarto das porções e cada batata leva meio copo de óleo.
 cobra('com a resposta dela crua, o óleo sai absurdo', /104 ml/.test(txt), (txt.match(/[^\n]*\d+ ml[^\n]*/) || ['(não achou)'])[0]);
+
+// E O CAMPO BRIGANDO COM AS NOTAS NÃO PODE FICAR QUIETO.
+//
+// A tela já oferecia "Usar 30 dias" — mas oferecer é pouco. Este campo decide
+// quantos galões entram no CMV do mês, e ninguém adivinha isso olhando um
+// botão no meio de outros.
+//
+//   com 7 dias ..... 30 ÷ 7 = 4,2857 galões/mês × R$ 189,09 = R$ 810,39
+//                    (a tela arredonda o galão pra 4,3; o dinheiro sai da
+//                     conta cheia, senão o número da tela não fecharia com o
+//                     CMV do mês)
+//   com 30 dias .... 1 galão/mês .......................... = R$ 189,09
+cobra('avisa que o campo não bate com as notas', /não bate com as tuas notas/i.test(txt), (txt.match(/[^\n]*não bate[^\n]*/i) || ['(ficou quieto)'])[0]);
+cobra('diz o que está no campo e o que dizem as notas', /campo está com 7 dias e as tuas compras dizem 30 dias/i.test(txt), (txt.match(/[^\n]*campo está com[^\n]*/i) || [''])[0]);
+cobra('e põe a diferença em galões por mês', /4\.3 galões por mês/.test(txt), (txt.match(/[^\n]*galões por mês[^\n]*/) || ['(não disse)'])[0]);
+cobra('e em dinheiro', /R\$ 810,39/.test(txt) && /R\$ 189,09/.test(txt), (txt.match(/[^\n]*R\$ 8\d\d,\d\d[^\n]*/) || [''])[0]);
+
 cobra('tem a calculadora na tela', /Não sabes\? Eu calculo/.test(txt), (txt.match(/[^\n]*Eu calculo[^\n]*/) || ['(não tem)'])[0]);
 
 await campo('Litros da fritadeira', '3,5');
@@ -484,6 +501,9 @@ txt = await texto();
 cobra('o óleo por porção vira 25 ml', /25 ml/.test(txt), (txt.match(/[^\n]*\d+ ml\b[^\n]*/) || ['(não achou)'])[0]);
 cobra('e o custo por porção, R$ 0,33', /R\$ 0,33/.test(txt), (txt.match(/[^\n]*R\$ 0,3\d[^\n]*/) || [''])[0]);
 cobra('o aviso de número absurdo sumiu', !/parece grande demais/i.test(txt));
+// 29 contra 30 é arredondamento, não briga. Alarme de ruído ensina a ignorar
+// alarme.
+cobra('e o aviso de briga com as notas também', !/não bate com as tuas notas/i.test(txt), (txt.match(/[^\n]*não bate[^\n]*/i) || [''])[0]);
 const pDepois = await painel();
 cobra('a resposta dela ficou guardada', pDepois.fritadeira && pDepois.fritadeira.litrosFritadeira === '3,5' && pDepois.fritadeira.diasEntreTrocas === '7', JSON.stringify(pDepois.fritadeira));
 cobra('e o campo do galão agora tem 29', pDepois.fritadeira && String(pDepois.fritadeira.dias) === '29', String(pDepois.fritadeira && pDepois.fritadeira.dias));
