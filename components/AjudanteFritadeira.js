@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { C, Card, Btn, Label, NumInput, Select } from './ui';
 import { brl, num, numQtd, fmtDate } from '../lib/util';
 import { fatorEntre, chaveNome } from '../lib/estoque';
-import { porcoesFritasPorDia, contaDoOleo, litrosParaMl, duracaoDoGalao, duracaoPelaTroca, oleoNoMes, litrosPelaDuracao } from '../lib/fritadeira';
+import { porcoesFritasPorDia, contaDoOleo, litrosParaMl, duracaoDoGalao, duracaoPelaTroca, oleoNoMes } from '../lib/fritadeira';
 import ListaDePratos from './ListaDePratos';
 
 // "EU PAGO ISSO EM ÓLEO PORÉM EU NÃO COLOCO ÓLEO NA FICHA TÉCNICA."
@@ -46,8 +46,8 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
   // de quanto em quanto tempo ela despeja. Duas contas independentes pro mesmo
   // número — uma das notas, outra da cozinha.
   const pelaTroca = useMemo(
-    () => duracaoPelaTroca({ conteudoMl, litrosFritadeira: cfg.litrosFritadeira, diasEntreTrocas: cfg.diasEntreTrocas }),
-    [conteudoMl, cfg.litrosFritadeira, cfg.diasEntreTrocas],
+    () => duracaoPelaTroca({ conteudoMl, litrosFritadeira: cfg.litrosFritadeira, diasEntreTrocas: cfg.diasEntreTrocas, trocasPorGalao: cfg.trocasPorGalao }),
+    [conteudoMl, cfg.litrosFritadeira, cfg.diasEntreTrocas, cfg.trocasPorGalao],
   );
 
   // O campo brigando com as notas, dito em galões e em reais por mês. Só
@@ -62,16 +62,6 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
     const preco = oleo ? num(oleo.custo) : 0;
     return { campo, notas, comCampo: oleoNoMes({ precoGalao: preco, dias: campo }), comNotas: oleoNoMes({ precoGalao: preco, dias: notas }) };
   }, [duracao, cfg.dias, oleo]);
-
-  // E a mesma conta ao contrário: com a duração vinda das notas e a troca que
-  // ela informa, o tamanho da fritadeira é consequência — ela não precisa medir
-  // nada.
-  const litrosDerivados = useMemo(
-    () => (duracao && duracao.ok
-      ? litrosPelaDuracao({ conteudoMl, diasPorGalao: duracao.diasPorGalao, diasEntreTrocas: cfg.diasEntreTrocas, bocas: cfg.bocas })
-      : null),
-    [duracao, conteudoMl, cfg.diasEntreTrocas, cfg.bocas],
-  );
 
   const conta = useMemo(
     () => contaDoOleo({ conteudoMl, precoGalao: oleo ? num(oleo.custo) : 0, diasAteTrocar: cfg.dias, porcoesPorDia: porDia }),
@@ -245,59 +235,25 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
             <div style={{ marginTop: 10, borderRadius: 11, padding: '11px 12px', background: C.raised, border: `1px solid ${C.line}` }}>
               <div style={{ fontSize: 12.5, fontWeight: 800, color: C.text, marginBottom: 3 }}>Não sabes? Eu calculo.</div>
               <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
-                Responde o que tu vê acontecer: de quanto em quanto tempo tu despeja a fritadeira. Os litros, se tu
-                não souber, eu tiro das tuas notas.
+                Duas perguntas de contar, não de medir: quantas vezes tu enche a fritadeira antes do galão
+                acabar, e de quanto em quanto tempo tu despeja ela.
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <Label>Quantas trocas dá um galão</Label>
+                  <NumInput value={cfg.trocasPorGalao || ''} onChange={(v) => set({ trocasPorGalao: v })} placeholder="ex.: 4" />
+                </div>
                 <div>
                   <Label>Troco de quantos em quantos dias</Label>
                   <NumInput value={cfg.diasEntreTrocas || ''} onChange={(v) => set({ diasEntreTrocas: v })} placeholder="ex.: 7" />
                 </div>
-                <div>
-                  <Label>Quantas bocas de óleo</Label>
-                  <NumInput value={cfg.bocas || ''} onChange={(v) => set({ bocas: v })} placeholder="ex.: 2" />
-                </div>
               </div>
 
-              {/* A CONTA AO CONTRÁRIO.
-                  "Não sei exatamente a quantidade que vai na fritadeira." Claro
-                  que não — ninguém mede o que despeja. Mas as notas dizem
-                  quanto dura um galão e ela diz de quanto em quanto troca; o
-                  tamanho da fritadeira é consequência disso, não pergunta. */}
-              {litrosDerivados && litrosDerivados.ok && (
-                <div style={{ marginTop: 10, borderRadius: 10, padding: '10px 11px', background: C.panel2, border: `1px solid ${C.hair}` }}>
-                  <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
-                    Pelas tuas notas, a tua fritadeira leva uns{' '}
-                    <b style={{ color: C.accent }}>{String(litrosDerivados.litros).replace('.', ',')} L</b> no total
-                    {litrosDerivados.bocas > 1 && (
-                      <> — uns <b style={{ color: C.accent }}>{String(litrosDerivados.porBoca).replace('.', ',')} L</b> em cada boca</>
-                    )}.
-                    <div style={{ fontSize: 11.5, color: C.faint, marginTop: 4, lineHeight: 1.5 }}>
-                      Um galão dá pra {String(litrosDerivados.trocasPorGalao).replace('.', ',')} trocas, e tu troca de{' '}
-                      {numQtd(cfg.diasEntreTrocas)} em {numQtd(cfg.diasEntreTrocas)} dias. Se isso parecer muito longe do
-                      que tu enche de verdade, provavelmente tem galão entrando sem nota.
-                    </div>
-                  </div>
-                  {numQtd(cfg.litrosFritadeira) !== litrosDerivados.litros && (
-                    <div style={{ marginTop: 8 }}>
-                      <Btn small onClick={() => set({ litrosFritadeira: String(litrosDerivados.litros).replace('.', ',') })}>
-                        Usar {String(litrosDerivados.litros).replace('.', ',')} L
-                      </Btn>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div style={{ marginTop: 10 }}>
-                <Label>Litros da fritadeira (as duas bocas juntas)</Label>
-                <NumInput value={cfg.litrosFritadeira || ''} onChange={(v) => set({ litrosFritadeira: v })} placeholder="ex.: 3,5" />
-              </div>
               {pelaTroca && pelaTroca.ok && !pelaTroca.estranho && (
-                <div style={{ marginTop: 8 }}>
+                <div style={{ marginTop: 10 }}>
                   <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
-                    Um galão de {litros} L dá pra <b style={{ color: C.accent }}>{pelaTroca.trocasPorGalao} trocas</b> —
-                    trocando de {numQtd(cfg.diasEntreTrocas)} em {numQtd(cfg.diasEntreTrocas)} dias, ele dura{' '}
-                    <b style={{ color: C.accent }}>{pelaTroca.diasPorGalao} dias</b>.
+                    {pelaTroca.trocasPorGalao} trocas de {numQtd(cfg.diasEntreTrocas)} em {numQtd(cfg.diasEntreTrocas)} dias:
+                    {' '}um galão <b style={{ color: C.accent }}>dura {pelaTroca.diasPorGalao} dias</b>.
                   </div>
                   {numQtd(cfg.dias) !== pelaTroca.diasPorGalao && (
                     <div style={{ marginTop: 8 }}>
@@ -308,7 +264,7 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
                   )}
                   {/* DUAS CONTAS INDEPENDENTES DIZENDO A MESMA COISA É
                       CONFIANÇA; discordando muito, é bandeira. Uma sai das
-                      notas de compra, a outra do que ela vê na cozinha. */}
+                      notas de compra, a outra do que ela conta na cozinha. */}
                   {duracao && duracao.ok && (
                     Math.abs(duracao.diasPorGalao - pelaTroca.diasPorGalao) <= Math.max(3, duracao.diasPorGalao * 0.2) ? (
                       <div style={{ fontSize: 11.5, color: C.green, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
@@ -317,13 +273,37 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
                     ) : (
                       <div style={{ fontSize: 11.5, color: C.amber, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
                         As tuas notas dizem {duracao.diasPorGalao} dias e esta conta diz {pelaTroca.diasPorGalao}.
-                        Se a diferença for grande, ou a fritadeira leva mais óleo do que tu pôs aí, ou tem galão
-                        entrando sem nota — vale olhar.
+                        Se a diferença for grande, ou tem troca que tu não contou, ou tem galão entrando sem nota —
+                        vale olhar.
                       </div>
                     )
                   )}
                 </div>
               )}
+
+              {/* OS LITROS VIRARAM RESPOSTA, não pergunta.
+                  "Não sei exatamente a quantidade que vai na fritadeira, ela
+                  tem duas bocas." Ninguém mede o que despeja — mas 14 L ÷ 4
+                  trocas é o tamanho da fritadeira, de graça. Eu vinha pedindo
+                  justamente o número que é consequência dos outros dois. */}
+              {pelaTroca && pelaTroca.ok && pelaTroca.litrosFritadeira > 0 && numQtd(cfg.trocasPorGalao) > 0 && (
+                <div style={{ fontSize: 11.5, color: C.muted, marginTop: 9, lineHeight: 1.55 }}>
+                  Com isso a tua fritadeira leva uns{' '}
+                  <b style={{ color: C.text }}>{String(pelaTroca.litrosFritadeira).replace('.', ',')} L</b> no total
+                  {numQtd(cfg.bocas) > 1 && (
+                    <> — uns <b style={{ color: C.text }}>{String(Math.round((pelaTroca.litrosFritadeira / numQtd(cfg.bocas)) * 10) / 10).replace('.', ',')} L</b> em cada boca</>
+                  )}. Tu não precisa medir nada.
+                </div>
+              )}
+
+              <div style={{ marginTop: 10 }}>
+                <Label>Quantas bocas de óleo</Label>
+                <NumInput value={cfg.bocas || ''} onChange={(v) => set({ bocas: v })} placeholder="ex.: 2" />
+                <div style={{ fontSize: 11, color: C.faint, marginTop: 4, lineHeight: 1.45 }}>
+                  Só pra eu te dizer quanto vai em cada uma — na conta do custo entra o galão inteiro de qualquer jeito.
+                </div>
+              </div>
+
               {pelaTroca && pelaTroca.estranho && (
                 <div style={{ fontSize: 11.5, color: C.amber, fontWeight: 700, marginTop: 8, lineHeight: 1.5 }}>
                   A fritadeira ficou maior que o galão. Confere se os litros estão certos — é pra ser o que ela leva de

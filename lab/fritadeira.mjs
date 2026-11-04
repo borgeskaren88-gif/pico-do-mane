@@ -482,49 +482,56 @@ cobra('e em dinheiro', /R\$ 810,39/.test(txt) && /R\$ 189,09/.test(txt), (txt.ma
 
 cobra('tem a calculadora na tela', /Não sabes\? Eu calculo/.test(txt), (txt.match(/[^\n]*Eu calculo[^\n]*/) || ['(não tem)'])[0]);
 
-console.log('\n### ELA NÃO SABE QUANTO A FRITADEIRA LEVA — então o app diz');
-// "Mas eu não sei exatamente a quantidade que vai na fritadeira, ela tem duas
-// bocas pra óleo."
+console.log('\n### ELA CONTA TROCAS, NÃO LITROS — e é a melhor pergunta de todas');
+// "Um galão de 14 litros dá para 4 trocas, o óleo novo dura uma semana e o
+// galão dura 4 semanas."
 //
-// Claro que não sabe: ninguém mede o que despeja. Mas as duas pontas que
-// faltam ela tem — as notas dizem quanto dura um galão (30 dias) e ela diz de
-// quanto em quanto troca (7). O tamanho da fritadeira é consequência:
-//   30 ÷ 7 .............. 4,3 trocas por galão
-//   14,5 L ÷ 4,2857 ..... 3,4 L no total
-//   3,383 ÷ 2 bocas ..... 1,7 L em cada boca
+// Terceira framing dela, e a que resolve tudo: ninguém mede o que despeja, mas
+// todo mundo sabe quantas vezes encheu antes do galão acabar. Contagem, não
+// medição.
+//
+//   4 trocas × 7 dias ..... 28 dias de galão
+//   14,5 L ÷ 4 trocas ..... 3,6 L na fritadeira (saída, não entrada)
+//   3,625 ÷ 2 bocas ....... 1,8 L em cada boca
+//   28 dias × 20/dia ...... 560 porções por galão
+//   14.500 ml ÷ 560 ....... 26 ml por porção
+await campo('Quantas trocas dá um galão', '4');
 await campo('Troco de quantos em quantos dias', '7');
 await campo('Quantas bocas de óleo', '2');
 await pg.waitForTimeout(700);
 txt = await texto();
-cobra('o app diz quanto a fritadeira leva', /fritadeira leva uns 3,4 L no total/.test(txt), (txt.match(/[^\n]*fritadeira leva[^\n]*/) || ['(não disse)'])[0]);
-cobra('e quanto vai em cada boca', /1,7 L\b[\s\S]{0,20}em cada boca/.test(txt), (txt.match(/[^\n]*cada boca[^\n]*/) || [''])[0]);
-cobra('mostra de onde tirou', /Um galão dá pra 4,3 trocas/.test(txt), (txt.match(/[^\n]*trocas, e tu troca[^\n]*/) || [''])[0]);
-// Vale como conferência: se o número for muito diferente do que ela enche, o
-// problema não é a fritadeira — é galão entrando sem nota.
-cobra('e avisa o que significa se não bater', /galão entrando sem nota/.test(txt));
+cobra('um galão dura 28 dias', /dura 28 dias/.test(txt), (txt.match(/[^\n]*um galão dura \d+ dias[^\n]*/) || ['(não calculou)'])[0]);
+// OS LITROS VIRAM RESPOSTA. Era exatamente o número que eu pedia e que é
+// consequência dos outros dois.
+cobra('e o app diz o tamanho da fritadeira sem ela medir', /fritadeira leva uns 3,6 L no total/.test(txt), (txt.match(/[^\n]*fritadeira leva[^\n]*/) || ['(não disse)'])[0]);
+cobra('com o tanto de cada boca', /1,8 L\b[\s\S]{0,20}em cada boca/.test(txt), (txt.match(/[^\n]*cada boca[^\n]*/) || [''])[0]);
+cobra('e diz que ela não precisa medir nada', /não precisa medir nada/.test(txt));
+// 28 contra os 30 das notas é arredondamento, não briga.
+cobra('confere com as notas de compra', /Bate com as tuas notas de compra \(30 dias\)/.test(txt), (txt.match(/[^\n]*notas de compra[^\n]*/) || ['(não cruzou)'])[0]);
 
-cobra('tocou em "Usar 3,4 L"', await toque('Usar 3,4 L'));
-await pg.waitForTimeout(1000);
-txt = await texto();
-cobra('os litros entraram no campo', /dura 30 dias/.test(txt), (txt.match(/[^\n]*ele dura \d+ dias[^\n]*/) || ['(não calculou)'])[0]);
-cobra('e bate com as notas', /Bate com as tuas notas de compra \(30 dias\)/.test(txt), (txt.match(/[^\n]*notas de compra[^\n]*/) || ['(não cruzou)'])[0]);
-
-cobra('tocou em "Usar 30 dias"', await toque('Usar 30 dias'));
+cobra('tocou em "Usar 28 dias"', await toque('Usar 28 dias'));
 await pg.waitForTimeout(1200);
 txt = await texto();
-// O número vira o de livro — e é a MESMA cozinha, a mesma semana, os mesmos
-// 7 dias. Só a pergunta mudou.
-cobra('o óleo por porção cai pra 24 ml', /24 ml/.test(txt), (txt.match(/[^\n]*\d+ ml\b[^\n]*/) || ['(não achou)'])[0]);
+cobra('o óleo por porção vira 26 ml', /26 ml/.test(txt), (txt.match(/[^\n]*\d+ ml\b[^\n]*/) || ['(não achou)'])[0]);
 cobra('o aviso de número absurdo sumiu', !/parece grande demais/i.test(txt));
 cobra('e o aviso de briga com as notas também', !/não bate com as tuas notas/i.test(txt), (txt.match(/[^\n]*não bate[^\n]*/i) || [''])[0]);
 const pDepois = await painel();
-cobra('a resposta dela ficou guardada', pDepois.fritadeira && pDepois.fritadeira.diasEntreTrocas === '7' && pDepois.fritadeira.bocas === '2', JSON.stringify(pDepois.fritadeira));
-cobra('e o campo do galão agora tem 30', pDepois.fritadeira && String(pDepois.fritadeira.dias) === '30', String(pDepois.fritadeira && pDepois.fritadeira.dias));
+cobra('a resposta dela ficou guardada', pDepois.fritadeira && pDepois.fritadeira.trocasPorGalao === '4' && pDepois.fritadeira.diasEntreTrocas === '7', JSON.stringify(pDepois.fritadeira));
+cobra('e o campo do galão agora tem 28', pDepois.fritadeira && String(pDepois.fritadeira.dias) === '28', String(pDepois.fritadeira && pDepois.fritadeira.dias));
 
 console.log('\n### FRITADEIRA MAIOR QUE O GALÃO É ERRO DE DIGITAÇÃO, não conta');
 // Quase sempre é litro trocado por mililitro. "Um galão dura meio dia" calado
 // faria o óleo do mês explodir no CMV sem ninguém entender por quê.
-await campo('Litros da fritadeira (as duas bocas juntas)', '35');
+// Pelo caminho dos litros, que continua valendo pra quem souber o tamanho de
+// cabeça. Sem trocas informadas, é ele que manda.
+await gravar({ ...(await painel()), fritadeira: { oleoId: 'oleo', litros: '14,5', dias: '28', pratos: ['c1'], porDiaManual: '20', diasEntreTrocas: '7', litrosFritadeira: '35' } });
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Estoque');
+await irPara('Fichas técnicas');
+await pg.evaluate(() => { const x = [...document.querySelectorAll('button')].find((e) => /Ajudante da fritadeira/.test(e.innerText || '')); if (x) x.click(); });
+await pg.waitForTimeout(1000);
 await pg.waitForTimeout(700);
 txt = await texto();
 cobra('avisa que a fritadeira ficou maior que o galão', /fritadeira ficou maior que o galão/i.test(txt), (txt.match(/[^\n]*maior que o galão[^\n]*/i) || ['(passou calado)'])[0]);
