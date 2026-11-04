@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { C, Card, Btn, Label, NumInput, Select } from './ui';
 import { brl, num, numQtd, fmtDate } from '../lib/util';
 import { fatorEntre, chaveNome } from '../lib/estoque';
-import { porcoesFritasPorDia, contaDoOleo, litrosParaMl, duracaoDoGalao, duracaoPelaTroca } from '../lib/fritadeira';
+import { porcoesFritasPorDia, contaDoOleo, litrosParaMl, duracaoDoGalao, duracaoPelaTroca, oleoNoMes } from '../lib/fritadeira';
 import ListaDePratos from './ListaDePratos';
 
 // "EU PAGO ISSO EM ÓLEO PORÉM EU NÃO COLOCO ÓLEO NA FICHA TÉCNICA."
@@ -49,6 +49,19 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
     () => duracaoPelaTroca({ conteudoMl, litrosFritadeira: cfg.litrosFritadeira, diasEntreTrocas: cfg.diasEntreTrocas }),
     [conteudoMl, cfg.litrosFritadeira, cfg.diasEntreTrocas],
   );
+
+  // O campo brigando com as notas, dito em galões e em reais por mês. Só
+  // levanta quando a diferença muda alguma coisa: um ou dois dias pra lá é
+  // ruído de arredondamento, e alarme de ruído ensina a ignorar alarme.
+  const brigaDias = useMemo(() => {
+    if (!duracao || !duracao.ok) return null;
+    const campo = numQtd(cfg.dias);
+    if (!(campo > 0)) return null;
+    const notas = duracao.diasPorGalao;
+    if (Math.abs(campo - notas) <= Math.max(3, notas * 0.2)) return null;
+    const preco = oleo ? num(oleo.custo) : 0;
+    return { campo, notas, comCampo: oleoNoMes({ precoGalao: preco, dias: campo }), comNotas: oleoNoMes({ precoGalao: preco, dias: notas }) };
+  }, [duracao, cfg.dias, oleo]);
 
   const conta = useMemo(
     () => contaDoOleo({ conteudoMl, precoGalao: oleo ? num(oleo.custo) : 0, diasAteTrocar: cfg.dias, porcoesPorDia: porDia }),
@@ -155,6 +168,36 @@ export default function AjudanteFritadeira({ cardapio = [], estoque = [], fichas
                 olhar em Compras — e ela respondeu 10 de novo, que é a troca da
                 fritadeira. Mandar a dona do bar folhear as próprias notas pra
                 achar uma data é trabalho meu, não dela: as notas estão aqui. */}
+            {/* O CAMPO BRIGANDO COM AS NOTAS NÃO PODE FICAR QUIETO.
+                A tela já oferecia "Usar 30 dias", mas oferecer é pouco: um
+                botão no meio de outros não diz que o número ali do lado está
+                custando dinheiro. E este campo não é configuração — é ele que
+                decide quantos galões entram no CMV do mês.
+                Com 7 dias o sistema acha que ela queima 4,3 galões por mês;
+                com 30, um. A diferença vai direto pro custo de cada prato
+                frito, e nunca houve nada na tela dizendo isso. */}
+            {brigaDias && (
+              <div style={{ marginTop: 8, borderRadius: 11, padding: '11px 12px', background: C.raised, border: `1px solid ${C.amber}` }}>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: C.amber, marginBottom: 5 }}>
+                  Esse número não bate com as tuas notas
+                </div>
+                <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
+                  O campo está com <b>{brigaDias.campo} dias</b> e as tuas compras dizem <b>{brigaDias.notas} dias</b>.
+                  {brigaDias.comCampo && brigaDias.comNotas && brigaDias.comCampo.custo > 0 && (
+                    <>
+                      <br />Com {brigaDias.campo}, o sistema acha que tu queima{' '}
+                      <b style={{ color: C.red }}>{brigaDias.comCampo.galoes} galões por mês</b> ({brl(brigaDias.comCampo.custo)}).
+                      Com {brigaDias.notas}, <b style={{ color: C.green }}>{brigaDias.comNotas.galoes}</b> ({brl(brigaDias.comNotas.custo)}).
+                      <br />Essa diferença vai inteira pro custo dos teus fritos.
+                    </>
+                  )}
+                </div>
+                <div style={{ marginTop: 9 }}>
+                  <Btn small onClick={() => set({ dias: String(brigaDias.notas) })}>Usar {brigaDias.notas} dias</Btn>
+                </div>
+              </div>
+            )}
+
             {duracao && duracao.ok ? (
               <div style={{ marginTop: 8, borderRadius: 11, padding: '10px 12px', background: C.panel2, border: `1px solid ${C.hair}` }}>
                 <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
