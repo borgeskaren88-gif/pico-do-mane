@@ -435,6 +435,68 @@ cobra('com a caixinha marcada', await pg.evaluate(() => {
   return !!(cb && cb.checked);
 }));
 
+console.log('\n### A PERGUNTA QUE ELA ERRA É A PERGUNTA ERRADA — agora a conta é minha');
+// "Lembra que adicionamos o óleo na ficha técnica? Essa semana eu reparei que
+// troquei uma vez por semana."
+//
+// Pela terceira vez ela me traz a troca da FRITADEIRA no lugar da duração do
+// GALÃO. E está certa em trazer: no balcão só existe uma coisa chamada "trocar
+// o óleo". Reescrever o rótulo não resolveu e não ia resolver — eu estava
+// pedindo uma multiplicação de cabeça pra receber um número que eu sei fazer.
+//
+// A CONTA FEITA NA MÃO:
+//   galão 14,5 L ÷ fritadeira 3,5 L .... 4,1 trocas por galão
+//   4,142 × 7 dias ..................... 29 dias de galão
+//   29 dias × 20 porções/dia ........... 580 porções por galão
+//   14.500 ml ÷ 580 .................... 25 ml por porção
+//   R$ 189,09 ÷ 580 .................... R$ 0,33 por porção
+const pT = await painel();
+await gravar({ ...pT, fritadeira: { oleoId: 'oleo', litros: '14,5', dias: '7', pratos: ['c1'], porDiaManual: '20' } });
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3600);
+await irPara('Abastecimento');
+await irPara('Estoque');
+await irPara('Fichas técnicas');
+await pg.evaluate(() => { const x = [...document.querySelectorAll('button')].find((e) => /Ajudante da fritadeira/.test(e.innerText || '')); if (x) x.click(); });
+await pg.waitForTimeout(1000);
+txt = await texto();
+// Com os 7 dias que ela respondeu — que é a troca da fritadeira — o galão é
+// dividido por um quarto das porções e cada batata leva meio copo de óleo.
+cobra('com a resposta dela crua, o óleo sai absurdo', /104 ml/.test(txt), (txt.match(/[^\n]*\d+ ml[^\n]*/) || ['(não achou)'])[0]);
+cobra('tem a calculadora na tela', /Não sabes\? Eu calculo/.test(txt), (txt.match(/[^\n]*Eu calculo[^\n]*/) || ['(não tem)'])[0]);
+
+await campo('Litros da fritadeira', '3,5');
+await campo('Troco de quantos em quantos dias', '7');
+await pg.waitForTimeout(700);
+txt = await texto();
+cobra('diz quantas trocas saem de um galão', /4\.1 trocas/.test(txt), (txt.match(/[^\n]*trocas[^\n]*/) || ['(não calculou)'])[0]);
+cobra('e quantos dias o galão dura', /dura 29 dias/.test(txt), (txt.match(/[^\n]*dura \d+ dias[^\n]*/) || [''])[0]);
+
+// DUAS CONTAS INDEPENDENTES DIZENDO A MESMA COISA É CONFIANÇA. Uma sai das
+// notas de compra (30 dias), a outra do que ela vê na cozinha (29).
+cobra('confere com as notas de compra', /Bate com as tuas notas de compra \(30 dias\)/.test(txt), (txt.match(/[^\n]*notas de compra[^\n]*/) || ['(não cruzou)'])[0]);
+
+cobra('tocou em "Usar 29 dias"', await toque('Usar 29 dias'));
+await pg.waitForTimeout(1200);
+txt = await texto();
+// O número vira o de livro — e é a MESMA cozinha, a mesma semana, os mesmos
+// 7 dias. Só a pergunta mudou.
+cobra('o óleo por porção vira 25 ml', /25 ml/.test(txt), (txt.match(/[^\n]*\d+ ml\b[^\n]*/) || ['(não achou)'])[0]);
+cobra('e o custo por porção, R$ 0,33', /R\$ 0,33/.test(txt), (txt.match(/[^\n]*R\$ 0,3\d[^\n]*/) || [''])[0]);
+cobra('o aviso de número absurdo sumiu', !/parece grande demais/i.test(txt));
+const pDepois = await painel();
+cobra('a resposta dela ficou guardada', pDepois.fritadeira && pDepois.fritadeira.litrosFritadeira === '3,5' && pDepois.fritadeira.diasEntreTrocas === '7', JSON.stringify(pDepois.fritadeira));
+cobra('e o campo do galão agora tem 29', pDepois.fritadeira && String(pDepois.fritadeira.dias) === '29', String(pDepois.fritadeira && pDepois.fritadeira.dias));
+
+console.log('\n### FRITADEIRA MAIOR QUE O GALÃO É ERRO DE DIGITAÇÃO, não conta');
+// Quase sempre é litro trocado por mililitro. "Um galão dura meio dia" calado
+// faria o óleo do mês explodir no CMV sem ninguém entender por quê.
+await campo('Litros da fritadeira', '35');
+await pg.waitForTimeout(700);
+txt = await texto();
+cobra('avisa que a fritadeira ficou maior que o galão', /fritadeira ficou maior que o galão/i.test(txt), (txt.match(/[^\n]*maior que o galão[^\n]*/i) || ['(passou calado)'])[0]);
+cobra('e não oferece botão pra usar esse número', !/Usar 0 dias/.test(txt));
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
