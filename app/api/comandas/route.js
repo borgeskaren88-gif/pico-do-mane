@@ -12,6 +12,9 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 
 const PAINEL = 'painel';
 const PREFIXO = 'comanda:';
+// O histórico de cortesia/consumo/perda: uma linha por lançamento, fora do
+// painel. Serve pra uma coisa só, e é a que faltava — desfazer.
+const CORTESIA = 'cortesia:';
 
 // Só a dona e o garçom mexem em comandas. A cozinha não (ela não vê valores).
 function papel() {
@@ -410,6 +413,18 @@ export async function GET(request) {
     // 79% da saída era painel relido à toa, 3 vezes por minuto. Com o pedido
     // leve isso vira quase zero — e o que sobra de folga é o que permite
     // atender mais gente no mesmo plano.
+    // A LISTA DO QUE FOI DADO/CONSUMIDO/PERDIDO, pra tela de cortesia poder
+    // oferecer o desfazer. Pedido separado de propósito: não tem por que
+    // arrastar isto junto do cardápio toda vez que alguém abre uma mesa.
+    if (new URL(request.url).searchParams.get('cortesias')) {
+      const { data: cs, error: errC } = await sb.from('pdm_dados').select('valor').like('chave', CORTESIA + '%');
+      if (errC) throw errC;
+      const lista = (cs || []).map((r) => r.valor).filter((c) => c && c.id)
+        .sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0))
+        .slice(0, 20);
+      return NextResponse.json({ ok: true, cortesias: lista, podeDesfazer: papel() === 'dona' });
+    }
+
     if (new URL(request.url).searchParams.get('leve')) {
       const { data: cxLeve } = await sb.from('pdm_dados').select('valor').like('chave', 'caixa:%');
       return NextResponse.json({
@@ -638,20 +653,80 @@ export async function POST(request) {
       const novoEstoque = estoque.slice();
       const nomeCompleto = saborNome ? `${prato} (${saborNome})` : prato;
       const motivo = `${motivoBase} · ${nomeCompleto}${quem ? ` · ${quem}` : ''}`;
+      // O BILHETE DA BAIXA, pra poder desfazer.
+      //
+      // "Fui colocar uma Heineken como cortesia e acabei colocando 11, como
+      // reverto isto?" — não revertia. Lançou, saiu do estoque, acabou.
+      //
+      // Guardo o que REALMENTE saiu de cada item, não o que eu pedi pra sair:
+      // a baixa trava no zero (quem tem 5 e tira 11 fica com 0, não com -6).
+      // Devolvendo o pedido em vez do tirado, o estoque sairia maior do que
+      // era antes do erro — um conserto que estraga mais que o estrago.
+      const idCortesia = uid();
+      const baixas = [];
       let mudou = false;
       for (const ing of [...ficha.itens, ...extras]) {
         const idx = novoEstoque.findIndex((x) => x.id === ing.estoqueId);
         if (idx < 0) continue;
         const baixa = qtd * qtdNaUnidadeDoItem(ing.qtd, ing.unidade, novoEstoque[idx]);
         if (!(baixa > 0)) continue;
-        novoEstoque[idx] = aplicarMovimentoItem(novoEstoque[idx], 'saida', baixa, motivo, undefined, { ...(quem ? { quem } : {}), por: p, produto: nomeCompleto });
+        const antes = num(novoEstoque[idx].saldo);
+        novoEstoque[idx] = aplicarMovimentoItem(novoEstoque[idx], 'saida', baixa, motivo, undefined, { ...(quem ? { quem } : {}), por: p, produto: nomeCompleto, refCortesia: idCortesia });
+        const saiu = Math.round((antes - num(novoEstoque[idx].saldo)) * 1000) / 1000;
+        if (saiu > 0) baixas.push({ estoqueId: ing.estoqueId, qtd: saiu });
         mudou = true;
       }
       if (!mudou) return NextResponse.json({ ok: false, erro: 'Não achei ingredientes pra baixar (confira a ficha).' }, { status: 400 });
       await gravarPainelParcial(sb, { estoque: novoEstoque });
+      // Uma linha por lançamento, fora do painel: o painel é lido inteiro a
+      // cada abertura do app, e isto aqui é histórico que só a tela de
+      // cortesia abre.
+      try {
+        await sb.from('pdm_dados').upsert([{
+          chave: CORTESIA + idCortesia,
+          valor: { id: idCortesia, ts: Date.now(), data: diaOperacional(), prato: nomeCompleto, qtd, motivo: motivoBase, quem, por: p, baixas },
+        }]);
+      } catch (e) { /* o histórico é um luxo; a baixa já aconteceu */ }
       try { await notificarEstoqueCritico(sb, estoque, novoEstoque); } catch (e) { /* push nunca quebra a baixa */ }
       try { await notificarSaidaSemVenda(sb, { titulo: `${motivoBase}: ${nomeCompleto}`, descricao: `${qtd} ${qtd === 1 ? 'unidade' : 'unidades'}${quem ? ` · ${quem}` : ''} · lançado pel${p === 'dona' ? 'a dona' : 'o atendimento'}` }); } catch (e) { /* push nunca quebra a baixa */ }
-      return NextResponse.json({ ok: true, prato: nomeCompleto, quem });
+      return NextResponse.json({ ok: true, prato: nomeCompleto, quem, id: idCortesia });
+    }
+
+    // DESFAZER A BAIXA.
+    //
+    // "Acabei colocando 11, como reverto isto?" Devolve ao estoque exatamente
+    // o que saiu, item por item, e tira o lançamento do histórico.
+    //
+    // SÓ A DONA. O atendimento lança cortesia, mas desfazer é apagar rastro de
+    // saída de mercadoria — e isso tem dono. O mesmo motivo de só ela abrir
+    // conta de fiado.
+    if (acao === 'desfazerCortesia') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona desfaz um lançamento desses.' }, { status: 403 });
+      const idAlvo = txt(body?.id, 40);
+      if (!idAlvo) return NextResponse.json({ ok: false, erro: 'Faltou dizer qual lançamento.' }, { status: 400 });
+      const { data: linhas, error: errLer } = await sb.from('pdm_dados').select('valor').eq('chave', CORTESIA + idAlvo);
+      if (errLer) throw errLer;
+      const reg = (linhas || [])[0]?.valor;
+      if (!reg) return NextResponse.json({ ok: false, erro: 'Esse lançamento não está mais aqui.' }, { status: 404 });
+
+      const blob = await lerPainel(sb);
+      const estoque = arr(blob.estoque).slice();
+      const motivoVolta = `Desfeito · ${reg.motivo} · ${reg.prato}`;
+      let voltou = false;
+      for (const b of arr(reg.baixas)) {
+        const idx = estoque.findIndex((x) => x.id === b.estoqueId);
+        if (idx < 0) continue;
+        const q = num(b.qtd);
+        if (!(q > 0)) continue;
+        estoque[idx] = aplicarMovimentoItem(estoque[idx], 'entrada', q, motivoVolta, undefined, { por: p, produto: reg.prato, desfazCortesia: idAlvo });
+        voltou = true;
+      }
+      if (voltou) await gravarPainelParcial(sb, { estoque });
+      // A linha sai mesmo que não tenha sobrado item pra devolver (item
+      // apagado do estoque depois): deixar o lançamento na lista com um
+      // "desfazer" que não faz nada é pior que tirá-lo.
+      await sb.from('pdm_dados').delete().eq('chave', CORTESIA + idAlvo);
+      return NextResponse.json({ ok: true, voltou, prato: reg.prato, qtd: reg.qtd });
     }
 
     // Ações que mexem numa comanda existente: sempre lê -> altera -> grava

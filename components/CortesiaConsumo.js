@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
-import { C, Card, Btn, Field, TextInput, NumInput, Empty } from './ui';
-import { num } from '../lib/util';
+import { C, Card, Btn, Field, TextInput, NumInput, Empty, SecTitle } from './ui';
+import { num, fmtDate } from '../lib/util';
 import QuemPegou from './QuemPegou';
 
 // Dar cortesia ou registrar consumo da casa de um PRODUTO do cardápio (ex.:
@@ -24,6 +24,8 @@ export default function CortesiaConsumo({ onFeito }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [erro, setErro] = useState('');
+  const [ultimos, setUltimos] = useState([]);
+  const [podeDesfazer, setPodeDesfazer] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -34,6 +36,41 @@ export default function CortesiaConsumo({ onFeito }) {
     finally { setCarregado(true); }
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // O HISTÓRICO, que é o que faltava.
+  //
+  // "Fui colocar uma Heineken como cortesia e acabei colocando 11, como
+  // reverto isto?" Não revertia: lançou, saiu do estoque, acabou. A tela não
+  // mostrava nem o que tinha acabado de ser lançado.
+  const carregarUltimos = useCallback(async () => {
+    try {
+      const r = await fetch('/api/comandas?cortesias=1', { cache: 'no-store' });
+      const j = await r.json();
+      if (j.ok) { setUltimos(Array.isArray(j.cortesias) ? j.cortesias : []); setPodeDesfazer(!!j.podeDesfazer); }
+    } catch { /* offline */ }
+  }, []);
+  useEffect(() => { carregarUltimos(); }, [carregarUltimos]);
+
+  const desfazer = async (c) => {
+    if (typeof window !== 'undefined'
+      && !window.confirm(`Desfazer ${c.qtd}× ${c.prato}? O que saiu volta pro estoque.`)) return;
+    setBusy(true); setErro(''); setMsg('');
+    try {
+      const r = await fetch('/api/comandas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'desfazerCortesia', id: c.id }),
+      });
+      const j = await r.json();
+      if (!j.ok) setErro(j.erro || 'Não consegui desfazer.');
+      else {
+        setMsg(j.voltou
+          ? `Desfeito: ${c.qtd}× ${c.prato}. O que saiu voltou pro estoque.`
+          : `Lançamento removido. Nada voltou pro estoque — os itens dele já não estão mais lá.`);
+        if (onFeito) onFeito();
+      }
+    } catch { setErro('Sem conexão.'); }
+    finally { setBusy(false); await carregarUltimos(); }
+  };
 
   const filtro = busca.trim().toLowerCase();
   const lista = filtro ? cardapio.filter((i) => (i.nome || '').toLowerCase().includes(filtro)) : cardapio;
@@ -47,7 +84,7 @@ export default function CortesiaConsumo({ onFeito }) {
       const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'cortesia', cardapioId: selId, qtd: num(qtd), motivo, sabor, quem }) });
       const j = await r.json();
       if (!j.ok) setErro(j.erro || 'Não consegui registrar.');
-      else { setMsg(`${motivo}: ${num(qtd)}× ${j.prato || sel?.nome || ''}${j.quem ? ` — ${j.quem}` : ''}. Ingredientes baixados do estoque.`); setSelId(''); setBusca(''); setQtd('1'); setSabor(''); setQuem(''); if (onFeito) onFeito(); }
+      else { setMsg(`${motivo}: ${num(qtd)}× ${j.prato || sel?.nome || ''}${j.quem ? ` — ${j.quem}` : ''}. Ingredientes baixados do estoque.`); setSelId(''); setBusca(''); setQtd('1'); setSabor(''); setQuem(''); if (onFeito) onFeito(); carregarUltimos(); }
     } catch { setErro('Sem conexão.'); }
     finally { setBusy(false); }
   };
@@ -120,6 +157,38 @@ export default function CortesiaConsumo({ onFeito }) {
             {busy ? 'Registrando…' : `Registrar ${motivo.toLowerCase()}`}
           </Btn>
         </Card>
+      )}
+
+      {/* OS ÚLTIMOS LANÇAMENTOS, com o desfazer.
+          Um erro de digitação aqui tira mercadoria do estoque e não tinha
+          volta: nem a lista existia. Mostrar os últimos é metade do conserto —
+          ela vê na hora que saiu 11 em vez de 1. */}
+      {ultimos.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <SecTitle>Últimos lançamentos</SecTitle>
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            {ultimos.map((c, i) => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', borderTop: i ? `1px solid ${C.hair}` : 'none' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: C.text, overflowWrap: 'anywhere' }}>
+                    {c.qtd}× {c.prato}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: C.faint, fontWeight: 700, marginTop: 2 }}>
+                    {c.motivo}{c.quem ? ` · ${c.quem}` : ''}{c.data ? ` · ${fmtDate(c.data)}` : ''}
+                  </div>
+                </div>
+                {podeDesfazer && (
+                  <Btn kind="ghost" small onClick={() => desfazer(c)} disabled={busy}>desfazer</Btn>
+                )}
+              </div>
+            ))}
+          </Card>
+          {!podeDesfazer && (
+            <div style={{ fontSize: 11.5, color: C.faint, marginTop: 8, lineHeight: 1.5 }}>
+              Quem desfaz um lançamento desses é a dona.
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
