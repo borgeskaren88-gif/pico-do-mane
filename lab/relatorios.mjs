@@ -63,10 +63,28 @@ const LUCRO = 5000, SOBROU = 4500, SOBROU_ERRADO = 6000;
 
 // Um CMV mínimo, pra o card ter o que calcular: um chopp com ficha.
 // 10 unidades × 0,3 L × R$ 10/L = R$ 30 de ingrediente em R$ 120 vendidos = 25%.
-const ESTOQUE = [{ id: 'e1', nome: 'Chopp barril', custo: '10', unidade: 'L', saldo: '50', categoria: 'Bebidas' }];
-const CARDAPIO = [{ id: 'c1', nome: 'Chopp 300ml', categoria: 'Chopp / Cerveja', preco: '12,00', ativo: true }];
-const FICHAS = [{ cardapioId: 'c1', itens: [{ estoqueId: 'e1', qtd: '0,3', unidade: 'L' }] }];
-const VENDA = { id: 'v1', data: dia(3), total: 120, itens: [{ cardapioId: 'c1', nome: 'Chopp 300ml', qtd: 10, preco: '12,00' }] };
+const ESTOQUE = [
+  { id: 'e1', nome: 'Chopp barril', custo: '10', unidade: 'L', saldo: '50', categoria: 'Bebidas' },
+  // A long neck revendida: custa 7,50 e sai por 14. É ela que puxa a média da
+  // categoria pra cima — e é o que ela não conseguia enxergar.
+  { id: 'e2', nome: 'Heineken long neck', custo: '7,50', unidade: 'un', saldo: '80', categoria: 'Bebidas' },
+  { id: 'e3', nome: 'Batata congelada', custo: '20', unidade: 'kg', saldo: '40', categoria: 'Cozinha' },
+];
+const CARDAPIO = [
+  { id: 'c1', nome: 'Chopp 300ml', categoria: 'Chopp / Cerveja', preco: '12,00', ativo: true },
+  { id: 'c2', nome: 'Heineken long neck', categoria: 'Chopp / Cerveja', preco: '14,00', ativo: true },
+  { id: 'c3', nome: 'Porção de batata', categoria: 'Porções', preco: '30,00', ativo: true },
+];
+const FICHAS = [
+  { cardapioId: 'c1', itens: [{ estoqueId: 'e1', qtd: '0,3', unidade: 'L' }] },
+  { cardapioId: 'c2', itens: [{ estoqueId: 'e2', qtd: '1', unidade: 'un' }] },
+  { cardapioId: 'c3', itens: [{ estoqueId: 'e3', qtd: '0,4', unidade: 'kg' }] },
+];
+const VENDA = { id: 'v1', data: dia(3), total: 410, itens: [
+  { cardapioId: 'c1', nome: 'Chopp 300ml', qtd: 10, preco: '12,00' },
+  { cardapioId: 'c2', nome: 'Heineken long neck', qtd: 10, preco: '14,00' },
+  { cardapioId: 'c3', nome: 'Porção de batata', qtd: 5, preco: '30,00' },
+] };
 
 const p0 = await painel();
 await gravar({ ...p0, receitas: RECEITAS, despesas: DESPESAS, compras: [], diario: [], estoque: ESTOQUE, cardapio: CARDAPIO, fichas: FICHAS });
@@ -234,6 +252,61 @@ if (Array.isArray(alturas) && alturas.length === 2 && alturas[0] > 0) {
 
 console.log('\n### um só gráfico de evolução, não dois desenhos da mesma coisa');
 cobra('"Lucro por mês" não duplica mais o de barras', !/Lucro por mês/.test(txt));
+
+console.log('\n### "ESSES VALORES ESTÃO CERTOS, TIPO DO CHOPP ALI?"');
+// A conta fechava — a pergunta é que não tinha resposta na tela. Média de
+// categoria esconde as duas pontas, e as duas pontas pedem coisas opostas.
+//
+// A CONTA FEITA NA MÃO (Chopp / Cerveja):
+//   chopp ....... 10 × 0,3 L × R$ 10 = R$ 30 de ingrediente em R$ 120 → 25%
+//   long neck ... 10 × R$ 7,50 ...... = R$ 75 de ingrediente em R$ 140 → 54%
+//   a categoria . R$ 105 em R$ 260 ................................. → 40%
+// Olhando só os 40% ela não tem o que fazer. Olhando por dentro, tem: a long
+// neck é revenda de margem fina, o chopp está ótimo.
+await irPara('Finanças');
+await irPara('Relatórios');
+await pg.waitForTimeout(1500);
+// O "Por categoria" mora dentro do detalhe do CMV, que começa fechado de
+// propósito (a página tinha 15 blocos abertos de uma vez).
+cobra('abriu o detalhe do CMV', await pg.evaluate(() => {
+  const bt = [...document.querySelectorAll('button')].find((x) => /Ver detalhe/i.test(x.innerText || ''));
+  if (!bt) return false;
+  bt.click();
+  return true;
+}));
+await pg.waitForTimeout(1000);
+txt = await texto();
+const linhaCat = (txt.match(/[^\n]*de ingrediente em[^\n]*/g) || []);
+cobra('a categoria mostra os 40%', /R\$\s105,00 de ingrediente em R\$\s260,00/.test(txt), linhaCat.join(' | ') || '(não achou)');
+cobra('e diz quantos produtos tem dentro', /2 produtos/.test(txt), linhaCat.join(' | '));
+
+// FECHADA, o miúdo não aparece: a lista de categorias é pra ler de relance.
+cobra('fechada, não mostra os produtos', !/vende por/.test(txt), (txt.match(/[^\n]*vende por[^\n]*/) || [''])[0]);
+
+const abriu = await pg.evaluate(() => {
+  const bt = [...document.querySelectorAll('button')].find((x) => /Chopp \/ Cerveja/.test(x.innerText || ''));
+  if (!bt) return false;
+  bt.click();
+  return true;
+});
+cobra('tocou na categoria', abriu);
+await pg.waitForTimeout(800);
+txt = await texto();
+cobra('abriu o chopp, a 25%', /Chopp 300ml[\s\S]{0,80}25%/.test(txt), (txt.match(/[^\n]*Chopp 300ml[^\n]*\n[^\n]*\n[^\n]*/) || ['(não abriu)'])[0]);
+cobra('e a long neck, a 54%', /Heineken long neck[\s\S]{0,80}54%/.test(txt), (txt.match(/[^\n]*Heineken long neck[^\n]*\n[^\n]*\n[^\n]*/) || [''])[0]);
+// O QUE FAZ ELA JULGAR EM UM SEGUNDO: quanto custa e por quanto sai.
+cobra('diz quanto custa e por quanto vende', /custa R\$\s7,50, vende por R\$\s14,00/.test(txt), (txt.match(/[^\n]*custa R\$\s7,50[^\n]*/) || ['(não disse)'])[0]);
+cobra('e quantos saíram', /saíram 10/.test(txt), (txt.match(/[^\n]*saíram[^\n]*/) || [''])[0]);
+// A MÉDIA ESCONDIA ISSO: 40 na categoria, 25 e 54 dentro.
+cobra('a média da categoria fica entre as duas pontas', /40%/.test(txt) && /25%/.test(txt) && /54%/.test(txt));
+
+await pg.evaluate(() => {
+  const bt = [...document.querySelectorAll('button')].find((x) => /Chopp \/ Cerveja/.test(x.innerText || ''));
+  if (bt) bt.click();
+});
+await pg.waitForTimeout(700);
+txt = await texto();
+cobra('e fecha de novo', !/vende por/.test(txt), (txt.match(/[^\n]*vende por[^\n]*/) || [''])[0]);
 
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
