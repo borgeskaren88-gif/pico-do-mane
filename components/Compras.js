@@ -346,6 +346,43 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
   });
   const totalCarrinho = totalItens + totalImposto;
 
+  // O IMPOSTO RATEADO POR DENTRO, item por item.
+  //
+  // Reparte pelo VALOR de cada item, que é como a distribuidora cobra o ICMS
+  // ST: quem custa mais carrega mais imposto. Rateio em centavos exatos (o
+  // mesmo das parcelas), pra a soma bater no tostão com o boleto.
+  const custoComImposto = useMemo(() => {
+    if (!(totalImposto > 0) || !carrinho.length) return [];
+    const totais = carrinho.map((it) => totalCompra(it));
+    const fatias = ratearParcelas(totais, [totalImposto])[0] || [];
+    return carrinho.map((it, i) => {
+      const q = numQtd(it.quantidade) || 1;
+      const unitAntes = num(it.valorUnit);
+      const unitDepois = Math.round(((totais[i] + (fatias[i] || 0)) / q) * 10000) / 10000;
+      return { i, produto: it.produto || '—', unitAntes, unitDepois, fatia: fatias[i] || 0 };
+    });
+  }, [carrinho, totalImposto]);
+
+  // Põe o imposto dentro do preço de cada item e zera os campos. O total pago
+  // não muda em um centavo: o que muda é o custo que vai pro estoque, pra
+  // ficha e pro preço de venda.
+  const porImpostoNoCusto = () => {
+    if (!custoComImposto.length) return;
+    const porIndice = new Map(custoComImposto.map((x) => [x.i, x]));
+    setCarrinho((lista) => lista.map((it, i) => {
+      const x = porIndice.get(i);
+      if (!x) return it;
+      return {
+        ...it,
+        valorUnit: String(x.unitDepois).replace('.', ','),
+        // O rastro de onde veio: na conferência com a nota, o preço do app não
+        // vai bater com o V.UNIT impresso, e ela precisa saber por quê.
+        obs: [it.obs, `${brl(x.unitAntes)} na nota + ${brl(x.fatia)} de imposto rateado`].filter(Boolean).join(' · '),
+      };
+    }));
+    setCompra((f) => ({ ...f, imposto: impostoVazio() }));
+  };
+
   // Parcelar só faz sentido em compra a prazo. Ao mudar o nº de parcelas (ou o
   // carrinho), as linhas são remontadas a partir do total — e ela ainda pode
   // ajustar data e valor de cada uma, porque boleto real raramente é redondo.
@@ -735,10 +772,47 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
             <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
               {totalImposto > 0 ? (
                 <>Itens <b style={{ color: C.text }}>{brl(totalItens)}</b> + imposto <b style={{ color: C.text }}>{brl(totalImposto)}</b> ={' '}
-                <b style={{ color: C.text }}>{brl(totalCarrinho)}</b> — tem que fechar com o boleto.
-                O imposto entra como uma linha da nota e <b style={{ color: C.text }}>não vai pro estoque</b>.</>
+                <b style={{ color: C.text }}>{brl(totalCarrinho)}</b> — tem que fechar com o boleto.</>
               ) : 'Preenche só se o boleto tiver imposto por cima dos produtos.'}
             </div>
+
+            {/* O IMPOSTO TAMBÉM É CUSTO DA MERCADORIA.
+                A nota do chopp dela: 30 L a R$ 8,86 na linha do produto, e
+                R$ 345,00 no fim do boleto. A diferença é ICMS ST e IPI — que
+                ela PAGA, e que num bar do Simples não volta como crédito.
+                Deixando o imposto só na linha da nota, o dinheiro fica certo
+                e o CUSTO DO LITRO fica 23% abaixo do real. E aí a ficha
+                técnica mente, o CMV mente pra melhor e o Preço Certo manda
+                cobrar menos do que devia — tudo calado.
+                Rateando por dentro, o total pago é EXATAMENTE o mesmo: muda
+                só onde o dinheiro é contado. */}
+            {totalImposto > 0 && carrinho.length > 0 && (
+              <div style={{ marginTop: 10, borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: C.text, marginBottom: 4 }}>
+                  Esse imposto é custo da mercadoria?
+                </div>
+                <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginBottom: 9 }}>
+                  Se tu paga e não recebe de volta (é o caso do Simples), ele faz parte do que o produto te custa.
+                  Hoje ele entra só como linha da nota: o boleto fecha certo, mas o custo de cada item fica
+                  abaixo do real — e é esse custo que vai pra ficha técnica, pro CMV e pro preço de venda.
+                </div>
+                {custoComImposto.slice(0, 4).map((x) => (
+                  <div key={x.i} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.6 }}>
+                    {x.produto}: <b style={{ color: C.text }}>{brl(x.unitAntes)}</b> → <b style={{ color: C.accent }}>{brl(x.unitDepois)}</b> cada
+                  </div>
+                ))}
+                {custoComImposto.length > 4 && (
+                  <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>e mais {custoComImposto.length - 4}…</div>
+                )}
+                <div style={{ marginTop: 9 }}>
+                  <Btn small onClick={porImpostoNoCusto}>Pôr o imposto no custo dos itens</Btn>
+                </div>
+                <div style={{ fontSize: 11, color: C.faint, marginTop: 6, lineHeight: 1.45 }}>
+                  O total continua {brl(totalCarrinho)} — só muda onde o dinheiro é contado. Se tu preferir deixar
+                  separado, é só não tocar: o boleto fecha igual dos dois jeitos.
+                </div>
+              </div>
+            )}
           </div>
         </details>
 
@@ -815,6 +889,10 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, color: C.text }}>{it.produto}</div>
                       <div style={{ fontSize: 12, color: C.faint }}>{numQtd(it.quantidade) || 1} × {brl(num(it.valorUnit))}{it.categoria ? ` · ${it.categoria}` : ''}</div>
+                      {/* Conferindo com o papel, o preço daqui não vai bater
+                          com o V.UNIT impresso quando o imposto foi rateado.
+                          Sem dizer por quê, ela acha que o app errou. */}
+                      {it.obs && <div style={{ fontSize: 11, color: C.faint, fontStyle: 'italic' }}>{it.obs}</div>}
                       <DestinoEstoque compacto item={it} estoque={estoque} onLigar={() => {}} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
