@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
-import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz, comprasComCustoEstranho, conversaoDaReceita, ehPorcionado, linhaDe, salvaDe } from '../lib/estoque';
+import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, custoPelasCompras, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz, comprasComCustoEstranho, conversaoDaReceita, ehPorcionado, linhaDe, salvaDe } from '../lib/estoque';
 import { painelDasPorcoes, consumoPorSaco, porcoesSemFicha, fichasComPacoteESaco } from '../lib/porcoes';
 import { prazoDeEntregaDoProduto } from '../lib/cotacao';
 import EntradaPorVoz from './EntradaPorVoz';
@@ -179,6 +179,25 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
     else setMsgCorrige('Não consegui corrigir agora. Tente de novo.');
     setTimeout(() => setMsgCorrige(''), 6000);
   };
+
+  // OS CUSTOS QUE BRIGAM COM AS COMPRAS.
+  //
+  // Mesma régua do "Corrigir custos", só que calculada aqui pra PODER AVISAR
+  // antes de ela tocar em nada. Só levanta quando a diferença muda alguma
+  // coisa — 1% é arredondamento de rateio, e alarme de ruído ensina a ignorar
+  // alarme. Ordenado pelo que mais distorce, que é onde mexer rende mais.
+  const custosTortos = useMemo(() => {
+    const lista = [];
+    for (const it of itens) {
+      const pelasCompras = custoPelasCompras(it, compras);
+      const atual = num(it.custo);
+      if (pelasCompras == null || !(pelasCompras > 0) || !(atual > 0)) continue;
+      const dif = Math.abs(atual - pelasCompras) / pelasCompras;
+      if (dif < 0.05) continue;
+      lista.push({ id: it.id, nome: it.nome, atual, compras: pelasCompras, dif });
+    }
+    return lista.sort((a, b) => b.dif - a.dif);
+  }, [itens, compras]);
 
   const totais = useMemo(() => {
     let valor = 0, baixo = 0;
@@ -629,10 +648,39 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
       <Card style={{ marginBottom: 12, background: C.panel2 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>Custos com valor estranho?</div>
-            <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>Recalcula o custo de cada item pelo preço da compra mais recente. Conserta valores inflados de uma vez.</div>
+            {/* OFERECER É POUCO: O APP TEM QUE DIZER QUE TEM ALGO ERRADO.
+                O chopp dela estava cadastrado a R$ 19,71 o litro quando a nota
+                diz R$ 11,50 — 71% a mais. Isso ia direto pra ficha, pro CMV e
+                pro preço, e o que existia aqui era um botão genérico
+                perguntando "custos com valor estranho?". Ela não tinha como
+                saber que tinha. Agora a tela aponta o dedo e mostra os dois
+                números. */}
+            {custosTortos.length > 0 ? (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 800, color: C.amber }}>
+                  {custosTortos.length === 1 ? '1 item com o custo diferente das tuas compras' : `${custosTortos.length} itens com o custo diferente das tuas compras`}
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
+                  Esse custo é o que vai pra ficha técnica, pro CMV e pro preço de venda — errado aqui, erra nos três.
+                </div>
+                {custosTortos.slice(0, 3).map((x) => (
+                  <div key={x.id} style={{ fontSize: 12, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
+                    {x.nome}: <b style={{ color: C.red }}>{brl(x.atual)}</b> aqui,{' '}
+                    <b style={{ color: C.green }}>{brl(x.compras)}</b> nas compras
+                  </div>
+                ))}
+                {custosTortos.length > 3 && (
+                  <div style={{ fontSize: 11.5, color: C.faint, marginTop: 3 }}>e mais {custosTortos.length - 3}…</div>
+                )}
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>Custos com valor estranho?</div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>Recalcula o custo de cada item pelo preço da compra mais recente. Conserta valores inflados de uma vez.</div>
+              </>
+            )}
           </div>
-          <Btn small onClick={corrigirCustos}>{corrigindo ? 'Corrigindo…' : 'Corrigir custos'}</Btn>
+          <Btn small kind={custosTortos.length > 0 ? 'primary' : 'ghost'} onClick={corrigirCustos}>{corrigindo ? 'Corrigindo…' : 'Corrigir custos'}</Btn>
         </div>
         {msgCorrige && <div style={{ fontSize: 13, color: C.green, fontWeight: 700, marginTop: 8 }}>{msgCorrige}</div>}
       </Card>

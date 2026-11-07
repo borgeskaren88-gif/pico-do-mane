@@ -188,6 +188,45 @@ await pg.waitForTimeout(900);
 txt = await texto();
 cobra('e o total segue R$ 405,00 depois do rateio', /R\$ 405,00/.test(txt), (txt.match(/[^\n]*405,00[^\n]*/) || ['(o boleto deixou de fechar)'])[0]);
 
+console.log('\n### E O CUSTO QUE BRIGA COM AS COMPRAS NÃO FICA QUIETO');
+// O chopp dela estava cadastrado a R$ 19,71 o litro quando a nota diz
+// R$ 11,50 — 71% a mais, indo direto pra ficha, pro CMV e pro preço. O que
+// existia aqui era um botão genérico: "custos com valor estranho?". Ela não
+// tinha como saber que tinha.
+const p2 = await painel();
+await gravar({ ...p2,
+  estoque: [
+    { id: 'chp', nome: 'Chopp Blumenau 30L', custo: '19,7061', unidade: 'L', saldo: '30', categoria: 'Bebidas', conteudo: '1000', conteudoUnid: 'ml' },
+    { id: 'gel', nome: 'Gelo saco 5kg', custo: '6', unidade: 'un', saldo: '10', categoria: 'Bebidas' },
+  ],
+  // A compra que o app conhece: 30 L por R$ 345,00 = R$ 11,50 o litro.
+  compras: [{
+    id: 'cp1', data: '2026-11-04', produto: 'Chopp Blumenau 30L', fornecedor: 'Cervejaria Blumenau',
+    categoria: 'Bebidas', quantidade: '30', valorUnit: '11,50', formaPagto: 'Prazo', pago: 'Não',
+    estoqueId: 'chp',
+  }],
+});
+await pg.reload({ waitUntil: 'domcontentloaded' });
+await pg.waitForTimeout(3800);
+await irPara('Abastecimento');
+await irPara('Estoque');
+await pg.waitForTimeout(1500);
+txt = await texto();
+cobra('a tela acusa o custo torto sozinha', /1 item com o custo diferente das tuas compras/.test(txt), (txt.match(/[^\n]*custo diferente[^\n]*/) || ['(ficou quieto)'])[0]);
+cobra('mostra os dois números, lado a lado', /Chopp Blumenau 30L: R\$\s19,71 aqui, R\$\s11,50 nas compras/.test(txt), (txt.match(/[^\n]*aqui,[^\n]*nas compras[^\n]*/) || ['(não mostra)'])[0]);
+cobra('e diz por que isso importa', /vai pra ficha técnica, pro CMV e pro preço de venda/.test(txt));
+// O gelo bate com a compra: não pode entrar na lista e virar ruído.
+cobra('o item que bate não entra na lista', !/Gelo saco 5kg: R\$/.test(txt), (txt.match(/[^\n]*Gelo saco[^\n]*aqui[^\n]*/) || [''])[0]);
+
+console.log('\n### E O BOTÃO CONSERTA');
+pg.on('dialog', (d) => d.accept());
+cobra('tocou em corrigir custos', await toque('Corrigir custos'));
+await pg.waitForTimeout(2800);
+const itemDepois = ((await painel()).estoque || []).find((x) => x.id === 'chp');
+cobra('o custo do chopp virou R$ 11,50', itemDepois && Math.abs(Number(itemDepois.custo) - 11.5) < 0.005, String(itemDepois && itemDepois.custo));
+txt = await texto();
+cobra('e o aviso sumiu', !/custo diferente das tuas compras/.test(txt), (txt.match(/[^\n]*custo diferente[^\n]*/) || [''])[0]);
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
