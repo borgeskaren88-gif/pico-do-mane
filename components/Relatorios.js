@@ -71,6 +71,10 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
   // destino das despesas. O detalhe de cada coisa está a um toque, e quem
   // nunca tocar não perde nada de decisão.
   const [verCMVDetalhe, setVerCMVDetalhe] = useState(false);
+  // Qual categoria de CMV está aberta. Média de categoria esconde as duas
+  // pontas: long neck revendida a 53% junto de chopp de barril a 30% dá 44%,
+  // e os dois pedem coisas opostas.
+  const [catAberta, setCatAberta] = useState('');
   const [verHistorico, setVerHistorico] = useState(false);
   // "Estou tentando copiar o relatório de outubro e não está dando."
   //
@@ -734,17 +738,68 @@ export default function Relatorios({ diario, receitas, despesas, mes, setMes, ve
                 <div style={{ fontSize: 11.5, color: C.faint, margin: '4px 0 10px', lineHeight: 1.45 }}>
                   Chopp e porção têm CMV bem diferente. Juntos, viram uma média que não serve pra decidir nada.
                 </div>
-                {cmv.categorias.map((g) => (
-                  <div key={g.categoria} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.line}` }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.categoria}</div>
-                      <div style={{ fontSize: 11, color: C.faint }}>{brl(g.custo)} de ingrediente em {brl(g.receita)}</div>
+                {/* E DÁ PRA ABRIR A CATEGORIA.
+                    "Esses valores estão certos, tipo do chopp ali?" A conta
+                    fechava — 552,59 ÷ 1.262,97 dá 44% mesmo — mas a tela não
+                    tinha como responder a pergunta de verdade, que é O QUE
+                    está dentro dos 44%.
+                    Média de categoria esconde: uma long neck revendida a 53%
+                    junto de um chopp de barril a 30% dá 44%, e os dois números
+                    pedem coisas opostas. Ela sabe julgar o produto num
+                    segundo; só precisava vê-lo. Mesmo remédio do "de onde vem
+                    essa conta" da fritadeira. */}
+                {cmv.categorias.map((g) => {
+                  const dentro = (cmv.produtos || [])
+                    .filter((p) => p.categoria === g.categoria)
+                    .sort((a, b) => b.custo - a.custo);
+                  const aberta = catAberta === g.categoria;
+                  return (
+                    <div key={g.categoria} style={{ borderTop: `1px solid ${C.line}` }}>
+                      <button
+                        onClick={() => setCatAberta(aberta ? '' : g.categoria)}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 0', width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.categoria}</div>
+                          <div style={{ fontSize: 11, color: C.faint }}>
+                            {brl(g.custo)} de ingrediente em {brl(g.receita)}
+                            {dentro.length > 0 && ` · ${dentro.length} ${dentro.length === 1 ? 'produto' : 'produtos'}`}
+                          </div>
+                        </div>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+                          <span style={{ fontSize: 16, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: g.pct == null ? C.faint : g.pct >= 45 ? C.red : g.pct >= 35 ? C.amber : C.green }}>
+                            {g.pct == null ? '—' : `${g.pct.toFixed(0)}%`}
+                          </span>
+                          {dentro.length > 0 && <span aria-hidden="true" style={{ color: C.faint, fontSize: 11, fontWeight: 900 }}>{aberta ? '▾' : '▸'}</span>}
+                        </span>
+                      </button>
+                      {aberta && dentro.length > 0 && (
+                        <div style={{ paddingBottom: 8 }}>
+                          {dentro.map((p) => {
+                            // O preço de venda MÉDIO do que saiu. É ele que
+                            // denuncia a causa mais comum de CMV alto: preço
+                            // velho de cardápio, ou desconto virando regra.
+                            const precoMedio = p.qtd > 0 ? p.receita / p.qtd : null;
+                            return (
+                              <div key={p.nome} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '6px 0 6px 12px', borderTop: `1px solid ${C.hair}` }}>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontSize: 12.5, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nome}</div>
+                                  <div style={{ fontSize: 10.5, color: C.faint }}>
+                                    saíram {p.qtd}
+                                    {p.custoUnit != null && precoMedio != null && ` · custa ${brl(p.custoUnit)}, vende por ${brl(precoMedio)}`}
+                                  </div>
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: 800, flexShrink: 0, fontVariantNumeric: 'tabular-nums', color: p.pct == null ? C.faint : p.pct >= 45 ? C.red : p.pct >= 35 ? C.amber : C.green }}>
+                                  {p.pct == null ? '—' : `${p.pct.toFixed(0)}%`}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                    <span style={{ fontSize: 16, fontWeight: 800, flexShrink: 0, fontVariantNumeric: 'tabular-nums', color: g.pct == null ? C.faint : g.pct >= 45 ? C.red : g.pct >= 35 ? C.amber : C.green }}>
-                      {g.pct == null ? '—' : `${g.pct.toFixed(0)}%`}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
