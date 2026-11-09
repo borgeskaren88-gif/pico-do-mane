@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { C, Card, Empty, PageTitle, TextInput } from './ui';
 import { brl, num, fmtDate, diaOperacional } from '../lib/util';
+import { custoDoItemVendido } from '../lib/cmv';
 
 // O QUE FOI VENDIDO, COMANDA POR COMANDA, NO DIA QUE ELA ESCOLHER.
 //
@@ -67,22 +68,59 @@ function itensJuntos(itens) {
   return [...m.values()].sort((a, b) => b.qtd * b.preco - a.qtd * a.preco);
 }
 
-// Uma linha por produto, somando TODAS as comandas do dia.
-function produtosDoDia(vendas) {
+// Uma linha por produto, somando TODAS as comandas do dia — e, ao lado do que
+// entrou, QUANTO SOBROU.
+//
+// "Poderia ter ao lado do valor feito, quanto teve de lucro né?"
+//
+// Podia, e é a pergunta certa: 32 chopps a 9,99 dão R$ 319,68 de caixa, mas o
+// que fica no bolso só dá pra saber tirando o que o chopp custou. Vender muito
+// e sobrar pouco é um jeito caro de trabalhar duro.
+//
+// SOBRA É RECEITA MENOS O CUSTO DA FICHA, E SÓ.
+//
+// Não é o lucro do bar: o aluguel, a luz e o salário não entram aqui — eles
+// não pertencem a nenhum produto, e rateá-los numa linha de chopp inventaria
+// um número que ninguém consegue conferir. Então a tela chama de SOBRA, que é
+// o que de fato é: o que fica da venda depois de pagar o que foi pro copo.
+//
+// Produto sem ficha técnica não vira zero: vira "sem ficha". Zero diria que
+// não custou nada, e aí a soma do dia mentiria pra cima.
+function produtosDoDia(vendas, fichaPorCardapio, estoquePorId) {
   const m = new Map();
   for (const v of vendas) {
+    // O desconto dado no fechamento derruba a receita de verdade. É a mesma
+    // régua do CMV do mês, de propósito: duas telas que respondem a mesma
+    // pergunta com contas diferentes sempre acabam discordando.
+    const fator = 1 - Math.max(0, Math.min(100, Number(v.descontoPct) || 0)) / 100;
     for (const it of Array.isArray(v.itens) ? v.itens : []) {
       const q = qtdDe(it);
       if (q <= 0) continue;
       const nome = it.nome || '—';
-      const cur = m.get(nome) || { nome, qtd: 0, total: 0, comandas: new Set() };
+      const cur = m.get(nome) || { nome, qtd: 0, total: 0, custo: 0, comandas: new Set(), temFicha: false, completo: true, faltando: new Set() };
       cur.qtd += q;
-      cur.total += q * precoDe(it);
+      cur.total += q * precoDe(it) * fator;
       cur.comandas.add(v.id);
+      if (fichaPorCardapio && estoquePorId) {
+        const r = custoDoItemVendido(it, fichaPorCardapio, estoquePorId);
+        if (r.temFicha) {
+          cur.temFicha = true;
+          cur.custo += r.custo;
+          if (!r.completo) { cur.completo = false; for (const f of r.faltando) if (f) cur.faltando.add(f); }
+        }
+      }
       m.set(nome, cur);
     }
   }
-  return [...m.values()].map((p) => ({ ...p, comandas: p.comandas.size })).sort((a, b) => b.total - a.total);
+  return [...m.values()].map((p) => ({
+    ...p,
+    total: Math.round(p.total * 100) / 100,
+    custo: Math.round(p.custo * 100) / 100,
+    comandas: p.comandas.size,
+    faltando: [...p.faltando],
+    sobra: p.temFicha ? Math.round((p.total - p.custo) * 100) / 100 : null,
+    margem: p.temFicha && p.total > 0 ? ((p.total - p.custo) / p.total) * 100 : null,
+  })).sort((a, b) => b.total - a.total);
 }
 
 const Linha = ({ esq, dir, cor, forte }) => (
@@ -92,7 +130,7 @@ const Linha = ({ esq, dir, cor, forte }) => (
   </div>
 );
 
-export default function VendasDoDia({ vendas = [] }) {
+export default function VendasDoDia({ vendas = [], fichas = [], estoque = [] }) {
   const [dia, setDia] = useState(() => diaOperacional());
   const [visao, setVisao] = useState('comanda'); // 'comanda' | 'produto'
   const [busca, setBusca] = useState('');
@@ -122,7 +160,32 @@ export default function VendasDoDia({ vendas = [] }) {
     });
   }, [doDia, termo]);
 
-  const prods = useMemo(() => produtosDoDia(filtradas), [filtradas]);
+  // Os mesmos mapas que o CMV do mês usa, montados uma vez só.
+  const fichaPorCardapio = useMemo(
+    () => new Map((fichas || []).filter((f) => f && f.cardapioId).map((f) => [f.cardapioId, Array.isArray(f.itens) ? f.itens : []])),
+    [fichas],
+  );
+  const estoquePorId = useMemo(() => new Map((estoque || []).map((it) => [it.id, it])), [estoque]);
+  const prods = useMemo(() => produtosDoDia(filtradas, fichaPorCardapio, estoquePorId), [filtradas, fichaPorCardapio, estoquePorId]);
+
+  // O dia inteiro: só entra o que dá pra custear. Misturar o que tem ficha com
+  // o que não tem daria uma sobra maior do que a verdadeira.
+  const sobraDoDia = useMemo(() => {
+    const comFicha = prods.filter((p) => p.temFicha);
+    const receita = comFicha.reduce((s, p) => s + p.total, 0);
+    const custo = comFicha.reduce((s, p) => s + p.custo, 0);
+    const faltam = prods.filter((p) => !p.temFicha);
+    const incompletos = comFicha.filter((p) => !p.completo).length;
+    return {
+      receita: Math.round(receita * 100) / 100,
+      custo: Math.round(custo * 100) / 100,
+      sobra: Math.round((receita - custo) * 100) / 100,
+      margem: receita > 0 ? ((receita - custo) / receita) * 100 : null,
+      faltam: faltam.length,
+      faltamValor: Math.round(faltam.reduce((s, p) => s + p.total, 0) * 100) / 100,
+      incompletos,
+    };
+  }, [prods]);
 
   const resumo = useMemo(() => {
     const total = filtradas.reduce((s, v) => s + (Number(v.total) || 0), 0);
@@ -235,9 +298,46 @@ export default function VendasDoDia({ vendas = [] }) {
                     esq={<><b style={{ fontVariantNumeric: 'tabular-nums' }}>{p.qtd}×</b> {p.nome}</>}
                     dir={brl(p.total)}
                   />
-                  <div style={{ fontSize: 11, color: C.faint }}>em {p.comandas} comanda(s)</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 11.5, lineHeight: 1.5 }}>
+                    <span style={{ color: C.faint, minWidth: 0 }}>
+                      em {p.comandas} comanda(s)
+                      {p.temFicha && <> · custou {brl(p.custo)}</>}
+                      {p.temFicha && !p.completo && <span style={{ color: C.amber }}> · ficha incompleta{p.faltando.length ? ` (falta custo de ${p.faltando.slice(0, 2).join(', ')})` : ''}</span>}
+                    </span>
+                    {p.temFicha ? (
+                      <span style={{ flexShrink: 0, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: p.sobra < 0 ? C.red : p.margem != null && p.margem < 30 ? C.amber : C.green }}>
+                        sobrou {brl(p.sobra)}{p.margem != null ? ` · ${Math.round(p.margem)}%` : ''}
+                      </span>
+                    ) : (
+                      // Zero diria que não custou nada. "Sem ficha" diz a
+                      // verdade: o app não sabe, e ela pode ir montar a ficha.
+                      <span style={{ flexShrink: 0, color: C.faint, fontWeight: 700 }}>sem ficha técnica</span>
+                    )}
+                  </div>
                 </div>
               ))}
+
+              {/* O FECHAMENTO DO DIA. Separado do resumo lá de cima de
+                  propósito: aquele fala de caixa, este fala do que sobrou. */}
+              <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 12, paddingTop: 10 }}>
+                <Linha esq="Entrou (só o que tem ficha)" dir={brl(sobraDoDia.receita)} />
+                <Linha esq="Custou (o que foi pro copo e pro prato)" dir={`− ${brl(sobraDoDia.custo)}`} cor={C.amber} />
+                <Linha
+                  esq="Sobrou no dia"
+                  dir={`${brl(sobraDoDia.sobra)}${sobraDoDia.margem != null ? ` · ${Math.round(sobraDoDia.margem)}%` : ''}`}
+                  forte
+                  cor={sobraDoDia.sobra < 0 ? C.red : C.green}
+                />
+                <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.5, marginTop: 6 }}>
+                  Sobra é o que fica depois de pagar <b style={{ color: C.muted }}>só os ingredientes</b>. Aluguel, luz, gás e salário ainda saem daqui — eles não são de nenhum produto, então não entram nesta conta.
+                  {sobraDoDia.faltam > 0 && (
+                    <> <span style={{ color: C.amber }}>{sobraDoDia.faltam} produto(s) ficaram de fora ({brl(sobraDoDia.faltamValor)}) porque não têm ficha técnica.</span></>
+                  )}
+                  {sobraDoDia.incompletos > 0 && (
+                    <> <span style={{ color: C.amber }}>E {sobraDoDia.incompletos} ficha(s) estão incompletas, então essa sobra está por cima.</span></>
+                  )}
+                </div>
+              </div>
             </Card>
           )}
 
