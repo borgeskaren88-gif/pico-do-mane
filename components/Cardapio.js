@@ -1,7 +1,8 @@
 'use client';
-import React, { useState, useMemo } from 'react';
-import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle, inputStyle } from './ui';
+import React, { useState, useMemo, useEffect } from 'react';
+import { C, Card, Btn, Field, Label, TextInput, NumInput, Select, Empty, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, uid, limparNome } from '../lib/util';
+import { promoVazia, limparPromo, erroDaPromo, estadoDaPromo, diasEmTexto } from '../lib/promocao';
 import { UNIDADES, qtdNaUnidadeDoItem, conversaoDaReceita } from '../lib/estoque';
 
 // AS CATEGORIAS DE FÁBRICA — o ponto de partida, não a lei.
@@ -35,7 +36,9 @@ export const CATEGORIAS_CARDAPIO = CATEGORIAS_PADRAO;
 
 const estCat = { width: 30, height: 30, borderRadius: 8, border: `1px solid var(--c-line)`, background: 'transparent', color: 'var(--c-muted)', fontSize: 15, fontWeight: 800, cursor: 'pointer', lineHeight: 1, flexShrink: 0 };
 
-const itemVazio = () => ({ nome: '', preco: '', categoria: '', sabores: [], saboresTotal: '', adicionais: [] });
+const CURTO = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+const itemVazio = () => ({ nome: '', preco: '', categoria: '', sabores: [], saboresTotal: '', adicionais: [], promo: promoVazia() });
 
 export default function Cardapio({ dados = [], onChange, estoque = [], categorias, onCategorias }) {
   const [novo, setNovo] = useState(itemVazio());
@@ -45,6 +48,23 @@ export default function Cardapio({ dados = [], onChange, estoque = [], categoria
   const [verCats, setVerCats] = useState(false);
   const CATS = categoriasDoCardapio(categorias, dados);
   const set = (k) => (v) => setNovo((f) => ({ ...f, [k]: v }));
+  const setPromo = (k) => (v) => setNovo((f) => ({ ...f, promo: { ...(f.promo || promoVazia()), [k]: v } }));
+  const diasDaPromo = Array.isArray(novo.promo && novo.promo.dias) ? novo.promo.dias : [0, 1, 2, 3, 4, 5, 6];
+  const alternarDia = (d) => setPromo('dias')(diasDaPromo.includes(d) ? diasDaPromo.filter((x) => x !== d) : [...diasDaPromo, d].sort((x, y) => x - y));
+  const erroPromo = erroDaPromo(novo.promo, novo.preco);
+
+  // O "valendo agora" tem que ser verdade AGORA.
+  //
+  // Sem este relógio, a tela que a dona deixou aberta às 15h58 continuaria
+  // dizendo "começa hoje às 16:00" às 17h — e ela ia achar que não ligou.
+  // Só anda quando existe promoção pra olhar.
+  const [, tic] = useState(0);
+  const temPromo = useMemo(() => dados.some((i) => i && i.promo), [dados]);
+  useEffect(() => {
+    if (!temPromo) return undefined;
+    const t = setInterval(() => tic((n) => n + 1), 30000);
+    return () => clearInterval(t);
+  }, [temPromo]);
 
   const estoqueOrdenado = useMemo(() => [...estoque].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })), [estoque]);
   // Sabores/variações do item (ex.: caipirinha de morango, maracujá…). Cada
@@ -91,12 +111,17 @@ export default function Cardapio({ dados = [], onChange, estoque = [], categoria
     const adicionaisLimpos = (novo.adicionais || [])
       .map((a) => ({ nome: limparNome(a.nome), preco: String(a.preco || '0'), estoqueId: String(a.estoqueId || ''), qtd: String(a.qtd || ''), unidade: String(a.unidade || '') }))
       .filter((a) => a.nome);
-    const limpo = { nome: nomeLimpo, preco: novo.preco || '0', categoria: novo.categoria, sabores: saboresLimpos, saboresTotal: saboresLimpos.length ? total : 0, adicionais: adicionaisLimpos };
+    // A promoção só entra se estiver inteira (preço + as duas horas). Pela
+    // metade, limparPromo devolve null e o item fica sem promoção nenhuma —
+    // melhor que guardar um horário sem preço e ninguém saber se liga.
+    if (erroPromo) return;
+    const promoLimpa = limparPromo(novo.promo);
+    const limpo = { nome: nomeLimpo, preco: novo.preco || '0', categoria: novo.categoria, sabores: saboresLimpos, saboresTotal: saboresLimpos.length ? total : 0, adicionais: adicionaisLimpos, promo: promoLimpa };
     if (editId) onChange(dados.map((i) => (i.id === editId ? { ...i, ...limpo } : i)));
     else onChange([{ id: uid(), ...limpo, ativo: true }, ...dados]);
     setNovo(itemVazio()); setEditId(null);
   };
-  const editar = (it) => { setNovo({ nome: it.nome || '', preco: it.preco || '', categoria: it.categoria || '', sabores: Array.isArray(it.sabores) ? it.sabores.map((s) => ({ ...s })) : [], saboresTotal: it.saboresTotal ? String(it.saboresTotal) : '', adicionais: Array.isArray(it.adicionais) ? it.adicionais.map((a) => ({ ...a })) : [] }); setEditId(it.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const editar = (it) => { setNovo({ nome: it.nome || '', preco: it.preco || '', categoria: it.categoria || '', sabores: Array.isArray(it.sabores) ? it.sabores.map((s) => ({ ...s })) : [], saboresTotal: it.saboresTotal ? String(it.saboresTotal) : '', adicionais: Array.isArray(it.adicionais) ? it.adicionais.map((a) => ({ ...a })) : [], promo: it.promo ? { ...promoVazia(), ...it.promo, dias: Array.isArray(it.promo.dias) ? [...it.promo.dias] : [0, 1, 2, 3, 4, 5, 6] } : promoVazia() }); setEditId(it.id); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const cancelar = () => { setNovo(itemVazio()); setEditId(null); };
   const excluir = (id) => { if (id === editId) cancelar(); onChange(dados.filter((i) => i.id !== id)); };
   const alternarAtivo = (it) => onChange(dados.map((i) => (i.id === it.id ? { ...i, ativo: i.ativo === false ? true : false } : i)));
@@ -196,6 +221,57 @@ export default function Cardapio({ dados = [], onChange, estoque = [], categoria
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 12 }}>
           <Field label="Preço (R$)"><NumInput value={novo.preco} onChange={set('preco')} /></Field>
           <Field label="Categoria"><Select value={novo.categoria} onChange={set('categoria')} options={CATS} /></Field>
+        </div>
+
+        {/* PROMOÇÃO COM HORÁRIO.
+            "Hoje tive chopp a 9,99, fiz das 16h às 18h, aí 18h eu fui e
+            desativei do cardápio." Agora ela marca uma vez e some da mão. */}
+        <div style={{ marginTop: 4, marginBottom: 12, borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4 }}>Promoção com horário (opcional)</div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>
+            Tipo <b style={{ color: C.text }}>chopp a 9,99 das 16h às 18h</b>. Tu marca uma vez e ela <b style={{ color: C.text }}>liga e desliga sozinha</b> nos dias que tu escolher. Fora do horário o preço volta ao normal, sem tu precisar fazer nada.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr 1fr', gap: 10 }}>
+            <Field label="Preço na promoção"><NumInput value={(novo.promo || {}).preco || ''} onChange={setPromo('preco')} placeholder="9,99" /></Field>
+            <Field label="Começa"><TextInput type="time" value={(novo.promo || {}).de || ''} onChange={setPromo('de')} /></Field>
+            <Field label="Termina"><TextInput type="time" value={(novo.promo || {}).ate || ''} onChange={setPromo('ate')} /></Field>
+          </div>
+          <Label>Em quais dias</Label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+            {CURTO.map((nome, d) => {
+              const on = diasDaPromo.includes(d);
+              return (
+                <button key={d} onClick={() => alternarDia(d)}
+                  style={{ border: `1px solid ${on ? C.accent : C.line}`, background: on ? `color-mix(in srgb, ${C.accent} 18%, transparent)` : 'transparent', color: on ? C.accent : C.muted, borderRadius: 999, padding: '6px 11px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}>{nome}</button>
+              );
+            })}
+            <button onClick={() => setPromo('dias')([0, 1, 2, 3, 4, 5, 6])}
+              style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '6px 4px' }}>todo dia</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+            <Field label="Só até o dia (pode deixar vazio)"><TextInput type="date" value={(novo.promo || {}).fim || ''} onChange={setPromo('fim')} /></Field>
+            <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 12 }}>
+              <button onClick={() => setPromo('ligada')((novo.promo || {}).ligada === false)}
+                style={{ border: `1px solid ${(novo.promo || {}).ligada === false ? C.line : C.green}`, background: 'transparent', color: (novo.promo || {}).ligada === false ? C.muted : C.green, borderRadius: 10, padding: '9px 13px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}>
+                {(novo.promo || {}).ligada === false ? 'Promoção desligada' : 'Promoção ligada'}
+              </button>
+            </div>
+          </div>
+          {erroPromo
+            ? <div style={{ fontSize: 12.5, color: C.red, fontWeight: 700, lineHeight: 1.45 }}>{erroPromo}</div>
+            : (() => {
+              const e = estadoDaPromo({ ...novo, promo: limparPromo(novo.promo) });
+              if (e.estado === 'nenhuma') return null;
+              const cor = e.estado === 'valendo' ? C.green : e.estado === 'erro' ? C.red : C.muted;
+              return (
+                <div style={{ fontSize: 12.5, color: cor, fontWeight: 700, lineHeight: 1.45 }}>
+                  {e.texto}{' '}
+                  <span style={{ color: C.faint, fontWeight: 600 }}>
+                    ({diasEmTexto((novo.promo || {}).dias)} · às {((novo.promo || {}).ate || '').slice(0, 5)} em ponto já voltou ao normal)
+                  </span>
+                </div>
+              );
+            })()}
         </div>
 
         {/* Sabores / variações (opcional) */}
@@ -325,14 +401,24 @@ export default function Cardapio({ dados = [], onChange, estoque = [], categoria
             <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4, color: C.accent }}>{g.cat}</div>
             {g.itens.map((it) => {
               const pausado = it.ativo === false;
+              const ep = estadoDaPromo(it);
+              const naPromo = ep.estado === 'valendo';
               return (
                 <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9, opacity: pausado ? 0.55 : 1 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, textDecoration: pausado ? 'line-through' : 'none' }}>{it.nome}</div>
                     {Array.isArray(it.sabores) && it.sabores.length > 0 && <div style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>{it.sabores.length} sabor(es): {it.sabores.map((s) => s.nome).join(', ')}</div>}
                     {pausado && <div style={{ fontSize: 11, color: C.faint }}>pausado (não aparece pro garçom)</div>}
+                    {ep.estado !== 'nenhuma' && (
+                      <div style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.4, color: naPromo ? C.green : ep.estado === 'erro' ? C.red : C.faint }}>
+                        {naPromo ? '● ' : ''}{ep.texto} <span style={{ fontWeight: 600 }}>({diasEmTexto(it.promo && it.promo.dias)})</span>
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: C.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(num(it.preco))}</div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {naPromo && <div style={{ fontSize: 11, color: C.faint, fontWeight: 600, textDecoration: 'line-through', fontVariantNumeric: 'tabular-nums' }}>{brl(num(it.preco))}</div>}
+                    <div style={{ fontSize: 14, fontWeight: 800, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{brl(naPromo ? ep.preco : num(it.preco))}</div>
+                  </div>
                   <button onClick={() => alternarAtivo(it)} title={pausado ? 'Reativar' : 'Pausar'} style={{ background: 'none', border: 'none', color: pausado ? C.green : C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 4 }}>{pausado ? 'Reativar' : 'Pausar'}</button>
                   <button onClick={() => editar(it)} title="Editar" style={{ background: 'none', border: 'none', color: C.accent, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 4 }}>Editar</button>
                   <button onClick={() => excluir(it.id)} title="Excluir" style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}>×</button>

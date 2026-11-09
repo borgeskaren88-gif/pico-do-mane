@@ -129,7 +129,10 @@ function TelaBalcao({ cardapio, clientes, onCobrar, onSair, busy, erro }) {
         {lista.map((i) => (
           <button key={i.id} onClick={() => por(i.id)} disabled={busy}
             style={{ border: `1px solid color-mix(in srgb, ${C.accent} 22%, ${C.panel})`, background: `color-mix(in srgb, ${C.accent} 7%, ${C.panel})`, color: C.text, borderRadius: 12, padding: '10px 14px', fontSize: 14.5, fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}>
-            {i.nome} <span style={{ color: C.faint, fontWeight: 600 }}>{brl(num(i.preco))}</span>
+            {i.nome}{' '}
+            {num(i.promoDe) > 0 && <span style={{ color: C.faint, fontWeight: 600, textDecoration: 'line-through', marginRight: 4 }}>{brl(num(i.promoDe))}</span>}
+            <span style={{ color: num(i.promoDe) > 0 ? C.green : C.faint, fontWeight: num(i.promoDe) > 0 ? 800 : 600 }}>{brl(num(i.preco))}</span>
+            {num(i.promoDe) > 0 && <span style={{ fontSize: 10, fontWeight: 800, color: '#06101F', background: C.green, borderRadius: 999, padding: '1px 6px', marginLeft: 5 }}>promo</span>}
           </button>
         ))}
         {!lista.length && <Empty>{busca ? 'Nada com esse nome.' : 'Nenhum item simples no cardápio.'}</Empty>}
@@ -563,6 +566,8 @@ export default function Comandas({ papel = 'dona' }) {
           {d === 0 && <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: C.red, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>em falta</span>}
           {d != null && d > 0 && d <= 3 && <span style={{ fontSize: 11, fontWeight: 800, color: '#06101F', background: C.amber, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>só {d}</span>}
           {q > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: '#06101F', background: C.green, borderRadius: 999, padding: '2px 8px', flexShrink: 0 }}>{q} na mesa</span>}
+          {num(it.promoDe) > 0 && <span style={{ fontSize: 10, fontWeight: 800, color: '#06101F', background: C.green, borderRadius: 999, padding: '1px 6px', flexShrink: 0 }}>promo</span>}
+          {num(it.promoDe) > 0 && <span style={{ fontSize: 12, fontWeight: 600, color: C.faint, textDecoration: 'line-through', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(num(it.promoDe))}</span>}
           <span style={{ fontSize: 13, fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(num(it.preco))}</span>
         </button>
       );
