@@ -4,6 +4,7 @@ import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
 import { num, limparNome, fiadoDaVenda, abertoDaVenda, brl, diaOperacional } from '../../../lib/util';
+import { precoAgora, promoValeAgora } from '../../../lib/promocao';
 import { enviarPush, notificarEstoqueCritico, notificarComandaFechada, notificarSaidaSemVenda } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -108,7 +109,15 @@ function montarItem(cardapio, pedido) {
   // como decimal. Então o garçom via "R$ 299,99" na lista, tocava, e a comanda
   // fechava em R$ 32.998,90. Duas réguas pro mesmo preço, cada uma numa ponta
   // do mesmo toque.
-  const preco = num(prod.preco);
+  //
+  // E É AQUI, E SÓ AQUI, QUE A PROMOÇÃO POR HORÁRIO ENTRA.
+  //
+  // O preço do happy hour não é um preço guardado em outro campo que alguém
+  // precisa lembrar de ligar e desligar: é este `preco`, decidido no instante
+  // em que o item entra na comanda, pelo relógio de Floripa. Quem pediu às
+  // 17h55 pagou 9,99 e fica pagando 9,99 mesmo que a conta feche às 20h — o
+  // preço fica gravado no item da comanda, como sempre foi.
+  const preco = precoAgora(prod);
   // Sabor/variação: se o item tem sabores, guarda a escolha em "extras" pra
   // baixar do estoque no fechamento. Dois modos:
   //  - Combo com saboresTotal > 0: o garçom distribui N unidades entre os
@@ -169,9 +178,20 @@ function montarItem(cardapio, pedido) {
 
 // Põe o item montado na lista: repetido só soma a quantidade (quando pode
 // juntar), senão entra como linha nova.
+//
+// O PREÇO FAZ PARTE DA IDENTIDADE DA LINHA.
+//
+// Sem isso, a mesa que pediu dois chopps às 17h50 (9,99) e mais dois às 18h05
+// (12,00) juntava os quatro numa linha só — e a linha ficava com o preço do
+// primeiro. O happy hour vazaria pra fora do horário, quatro chopps a 9,99, e
+// na conta do cliente não haveria nada de errado pra ver.
+//
+// Com o preço na chave, viram duas linhas: "2x Chopp 9,99" e "2x Chopp 12,00".
+// É o que o cliente espera ver no papel, e é o que de fato aconteceu.
 function porNaLista(itens, m) {
   const existe = m.mergeKey != null
-    ? itens.find((it) => it.cardapioId === m.cardapioId && (it.sabor || '') === m.mergeKey && (it.add || '') === m.addKey)
+    ? itens.find((it) => it.cardapioId === m.cardapioId && (it.sabor || '') === m.mergeKey && (it.add || '') === m.addKey
+      && Math.round(num(it.preco) * 100) === Math.round(num(m.item.preco) * 100))
     : null;
   if (existe) existe.qtd = (Number(existe.qtd) || 0) + 1;
   else itens.push(m.item);
@@ -438,7 +458,25 @@ export async function GET(request) {
     // Disponibilidade de cada item (via fichas técnicas + estoque), pra avisar o
     // garçom o que está em falta/acabando. disp = null quando não há ficha.
     const disp = disponibilidadeCardapio(cardapioAtivo, arr(blob.fichas), arr(blob.estoque));
-    const cardapio = cardapioAtivo.map((i) => ({ ...i, disp: disp[i.id] ? disp[i.id].disp : null }));
+    // O PREÇO QUE VAI PRA TELA DO GARÇOM JÁ VEM COM A PROMOÇÃO APLICADA.
+    //
+    // A tela não calcula happy hour. Ela recebe `preco` pronto, do mesmo
+    // `precoAgora` que vai cobrar quando o item entrar na comanda. Se a tela
+    // fizesse essa conta por conta própria, bastaria o relógio do iPad estar
+    // adiantado dez minutos pra ela mostrar 9,99 e o servidor cobrar 12,00.
+    //
+    // `promoDe` é só o preço normal, riscado, pro garçom saber que é promoção
+    // e poder falar isso pro cliente. A regra em si não desce pra tela.
+    const cardapio = cardapioAtivo.map((i) => {
+      const emPromo = promoValeAgora(i.promo);
+      const { promo, ...resto } = i;
+      return {
+        ...resto,
+        preco: precoAgora(i),
+        ...(emPromo ? { promoDe: num(i.preco) } : {}),
+        disp: disp[i.id] ? disp[i.id].disp : null,
+      };
+    });
     // Só os nomes dos clientes, pro seletor de "quem ficou devendo" no fiado.
     const clientes = (Array.isArray(blob.clientes) ? blob.clientes : []).map((c) => (c && c.nome ? String(c.nome) : '')).filter(Boolean).sort((a, b) => a.localeCompare(b));
     // Itens do estoque (só nome/unidade, SEM custo/saldo) pro garçom registrar
