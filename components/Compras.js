@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, QtdInput, Select, Empty, Resumo, SecTitle, PageTitle, Sugestoes } from './ui';
 import { brl, num, numQtd, totalCompra, todayISO, ymOf, fmtDate, addDays, uid, limparNome, montarParcelas, ratearParcelas, CATEGORIAS_PRODUTO, CATEGORIAS_DESPESA } from '../lib/util';
-import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, fatorEntre, UNIDADES } from '../lib/estoque';
+import { resolverCompraNoEstoque, entradaDaCompra, comprasPendentesDeEstoque, fatorEntre, UNIDADES, embalagemQueFalta } from '../lib/estoque';
 import { efeitoDaEdicaoNaDespesa } from '../lib/despesaDaCompra';
 import { precoNaUnidadeDoItem } from '../lib/cotacao';
 import { guardarRascunho, lerRascunho, limparRascunho, registrarTentativa, lerTentativas, limparTentativas, quandoBR } from '../lib/notaPendente';
@@ -841,8 +841,42 @@ export default function Compras({ dados, cotacoes, despesas = [], estoque = [], 
             "3,5" e não um "3.500" que seria lido como três e meio. */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <Field label="Cada um tem"><QtdInput value={item.conteudo} onChange={setI('conteudo')} placeholder="ex: 30" /></Field>
-          <Field label="De quê"><Select value={item.conteudoUnid} onChange={setI('conteudoUnid')} options={UNIDADES} placeholder="kg, g, L, ml…" /></Field>
+          <Field label="De quê"><Select value={item.conteudoUnid} onChange={setI('conteudoUnid')} options={UNIDADES} placeholder="un, kg, g, L, ml…" /></Field>
         </div>
+        {/* A PERGUNTA NA HORA, QUANDO OS DOIS NÚMEROS BRIGAM.
+
+            Os campos acima sempre estiveram aqui e ela nunca precisou deles —
+            até o pão de alho, que entrou como "1 × R$ 18,40" e virou um pão
+            de R$ 18,40 no Preço Certo. O campo existir não adianta: a tela
+            tem que PERGUNTAR, e com o pacote ainda na mão. */}
+        {(() => {
+          // alvoItem é a MESMA resolução que o resto da tela usa. Resolver de
+          // novo aqui abriria a porta pra este aviso falar de um item e a
+          // linha entrar em outro.
+          const f = alvoItem ? embalagemQueFalta(item, alvoItem.item) : null;
+          if (!f) return null;
+          return (
+            <div style={{ background: C.raised, border: `1px solid ${C.amber}`, borderRadius: 10, padding: 12, margin: '-4px 0 12px' }}>
+              <div style={{ fontSize: 12, color: C.amber, fontWeight: 800, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                Esse valor é do pacote ou de um só?
+              </div>
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+                No estoque, <b>{f.nome}</b> está a <b>{brl(f.noItem)}</b> por {f.unidade}. Tu está lançando a <b>{brl(f.naNota)}</b> — {String(f.vezes).replace('.', ',')}× mais.
+              </div>
+              <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginTop: 5 }}>
+                Se esse valor é de uma embalagem fechada, diz quantos vêm dentro. Senão o app vai achar
+                que cada {f.unidade} custa {brl(f.naNota)}, e o Preço Certo vai mandar tu cobrar caro demais.
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <Btn small onClick={() => setItem((x) => ({ ...x, conteudo: String(f.sugerido), conteudoUnid: f.unidade }))}>
+                  Vêm {f.sugerido} {f.unidade} ({brl(f.cadaUm)} cada)
+                </Btn>
+                <Btn kind="ghost" small onClick={() => setItem((x) => ({ ...x, conteudo: '', conteudoUnid: '' }))}>É de um só mesmo</Btn>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Mesma pergunta e mesmo exemplo da tela de Cotações — veja a nota lá. */}
         <div style={{ fontSize: 11.5, color: C.faint, margin: '-4px 0 10px', lineHeight: 1.45 }}>
           O que vem <b>dentro</b> de cada embalagem: barril de <b>30 L</b>, caixa de <b>12 un</b>, pacote de <b>2 kg</b>.

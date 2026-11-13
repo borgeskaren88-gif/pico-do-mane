@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, PageTitle, Label } from './ui';
 import { brl, num, todayISO, ymOf, uid } from '../lib/util';
-import { custoDaFicha, custoDosSabores, tamanhoQueResolve } from '../lib/estoque';
+import { custoDaFicha, custoDosSabores, tamanhoQueResolve, comprasComCustoEstranho } from '../lib/estoque';
 import { CMV_BOM, CMV_ATENCAO, estoqueNoMes} from '../lib/cmv';
 import { rateioDoMes, mesFechadoAnterior } from '../lib/rateio';
 
@@ -119,6 +119,32 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], c
     const v = Math.round((soma / n + num(embalagem) + num(rateio)) * 100) / 100;
     return { valor: v, pronto: v > 0, motivo: '' };
   }, [modo, item, fichaPorId, estoqueCusteado, ingredientes, rende, embalagem, rateio]);
+
+  // A NOTA BRIGANDO COM O ESTOQUE, DITA AQUI — onde ela vê o número errado.
+  //
+  // "Na hora que vou calcular o preço certo do pão de alho, ele pega o valor
+  // que está na compra, que é 18 e pouco, porém no abastecimento o valor está
+  // 3 e pouco, porque 18 e pouco é o valor do pacote que vem com 5 unidades."
+  //
+  // Esta tela usa de propósito o custo reconstruído pelas NOTAS, e não o
+  // guardado no item — é o único caminho em que o custo anda sozinho quando o
+  // fornecedor sobe o preço. Mas quando a nota não diz o que vem na embalagem,
+  // o custo da nota é o do PACOTE, e o preço sugerido sai cinco vezes maior.
+  //
+  // O aviso já existia — em Abastecimento → Estoque, que é onde se conserta.
+  // Só que ela não estava lá: estava aqui, olhando um R$ 18,40 sem explicação,
+  // e precisou perguntar pra uma pessoa. Número estranho tem que se explicar
+  // na tela em que aparece.
+  const brigas = useMemo(() => {
+    const ids = new Set();
+    if (modo === 'cardapio' && item) {
+      for (const f of (fichaPorId.get(item.id) || [])) if (f && f.estoqueId) ids.add(f.estoqueId);
+      for (const sb of (item.sabores || [])) if (sb && sb.estoqueId) ids.add(sb.estoqueId);
+    }
+    if (!ids.size) return [];
+    const soDesteProduto = estoque.filter((it) => it && ids.has(it.id));
+    return comprasComCustoEstranho(soDesteProduto, compras).filter((b) => b.notaMaisCara);
+  }, [modo, item, fichaPorId, estoque, compras]);
 
   // Dos chutes, quais o NOME DO ITEM já resolve. Só entra aqui o que conserta
   // de verdade: nome em ml não arruma ficha que pede grama.
@@ -271,6 +297,28 @@ export default function PrecoCerto({ cardapio = [], fichas = [], estoque = [], c
               <div style={{ fontSize: 12.5, color: C.amber, lineHeight: 1.5, marginBottom: 10 }}>
                 ⚠️ A ficha existe, mas os ingredientes dela estão <b>sem custo cadastrado</b> no estoque. Põe o custo
                 deles que o número aparece aqui.
+              </div>
+            )}
+            {brigas.length > 0 && (
+              <div style={{ background: C.raised, border: `1px solid ${C.red}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                <div style={{ fontSize: 12, color: C.red, fontWeight: 800, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                  O custo abaixo está alto demais
+                </div>
+                {brigas.map((b) => (
+                  <div key={b.estoqueId} style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 4 }}>
+                    <b>{b.nome}</b>: esta conta está usando <b style={{ color: C.red }}>{brl(b.custoCompras)}</b> por {b.unidade},
+                    que é o que as notas dizem. Mas no estoque ele está a <b>{brl(b.custoItem)}</b> — {String(b.vezes).replace('.', ',')}× menos.
+                    {b.semEmbalagem > 0 && <> {b.semEmbalagem} de {b.totalNotas} nota(s) dele <b style={{ color: C.muted }}>não dizem o que vem na embalagem</b>.</>}
+                  </div>
+                ))}
+                <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginTop: 6 }}>
+                  Quase sempre é isto: a nota tem o valor do <b style={{ color: C.text }}>pacote fechado</b> e ninguém disse
+                  quantos vêm dentro. Abre a compra em <b style={{ color: C.text }}>Abastecimento → Compras</b>, preenche
+                  o <b style={{ color: C.text }}>&quot;Cada um tem&quot;</b> (ex.: 5 un) e o preço aqui se acerta sozinho.
+                </div>
+                <div style={{ fontSize: 12.5, color: C.amber, lineHeight: 1.5, marginTop: 6 }}>
+                  Até lá, <b>não usa o preço sugerido abaixo</b>: ele está calculado em cima do custo do pacote.
+                </div>
               </div>
             )}
             {custo.pronto && custo.completo === false && (
