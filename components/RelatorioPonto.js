@@ -8,7 +8,7 @@ const norm = (s) => (s || '').trim().toLowerCase();
 const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch { return ''; } };
 const horasDe = (r) => (r.entrada && r.saida ? Math.max(0, (new Date(r.saida) - new Date(r.entrada)) / 3600000) : 0);
 const fmtHoras = (h) => { const t = Math.round(Math.abs(h) * 60); const hh = Math.floor(t / 60), mm = t % 60; return `${hh}h${mm > 0 ? String(mm).padStart(2, '0') : ''}`; };
-const SETORES = { cozinha: 'Cozinha', garcom: 'Atendimento', dona: 'Dona' };
+const SETORES = { cozinha: 'Cozinha', garcom: 'Atendimento', dona: 'Dona', extra: 'EXTRA' };
 const parseHHMM = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ''); return m ? (+m[1] + (+m[2]) / 60) : null; };
 // Horas de um turno da jornada (16:00 → 00:00 = 8h; quando vira a meia-noite, soma 24).
 const horasJornada = (j) => { const e = parseHHMM(j?.entrada), s = parseHHMM(j?.saida); if (e == null || s == null) return 0; let d = s - e; if (d <= 0) d += 24; return d; };
@@ -72,9 +72,11 @@ export default function RelatorioPonto({ mesInicial, negocio = '' }) {
     const doMes = registros.filter((r) => (r.data || '').slice(0, 7) === mes);
     const map = new Map();
     for (const r of doMes) {
-      const k = norm(r.nome);
-      if (!k) continue;
-      if (!map.has(k)) map.set(k, { nome: r.nome, papel: r.papel || '', horas: 0, turnos: [], dias: new Set(), abertos: 0 });
+      // O extra é outra pessoa, mesmo com o mesmo nome: um "João" que veio um
+      // sábado não pode somar nas horas do João que trabalha lá todo dia.
+      if (!norm(r.nome)) continue;
+      const k = norm(r.nome) + (r.papel === 'extra' ? '|extra' : '');
+      if (!map.has(k)) map.set(k, { chave: k, nome: r.nome, papel: r.papel || '', horas: 0, turnos: [], dias: new Set(), abertos: 0 });
       const g = map.get(k);
       if (!g.papel && r.papel) g.papel = r.papel;
       if (r.saida) g.horas += horasDe(r); else g.abertos += 1;
@@ -144,10 +146,10 @@ export default function RelatorioPonto({ mesInicial, negocio = '' }) {
         : pessoas.length === 0 ? <Empty>Ninguém bateu ponto em {rotuloMes(mes)}.</Empty> : (
           <>
             {pessoas.map((p) => {
-              const abertoAqui = aberto === norm(p.nome);
+              const abertoAqui = aberto === p.chave;
               return (
-                <Card key={p.nome} style={{ marginBottom: 8, padding: 14 }}>
-                  <button onClick={() => setAberto(abertoAqui ? '' : norm(p.nome))} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <Card key={p.chave} style={{ marginBottom: 8, padding: 14 }}>
+                  <button onClick={() => setAberto(abertoAqui ? '' : p.chave)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
                     <span style={{ minWidth: 0 }}>
                       <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>
                         <span style={{ color: C.accent, fontSize: 12, marginRight: 6 }}>{abertoAqui ? '▾' : '▸'}</span>{p.nome}
