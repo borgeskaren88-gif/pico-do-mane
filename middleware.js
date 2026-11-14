@@ -22,6 +22,8 @@ const PAPEIS = [
   ['cozinha', 'pico-do-mane-cozinha:'],
   ['garcom', 'pico-do-mane-garcom:'],
   ['reservas', 'pico-do-mane-reservas:'],
+  // O extra tem geração própria: fechar o acesso dele não derruba o atendimento.
+  ['extra', 'pico-do-mane-extra:'],
 ];
 
 // Um cache e uma "última boa" POR NEGÓCIO. Num app de muitos, as gerações de

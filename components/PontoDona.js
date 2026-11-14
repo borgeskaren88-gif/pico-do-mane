@@ -106,8 +106,12 @@ export default function PontoDona() {
     const doMes = registros.filter((r) => (r.data || '').slice(0, 7) === ym);
     const map = new Map();
     for (const r of doMes) {
-      const k = norm(r.nome);
-      if (!map.has(k)) map.set(k, { nome: r.nome, horas: 0, turnos: [], papel: r.papel || '' });
+      // O EXTRA É OUTRA PESSOA, mesmo com o mesmo nome. Um "João" que veio
+      // um sábado não pode somar nas horas — nem na escala, nem no banco — do
+      // João que trabalha lá todo dia.
+      const ehExtra = r.papel === 'extra';
+      const k = norm(r.nome) + (ehExtra ? '|extra' : '');
+      if (!map.has(k)) map.set(k, { chave: k, nome: r.nome, horas: 0, turnos: [], papel: r.papel || '', extra: ehExtra });
       const g = map.get(k);
       if (!g.papel && r.papel) g.papel = r.papel;
       g.horas += horasDe(r);
@@ -122,7 +126,7 @@ export default function PontoDona() {
       g.s = saldoDaPessoa(g.turnos, jornadas[g.papel], ym, hojeISO);
       // O banco de horas roda sobre TODOS os registros da pessoa, não só os do
       // mês aberto — é isso que sobrevive à virada do mês.
-      const todosDela = registros.filter((r) => norm(r.nome) === norm(g.nome));
+      const todosDela = registros.filter((r) => norm(r.nome) === norm(g.nome) && (r.papel === 'extra') === g.extra);
       g.banco = saldoAcumulado(todosDela, jornadas[g.papel], hojeISO);
       // Quanto o trabalho já feito vale. É a pergunta que ela faz no dia de
       // pagar, e era a única que esta tela não sabia responder.
@@ -144,7 +148,8 @@ export default function PontoDona() {
     return { horas, esperado: quantos ? esperado : null, quantos };
   }, [pessoas]);
   const trabalhandoAgora = registros.filter((r) => !r.saida);
-  const rotuloSetor = (papel) => (SETORES.find(([k]) => k === papel)?.[1] || '');
+  // 'extra' tem rótulo mas NÃO tem jornada: quem vem um dia só não tem escala.
+  const rotuloSetor = (papel) => (papel === 'extra' ? 'EXTRA' : (SETORES.find(([k]) => k === papel)?.[1] || ''));
 
   // Etiqueta de saldo (em haver / devendo / em dia) pra uma pessoa.
   const rotuloSaldo = (v) => (Math.abs(v) < 0.05 ? 'em dia' : v > 0 ? `+${fmtHoras(v)} em haver` : `−${fmtHoras(v)} devendo`);
@@ -156,6 +161,7 @@ export default function PontoDona() {
   const emDinheiro = (horas, papel, mes) => fmtReais(emReais(horas, jornadas[papel], mes));
 
   const Saldo = ({ s, banco, papel }) => {
+    if (papel === 'extra') return <span style={{ fontSize: 11, color: C.faint, display: 'block' }}>extra — sem escala, então sem saldo de horas</span>;
     if (!s || !s.temEscala) return <span style={{ fontSize: 11, color: C.faint, display: 'block' }}>sem escala configurada — não dá pra dizer saldo</span>;
     const recado = recadoDoSaldo(s);
     // O acumulado vem PRIMEIRO e em destaque: é ele que diz se a pessoa deve ou
@@ -205,7 +211,7 @@ export default function PontoDona() {
           </div>
 
           {pessoas.map((p) => (
-            <div key={p.nome} style={{ borderTop: `1px solid ${C.hair}`, paddingTop: 10, marginTop: 10 }}>
+            <div key={p.chave} style={{ borderTop: `1px solid ${C.hair}`, paddingTop: 10, marginTop: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
                 <span style={{ fontSize: 14.5, fontWeight: 800, minWidth: 0 }}>
                   {p.nome}
@@ -219,6 +225,14 @@ export default function PontoDona() {
               {p.pagar ? (
                 <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.45, marginTop: 2 }}>
                   {fmtHoras(p.pagar.horas)} trabalhadas em {p.pagar.turnos} turno(s) × {brl(Math.round(p.pagar.valorHora * 100) / 100)} a hora
+                </div>
+              ) : p.extra ? (
+                // O extra é pago por diária, combinada na hora. A tela não
+                // inventa valor: dá os turnos e as horas, que é o que ela
+                // precisa pra fazer a conta — e não manda "configurar jornada"
+                // de quem não tem jornada.
+                <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.45, marginTop: 2 }}>
+                  Extra: {p.turnos.length} turno(s), {fmtHoras(p.horas)} no mês. A diária é a que tu combinou com ele.
                 </div>
               ) : (
                 // Sem salário configurado não dá pra dizer valor nenhum — e
@@ -363,7 +377,10 @@ export default function PontoDona() {
                 <div>
                   <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 4 }}>Setor</div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    {SETORES.map(([k, rot]) => (
+                    {/* Extra entra aqui (dá pra lançar o turno de quem veio e
+                        não bateu), mas não na jornada lá em cima: quem vem um
+                        dia só não tem escala. */}
+                    {[...SETORES, ['extra', 'Extra']].map(([k, rot]) => (
                       <button key={k} onClick={() => setLancSetor(k)} style={{ flex: 1, border: `1px solid ${lanc.setor === k ? C.accent : C.line}`, background: lanc.setor === k ? C.accent : 'transparent', color: lanc.setor === k ? '#06101F' : C.muted, borderRadius: 9, padding: '9px 8px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{rot}</button>
                     ))}
                   </div>
@@ -418,10 +435,10 @@ export default function PontoDona() {
       {!carregado ? <Empty>Carregando…</Empty> : pessoas.length === 0 ? (
         <Empty>Nenhum ponto batido neste mês.<br />A equipe registra na aba Ponto do login dela.</Empty>
       ) : pessoas.map((p) => {
-        const ab = aberto === norm(p.nome);
+        const ab = aberto === p.chave;
         return (
-          <div key={p.nome} style={{ marginBottom: 10 }}>
-            <button onClick={() => setAberto(ab ? '' : norm(p.nome))} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: '13px 14px', cursor: 'pointer', textAlign: 'left', boxShadow: C.cardShadow }}>
+          <div key={p.chave} style={{ marginBottom: 10 }}>
+            <button onClick={() => setAberto(ab ? '' : p.chave)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.panel, border: `1px solid ${C.cardBorder}`, borderRadius: 12, padding: '13px 14px', cursor: 'pointer', textAlign: 'left', boxShadow: C.cardShadow }}>
               <span style={{ color: C.accent, fontSize: 12, fontWeight: 800, width: 12, flexShrink: 0 }}>{ab ? '▾' : '▸'}</span>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ fontSize: 15, fontWeight: 800 }}>{p.nome}{rotuloSetor(p.papel) ? <span style={{ color: C.faint, fontWeight: 500, fontSize: 12 }}> · {rotuloSetor(p.papel)}</span> : null}</span>

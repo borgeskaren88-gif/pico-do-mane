@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { nomeCookie, papelDaSessao } from '../../../lib/auth';
+import { nomeCookie, acessoDaSessao } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { notificarPonto } from '../../../lib/push';
 import { num } from '../../../lib/util';
@@ -20,9 +20,21 @@ const nomeCanonico = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim
 const hojeBrasil = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
 // A cozinha e o atendimento batem o ponto; a dona também vê e pode corrigir.
+//
+// AQUI A PERGUNTA É "POR QUAL PORTA ENTROU", NÃO "O QUE PODE FAZER".
+//
+// No resto do app o extra é tratado como atendimento, e está certo: ele faz o
+// mesmo trabalho. No ponto é diferente — o turno dele sai carimbado 'extra'.
+// Sem isso, a hora do extra cairia no mesmo balde do atendimento fixo: entraria
+// na escala deles, viraria "falta" nos dias em que ele não veio, e o banco de
+// horas de quem trabalha lá todo dia sairia torto por causa de quem veio um
+// sábado. E ela pediu exatamente o contrário: separado dos fixos.
+//
+// A privacidade vem de graça com o mesmo carimbo: o extra só enxerga o ponto
+// dos extras, e não as horas da equipe fixa.
 function papel() {
-  const p = papelDaSessao(cookies().get(nomeCookie())?.value);
-  return p === 'dona' || p === 'cozinha' || p === 'garcom' ? p : null;
+  const p = acessoDaSessao(cookies().get(nomeCookie())?.value);
+  return p === 'dona' || p === 'cozinha' || p === 'garcom' || p === 'extra' ? p : null;
 }
 
 async function lerRegistros(sb) {
@@ -128,7 +140,7 @@ export async function POST(request) {
     // meia-noite, ex.: 16:00 → 00:00).
     if (acao === 'lancar') {
       if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona lança turno à mão.' }, { status: 403 });
-      const setor = ['cozinha', 'garcom', 'dona'].includes(body?.setor) ? body.setor : '';
+      const setor = ['cozinha', 'garcom', 'dona', 'extra'].includes(body?.setor) ? body.setor : '';
       const data = txt(body?.data, 10);
       const hm = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '')); if (!m) return null; return `${String(Math.min(23, Math.max(0, +m[1]))).padStart(2, '0')}:${String(Math.min(59, Math.max(0, +m[2]))).padStart(2, '0')}`; };
       const eHM = hm(body?.entrada), sHM = hm(body?.saida);

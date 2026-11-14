@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { ACESSOS, lerGeracoes, subirGeracao } from '../../../lib/acessos';
-import { definirSenhaPapel, senhaFoiTrocada, ehSenhaDeFabrica } from '../../../lib/senha';
+import { definirSenhaPapel, senhaFoiTrocada, ehSenhaDeFabrica, acessoFechado, apagarSenhaPapel } from '../../../lib/senha';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +27,10 @@ export async function GET() {
         ...a, geracao: ger[a.papel] || 1,
         senhaPropria: await senhaFoiTrocada(sb, a.papel),
         deFabrica: await ehSenhaDeFabrica(sb, a.papel),
+        // Só o extra pode estar fechado (sem senha nenhuma). E só ele pode ser
+        // fechado de novo — os outros acessos existem todo dia.
+        fechado: await acessoFechado(sb, a.papel),
+        podeFechar: a.papel === 'extra',
       });
     }
     return NextResponse.json({ ok: true, acessos: lista });
@@ -67,6 +71,18 @@ export async function POST(request) {
       // juntas, e a tela diz isso.
       const g = await subirGeracao(sb, papel);
       return NextResponse.json({ ok: true, geracao: g });
+    }
+
+    // FECHAR o acesso do extra: a noite acabou, ele foi embora.
+    //
+    // Apaga a senha (ninguém mais entra) e sobe a geração (quem estava dentro
+    // cai). As duas coisas, sempre: só apagar a senha deixaria o celular dele
+    // logado por noventa dias. O ponto que ele bateu fica guardado.
+    if (acao === 'fechar') {
+      if (papel !== 'extra') return NextResponse.json({ ok: false, erro: 'Esse acesso não fecha: ele é da equipe de todo dia.' }, { status: 400 });
+      await apagarSenhaPapel(sb, papel);
+      const g = await subirGeracao(sb, papel);
+      return NextResponse.json({ ok: true, geracao: g, fechado: true });
     }
 
     return NextResponse.json({ ok: false, erro: 'Ação desconhecida.' }, { status: 400 });

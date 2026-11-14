@@ -20,6 +20,7 @@ const RECADOS = {
   cozinha: 'Quem entra por aqui vê a lista de compras, as tarefas, as porções e bate o ponto. Não vê dinheiro.',
   garcom: 'Quem entra por aqui abre e fecha comanda e vê o cardápio. Não vê o financeiro do bar.',
   reservas: 'Quem entra por aqui vê e marca as reservas de mesa. Não vê mais nada.',
+  extra: 'Pra quem vem trabalhar um dia só. Faz tudo que o Atendimento faz, com senha separada: tu fecha este acesso no fim da noite sem derrubar a equipe fixa. O ponto dele sai marcado como extra.',
 };
 
 export default function Acessos() {
@@ -61,7 +62,16 @@ export default function Acessos() {
   const salvarSenha = (a) => {
     if (nova.trim().length < 4) { setMsg('A senha precisa ter pelo menos 4 caracteres.'); return; }
     mandar({ acao: 'senha', papel: a.papel, nova: nova.trim() },
-      `Senha de ${a.nome} trocada — e todos os aparelhos que estavam logados foram desconectados junto.`);
+      a.fechado
+        ? `Pronto: o acesso ${a.nome} está aberto. Passa a senha pra quem vai trabalhar hoje — ele entra pelo botão "Extra" da tela de entrada.`
+        : `Senha de ${a.nome} trocada — e todos os aparelhos que estavam logados foram desconectados junto.`);
+  };
+
+  const fechar = (a) => {
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Fechar o acesso "${a.nome}"?\n\nA senha é apagada e quem estiver usando cai na hora. Ninguém entra por ele até tu criar outra senha. O ponto que foi batido continua guardado.`
+    )) return;
+    mandar({ acao: 'fechar', papel: a.papel }, `Pronto: o acesso ${a.nome} está fechado. Ninguém entra por ele até tu criar outra senha.`);
   };
 
   if (!carregado) return <Empty>Carregando…</Empty>;
@@ -102,16 +112,23 @@ export default function Acessos() {
 
           {/* "1234" é a senha de fábrica, e é o tipo de coisa que fica anos no
               ar sem ninguém lembrar. Se nunca foi trocada, a tela diz. */}
-          {!a.senhaPropria && (
+          {!a.senhaPropria && !a.fechado && (
             <div style={{ fontSize: 12, color: C.amber, fontWeight: 700, marginTop: 8, lineHeight: 1.45 }}>
               Ainda está com a senha de fábrica. Vale trocar.
+            </div>
+          )}
+          {a.podeFechar && (
+            <div style={{ fontSize: 12, color: a.fechado ? C.faint : C.green, fontWeight: 800, marginTop: 8, lineHeight: 1.45 }}>
+              {a.fechado ? 'Fechado: ninguém entra por aqui. Cria uma senha quando tiver extra trabalhando.' : 'Aberto: quem tem a senha entra pelo botão "Extra".'}
             </div>
           )}
 
           {trocando === a.papel ? (
             <div style={{ marginTop: 12 }}>
               <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 6, lineHeight: 1.45 }}>
-                Senha nova de {a.nome} (pelo menos 4 caracteres). Quem estiver logado agora será desconectado.
+                {a.fechado
+                  ? <>Cria a senha do extra de hoje (pelo menos 4 caracteres). É ela que tu passa pra ele.</>
+                  : <>Senha nova de {a.nome} (pelo menos 4 caracteres). Quem estiver logado agora será desconectado.</>}
               </div>
               <input
                 type="text" value={nova} onChange={(e) => setNova(e.target.value)} placeholder="senha nova"
@@ -119,16 +136,24 @@ export default function Acessos() {
                 style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 9, padding: '10px 12px', fontSize: 15, width: '100%', boxSizing: 'border-box' }}
               />
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <Btn small onClick={() => salvarSenha(a)} disabled={busy === a.papel}>{busy === a.papel ? 'Salvando…' : 'Salvar e desconectar'}</Btn>
+                <Btn small onClick={() => salvarSenha(a)} disabled={busy === a.papel}>{busy === a.papel ? 'Salvando…' : a.fechado ? 'Abrir o acesso' : 'Salvar e desconectar'}</Btn>
                 <Btn small kind="ghost" onClick={() => { setTrocando(''); setNova(''); }}>Cancelar</Btn>
               </div>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-              <Btn small onClick={() => { setTrocando(a.papel); setNova(''); setMsg(''); }}>Trocar a senha</Btn>
-              <Btn small kind="ghost" onClick={() => desconectar(a)} disabled={busy === a.papel}>
-                {busy === a.papel ? 'Desconectando…' : 'Só desconectar os aparelhos'}
-              </Btn>
+              <Btn small onClick={() => { setTrocando(a.papel); setNova(''); setMsg(''); }}>{a.fechado ? 'Criar a senha e abrir' : 'Trocar a senha'}</Btn>
+              {/* Acesso fechado não tem aparelho dentro pra desconectar. */}
+              {!a.fechado && !a.podeFechar && (
+                <Btn small kind="ghost" onClick={() => desconectar(a)} disabled={busy === a.papel}>
+                  {busy === a.papel ? 'Desconectando…' : 'Só desconectar os aparelhos'}
+                </Btn>
+              )}
+              {a.podeFechar && !a.fechado && (
+                <Btn small kind="danger" onClick={() => fechar(a)} disabled={busy === a.papel}>
+                  {busy === a.papel ? 'Fechando…' : 'Fechar o acesso'}
+                </Btn>
+              )}
             </div>
           )}
         </Card>

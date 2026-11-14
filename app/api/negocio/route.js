@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { bancoDo, nomeDeNegocioValido } from '../../../lib/banco';
 import { lerNegocio, papeisParaLogin, PADRAO } from '../../../lib/negocio';
 import { lerNegocios } from '../../../lib/negocios';
+import { acessoFechado } from '../../../lib/senha';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,10 @@ export async function GET() {
   try {
     const muitos = Object.keys(await lerNegocios()).length > 0;
     if (muitos) {
-      return NextResponse.json({ ok: true, multi: true, nome: '', papeis: papeisParaLogin(PADRAO) });
+      // No app de muitos o botão "Extra" aparece sempre: aqui não se sabe de
+      // que negócio é a pessoa, e dizer "este tem extra, aquele não" seria
+      // contar coisa de cliente pra quem ainda não provou nada.
+      return NextResponse.json({ ok: true, multi: true, nome: '', papeis: [...papeisParaLogin(PADRAO), ['extra', 'Extra']] });
     }
     // Instalação de um cliente só: o negócio é o da configuração do site. Isto
     // acontece ANTES de existir login, então não há crachá de onde tirar o nome.
@@ -39,7 +43,14 @@ export async function GET() {
     const sb = bancoDo(unico);
     const { data } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
     const n = lerNegocio(data?.valor || {});
-    return NextResponse.json({ ok: true, nome: n.nome, papeis: papeisParaLogin(n) });
+    // O BOTÃO "EXTRA" SÓ EXISTE ENQUANTO A PORTA ESTÁ ABERTA.
+    //
+    // Na maior parte dos dias não tem extra nenhum trabalhando. Um botão que
+    // não leva a lugar nenhum na tela de entrada é o tipo de coisa que a equipe
+    // toca sem querer e depois pergunta por que a senha não funciona.
+    const papeis = papeisParaLogin(n);
+    if (!(await acessoFechado(sb, 'extra'))) papeis.push(['extra', 'Extra']);
+    return NextResponse.json({ ok: true, nome: n.nome, papeis });
   } catch {
     // Falhou? A tela de entrada usa os nomes genéricos e continua funcionando.
     // Ninguém fica sem conseguir entrar por causa de um rótulo.
