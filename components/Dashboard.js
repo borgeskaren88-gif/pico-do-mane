@@ -26,7 +26,7 @@ import ListaCompras from './ListaCompras';
 import Lancamentos from './Lancamentos';
 import Compras from './Compras';
 import ContasPagar from './ContasPagar';
-import Garrafas from './Garrafas';
+import ControleDoses from './ControleDoses';
 import Cotacoes from './Cotacoes';
 import Relatorios from './Relatorios';
 import TetoMEI from './TetoMEI';
@@ -189,6 +189,7 @@ export default function Dashboard() {
   // do saldo que atravessa os meses (lib/saldo.js). Lista curta, uma por vez
   // que ela confere — mora no painel junto com as outras listas pequenas.
   const [conferenciasCaixa, setConferenciasCaixa] = useState([]);
+  const [controleDoses, setControleDoses] = useState(null);   // contagens de garrafa (lib/controleDoses.js)
   // O nome do negócio e os nomes dos acessos. Cada um põe o seu — por isso
   // nada disso fica escrito no código.
   const [negocio, setNegocio] = useState(null);
@@ -301,6 +302,7 @@ export default function Dashboard() {
       setListasModelo(arr(salvo && salvo.listasModelo));
       setMetas((salvo && typeof salvo.metas === 'object' && salvo.metas) || null);
       setConferenciasCaixa(arr(salvo && salvo.conferenciasCaixa));
+      setControleDoses((salvo && typeof salvo.controleDoses === 'object' && salvo.controleDoses) || null);
       setNegocio(lerNegocio(salvo || {}));
       // NA PRIMEIRA ABERTURA, a configuração é a do seed — que é justamente o
       // que acabou de ser gravado. Lendo de `salvo` (vazio), a tela abria com o
@@ -460,6 +462,7 @@ export default function Dashboard() {
     fritadeira: (v) => { setFritadeira(v); salvarTudo({ fritadeira: v }); },
     metas: (v) => { setMetas(v); salvarTudo({ metas: v }); },
     conferenciasCaixa: (v) => { setConferenciasCaixa(v); salvarTudo({ conferenciasCaixa: v }); },
+    controleDoses: (v) => { setControleDoses(v); salvarTudo({ controleDoses: v }); },
     negocio: (v) => { setNegocio(v); salvarTudo({ negocio: v }); },
     modulos: (v) => { setModulos(v); salvarTudo({ modulos: v }); },
     clientes: (v) => { setClientes(v); salvarTudo({ clientes: v }); },
@@ -1157,7 +1160,7 @@ export default function Dashboard() {
             senhasDeFabrica={senhasDeFabrica}
           />
         )}
-        {tab === 'garrafas' && <Garrafas dados={garrafas} onChange={upd.garrafas} onRepor={reporLista} />}
+        {tab === 'garrafas' && <ControleDoses estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} compras={compras} controle={controleDoses} onControle={upd.controleDoses} onAcao={estoqueAcao} onRepor={reporLista} antigas={garrafas} />}
         {tab === 'salao' && (
           <>
             <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 2, gap: 2, marginBottom: 14 }}>
