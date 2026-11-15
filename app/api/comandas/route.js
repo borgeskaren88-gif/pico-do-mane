@@ -5,6 +5,7 @@ import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
 import { num, limparNome, fiadoDaVenda, abertoDaVenda, brl, diaOperacional } from '../../../lib/util';
 import { precoAgora, promoValeAgora } from '../../../lib/promocao';
+import { fiadoEmAberto, situacaoFiado } from '../../../lib/clientes';
 import { enviarPush, notificarEstoqueCritico, notificarComandaFechada, notificarSaidaSemVenda } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -307,14 +308,14 @@ async function fecharComanda(sb, c, body, p) {
       // o mesmo aqui e na tela onde ela digitou.
       const numBR = (s) => num(s);
       const fmt = (n) => 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
-      const fiadoDe = (v) => { const base = v.fiado != null ? (Number(v.fiado) || 0) : (v.pagamento === 'Fiado' ? (Number(v.total) || 0) : 0); return Math.max(0, base - (Number(v.abatido) || 0)); };
       const blob = await lerPainel(sb);
       const clientes = Array.isArray(blob.clientes) ? blob.clientes : [];
       const cli = clientes.find((x) => norm(x.nome) === norm(nomeCli) && x.bloquear && numBR(x.limite) > 0);
       if (cli) {
         const limite = numBR(cli.limite);
         const { data: vrows } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
-        const abertoAtual = (vrows || []).map((r) => r.valor).filter((v) => v && !v.pago && norm(v.nome) === norm(nomeCli)).reduce((s, v) => s + fiadoDe(v), 0);
+        // A mesma conta que a tela usa pra dizer "ainda pode fiar tanto".
+        const abertoAtual = fiadoEmAberto((vrows || []).map((r) => r.valor), nomeCli);
         if (abertoAtual + fiado > limite + 0.005) {
           return { falhou: true, bloqueado: true, erro: `${cli.nome} atingiu o limite de fiado (${fmt(limite)}). Em aberto: ${fmt(abertoAtual)}. Não dá pra fiar mais ${fmt(fiado)}.`, status: 400 };
         }
@@ -443,6 +444,23 @@ export async function GET(request) {
         .sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0))
         .slice(0, 20);
       return NextResponse.json({ ok: true, cortesias: lista, podeDesfazer: papel() === 'dona' });
+    }
+
+    // O FIADO DE QUEM ESTÁ NA COMANDA — perguntado SÓ quando a tela precisa.
+    //
+    // Isto lê todas as vendas, e a tela das mesas se atualiza sozinha a cada
+    // poucos segundos. Se viesse junto na volta normal, o app releria o
+    // histórico inteiro de vendas dezenas de vezes por minuto pra mostrar um
+    // número que só muda quando alguém paga. Então é uma pergunta à parte,
+    // feita quando o nome é escrito ou a comanda é aberta.
+    const nomeFiadoPedido = new URL(request.url).searchParams.get('fiadoDe');
+    if (nomeFiadoPedido != null) {
+      const nomePedido = txt(nomeFiadoPedido, 60);
+      if (!nomePedido) return NextResponse.json({ ok: true, fiado: null });
+      const blobF = await lerPainel(sb);
+      const { data: vf, error: errF } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
+      if (errF) throw errF;
+      return NextResponse.json({ ok: true, fiado: situacaoFiado(nomePedido, arr(blobF.clientes), (vf || []).map((r) => r.valor)) });
     }
 
     if (new URL(request.url).searchParams.get('leve')) {
