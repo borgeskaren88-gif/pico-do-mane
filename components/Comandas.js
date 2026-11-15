@@ -510,6 +510,31 @@ export default function Comandas({ papel = 'dona' }) {
     if (!sel) { infoDe.current = null; }
   }, [sel]);
 
+  // O FIADO DE QUEM ESTÁ NA MESA, na hora em que o nome é escrito.
+  //
+  // Pergunta pelo nome JÁ SALVO na comanda (ele é gravado sozinho pouco depois
+  // de parar de digitar), e não a cada letra: "Ta", "Tam", "Tama" seriam três
+  // leituras do histórico inteiro de vendas pra nada.
+  //
+  // A resposta guarda de que comanda e de que nome ela é. Sem isso, trocar de
+  // mesa rápido mostraria por um instante a dívida da Tamara na mesa do João.
+  const nomeSalvo = sel ? String(sel.nome || '').trim() : '';
+  const [fiadoInfo, setFiadoInfo] = useState(null);
+  useEffect(() => {
+    if (!selId || !nomeSalvo) { setFiadoInfo(null); return undefined; }
+    const chave = `${selId}|${nomeSalvo}`;
+    let vivo = true;
+    (async () => {
+      try {
+        const r = await fetch(`/api/comandas?fiadoDe=${encodeURIComponent(nomeSalvo)}`, { cache: 'no-store' });
+        const j = await r.json();
+        if (vivo) setFiadoInfo({ chave, dados: j && j.ok ? j.fiado : null });
+      } catch { if (vivo) setFiadoInfo(null); }
+    })();
+    return () => { vivo = false; };
+  }, [selId, nomeSalvo]);
+  const fiadoDaMesa = fiadoInfo && fiadoInfo.chave === `${selId}|${nomeSalvo}` ? fiadoInfo.dados : null;
+
   // Salvar infos NUNCA muda a mesa selecionada (manterSel:false), pra um save
   // atrasado (do nome) não jogar a garçom de volta pra uma mesa antiga.
   const salvarInfos = (parcial) => acao({ acao: 'infos', comandaId: selId, ...parcial }, { manterSel: false });
@@ -740,6 +765,39 @@ export default function Comandas({ papel = 'dona' }) {
               </div>
             </Field>
           </div>
+
+          {/* QUANTO ELA AINDA PODE FIAR — aqui, e não só no fechamento.
+              Antes o limite só aparecia como um erro na hora de fechar a
+              conta, com a noite já consumida e o cliente olhando. */}
+          {fiadoDaMesa && (() => {
+            const f = fiadoDaMesa;
+            const conta = contaDe(sel).total;
+            const cor = f.estado === 'estourou' ? C.red : f.estado === 'semLimite' ? C.amber : C.green;
+            // Esta conta, sozinha, já passa do que cabe no fiado?
+            const passa = f.estado === 'livre' && conta > f.disponivel + 0.005 ? Math.round((conta - f.disponivel) * 100) / 100 : 0;
+            return (
+              <div data-fiado={f.estado} style={{ borderLeft: `4px solid ${passa ? C.amber : cor}`, background: `color-mix(in srgb, ${passa ? C.amber : cor} 10%, transparent)`, borderRadius: 8, padding: '9px 12px', marginBottom: 12 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, lineHeight: 1.45 }}>
+                  {f.estado === 'livre' && <><b>{f.cliente}</b> ainda pode fiar <span style={{ color: C.green }}>{brl(f.disponivel)}</span>.</>}
+                  {f.estado === 'estourou' && <><b>{f.cliente}</b> <span style={{ color: C.red }}>já atingiu o limite de fiado</span>.</>}
+                  {f.estado === 'semLimite' && <><b>{f.cliente}</b> tem <span style={{ color: C.amber }}>{brl(f.aberto)}</span> em aberto no fiado.</>}
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginTop: 2 }}>
+                  {f.estado === 'semLimite'
+                    ? 'Essa conta não tem limite definido.'
+                    : <>Limite {brl(f.limite)} · em aberto {brl(f.aberto)}</>}
+                  {f.estado === 'estourou' && (f.bloquear
+                    ? ' · no fiado esta conta não fecha.'
+                    : ' · o bloqueio está desligado, então o app ainda deixa fechar no fiado.')}
+                </div>
+                {passa > 0 && (
+                  <div style={{ fontSize: 12.5, color: C.amber, fontWeight: 700, lineHeight: 1.45, marginTop: 4 }}>
+                    Esta conta já está em {brl(conta)}: são {brl(passa)} a mais do que cabe no fiado dessa pessoa.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <Field label="Observação (opcional)"><TextInput value={info.obs} onChange={(v) => setInfo((s) => ({ ...s, obs: v }))} onBlur={() => salvarInfos({ obs: info.obs })} placeholder="Ex.: sem cebola, cliente com pressa…" /></Field>
         </Card>
 
