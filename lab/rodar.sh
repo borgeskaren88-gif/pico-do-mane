@@ -20,7 +20,12 @@ AQUI=$(dirname "$0")
 # e uma classe inteira de susto a menos.
 pkill -f "[n]ext-server" >/dev/null 2>&1
 sleep 1
-( cd "$AQUI/.." && SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_ROLE_KEY=chave-de-mentira \
+# UM TESTE PODE PEDIR UMA VARIÁVEL A MAIS, escrevendo no próprio arquivo uma
+# linha "// LAB_ENV: NOME=valor". O Darci só aparece na tela quando existe uma
+# chave de IA no servidor; o teste dele pede uma chave de mentira aqui. Ligar
+# isso pra todos os testes mudaria a tela de todos — então é só pra quem pede.
+EXTRA=$(grep -h "^// LAB_ENV: " "$@" 2>/dev/null | sed 's#^// LAB_ENV: ##' | tr '\n' ' ')
+( cd "$AQUI/.." && env $EXTRA SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_ROLE_KEY=chave-de-mentira \
   APP_PASSWORD=Teste@123 SESSION_SECRET=um-texto-longo-e-aleatorio-so-pra-teste \
   NEGOCIO_UNICO=pico-do-mane nohup npx next start -p 3100 > "lab/app.log" 2>&1 & )
 sleep 6

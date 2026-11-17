@@ -4,6 +4,7 @@ import { C, Card, KPI, Empty, PageTitle, Select } from './ui';
 import { brl, num, ymOf, todayISO, mesLabel, FONTES_NAO_OPERACIONAL, DESPESA_NAO_OPERACIONAL } from '../lib/util';
 import { custoDaFicha, custoDosSabores } from '../lib/estoque';
 import { cmvDoMes, lerCMV, estoqueNoMes } from '../lib/cmv';
+import { saiuSemVender } from '../lib/fechamento';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
@@ -58,22 +59,8 @@ export default function RaioX({ receitas = [], despesas = [], cardapio = [], fic
 
   // Saiu sem vender (custo): perdas/desperdício, cortesias, consumo da casa,
   // a partir dos movimentos de saída do estoque no mês.
-  const outfl = useMemo(() => {
-    const cat = { perda: 0, cortesia: 0, consumo: 0 };
-    for (const it of estoque) {
-      const custo = num(it.custo);
-      if (!(custo > 0)) continue;
-      for (const mv of (it.movimentos || [])) {
-        if (mv.tipo !== 'saida' || ymOf(mv.data) !== mes) continue;
-        const m = norm(mv.motivo);
-        const val = num(mv.qtd) * custo;
-        if (m.includes('desperd') || m.includes('vencid') || m.includes('perda') || m.includes('quebra')) cat.perda += val;
-        else if (m.includes('cortesia')) cat.cortesia += val;
-        else if (m.includes('consumo')) cat.consumo += val;
-      }
-    }
-    return { perda: Math.round(cat.perda * 100) / 100, cortesia: Math.round(cat.cortesia * 100) / 100, consumo: Math.round(cat.consumo * 100) / 100 };
-  }, [estoque, mes]);
+  // A mesma conta que a tela de Cortesia / Consumo mostra no topo.
+  const outfl = useMemo(() => saiuSemVender(estoque, { mes }).mes, [estoque, mes]);
 
   // Pontos de atenção (o que fazer).
   const alertas = [];

@@ -150,6 +150,18 @@ cobra('não mexe nos acessos', (await pedir(extra, '/api/acessos')).status === 4
 cobra('nem abre a própria porta de novo', (await pedir(extra, '/api/acessos', { acao: 'senha', papel: 'extra', nova: 'outra1234' })).status === 401);
 
 // ---------------------------------------------------------------------------
+console.log('\n### COM O PONTO BATIDO, ELE ABRE O CAIXA');
+// A regra é a do atendimento: só abre o caixa quem bateu o ponto. O turno do
+// extra sai carimbado 'extra' — e a regra antiga só aceitava 'garcom', então
+// ele batia o ponto e continuava barrado.
+const semPonto = await pedir(extra, '/api/caixa', { acao: 'abrir', saldoInicial: '50' });
+cobra('sem bater o ponto, não abre o caixa', semPonto.status === 400 && semPonto.j?.semPonto === true, JSON.stringify(semPonto.j).slice(0, 120));
+await pedir(extra, '/api/ponto', { acao: 'entrada', nome: 'Zé' });
+const comPonto = await pedir(extra, '/api/caixa', { acao: 'abrir', saldoInicial: '50' });
+cobra('batido o ponto, abre', comPonto.status === 200 && comPonto.j?.ok === true, JSON.stringify(comPonto.j).slice(0, 120));
+await pedir(extra, '/api/ponto', { acao: 'saida', nome: 'Zé' });
+
+// ---------------------------------------------------------------------------
 console.log('\n### O PONTO DELE É DELE');
 const fixo = await novo();
 await entrarPelaTela(fixo, 'Atendimento', '1234');
@@ -160,12 +172,12 @@ const pExtra = await pedir(extra, '/api/ponto', { acao: 'entrada', nome: 'João'
 cobra('o João extra bateu o dele — carimbado extra', pExtra.status === 200 && pExtra.j.registro?.papel === 'extra', JSON.stringify(pExtra.j.registro || pExtra.j).slice(0, 120));
 // Com o mesmo nome, o app respondia "esse já está com o ponto aberto".
 cobra('e NÃO foi confundido com o João fixo', !pExtra.j.jaAberto && pExtra.j.registro?.id !== pFixo.j.registro?.id, `jaAberto=${pExtra.j.jaAberto}`);
-const noBanco = await pontos();
-cobra('são dois turnos no banco, um de cada', noBanco.length === 2 && noBanco.map((x) => x.papel).sort().join(',') === 'extra,garcom', noBanco.map((x) => x.papel).join(','));
+const noBanco = (await pontos()).filter((x) => x.nome === 'João');
+cobra('são dois turnos de João no banco, um de cada', noBanco.length === 2 && noBanco.map((x) => x.papel).sort().join(',') === 'extra,garcom', noBanco.map((x) => x.papel).join(','));
 const veFixo = (await pedir(fixo, '/api/ponto')).j.registros || [];
 const veExtra = (await pedir(extra, '/api/ponto')).j.registros || [];
 cobra('o atendimento fixo não enxerga o ponto do extra', veFixo.length === 1 && veFixo[0].papel === 'garcom', veFixo.map((x) => x.papel).join(','));
-cobra('e o extra não enxerga o ponto da equipe fixa', veExtra.length === 1 && veExtra[0].papel === 'extra', veExtra.map((x) => x.papel).join(','));
+cobra('e o extra não enxerga o ponto da equipe fixa', veExtra.length >= 1 && veExtra.every((x) => x.papel === 'extra'), veExtra.map((x) => x.papel).join(','));
 const sai = await pedir(extra, '/api/ponto', { acao: 'saida', nome: 'João' });
 cobra('a saída do extra fecha o turno DELE', sai.status === 200 && sai.j.registro?.papel === 'extra' && !!sai.j.registro?.saida, JSON.stringify(sai.j.registro || sai.j).slice(0, 120));
 cobra('e o do João fixo continua aberto', (await pontos()).some((x) => x.papel === 'garcom' && !x.saida), JSON.stringify((await pontos()).map((x) => [x.papel, !!x.saida])));

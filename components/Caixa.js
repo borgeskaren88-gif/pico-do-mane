@@ -60,7 +60,9 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
   };
   const abrir = async () => { const j = await acao({ acao: 'abrir', saldoInicial: saldoInput }); if (j) setSaldoInput(''); };
   const fechar = async () => {
-    if (typeof window !== 'undefined' && !window.confirm('Fechar o caixa do turno? Isso encerra o caixa atual.')) return;
+    // Sem a janela de "tem certeza?": já são dois toques pra chegar aqui
+    // (abrir o cartão e confirmar nele). O terceiro só ensinava a tocar em OK
+    // sem ler.
     // Viajam só as CONTAGENS. Quem cruza com vendas, fichas e estoque é o
     // servidor — assim a conferência acontece mesmo quando quem fecha o caixa
     // é o atendimento, que era o caso real e por isso não aparecia nada.
@@ -201,12 +203,27 @@ export default function Caixa({ papel = 'dona', receitas = null, onReceitas = nu
             <Btn kind="danger" onClick={() => setFechando(true)}>Fechar caixa</Btn>
           ) : (
             <Card style={{ padding: 14, borderColor: C.amber }}>
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Fechar caixa</div>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Confira: o esperado na gaveta é <b style={{ color: C.green }}>{brl(dados.dinheiroFinal)}</b>. Conte o dinheiro (opcional) pra ver se bate.</div>
-              <Field label="Dinheiro contado na gaveta (R$) — opcional"><NumInput value={contado} onChange={setContado} /></Field>
+              {/* FECHAR EM DOIS PASSOS CURTOS: o dinheiro, e três coisas na
+                  prateleira. Os dois continuam podendo ser pulados — fechar o
+                  caixa não pode travar por causa de uma contagem — mas agora
+                  cada um leva segundos e diz na hora no que deu. */}
+              <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>Fechar o caixa</div>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 2 }}>1. Conta o dinheiro da gaveta</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>Era pra ter <b style={{ color: C.green }}>{brl(dados.dinheiroFinal)}</b>.</div>
+              <NumInput value={contado} onChange={setContado} placeholder="quanto tem" />
+              {String(contado).trim() !== '' && (() => {
+                const dif = Math.round((num(contado) - (Number(dados.dinheiroFinal) || 0)) * 100) / 100;
+                const cor = Math.abs(dif) < 0.005 ? C.green : dif < 0 ? C.red : C.amber;
+                return (
+                  <div data-gaveta={Math.abs(dif) < 0.005 ? 'bateu' : dif < 0 ? 'falta' : 'sobra'} style={{ fontSize: 13.5, fontWeight: 800, color: cor, marginTop: 6 }}>
+                    {Math.abs(dif) < 0.005 ? 'Bateu certinho.' : dif < 0 ? `Faltam ${brl(-dif)} na gaveta.` : `Sobram ${brl(dif)} na gaveta.`}
+                  </div>
+                );
+              })()}
+              <div style={{ height: 14 }} />
               <ContarNoFechamento itens={dados.paraContar || []} contagens={contagens} onContagens={setContagens} />
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                <Btn kind="danger" onClick={fechar} disabled={busy}>Confirmar fechamento</Btn>
+                <Btn kind="danger" onClick={fechar} disabled={busy}>{busy ? 'Fechando…' : 'Fechar o caixa'}</Btn>
                 <Btn kind="ghost" onClick={() => { setFechando(false); setContado(''); }}>Voltar</Btn>
               </div>
             </Card>
