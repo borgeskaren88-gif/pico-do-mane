@@ -1116,7 +1116,7 @@ export default function Dashboard() {
                   <ConferirVendas compras={compras} vendas={vendas} fichas={fichas} estoque={estoque} cardapio={cardapio} />
                   <ConferenciaEstoque estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} onAcao={estoqueAcao} carregado={estCarregado} />
                 </>)}
-                {subEstoque === 'cortesia' && <CortesiaConsumo onFeito={() => carregarEstoque({})} />}
+                {subEstoque === 'cortesia' && <CortesiaConsumo estoque={estoque} onFeito={() => carregarEstoque({})} />}
               </>
             )}
 

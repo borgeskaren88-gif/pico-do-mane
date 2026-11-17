@@ -4,7 +4,7 @@ import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { notificarCaixa, notificarConferencia } from '../../../lib/push';
 import { diaOperacional, num } from '../../../lib/util';
-import { conferirFechamento, movimentoDoDia } from '../../../lib/fechamento';
+import { conferirFechamento, movimentoDoDia, ehContavel } from '../../../lib/fechamento';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,20 +21,32 @@ function papel() {
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 // Aceita número ou texto em formato brasileiro ("1.234,50") e arredonda em 2 casas.
-// Os produtos que vale a pena contar no fechamento: os que mexeram hoje, do
-// que girou mais valor pro que girou menos.
+// O QUE CONTAR NO FECHAMENTO: TRÊS COISAS, E SÓ AS QUE SE CONTA COM O OLHO.
+//
+// "Toda vez que fecho o caixa estou ignorando essa conferência."
+//
+// Ela ignorava porque a lista trazia até DOZE itens, tudo que tinha mexido no
+// dia — inclusive camarão em quilo e farinha, que ninguém pesa à uma da manhã.
+// Conferência que ninguém faz vale exatamente zero, por mais completa que
+// seja. Três garrafas contadas toda noite valem mais que doze itens pulados.
+//
+// Então são os 3 que mais giraram dinheiro hoje, entre os que vêm em unidade
+// (long neck, lata, garrafa). Sempre pelo mesmo critério, de propósito: contar
+// os mesmos campeões noite após noite é o que deixa aparecer o padrão — "essa
+// cerveja falta toda sexta" só se vê em quem é contado toda sexta.
 //
 // Vai com NOME e UNIDADE só, pra qualquer um que esteja fechando. Quem vê "o
 // sistema diz 6" digita 6 — não por má fé, é o que a cabeça faz com um número
 // pronto na frente. E como tem noite que quem fecha é a dona e tem noite que é
 // o atendimento, a tela tem que ser a mesma nas duas, senão as noites não são
 // comparáveis entre si.
-async function itensParaContar(sb, limite = 12) {
+const QUANTOS_CONTAR = 3;
+async function itensParaContar(sb, limite = QUANTOS_CONTAR) {
   const { data } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
   const blob = (data?.valor && typeof data.valor === 'object') ? data.valor : {};
   const hoje = diaOperacional();
   return arr(blob.estoque)
-    .filter((it) => it && it.id)
+    .filter((it) => it && it.id && ehContavel(it))
     .map((it) => {
       const m = movimentoDoDia(it, hoje);
       const girou = m.venda + m.entrou + m.perda + m.cortesia + m.consumo + m.outras;
@@ -257,7 +269,12 @@ export async function POST(request) {
       // aberta). A dona abre livremente.
       if (p === 'garcom') {
         const { data: prows } = await sb.from('pdm_dados').select('valor').like('chave', 'ponto:%');
-        const temPontoAberto = (prows || []).map((r) => r.valor).some((v) => v && !v.saida && (!v.papel || v.papel === 'garcom'));
+        // O ponto do EXTRA também vale. O turno dele sai carimbado 'extra' pra
+        // não se misturar com a equipe fixa — e por isso esta regra, que só
+        // olhava 'garcom', deixava o extra de fora: ele batia o ponto e o app
+        // respondia "bata seu ponto". Quem está no salão com o ponto aberto
+        // pode abrir o caixa, fixo ou não.
+        const temPontoAberto = (prows || []).map((r) => r.valor).some((v) => v && !v.saida && (!v.papel || v.papel === 'garcom' || v.papel === 'extra'));
         if (!temPontoAberto) return NextResponse.json({ ok: false, semPonto: true, erro: 'Bata seu ponto (Entrada) antes de abrir o caixa.' }, { status: 400 });
       }
       const saldoInicial = n2(body?.saldoInicial);

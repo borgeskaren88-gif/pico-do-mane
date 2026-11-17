@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { C, Card, Btn, KPI, Field, TextInput, NumInput, Select, Empty, SecTitle, PageTitle } from './ui';
-import { brl, num, totalCompra, todayISO, fmtDate, addDays, daysBetween, uid, limparNome, montarParcelas, agruparContasAbertas, CATEGORIAS_PRODUTO, JUROS_ATRASO } from '../lib/util';
+import { brl, num, totalCompra, todayISO, fmtDate, addDays, daysBetween, uid, limparNome, montarParcelas, agruparContasAbertas, CATEGORIAS_PRODUTO, JUROS_ATRASO, ymOf, mesLabel } from '../lib/util';
 import CalendarioFluxo from './CalendarioFluxo';
 
 const formVazio = () => ({ fornecedor: '', descricao: '', categoria: '', valorTotal: '', parcelas: '1' });
@@ -188,6 +188,16 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
     return [...map.values()].sort((a, b) => (b.dataPagamento || '').localeCompare(a.dataPagamento || ''));
   }, [dados]);
 
+  // Os juros saem das despesas na categoria de juros — as mesmas que o
+  // pagamento de boleto atrasado cria. Nada é somado de novo por fora.
+  const mesHoje = ymOf(todayISO());
+  const somaJuros = (filtro) => {
+    const l = (despesas || []).filter((d) => d && d.categoria === JUROS_ATRASO && filtro(String(d.data || '')));
+    return { total: Math.round(l.reduce((s, d) => s + num(d.valor), 0) * 100) / 100, n: l.length };
+  };
+  const jurosMes = somaJuros((d) => d.slice(0, 7) === mesHoje);
+  const jurosAno = somaJuros((d) => d.slice(0, 4) === mesHoje.slice(0, 4));
+
   return (
     <div>
       <PageTitle sub="Boletos e contas em aberto">Contas a Pagar</PageTitle>
@@ -195,6 +205,25 @@ export default function ContasPagar({ dados, onChange, despesas = [], onPagament
         <KPI titulo="Total em aberto" valor={brl(total)} cor={C.red} sub={`${grupos.length} conta(s)`} />
         <KPI titulo="Vencidas" valor={brl(totalVenc)} cor={vencidasGrupos.length ? C.red : C.faint} sub={`${vencidasGrupos.length} vencida(s)`} />
       </div>
+
+      {/* OS JUROS DO MÊS, À VISTA.
+          "Quero também ter bem claro o tanto de juros gasto no mês."
+          O juro de boleto atrasado é o gasto mais evitável do bar, e ele se
+          escondia: cada um virava uma linha no meio das despesas. Aqui ele é
+          um número só, na tela onde se decide o que pagar primeiro. */}
+      <Card data-placar="juros" style={{ marginBottom: 14, borderColor: jurosMes.total > 0 ? C.red : C.line }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11.5, color: C.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Juros e multas em {mesLabel(mesHoje)}</div>
+            <div style={{ fontSize: 12, color: C.faint, marginTop: 3, lineHeight: 1.45 }}>
+              {jurosMes.total > 0
+                ? <>em {jurosMes.n} {jurosMes.n === 1 ? 'boleto pago atrasado' : 'boletos pagos atrasados'}{jurosAno.total > jurosMes.total + 0.005 ? <> · no ano: <b style={{ color: C.muted }}>{brl(jurosAno.total)}</b></> : null}</>
+                : <>Nenhum juro pago neste mês.{jurosAno.total > 0 ? <> No ano: <b style={{ color: C.muted }}>{brl(jurosAno.total)}</b>.</> : null}</>}
+            </div>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: jurosMes.total > 0 ? C.red : C.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{brl(jurosMes.total)}</div>
+        </div>
+      </Card>
 
       <CalendarioFluxo contas={abertas} />
 

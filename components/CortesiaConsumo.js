@@ -1,7 +1,8 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Empty, SecTitle } from './ui';
-import { num, fmtDate } from '../lib/util';
+import { num, fmtDate, brl, todayISO, ymOf, mesLabel, diaOperacional } from '../lib/util';
+import { saiuSemVender } from '../lib/fechamento';
 import QuemPegou from './QuemPegou';
 
 // Dar cortesia ou registrar consumo da casa de um PRODUTO do cardápio (ex.:
@@ -12,7 +13,12 @@ import QuemPegou from './QuemPegou';
 // resumo "Para onde foi o estoque", não pro de cortesia.
 const MOTIVOS = [['Cortesia', 'Cortesia'], ['Consumo da casa', 'Consumo da casa'], ['Perda', 'Perda / derrubou']];
 
-export default function CortesiaConsumo({ onFeito }) {
+export default function CortesiaConsumo({ onFeito, estoque = [] }) {
+  // O PLACAR. "Queria algo bem claro: quanto já foi gasto em cortesia, perda
+  // ou consumo. Tipo bati o olho, já sei." É a mesma conta do Raio-X, pelo
+  // mesmo caminho — as duas telas não podem dar números diferentes.
+  const mesAtual = ymOf(todayISO());
+  const placar = useMemo(() => saiuSemVender(estoque, { mes: mesAtual, hoje: diaOperacional() }), [estoque, mesAtual]);
   const [cardapio, setCardapio] = useState([]);
   const [carregado, setCarregado] = useState(false);
   const [busca, setBusca] = useState('');
@@ -89,8 +95,32 @@ export default function CortesiaConsumo({ onFeito }) {
     finally { setBusy(false); }
   };
 
+  const BALDES = [['cortesia', 'Cortesia', C.amber], ['consumo', 'Consumo da casa', C.amber], ['perda', 'Perda', C.red]];
+
   return (
     <div>
+      <Card data-placar="sem-vender" style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 11.5, color: C.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Saiu sem vender em {mesLabel(mesAtual)}</div>
+        <div style={{ fontSize: 30, fontWeight: 900, color: placar.mes.total > 0 ? C.red : C.green, fontVariantNumeric: 'tabular-nums', lineHeight: 1.15 }}>{brl(placar.mes.total)}</div>
+        <div style={{ fontSize: 12, color: C.faint, marginBottom: 10 }}>
+          a preço de custo · hoje: <b style={{ color: placar.hoje.total > 0 ? C.text : C.faint }}>{brl(placar.hoje.total)}</b>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          {BALDES.map(([k, rot, cor]) => (
+            <div key={k} data-balde={k} style={{ background: C.panel2, borderRadius: 10, padding: '9px 10px', minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rot}</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: placar.mes[k] > 0 ? cor : C.faint, fontVariantNumeric: 'tabular-nums' }}>{brl(placar.mes[k])}</div>
+              <div style={{ fontSize: 10.5, color: C.faint }}>{placar.mes.vezes[k]} {placar.mes.vezes[k] === 1 ? 'vez' : 'vezes'}</div>
+            </div>
+          ))}
+        </div>
+        {placar.semCusto > 0 && (
+          <div style={{ fontSize: 11.5, color: C.amber, lineHeight: 1.45, marginTop: 8 }}>
+            {placar.semCusto} {placar.semCusto === 1 ? 'saída ficou' : 'saídas ficaram'} de fora dessa soma porque o item não tem custo cadastrado no estoque.
+          </div>
+        )}
+      </Card>
+
       <Card style={{ marginBottom: 14, background: C.panel2 }}>
         <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Cortesia / Consumo da casa</div>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Deu um produto de graça (cortesia) ou a casa consumiu? Escolha o produto do cardápio (narguilé, drink…) e o sistema baixa os ingredientes da ficha sozinho. Não mexe no caixa nem no DRE.</div>

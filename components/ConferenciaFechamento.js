@@ -24,22 +24,26 @@ export function ContarNoFechamento({ itens = [], contagens = {}, onContagens }) 
 
   return (
     <div style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.06em', color: C.muted, fontWeight: 700, marginBottom: 6 }}>
-        Conferir o estoque (opcional)
+      {/* Era "Conferir o estoque (opcional)" com até doze linhas numa caixa de
+          rolar — e ela pulava toda noite. Agora são no máximo três, e o título
+          diz quanto custa fazer. */}
+      <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 2 }}>
+        2. {itens.length === 0 ? 'Nada pra contar hoje' : itens.length === 1 ? 'Conta só este' : `Conta só estes ${itens.length}`}
       </div>
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
-        Conta na prateleira e digita o que tem de verdade. Não mostro o que o sistema espera de propósito — se eu
-        mostrasse, a conta viria da tela e não da prateleira. O resultado aparece depois de fechar.
-      </div>
+      {itens.length > 0 && (
+        <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>
+          Meio minuto na prateleira. Não mostro quanto o sistema espera: a conta tem que vir da prateleira, não da tela.
+        </div>
+      )}
 
       {itens.length === 0 ? (
-        <Empty>Nada mexeu no estoque hoje.</Empty>
+        <div style={{ fontSize: 12, color: C.faint, marginBottom: 10 }}>Nenhuma garrafa, lata ou unidade saiu hoje.</div>
       ) : (
-        <div style={{ maxHeight: 250, overflowY: 'auto', margin: '0 -4px 10px', padding: '0 4px' }}>
+        <div style={{ marginBottom: 10 }}>
           {itens.map((it) => (
             <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', borderTop: `1px solid ${C.hair}` }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: C.text }}>{limparNome(it.nome)}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{limparNome(it.nome)}</div>
                 <div style={{ fontSize: 11, color: C.faint }}>em {it.unidade || 'un'}</div>
               </div>
               <div style={{ width: 110, flexShrink: 0 }}>

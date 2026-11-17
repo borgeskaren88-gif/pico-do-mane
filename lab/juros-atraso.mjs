@@ -100,7 +100,10 @@ const botaoDoCartao = (dono, rotulo) => pg.evaluate(([d, r]) => {
   return false;
 }, [dono, rotulo]);
 const escreverJuros = (v) => pg.evaluate((valor) => {
-  const lab = [...document.querySelectorAll('div')].find((x) => /^juros e multa/i.test((x.innerText || '').trim()));
+  // O RÓTULO EXATO DO CAMPO, e só ele (um elemento sem filhos). A tela agora
+  // tem também o cartão "Juros e multas em <mês>" lá em cima; procurar por
+  // "começa com juros e multa" achava o cartão e escrevia no campo errado.
+  const lab = [...document.querySelectorAll('div,label')].find((x) => x.children.length === 0 && /^juros e multa \(r\$\)$/i.test((x.textContent || '').trim()));
   const campo = lab && lab.parentElement ? lab.parentElement.querySelector('input') : null;
   if (!campo) return false;
   const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
