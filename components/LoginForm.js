@@ -28,7 +28,15 @@ export default function LoginForm() {
         const r = await fetch('/api/negocio', { cache: 'no-store' });
         const j = await r.json();
         if (!vivo || !j) return;
-        if (Array.isArray(j.papeis) && j.papeis.length) setPapeis(j.papeis);
+        if (Array.isArray(j.papeis) && j.papeis.length) {
+          setPapeis(j.papeis);
+          // Quem entrou por último neste aparelho já vem escolhido — se essa
+          // porta ainda existir (um acesso fechado some da lista).
+          try {
+            const ultimo = localStorage.getItem('picoos-ultimo-papel');
+            if (ultimo && j.papeis.some(([v]) => v === ultimo)) setPapel(ultimo);
+          } catch { /* ignora */ }
+        }
         if (j.nome) setNegocio(j.nome);
         if (j.multi) {
           setMulti(true);
@@ -67,6 +75,7 @@ export default function LoginForm() {
         // entrar — laço infinito, e ninguém entraria no notebook.
         try { sessionStorage.setItem('pdm_sessaoAtiva', '1'); } catch { /* ignora */ }
         if (multi) { try { localStorage.setItem('picoos-codigo', codigo.trim().toLowerCase()); } catch { /* ignora */ } }
+        try { localStorage.setItem('picoos-ultimo-papel', papel); } catch { /* ignora */ }
         router.refresh();
       } else {
         setErro(json.erro || 'Senha incorreta.');
@@ -105,14 +114,23 @@ export default function LoginForm() {
                 />
               </Field>
             )}
+            {/* UMA SETINHA, NÃO UM BOTÃO POR LOGIN.
+                "Tá ficando muito login, aí fica poluído." Com Dona, Cozinha,
+                Atendimento, Reservas, Gerente e Extra a grade virou um mural.
+                Agora é uma caixa só, que abre a lista ao tocar — no celular
+                vira a roleta do próprio aparelho. E o aparelho lembra quem
+                entrou da última vez: o notebook da Sarah já abre em "Gerente". */}
             <Field label="Quem está entrando?">
-              <div style={{ display: 'flex', flexWrap: 'wrap', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: 3, gap: 3 }}>
-                {papeis.map(([v, rot]) => (
-                  <button key={v} type="button" onClick={() => { setPapel(v); setErro(''); }} style={{
-                    flex: '1 1 45%', minWidth: 0, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '9px 6px', fontSize: 14, fontWeight: 700,
-                    background: papel === v ? C.accent : 'transparent', color: papel === v ? '#06101F' : C.muted,
-                  }}>{rot}</button>
-                ))}
+              <div style={{ position: 'relative' }}>
+                <select data-quem value={papel} onChange={(e) => { setPapel(e.target.value); setErro(''); }}
+                  aria-label="Quem está entrando?"
+                  style={{ ...inputStyle, appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', paddingRight: 40, fontWeight: 700, cursor: 'pointer' }}>
+                  {papeis.map(([v, rot]) => <option key={v} value={v} style={{ background: C.panel, color: C.text }}>{rot}</option>)}
+                </select>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none' }}>
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
               </div>
             </Field>
             <Field label="Senha">

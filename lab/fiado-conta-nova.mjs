@@ -61,7 +61,7 @@ const SENHA = { Dona: 'Teste@123', Atendimento: '1234' };
 const entrar = async (pg, quem) => {
   await pg.goto(BASE, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(1800);
-  await pg.locator(`button:text-is("${quem}")`).first().click();
+  await pg.locator('select[data-quem]').selectOption({ label: `${quem}` });
   await pg.locator('input[type="password"]').first().fill(SENHA[quem]);
   await pg.locator('button:has-text("Entrar")').first().click();
   await pg.waitForTimeout(3800);

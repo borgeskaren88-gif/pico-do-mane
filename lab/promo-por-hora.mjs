@@ -108,7 +108,7 @@ pg.on('console', (m) => { const x = m.text(); if (m.type() === 'error' && !/stat
 
 await pg.goto(BASE, { waitUntil: 'domcontentloaded' });
 await pg.waitForTimeout(1800);
-await pg.locator('button:text-is("Atendimento")').first().click();
+await pg.locator('select[data-quem]').selectOption({ label: 'Atendimento' });
 await pg.locator('input[type="password"]').first().fill('1234');
 await pg.locator('button:has-text("Entrar")').first().click();
 await pg.waitForTimeout(3800);
@@ -192,7 +192,7 @@ don.on('pageerror', (e) => { console.log('[pageerror dona]', e.message.slice(0, 
 don.on('dialog', (d) => d.accept());
 await don.goto(BASE, { waitUntil: 'domcontentloaded' });
 await don.waitForTimeout(1800);
-await don.locator('button:text-is("Karen")').first().click();
+await don.locator('select[data-quem]').selectOption({ label: 'Karen' });
 await don.locator('input[type="password"]').first().fill('Teste@123');
 await don.locator('button:has-text("Entrar")').first().click();
 await don.waitForTimeout(3800);

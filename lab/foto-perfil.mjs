@@ -67,7 +67,7 @@ const htmlLogin = await pg.content();
 cobra('nenhuma imagem embutida na tela de senha', !/data:image\/(png|jpeg|webp);base64/.test(htmlLogin));
 cobra('o nome do acesso continua lá', /Karen/.test(limpa(await pg.locator('body').innerText())));
 
-await pg.locator('button:text-is("Karen")').first().click();
+await pg.locator('select[data-quem]').selectOption({ label: 'Karen' });
 await pg.locator('input[type="password"]').first().fill('Teste@123');
 await pg.locator('button:has-text("Entrar")').first().click();
 await pg.waitForTimeout(3800);

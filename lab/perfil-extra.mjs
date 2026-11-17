@@ -48,7 +48,7 @@ const novo = async () => {
   return pg;
 };
 const entrarPelaTela = async (pg, botao, senha) => {
-  await pg.locator(`button:text-is("${botao}")`).first().click();
+  await pg.locator('select[data-quem]').selectOption({ label: `${botao}` });
   await pg.locator('input[type="password"]').first().fill(senha);
   await pg.locator('button:has-text("Entrar")').first().click();
   await pg.waitForTimeout(3800);

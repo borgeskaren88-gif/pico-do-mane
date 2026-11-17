@@ -75,7 +75,7 @@ pg.on('dialog', (d) => { janelas += 1; d.dismiss(); });
 
 await pg.goto(BASE, { waitUntil: 'domcontentloaded' });
 await pg.waitForTimeout(1800);
-await pg.locator('button:text-is("Karen")').first().click();
+await pg.locator('select[data-quem]').selectOption({ label: 'Karen' });
 await pg.locator('input[type="password"]').first().fill('Teste@123');
 await pg.locator('button:has-text("Entrar")').first().click();
 await pg.waitForTimeout(3800);
