@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { C, Card, Btn, Empty, QtdInput } from './ui';
 import { brl, limparNome } from '../lib/util';
-import { Garrafa, Passo, passo } from './ControleDoses';
+import { Garrafa, Passo, passo, veredito, SINAL, resumoContado } from './ControleDoses';
 import Acessos from './Acessos';
 import CalendarioTarefas from './CalendarioTarefas';
 import AvisoReservas from './AvisoReservas';
@@ -149,9 +149,9 @@ function Doses({ doses, onFeito }) {
 
   const frase = (r) => {
     const d = r.doses == null ? '' : `${String(r.doses).replace('.', ',')} ${plural(r.doses, 'dose', 'doses')}${r.doseNome ? ` de ${r.doseNome}` : ''}`;
-    if (r.estado === 'partida') return 'Primeira contagem: o estoque foi acertado. Da próxima eu comparo.';
-    if (r.estado === 'bateu') return 'Bateu. O que saiu passou pela comanda.';
-    if (r.estado === 'sobrou') return `Tem ${d} a mais do que devia. Avisa a dona: pode ser compra não lançada.`;
+    if (r.estado === 'partida') return 'Primeira vez que essa garrafa é contada: o estoque foi acertado. Da próxima vez eu comparo.';
+    if (r.estado === 'bateu') return 'O que saiu da garrafa passou pela comanda.';
+    if (r.estado === 'sobrou') return `Tem ${d} a mais do que eu esperava. Avisa a dona: pode ser compra não lançada.`;
     if (r.estado === 'pouco') return `Faltaram ${d}. Dentro do que mão pesada explica.`;
     return `Faltaram ${d}. É mais do que mão pesada explica — conta pra dona.`;
   };
@@ -173,6 +173,7 @@ function Doses({ doses, onFeito }) {
           {resultados.map((r, i) => (
             <div key={i} style={{ borderLeft: `4px solid ${COR[r.estado] || C.line}`, padding: '7px 11px', marginBottom: 6, background: C.panel2, borderRadius: 8 }}>
               <b style={{ fontSize: 13.5 }}>{limparNome(r.nome)}</b>
+              <div data-veredito={r.estado} style={{ fontSize: 13.5, fontWeight: 900, color: COR[r.estado] || C.text }}>{SINAL[r.estado] || ''} {veredito(r)}</div>
               <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>{frase(r)}</div>
             </div>
           ))}
@@ -196,7 +197,7 @@ function Doses({ doses, onFeito }) {
               <div style={{ maxWidth: 180 }}><QtdInput value={tamanho} onChange={setTamanho} placeholder={`${alvo.unidade} por embalagem`} /></div>
             </div>
           )}
-          <Passo valor={fechadas} onDelta={(d) => setFechadas((v) => passo(v, d))} rotulo="Quantas FECHADAS sobraram na prateleira?" />
+          <Passo valor={fechadas} onDelta={(d) => setFechadas((v) => passo(v, d))} rotulo="Quantas FECHADAS sobraram na prateleira?" dica="lacradas — a que acabou não conta" />
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <Btn disabled={busy} onClick={async () => {
               if (fechadas === '') { setErro('Diz quantas fechadas sobraram — pode ser zero.'); return; }
@@ -218,10 +219,13 @@ function Doses({ doses, onFeito }) {
                 {!it.embalagem ? (
                   <div style={{ fontSize: 12.5, color: C.amber, marginTop: 4 }}>Marca um "Acabou" dela uma vez, que lá eu pergunto o tamanho da embalagem.</div>
                 ) : (
-                  <div style={{ display: 'flex', gap: 20, alignItems: 'flex-end', marginTop: 8, flexWrap: 'wrap' }}>
-                    <Passo valor={c.cheias} onDelta={(d) => setSemana((m) => ({ ...m, [it.id]: { ...(m[it.id] || {}), cheias: passo((m[it.id] || {}).cheias, d) } }))} rotulo="Fechadas" />
-                    <Garrafa nivel={c.nivel == null ? null : c.nivel} onNivel={(n) => setSemana((m) => ({ ...m, [it.id]: { ...(m[it.id] || {}), nivel: n } }))} />
-                  </div>
+                  <>
+                    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', marginTop: 8, flexWrap: 'wrap' }}>
+                      <Passo valor={c.cheias} onDelta={(d) => setSemana((m) => ({ ...m, [it.id]: { ...(m[it.id] || {}), cheias: passo((m[it.id] || {}).cheias, d) } }))} rotulo="Garrafas FECHADAS" dica="lacradas, sem a aberta" />
+                      <Garrafa nivel={c.nivel == null ? null : c.nivel} onNivel={(n) => setSemana((m) => ({ ...m, [it.id]: { ...(m[it.id] || {}), nivel: n } }))} />
+                    </div>
+                    {resumoContado(c.cheias, c.nivel) && <div data-resumo style={{ fontSize: 12.5, fontWeight: 700, marginTop: 8 }}>= {resumoContado(c.cheias, c.nivel)}</div>}
+                  </>
                 )}
               </div>
             );

@@ -226,6 +226,7 @@ const res = (ds.j?.resultados || [])[0] || {};
 cobra('volta o veredito, sem custo, venda nem saldo esperado', res.estado === 'partida' && !('custo' in res) && !('venda' in res) && !('esperado' in res), JSON.stringify(res));
 const reg = (((await painel()).controleDoses || {}).registros || [])[0] || {};
 cobra('e a dona recebe o registro completo, marcado como da gerência', reg.por === 'gerente' && reg.estoqueId === 'hei' && 'custo' in reg, JSON.stringify({ por: reg.por, custo: reg.custo }));
+cobra('desfazer contagem é só com a dona', (await pedir(sarah, '/api/estoque', { acao: 'desfazerContagens' })).status === 403);
 cobra('o estoque foi acertado pro que ela contou', Number(((await painel()).estoque || []).find((x) => x.id === 'hei')?.saldo) === 18);
 
 console.log('\n### O EXTRA: ELA ABRE, E SÓ ELE');

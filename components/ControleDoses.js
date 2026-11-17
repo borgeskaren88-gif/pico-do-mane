@@ -28,14 +28,28 @@ const emDoses = (r) => {
   return `${n} ${plural(r.doses, 'dose', 'doses')}${r.doseNome ? ` de ${r.doseNome}` : ''}`;
 };
 
-// A frase do resultado. Uma por estado, em português de balcão.
+// O RESULTADO EM DUAS LINHAS: primeiro o veredito, em palavras de olhar e
+// saber ("Tudo certo", "Faltou bebida — vale olhar"); depois a explicação.
+//
+// "As frases do resultado" foram o que mais confundiu: "Tem 9,7 doses A MAIS"
+// e "acertei" não diziam se aquilo era bom ou ruim. Agora a primeira linha
+// diz, com a cor e o símbolo de semáforo.
+export function veredito(r) {
+  if (r.estado === 'partida') return 'Primeira contagem — anotado';
+  if (r.estado === 'bateu') return 'Tudo certo';
+  if (r.estado === 'sobrou') return 'Sobrou bebida — não é prejuízo';
+  if (r.estado === 'pouco') return 'Faltou um pouquinho — normal';
+  return 'Faltou bebida — vale olhar';
+}
+export const SINAL = { partida: '📌', bateu: '✅', sobrou: '🔵', pouco: '🟡', sumiu: '🔴' };
+
 function frase(r) {
   if (r.estado === 'partida') {
-    return `Primeira contagem. O estoque dizia ${fmtQtd(r.esperado)} ${r.unidade} e tu contou ${fmtQtd(r.contado)} — acertei. Daqui pra frente eu vigio.`;
+    return `O estoque dizia ${fmtQtd(r.esperado)} ${r.unidade} e tu contou ${fmtQtd(r.contado)}. Já acertei o estoque. Da próxima vez eu comparo.`;
   }
-  if (r.estado === 'bateu') return 'Bateu. O que saiu da garrafa passou pela comanda.';
+  if (r.estado === 'bateu') return 'O que saiu da garrafa passou pela comanda.';
   if (r.estado === 'sobrou') {
-    return `Tem ${emDoses(r)} A MAIS do que devia. Quase sempre é compra que não foi lançada, ou ficha gastando mais do que o copo leva.`;
+    return `Tem ${emDoses(r)} a mais do que eu esperava. Quase sempre é compra que não foi lançada, ou a contagem anterior que ficou baixa.`;
   }
   const dinheiro = r.venda > 0 ? `${brl(r.venda)} que não entrou no caixa` : `${brl(r.custo)} de custo`;
   const base = `Sumiram ${emDoses(r)} — ${dinheiro}.`;
@@ -44,23 +58,51 @@ function frase(r) {
     : `${base} É ${fmtQtd(r.pct)}% do que saiu — acima dos ${TOLERANCIA_PCT}% que mão pesada explica.`;
 }
 
-// A GARRAFA DE TOCAR. Dez fatias: toca na altura do líquido. É assim que o
-// mercado conta garrafa aberta — décimo é o que o olho consegue, e pedir
-// mililitro seria pedir um número inventado com cara de exato.
+// QUANTO TEM NA ABERTA, EM PALAVRAS. "6 de 10" sozinho é número de prova;
+// "mais da metade" é como se fala no balcão.
+export const alturaEmPalavras = (n) => (n == null ? '' : n <= 0 ? 'vazia' : n <= 2 ? 'quase vazia' : n <= 4 ? 'menos da metade'
+  : n === 5 ? 'pela metade' : n <= 8 ? 'mais da metade' : n === 9 ? 'quase cheia' : 'cheia');
+
+// A CONTA QUE ELA ACABOU DE FAZER, ESCRITA DE VOLTA: "2 fechadas + a aberta
+// pela metade = 2,5 garrafas". Se ela marcou errado, vê ali, antes de conferir.
+export function resumoContado(cheias, nivel) {
+  if (cheias === undefined || cheias === '' || cheias == null || nivel == null) return '';
+  const c = Math.max(0, Math.floor(Number(cheias) || 0));
+  const total = c + nivel / 10;
+  const fech = `${c} ${plural(c, 'fechada', 'fechadas')}`;
+  const ab = nivel === 0 ? 'nenhuma aberta' : `a aberta ${alturaEmPalavras(nivel)}`;
+  return `${fech} + ${ab} = ${fmtQtd(total)} ${plural(total, 'garrafa', 'garrafas')}`;
+}
+
+// A GARRAFA ABERTA, DE TOCAR. Dez fatias: toca até onde tem bebida. É assim
+// que o mercado conta garrafa aberta — décimo é o que o olho consegue.
+//
+// O nome em cima ("Garrafa ABERTA") é o que faltava: sem ele, a garrafinha
+// desenhada do lado das "Fechadas" parecia mais uma coisa pra contar junto.
+// E "não tem aberta" virou um botão de verdade, que fica aceso quando escolhido.
 export function Garrafa({ nivel, onNivel }) {
+  const semAberta = nivel === 0;
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-      <div role="group" aria-label="Altura da garrafa aberta"
-        style={{ width: 46, border: `2px solid ${C.line}`, borderRadius: '10px 10px 8px 8px', overflow: 'hidden', display: 'flex', flexDirection: 'column-reverse', background: C.panel2 }}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-          <button key={n} onClick={() => onNivel(nivel === n ? n - 1 : n)} title={`${n} de 10`} aria-label={`${n} de 10`}
-            style={{ height: 15, border: 'none', borderTop: n === 10 ? 'none' : `1px solid color-mix(in srgb, ${C.line} 60%, transparent)`, background: nivel != null && n <= nivel ? C.accent : 'transparent', cursor: 'pointer', padding: 0 }} />
-        ))}
-      </div>
-      <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45, paddingBottom: 2 }}>
-        {nivel == null ? 'Toca na altura do líquido' : nivel === 0 ? 'Nenhuma aberta' : <><b style={{ color: C.text }}>{nivel} de 10</b> na aberta</>}
-        <div>
-          <button onClick={() => onNivel(0)} style={{ background: 'none', border: 'none', color: C.faint, cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '4px 0 0' }}>não tem aberta</button>
+    <div data-garrafa>
+      <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, marginBottom: 5 }}>Garrafa ABERTA</div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+        <div role="group" aria-label="Altura da garrafa aberta"
+          style={{ width: 46, border: `2px solid ${C.line}`, borderRadius: '10px 10px 8px 8px', overflow: 'hidden', display: 'flex', flexDirection: 'column-reverse', background: C.panel2, opacity: semAberta ? 0.45 : 1 }}>
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+            <button key={n} onClick={() => onNivel(nivel === n ? n - 1 : n)} title={`${n} de 10`} aria-label={`${n} de 10`}
+              style={{ height: 15, border: 'none', borderTop: n === 10 ? 'none' : `1px solid color-mix(in srgb, ${C.line} 60%, transparent)`, background: nivel != null && n <= nivel ? C.accent : 'transparent', cursor: 'pointer', padding: 0 }} />
+          ))}
+        </div>
+        <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45, paddingBottom: 2 }}>
+          {nivel == null ? <>Toca na garrafa<br />até onde tem bebida</>
+            : semAberta ? <b style={{ color: C.text }}>Não tem aberta</b>
+              : <><b style={{ color: C.text }}>{alturaEmPalavras(nivel)}</b><br />{nivel} de 10 na aberta</>}
+          <div>
+            <button onClick={() => onNivel(0)} aria-pressed={semAberta} style={{
+              marginTop: 6, border: `1px solid ${semAberta ? C.accent : C.line}`, background: semAberta ? C.accent : 'transparent',
+              color: semAberta ? '#06101F' : C.muted, borderRadius: 999, padding: '5px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+            }}>não tem aberta</button>
+          </div>
         </div>
       </div>
     </div>
@@ -76,12 +118,13 @@ export const passo = (v, d) => {
   return String(n == null ? 0 : Math.max(0, n + d));
 };
 
-export function Passo({ valor, onDelta, rotulo }) {
+export function Passo({ valor, onDelta, rotulo, dica }) {
   const n = (valor === '' || valor === undefined || valor === null) ? null : Math.max(0, Math.floor(Number(valor) || 0));
   const bt = { width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.line}`, background: 'transparent', color: C.text, fontSize: 20, fontWeight: 800, cursor: 'pointer', lineHeight: 1 };
   return (
     <div>
-      <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, marginBottom: 5 }}>{rotulo}</div>
+      <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, marginBottom: dica ? 1 : 5 }}>{rotulo}</div>
+      {dica && <div style={{ fontSize: 11, color: C.faint, marginBottom: 5 }}>{dica}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button style={bt} aria-label="menos" onClick={() => onDelta(-1)}>–</button>
         <span style={{ minWidth: 34, textAlign: 'center', fontSize: 20, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: n == null ? C.faint : C.text }}>{n == null ? '?' : n}</span>
@@ -96,6 +139,7 @@ function Resultado({ r }) {
   return (
     <div style={{ borderLeft: `4px solid ${cor}`, background: `color-mix(in srgb, ${cor} 9%, transparent)`, borderRadius: 8, padding: '9px 12px', marginTop: 8 }}>
       <div style={{ fontSize: 13.5, fontWeight: 800 }}>{limparNome(r.nome)}</div>
+      <div data-veredito={r.estado} style={{ fontSize: 14, fontWeight: 900, color: cor, marginTop: 2 }}>{SINAL[r.estado] || ''} {veredito(r)}</div>
       <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginTop: 2 }}>{frase(r)}</div>
     </div>
   );
@@ -114,6 +158,7 @@ export default function ControleDoses({ estoque = [], fichas = [], cardapio = []
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState('');
   const [reposto, setReposto] = useState('');
+  const [desfeito, setDesfeito] = useState('');
 
   const lista = useMemo(() => vigiados({ estoque, fichas, vendas, hoje, config: cfg }), [estoque, fichas, vendas, hoje, cfg]);
   const idsVigiados = useMemo(() => new Set(lista.map((x) => x.item.id)), [lista]);
@@ -210,6 +255,19 @@ export default function ControleDoses({ estoque = [], fichas = [], cardapio = []
   const ultimaSemanal = cfg.registros.filter((r) => r.tipo === 'semanal').sort((a, b) => (b.ts || 0) - (a.ts || 0))[0] || null;
   const diasSemConferir = diasDesde(ultimaSemanal && ultimaSemanal.ts);
   const historico = cfg.registros.slice(0, 25);
+  const deHoje = cfg.registros.filter((r) => r.data === hoje).length;
+
+  const desfazerHoje = async () => {
+    if (busy || !deHoje) return;
+    if (typeof window !== 'undefined' && !window.confirm(`Desfazer as ${deHoje} contagens de hoje? O estoque de cada garrafa volta pro que era antes delas.`)) return;
+    setBusy(true); setErro(''); setDesfeito('');
+    const j = await onAcao({ acao: 'desfazerContagens' });
+    setBusy(false);
+    if (!j || !j.ok) { setErro((j && j.erro) || 'Não consegui desfazer. Tenta de novo.'); return; }
+    onControle(lerConfig(j.controleDoses));
+    setSaidas([]);
+    setDesfeito(`Pronto: desfiz ${j.quantas === 1 ? 'a contagem' : `as ${j.quantas} contagens`} de hoje. O estoque voltou. Pode contar de novo quando quiser.`);
+  };
 
   const pill = (on) => ({
     border: `1px solid ${on ? C.accent : C.line}`, background: on ? C.accent : 'transparent', color: on ? '#06101F' : C.muted,
@@ -300,7 +358,7 @@ export default function ControleDoses({ estoque = [], fichas = [], cardapio = []
               {embAlvo && ehMedido(alvo) && (
                 <div style={{ fontSize: 12, color: C.faint, marginBottom: 10 }}>Cada embalagem: {fmtQtd(embAlvo.tamanho)} {alvo.unidade}</div>
               )}
-              <Passo valor={fechadas} onDelta={(d) => setFechadas((v) => passo(v, d))} rotulo="Quantas FECHADAS sobraram na prateleira?" />
+              <Passo valor={fechadas} onDelta={(d) => setFechadas((v) => passo(v, d))} rotulo="Quantas FECHADAS sobraram na prateleira?" dica="lacradas — a que acabou não conta" />
               <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
                 <Btn onClick={confirmarAcabou} disabled={busy}>{busy ? 'Conferindo…' : 'Conferir'}</Btn>
                 <Btn kind="ghost" onClick={() => { setAlvoId(''); setErro(''); }}>Voltar</Btn>
@@ -313,7 +371,7 @@ export default function ControleDoses({ estoque = [], fichas = [], cardapio = []
       {modo === 'semana' && (
         <Card style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>
-            As garrafas que mais giraram no mês. Pra cada uma: <b style={{ color: C.text }}>quantas fechadas</b> e <b style={{ color: C.text }}>a altura da aberta</b>. A que tu não contar eu pulo.
+            As garrafas que mais giraram no mês. Pra cada uma, duas coisas: <b style={{ color: C.text }}>quantas estão fechadas</b> (lacradas) e <b style={{ color: C.text }}>até onde tem bebida na aberta</b>. A que tu não contar eu pulo.
           </div>
           <div style={{ fontSize: 12, color: diasSemConferir != null && diasSemConferir >= 7 ? C.amber : C.faint, marginBottom: 10 }}>
             {diasSemConferir == null ? 'Nenhuma conferência da semana feita ainda.'
@@ -338,10 +396,15 @@ export default function ControleDoses({ estoque = [], fichas = [], cardapio = []
                     Guardado em {it.unidade}, e eu não sei quanto vem em cada embalagem. Marca um "Acabou" dele uma vez, que lá eu pergunto.
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', gap: 22, alignItems: 'flex-end', marginTop: 10, flexWrap: 'wrap' }}>
-                    <Passo valor={c.cheias} onDelta={(d) => setSemana((m) => ({ ...m, [it.id]: { ...(m[it.id] || {}), cheias: passo((m[it.id] || {}).cheias, d) } }))} rotulo="Fechadas" />
-                    <Garrafa nivel={c.nivel == null ? null : c.nivel} onNivel={(n) => setS(it.id, { nivel: n })} />
-                  </div>
+                  <>
+                    <div style={{ display: 'flex', gap: 22, alignItems: 'flex-start', marginTop: 10, flexWrap: 'wrap' }}>
+                      <Passo valor={c.cheias} onDelta={(d) => setSemana((m) => ({ ...m, [it.id]: { ...(m[it.id] || {}), cheias: passo((m[it.id] || {}).cheias, d) } }))} rotulo="Garrafas FECHADAS" dica="lacradas, sem a aberta" />
+                      <Garrafa nivel={c.nivel == null ? null : c.nivel} onNivel={(n) => setS(it.id, { nivel: n })} />
+                    </div>
+                    {resumoContado(c.cheias, c.nivel) && (
+                      <div data-resumo style={{ fontSize: 12.5, color: C.text, marginTop: 8, fontWeight: 700 }}>= {resumoContado(c.cheias, c.nivel)}</div>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -362,14 +425,25 @@ export default function ControleDoses({ estoque = [], fichas = [], cardapio = []
       )}
 
       <SecTitle>Últimas contagens</SecTitle>
+      {/* "FIZ TUDO ERRADO." Desfazer as contagens de hoje: o estoque de cada
+          garrafa volta pro que seria sem elas (as vendas de depois continuam
+          valendo), e as contagens saem da lista. */}
+      {deHoje > 0 && (
+        <div data-desfazer style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+          <Btn small kind="ghost" disabled={busy} onClick={desfazerHoje}>Desfazer as {deHoje === 1 ? 'contagem' : `${deHoje} contagens`} de hoje</Btn>
+          <span style={{ fontSize: 12, color: C.faint }}>o estoque volta pro que era antes</span>
+        </div>
+      )}
+      {desfeito && <div data-desfeito style={{ fontSize: 13, color: C.green, fontWeight: 700, marginBottom: 10 }}>{desfeito}</div>}
       {historico.length === 0 ? (
         <Empty>Nenhuma contagem ainda.<br />A primeira de cada garrafa só acerta o estoque. Da segunda em diante eu te digo o que sumiu.</Empty>
       ) : historico.map((r) => (
         <div key={r.id} style={{ borderLeft: `4px solid ${COR[r.estado] || C.line}`, padding: '7px 11px', marginBottom: 7, background: C.panel, borderRadius: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13.5 }}>
             <b style={{ minWidth: 0 }}>{limparNome(r.nome)}</b>
-            <span style={{ color: C.faint, fontSize: 11.5, flexShrink: 0 }}>{fmtDate(r.data)} · {r.tipo === 'acabou' ? 'acabou' : 'semana'}</span>
+            <span style={{ color: C.faint, fontSize: 11.5, flexShrink: 0 }}>{fmtDate(r.data)} · {r.tipo === 'acabou' ? 'acabou' : 'semana'}{r.por === 'gerente' ? ' · gerência' : ''}</span>
           </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: COR[r.estado] || C.text, marginTop: 1 }}>{SINAL[r.estado] || ''} {veredito(r)}</div>
           <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45, marginTop: 1 }}>{frase(r)}</div>
         </div>
       ))}
