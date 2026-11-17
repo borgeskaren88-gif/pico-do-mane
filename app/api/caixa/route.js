@@ -16,7 +16,7 @@ const FORMAS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Fiado'];
 // Dona e garçom operam o caixa (é o dinheiro do turno). A cozinha não.
 function papel() {
   const p = papelDaSessao(cookies().get(nomeCookie())?.value);
-  return p === 'dona' || p === 'garcom' ? p : null;
+  return p === 'dona' || p === 'garcom' || p === 'gerente' ? p : null;
 }
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -267,14 +267,16 @@ export async function POST(request) {
       if (aberto) return NextResponse.json({ ok: false, erro: 'Já existe um caixa aberto.' }, { status: 400 });
       // O garçom (atendimento) só abre o caixa se tiver batido o ponto (entrada
       // aberta). A dona abre livremente.
-      if (p === 'garcom') {
+      // A gerente segue a mesma regra do atendimento: abre o caixa quem está
+      // no turno, com o ponto batido.
+      if (p === 'garcom' || p === 'gerente') {
         const { data: prows } = await sb.from('pdm_dados').select('valor').like('chave', 'ponto:%');
         // O ponto do EXTRA também vale. O turno dele sai carimbado 'extra' pra
         // não se misturar com a equipe fixa — e por isso esta regra, que só
         // olhava 'garcom', deixava o extra de fora: ele batia o ponto e o app
         // respondia "bata seu ponto". Quem está no salão com o ponto aberto
         // pode abrir o caixa, fixo ou não.
-        const temPontoAberto = (prows || []).map((r) => r.valor).some((v) => v && !v.saida && (!v.papel || v.papel === 'garcom' || v.papel === 'extra'));
+        const temPontoAberto = (prows || []).map((r) => r.valor).some((v) => v && !v.saida && (!v.papel || v.papel === 'garcom' || v.papel === 'extra' || v.papel === 'gerente'));
         if (!temPontoAberto) return NextResponse.json({ ok: false, semPonto: true, erro: 'Bata seu ponto (Entrada) antes de abrir o caixa.' }, { status: 400 });
       }
       const saldoInicial = n2(body?.saldoInicial);

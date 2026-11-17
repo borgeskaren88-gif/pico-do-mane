@@ -20,10 +20,13 @@ const RECADOS = {
   cozinha: 'Quem entra por aqui vê a lista de compras, as tarefas, as porções e bate o ponto. Não vê dinheiro.',
   garcom: 'Quem entra por aqui abre e fecha comanda e vê o cardápio. Não vê o financeiro do bar.',
   reservas: 'Quem entra por aqui vê e marca as reservas de mesa. Não vê mais nada.',
+  gerente: 'Pra quem gerencia o bar com você. Faz o que o Atendimento e a Cozinha fazem, vê a meta em porcentagem, cobra o fiado e abre o acesso do Extra. Não vê lucro, despesas, custos nem salários. Nasce fechado: cria a senha pra abrir.',
   extra: 'Pra quem vem trabalhar um dia só. Faz tudo que o Atendimento faz, com senha separada: tu fecha este acesso no fim da noite sem derrubar a equipe fixa. O ponto dele sai marcado como extra.',
 };
 
-export default function Acessos() {
+// `soExtra`: a tela da gerente usa este mesmo componente, mas só com o cartão
+// do Extra — sem o texto de dona, sem a troca da senha da dona.
+export default function Acessos({ soExtra = false }) {
   const [lista, setLista] = useState([]);
   const [carregado, setCarregado] = useState(false);
   const [busy, setBusy] = useState('');
@@ -63,7 +66,9 @@ export default function Acessos() {
     if (nova.trim().length < 4) { setMsg('A senha precisa ter pelo menos 4 caracteres.'); return; }
     mandar({ acao: 'senha', papel: a.papel, nova: nova.trim() },
       a.fechado
-        ? `Pronto: o acesso ${a.nome} está aberto. Passa a senha pra quem vai trabalhar hoje — ele entra pelo botão "Extra" da tela de entrada.`
+        ? (a.papel === 'extra'
+          ? `Pronto: o acesso ${a.nome} está aberto. Passa a senha pra quem vai trabalhar hoje — a pessoa entra pelo botão "Extra" da tela de entrada.`
+          : `Pronto: o acesso ${a.nome} está aberto. Quem tem a senha entra pelo botão "Gerente" da tela de entrada.`)
         : `Senha de ${a.nome} trocada — e todos os aparelhos que estavam logados foram desconectados junto.`);
   };
 
@@ -78,6 +83,7 @@ export default function Acessos() {
 
   return (
     <div>
+      {!soExtra && (<>
       <PageTitle sub="Quem entra no PicoOS, e como tirar alguém daqui">Acessos da equipe</PageTitle>
 
       <Card style={{ marginBottom: 14, padding: 14 }}>
@@ -97,6 +103,7 @@ export default function Acessos() {
           acesso veio parar em Acessos, não achou, e perguntou. Tela de senha
           mora na tela de senhas. */}
       <TrocarSenha titulo="A TUA senha" quem="tua — a de entrar e a de destravar a tela" />
+      </>)}
 
       {msg && (
         <div style={{ background: C.panel2, border: `1px solid ${msg.startsWith('Pronto') || msg.includes('trocada') ? C.green : C.amber}`, borderRadius: 10, padding: '10px 13px', marginBottom: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -119,7 +126,9 @@ export default function Acessos() {
           )}
           {a.podeFechar && (
             <div style={{ fontSize: 12, color: a.fechado ? C.faint : C.green, fontWeight: 800, marginTop: 8, lineHeight: 1.45 }}>
-              {a.fechado ? 'Fechado: ninguém entra por aqui. Cria uma senha quando tiver extra trabalhando.' : 'Aberto: quem tem a senha entra pelo botão "Extra".'}
+              {a.fechado
+                ? (a.papel === 'extra' ? 'Fechado: ninguém entra por aqui. Cria uma senha quando tiver extra trabalhando.' : 'Fechado: ninguém entra por aqui. Cria a senha pra abrir.')
+                : `Aberto: quem tem a senha entra pelo botão "${a.papel === 'gerente' ? 'Gerente' : 'Extra'}".`}
             </div>
           )}
 
@@ -127,7 +136,7 @@ export default function Acessos() {
             <div style={{ marginTop: 12 }}>
               <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 6, lineHeight: 1.45 }}>
                 {a.fechado
-                  ? <>Cria a senha do extra de hoje (pelo menos 4 caracteres). É ela que tu passa pra ele.</>
+                  ? (a.papel === 'extra' ? <>Cria a senha do extra de hoje (pelo menos 4 caracteres). É ela que tu passa pra pessoa.</> : <>Cria a senha de {a.nome} (pelo menos 4 caracteres).</>)
                   : <>Senha nova de {a.nome} (pelo menos 4 caracteres). Quem estiver logado agora será desconectado.</>}
               </div>
               <input

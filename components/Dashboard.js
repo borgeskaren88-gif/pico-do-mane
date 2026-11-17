@@ -203,6 +203,7 @@ export default function Dashboard() {
   const [senhasDeFabrica, setSenhasDeFabrica] = useState([]);
   const [escondeuAvisoSenha, setEscondeuAvisoSenha] = useState(false);
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
+  const [tarefasGerente, setTarefasGerente] = useState([]);
   const [cardapio, setCardapio] = useState([]);
   const [cardapioCategorias, setCardapioCategorias] = useState(null);
   // As taxas da calculadora de preço (imposto, cartão, comissão, delivery,
@@ -310,6 +311,7 @@ export default function Dashboard() {
       // seja: no exato momento em que o cliente abre o app pela primeira vez.
       setModulos(lerModulos(primeiraVez ? SEED_DATA : (salvo || {})));
       setTarefasCozinha(arr(salvo && salvo.tarefasCozinha));
+      setTarefasGerente(arr(salvo && salvo.tarefasGerente));
       setCardapio(arr(salvo && salvo.cardapio));
       setCardapioCategorias(Array.isArray(salvo && salvo.cardapioCategorias) ? salvo.cardapioCategorias : null);
       setPrecoBase((salvo && salvo.precoBase) || null);
@@ -455,6 +457,8 @@ export default function Dashboard() {
     visitantes: (v) => { setVisitantes(v); salvarTudo({ visitantes: v }); },
     listaCompras: (v) => { setListaCompras(v); salvarTudo({ listaCompras: v }); },
     tarefasCozinha: (v) => { setTarefasCozinha(v); salvarTudo({ tarefasCozinha: v }); },
+    // Apagar a última tarefa da gerente é intenção, não cópia velha.
+    tarefasGerente: (v) => { setTarefasGerente(v); salvarTudo({ tarefasGerente: v }); },
     cardapio: (v) => { setCardapio(v); salvarTudo({ cardapio: v }); },
     cardapioCategorias: (v) => { setCardapioCategorias(v); salvarTudo({ cardapioCategorias: v }); },
     precoBase: (v) => { setPrecoBase(v); salvarTudo({ precoBase: v }); },
@@ -1034,7 +1038,7 @@ export default function Dashboard() {
             em qualquer aba da dona, igual aos outros dois logins. */}
         <PedidoPronto />
         {tab === 'darci' && temDarci && <Darci {...propsDarci} />}
-        {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} />}
+        {tab === 'brain' && <Brain tarefas={tarefas} onTarefas={upd.tarefas} ideias={ideias} onIdeias={upd.ideias} tarefasGerente={tarefasGerente} onTarefasGerente={upd.tarefasGerente} />}
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
             ficha técnica de prato e de drink. As duas leem e escrevem. */}
         {tab === 'pasta' && <Pasta />}

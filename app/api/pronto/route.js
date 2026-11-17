@@ -32,7 +32,7 @@ const MAX = 20;
 
 function papel() {
   const p = papelDaSessao(cookies().get(nomeCookie())?.value);
-  return p === 'dona' || p === 'cozinha' || p === 'garcom' ? p : null;
+  return p === 'dona' || p === 'cozinha' || p === 'garcom' || p === 'gerente' ? p : null;
 }
 
 const txt = (v, max) => String(v == null ? '' : v).slice(0, max).trim();

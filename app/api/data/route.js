@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { nomeCookie, sessaoEhValida } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
-import { notificarNovasTarefasCozinha } from '../../../lib/push';
+import { notificarNovasTarefasCozinha, notificarNovasTarefasGerente } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +82,32 @@ export async function POST(request) {
     }
     if (!('listaCozinha' in valor) && Array.isArray(anterior.listaCozinha)) valor.listaCozinha = anterior.listaCozinha;
     if (!('tarefasCozinha' in valor) && Array.isArray(anterior.tarefasCozinha)) valor.tarefasCozinha = anterior.tarefasCozinha;
+    // AS TAREFAS DA GERENTE: a dona cria e apaga; quem MARCA como feita é a
+    // gerente, pela rota dela. Se a dona estiver com a tela aberta há uma
+    // hora e adicionar uma tarefa, a cópia dela ainda diz "não feita" nas que
+    // a gerente já fez — e gravaria isso por cima. Então o "feito" de uma
+    // tarefa que já existia vem sempre do que está salvo.
+    if (Array.isArray(dados.tarefasGerente)) {
+      const antes = new Map((Array.isArray(anterior.tarefasGerente) ? anterior.tarefasGerente : []).filter((t) => t && t.id).map((t) => [t.id, t]));
+      valor.tarefasGerente = dados.tarefasGerente.map((t) => {
+        const a = t && antes.get(t.id);
+        return a ? { ...t, feito: !!a.feito, feitoEm: a.feitoEm || null } : t;
+      });
+    }
+    // AS CONTAGENS DE GARRAFA: a gerente também conta (pela rota dela). Uma
+    // cópia velha da dona não pode apagar a contagem que ela fez no meio —
+    // então os registros dos dois lados se juntam, pelo id.
+    if (dados.controleDoses && typeof dados.controleDoses === 'object' && anterior.controleDoses && typeof anterior.controleDoses === 'object') {
+      const juntos = new Map();
+      for (const r of [...(Array.isArray(anterior.controleDoses.registros) ? anterior.controleDoses.registros : []), ...(Array.isArray(dados.controleDoses.registros) ? dados.controleDoses.registros : [])]) {
+        if (r && r.id) juntos.set(r.id, r);
+      }
+      valor.controleDoses = {
+        ...dados.controleDoses,
+        tamanhos: { ...(anterior.controleDoses.tamanhos || {}), ...(dados.controleDoses.tamanhos || {}) },
+        registros: [...juntos.values()].sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0)).slice(0, 400),
+      };
+    }
     if (!('cardapio' in valor) && Array.isArray(anterior.cardapio)) valor.cardapio = anterior.cardapio;
     if (!('clientes' in valor) && Array.isArray(anterior.clientes)) valor.clientes = anterior.clientes;
     if (!('ideias' in valor) && Array.isArray(anterior.ideias)) valor.ideias = anterior.ideias;
@@ -103,6 +129,9 @@ export async function POST(request) {
     // Se a dona criou tarefa(s) nova(s) pra cozinha, avisa a cozinha no celular.
     if (Array.isArray(dados?.tarefasCozinha)) {
       await notificarNovasTarefasCozinha(sb, dados.tarefasCozinha, anterior.tarefasCozinha);
+    }
+    if (Array.isArray(dados?.tarefasGerente)) {
+      await notificarNovasTarefasGerente(sb, dados.tarefasGerente, anterior.tarefasGerente);
     }
     return NextResponse.json({ ok: true });
   } catch (e) {

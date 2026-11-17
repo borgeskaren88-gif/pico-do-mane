@@ -36,7 +36,7 @@ const TIPOS = {
 const VALIDADE = 60 * 60;
 
 const papel = () => papelDaSessao(cookies().get(nomeCookie())?.value);
-const podeVer = (p) => p === 'dona' || p === 'cozinha';
+const podeVer = (p) => p === 'dona' || p === 'cozinha' || p === 'gerente';
 const podeMexer = (p) => p === 'dona';
 const txt = (v, max) => String(v == null ? '' : v).slice(0, max).trim();
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);

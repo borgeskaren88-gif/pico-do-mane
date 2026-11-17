@@ -34,7 +34,7 @@ const hojeBrasil = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/S
 // dos extras, e não as horas da equipe fixa.
 function papel() {
   const p = acessoDaSessao(cookies().get(nomeCookie())?.value);
-  return p === 'dona' || p === 'cozinha' || p === 'garcom' || p === 'extra' ? p : null;
+  return p === 'dona' || p === 'cozinha' || p === 'garcom' || p === 'extra' || p === 'gerente' ? p : null;
 }
 
 async function lerRegistros(sb) {
@@ -56,8 +56,30 @@ export async function GET() {
       .sort((a, b) => (b.entrada || '').localeCompare(a.entrada || ''));
     // Jornada esperada por setor (dona configura): { cozinha:{dias,entrada,saida}, garcom:{...} }.
     const { data: jr } = await sb.from('pdm_dados').select('valor').eq('chave', 'jornadas').maybeSingle();
-    const jornadas = (jr?.valor && typeof jr.valor === 'object') ? jr.valor : {};
-    return NextResponse.json({ ok: true, registros, jornadas, papel: p });
+    const todasJornadas = (jr?.valor && typeof jr.valor === 'object') ? jr.valor : {};
+    // CADA UM VÊ SÓ A JORNADA DO SEU SETOR.
+    //
+    // A jornada guarda o salário e o valor da hora. Antes ia a de todo mundo
+    // pra qualquer um que batesse ponto — a cozinha lia o salário do
+    // atendimento sem que nenhuma tela mostrasse, bastava olhar o que chegava.
+    // Agora que existe uma gerente, que ia receber o salário da equipe
+    // inteira junto, a regra ficou explícita: a dona vê todas; o resto, a sua.
+    const jornadas = p === 'dona' ? todasJornadas : (todasJornadas[p] ? { [p]: todasJornadas[p] } : {});
+
+    // QUEM ESTÁ NO TURNO HOJE — só pra gerente.
+    //
+    // "Ver a equipe no ponto: quem está trabalhando agora e quem bateu o ponto
+    // hoje. Sem ver salário nem horas dos outros." Vai o nome, o setor e o
+    // horário de hoje. O mês dos outros, o saldo e o dinheiro, não.
+    let equipeHoje;
+    if (p === 'gerente') {
+      const hoje = hojeBrasil();
+      equipeHoje = (await lerRegistros(sb))
+        .filter((r) => r && r.papel !== 'gerente' && (r.data === hoje || !r.saida))
+        .map((r) => ({ nome: r.nome, setor: r.papel || '', entrada: r.entrada, saida: r.saida || null }))
+        .sort((a, b) => (a.entrada || '').localeCompare(b.entrada || ''));
+    }
+    return NextResponse.json({ ok: true, registros, jornadas, papel: p, ...(equipeHoje ? { equipeHoje } : {}) });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar o ponto.' }, { status: 500 });
   }
@@ -105,7 +127,7 @@ export async function POST(request) {
       const entra = (body?.jornadas && typeof body.jornadas === 'object') ? body.jornadas : {};
       const hhmm = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '')); if (!m) return ''; const h = Math.min(23, Math.max(0, +m[1])); const mi = Math.min(59, Math.max(0, +m[2])); return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`; };
       const limpo = {};
-      for (const key of ['cozinha', 'garcom', 'dona']) {
+      for (const key of ['cozinha', 'garcom', 'gerente', 'dona']) {
         const j = entra[key];
         if (!j || typeof j !== 'object') continue;
         const nome = nomeCanonico(txt(j.nome, 60));
@@ -140,7 +162,7 @@ export async function POST(request) {
     // meia-noite, ex.: 16:00 → 00:00).
     if (acao === 'lancar') {
       if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona lança turno à mão.' }, { status: 403 });
-      const setor = ['cozinha', 'garcom', 'dona', 'extra'].includes(body?.setor) ? body.setor : '';
+      const setor = ['cozinha', 'garcom', 'dona', 'extra', 'gerente'].includes(body?.setor) ? body.setor : '';
       const data = txt(body?.data, 10);
       const hm = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '')); if (!m) return null; return `${String(Math.min(23, Math.max(0, +m[1]))).padStart(2, '0')}:${String(Math.min(59, Math.max(0, +m[2]))).padStart(2, '0')}`; };
       const eHM = hm(body?.entrada), sHM = hm(body?.saida);

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { nomeCookie, papelDaSessao } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { ACESSOS, lerGeracoes, subirGeracao } from '../../../lib/acessos';
-import { definirSenhaPapel, senhaFoiTrocada, ehSenhaDeFabrica, acessoFechado, apagarSenhaPapel } from '../../../lib/senha';
+import { definirSenhaPapel, senhaFoiTrocada, ehSenhaDeFabrica, acessoFechado, apagarSenhaPapel, nasceFechado } from '../../../lib/senha';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,13 +16,24 @@ function ehDona() {
   return papelDaSessao(cookies().get(nomeCookie())?.value) === 'dona';
 }
 
+// A GERENTE MEXE EM UM ACESSO SÓ: O DO EXTRA.
+//
+// "Quando vier alguém trabalhar de extra, a Sarah pode abrir e fechar o acesso
+// do Extra?" — "Sim." Só isso: criar a senha do dia e fechar no fim da noite.
+// A senha dela mesma, a do atendimento, a da cozinha e a da dona continuam
+// fora do alcance. E a regra mora aqui, não na tela: tela é sugestão.
+const ehGerente = () => papelDaSessao(cookies().get(nomeCookie())?.value) === 'gerente';
+const GERENTE_PODE = new Set(['extra']);
+
 export async function GET() {
-  if (!ehDona()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
+  const gerente = ehGerente();
+  if (!ehDona() && !gerente) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
     const sb = bancoDaSessao();
     const ger = await lerGeracoes(sb);
     const lista = [];
     for (const a of ACESSOS) {
+      if (gerente && !GERENTE_PODE.has(a.papel)) continue;
       lista.push({
         ...a, geracao: ger[a.papel] || 1,
         senhaPropria: await senhaFoiTrocada(sb, a.papel),
@@ -30,7 +41,7 @@ export async function GET() {
         // Só o extra pode estar fechado (sem senha nenhuma). E só ele pode ser
         // fechado de novo — os outros acessos existem todo dia.
         fechado: await acessoFechado(sb, a.papel),
-        podeFechar: a.papel === 'extra',
+        podeFechar: nasceFechado(a.papel),
       });
     }
     return NextResponse.json({ ok: true, acessos: lista });
@@ -40,7 +51,8 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  if (!ehDona()) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
+  const gerente = ehGerente();
+  if (!ehDona() && !gerente) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
 
   let body;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'Requisição inválida.' }, { status: 400 }); }
@@ -48,6 +60,9 @@ export async function POST(request) {
   const papel = String(body?.papel || '');
   if (!ACESSOS.some((a) => a.papel === papel)) {
     return NextResponse.json({ ok: false, erro: 'Esse acesso não existe.' }, { status: 400 });
+  }
+  if (gerente && !GERENTE_PODE.has(papel)) {
+    return NextResponse.json({ ok: false, erro: 'Esse acesso só a dona mexe.' }, { status: 403 });
   }
 
   try {
@@ -79,7 +94,7 @@ export async function POST(request) {
     // cai). As duas coisas, sempre: só apagar a senha deixaria o celular dele
     // logado por noventa dias. O ponto que ele bateu fica guardado.
     if (acao === 'fechar') {
-      if (papel !== 'extra') return NextResponse.json({ ok: false, erro: 'Esse acesso não fecha: ele é da equipe de todo dia.' }, { status: 400 });
+      if (!nasceFechado(papel)) return NextResponse.json({ ok: false, erro: 'Esse acesso não fecha: ele é da equipe de todo dia.' }, { status: 400 });
       await apagarSenhaPapel(sb, papel);
       const g = await subirGeracao(sb, papel);
       return NextResponse.json({ ok: true, geracao: g, fechado: true });

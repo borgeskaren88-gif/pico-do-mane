@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { nomeCookie, opcoesDoCracha, valorSessaoValida, valorSessaoCozinha, valorSessaoGarcom, valorSessaoReservas, valorSessaoExtra } from '../../../lib/auth';
+import { nomeCookie, opcoesDoCracha, valorSessaoValida, valorSessaoCozinha, valorSessaoGarcom, valorSessaoReservas, valorSessaoExtra, valorSessaoGerente } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { conferirSenhaDona, temSenhaDona, conferirSenhaPapel } from '../../../lib/senha';
 import { lerGeracoes } from '../../../lib/acessos';
@@ -115,6 +115,9 @@ export async function POST(request) {
     // Acessos, nenhuma senha abre esta porta. E o que volta pra tela é
     // 'garcom', porque é a tela do atendimento que ele vai usar.
     if (senha && await conferirSenhaPapel(sb, 'extra', senha, op)) { valorCookie = valorSessaoExtra(ger.extra, negocio); papel = 'garcom'; }
+  } else if (papelPedido === 'gerente') {
+    // Sem senha de fábrica: enquanto a dona não criar uma, nada abre.
+    if (senha && await conferirSenhaPapel(sb, 'gerente', senha, op)) { valorCookie = valorSessaoGerente(ger.gerente, negocio); papel = 'gerente'; }
   } else if (papelPedido === 'dona' || !papelPedido) {
     // 'dona' explícito, ou sem papel (compatibilidade): tenta dona e, se não for,
     // ainda aceita cozinha pela senha (não quebra quem já usava só a senha).

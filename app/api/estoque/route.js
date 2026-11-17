@@ -51,7 +51,7 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 
 export async function GET() {
   const p = papelAtual();
-  if (p !== 'dona' && p !== 'cozinha') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
+  if (p !== 'dona' && p !== 'cozinha' && p !== 'gerente') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
     const sb = bancoDaSessao();
     const blob = await lerPainel(sb);
@@ -69,7 +69,7 @@ export async function GET() {
 
 export async function POST(request) {
   const p = papelAtual();
-  if (p !== 'dona' && p !== 'cozinha') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
+  if (p !== 'dona' && p !== 'cozinha' && p !== 'gerente') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   let body;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'JSON inválido.' }, { status: 400 }); }
   const acao = String(body?.acao || '');
@@ -92,12 +92,14 @@ export async function POST(request) {
         return NextResponse.json({ ok: false, erro: 'Esse item é separado em sacos. Use Separei / Levei pra frente / Contei.' }, { status: 400 });
       }
       let achou = false;
-      const quem = p === 'cozinha' ? ' (cozinha)' : '';
+      const quem = p === 'cozinha' ? ' (cozinha)' : p === 'gerente' ? ' (gerência)' : '';
       // Saída lançada pela COZINHA é sempre Desperdício, decidido aqui e não na
       // tela. Eles perdiam carne na limpeza e marcavam "Consumo da casa" (que
       // era a primeira opção da lista), e aí a perda sumia do balde de perdas.
       // Consumo da casa e cortesia são decisão da dona — ela lança na tela dela.
-      const motivo = (p === 'cozinha' && tipo === 'saida') ? 'Desperdício' : String(body?.motivo || '');
+      // A gerente lança cortesia e consumo pela tela de Cortesia (que passa pela
+      // comanda); por aqui ela entra igual à cozinha: saída é desperdício.
+      const motivo = ((p === 'cozinha' || p === 'gerente') && tipo === 'saida') ? 'Desperdício' : String(body?.motivo || '');
       itens = itens.map((it) => { if (it.id !== id) return it; achou = true; return aplicarMovimentoItem(it, tipo, body?.qtd, motivo + quem, body?.validade); });
       if (!achou) return NextResponse.json({ ok: false, erro: 'Item não encontrado.' }, { status: 404 });
       const novo = await gravarEstoque(sb, blob, { estoque: itens });
@@ -130,7 +132,7 @@ export async function POST(request) {
         .filter((e) => e.id && e.qtd > 0);
       if (!entradas.length) return NextResponse.json({ ok: false, erro: 'Nenhuma entrada pra lançar.' }, { status: 400 });
 
-      const quem = p === 'cozinha' ? ' (cozinha)' : '';
+      const quem = p === 'cozinha' ? ' (cozinha)' : p === 'gerente' ? ' (gerência)' : '';
       const motivo = (String(body?.motivo || '').trim() || 'Entrada por voz') + quem;
       const feitas = [];
       // Aplica uma a uma, em ordem: duas linhas do MESMO item viram dois
@@ -174,7 +176,7 @@ export async function POST(request) {
       if (!alvo) return NextResponse.json({ ok: false, erro: 'Item não encontrado.' }, { status: 404 });
       if (!ehPorcionado(alvo)) return NextResponse.json({ ok: false, erro: 'Esse item não é separado em sacos.' }, { status: 400 });
       // Quem fez o movimento, com o nome que o negócio configurou.
-      const quem = p === 'cozinha' ? nomeDoPapel(lerNegocio(blob), 'cozinha') : nomeDoPapel(lerNegocio(blob), 'dona');
+      const quem = (p === 'cozinha' || p === 'gerente') ? nomeDoPapel(lerNegocio(blob), p) : nomeDoPapel(lerNegocio(blob), 'dona');
 
       let r = null;
       let brutoNovo = null;

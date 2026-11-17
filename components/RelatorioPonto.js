@@ -8,7 +8,7 @@ const norm = (s) => (s || '').trim().toLowerCase();
 const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch { return ''; } };
 const horasDe = (r) => (r.entrada && r.saida ? Math.max(0, (new Date(r.saida) - new Date(r.entrada)) / 3600000) : 0);
 const fmtHoras = (h) => { const t = Math.round(Math.abs(h) * 60); const hh = Math.floor(t / 60), mm = t % 60; return `${hh}h${mm > 0 ? String(mm).padStart(2, '0') : ''}`; };
-const SETORES = { cozinha: 'Cozinha', garcom: 'Atendimento', dona: 'Dona', extra: 'EXTRA' };
+const SETORES = { cozinha: 'Cozinha', garcom: 'Atendimento', dona: 'Dona', extra: 'EXTRA', gerente: 'Gerente' };
 const parseHHMM = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ''); return m ? (+m[1] + (+m[2]) / 60) : null; };
 // Horas de um turno da jornada (16:00 → 00:00 = 8h; quando vira a meia-noite, soma 24).
 const horasJornada = (j) => { const e = parseHHMM(j?.entrada), s = parseHHMM(j?.saida); if (e == null || s == null) return 0; let d = s - e; if (d <= 0) d += 24; return d; };
