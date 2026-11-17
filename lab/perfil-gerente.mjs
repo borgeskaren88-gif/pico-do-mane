@@ -133,8 +133,13 @@ await sarah.waitForTimeout(1500);
 let tela = await texto(sarah);
 cobra('a tela inicial cumprimenta pelo nome', /(Bom dia|Boa tarde|Boa noite), Sarah!/.test(tela), (tela.match(/[^\n]*(Bom dia|Boa tarde|Boa noite)[^\n]*/) || ['(sem cumprimento)'])[0]);
 cobra('e avisa da tarefa de hoje', /Tu tens 1 tarefa pra hoje/.test(tela), (tela.match(/[^\n]*tarefa[^\n]*/) || [''])[0]);
-const areas = await sarah.locator('[data-area]').evaluateAll((els) => els.map((e) => e.getAttribute('data-area')));
-cobra('tem os quatro caminhos: Início, Central de Operações, Cozinha, Gerência', areas.join(',') === 'inicio,salao,cozinha,gerencia', areas.join(','));
+// O MENU IGUAL AO DA DONA: os mesmos grupos, um assunto por tela.
+const grupos = await sarah.locator('.pos-group-title').allInnerTexts();
+cobra('o menu do lado tem os grupos do menu da dona: Início, Operação, Cozinha, Gestão', grupos.map((x) => x.trim().toLowerCase()).join(',') === 'início,operação,cozinha,gestão', grupos.join(','));
+const itens = await sarah.locator('[data-nav]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav')));
+cobra('com cada tela no seu lugar', itens.join(',') === 'inicio,salao,reservas,controle,ponto,compras,porcoes,estoque,fichas,equipe,extra,avisos', itens.join(','));
+const badge = limpa(await sarah.locator('[data-nav="inicio"] .pos-badge').innerText().catch(() => ''));
+cobra('e o Início mostra no menu que tem 1 tarefa esperando', badge === '1', badge || '(sem número)');
 // 12.345,67 de 50.000 = 24,69% -> 25%.
 const meta = limpa(await sarah.locator('[data-gerencia="meta"]').innerText()).replace(/\s+/g, ' ');
 cobra('a meta aparece em porcentagem: 25%', /25%/.test(meta), meta);
@@ -227,27 +232,51 @@ cobra('mas não troca a senha do atendimento', (await pedir(sarah, '/api/acessos
 cobra('nem a própria', (await pedir(sarah, '/api/acessos', { acao: 'senha', papel: 'gerente', nova: 'outra123' })).status === 403);
 cobra('e o atendimento continua com a senha dele', (await tentar(rua, 'garcom', '1234')) === 200);
 
-console.log('\n### NA TELA: AS ÁREAS DA EQUIPE ESTÃO LÁ');
+console.log('\n### NA TELA: CADA ITEM DO MENU ABRE A SUA TELA');
 await sarah.reload({ waitUntil: 'domcontentloaded' });
 await sarah.waitForTimeout(3500);
-await sarah.locator('[data-area="salao"]').click();
-await sarah.waitForTimeout(1800);
-tela = await texto(sarah);
-await tocar(sarah, 'Ponto');
-await sarah.waitForTimeout(1800);
-const pto = (await texto(sarah)).replace(/\s+/g, ' ');
-cobra('no Ponto, o nome dela já vem pronto e o saldo de horas aparece', /Sarah Lima/.test(pto) && /(em dia|em haver|devendo)/.test(pto) && !/aparece quando a dona configurar/.test(pto), (pto.match(/Sarah Lima.{0,80}/) || [pto.slice(0, 160)])[0]);
-cobra('sem reais no ponto dela', !/R\$/.test(pto));
-cobra('Central de Operações: caixa e comandas do atendimento', /Comandas/.test(tela) && /Caixa/.test(tela) && /Perdas e consumo/.test(tela), tela.replace(/\s+/g, ' ').slice(0, 160));
-await sarah.locator('[data-area="cozinha"]').click();
-await sarah.waitForTimeout(1800);
-tela = await texto(sarah);
-cobra('Cozinha: compras, porções, estoque e fichas', /Compras/.test(tela) && /Porções/.test(tela) && /Fichas/.test(tela), tela.replace(/\s+/g, ' ').slice(0, 160));
-await sarah.locator('[data-area="gerencia"]').click();
-await sarah.waitForTimeout(2600);
-tela = await texto(sarah);
-cobra('Gerência: fiado, garrafas e o acesso do Extra', /Fiado pra cobrar/.test(tela) && /Controle de doses/.test(tela) && /Acesso do Extra/i.test(tela), tela.replace(/\s+/g, ' ').slice(0, 160));
-cobra('e em nenhum lugar fala de Finanças, lucro ou despesas', !/Finanças|Lucro operacional|Despesas do mês/.test(tela));
+// No celular o menu fica guardado: abre pelos três risquinhos, como o da dona.
+const abrir = async (id) => {
+  await sarah.locator('.pos-burger').click();
+  await sarah.waitForTimeout(400);
+  await sarah.locator(`[data-nav="${id}"]`).click();
+  await sarah.waitForTimeout(1800);
+  return (await texto(sarah)).replace(/\s+/g, ' ');
+};
+const corpo = (t) => t.slice(t.indexOf('PicoOS', t.indexOf('Sair') + 1));
+const visto = [];
+tela = await abrir('salao'); visto.push(tela);
+cobra('Central de Operações: as abinhas Caixa, Comandas, Fiados, Perdas e consumo', (await sarah.locator('[data-sub]').evaluateAll((els) => els.map((e) => e.getAttribute('data-sub')))).join(',') === 'caixa,comandas,fiados,perdas');
+cobra('e abre nas comandas, com as mesas', /Central de Operações/.test(corpo(tela)) && /Balcão|Mesa/i.test(corpo(tela)) && !/Fiado pra cobrar/.test(tela), corpo(tela).slice(0, 160));
+await sarah.locator('[data-sub="fiados"]').click(); await sarah.waitForTimeout(1500);
+tela = (await texto(sarah)).replace(/\s+/g, ' '); visto.push(tela);
+cobra('a abinha Fiados mostra quem cobrar', /Fiado pra cobrar/.test(tela) && /Tamara Silva/.test(tela));
+await sarah.locator('[data-sub="perdas"]').click(); await sarah.waitForTimeout(1500);
+tela = (await texto(sarah)).replace(/\s+/g, ' '); visto.push(tela);
+cobra('e Perdas e consumo é a tela do atendimento', /cortesia|perda|consumo/i.test(corpo(tela)), corpo(tela).slice(0, 140));
+tela = await abrir('ponto'); visto.push(tela);
+cobra('no Ponto, o nome dela já vem pronto e o saldo de horas aparece', /Sarah Lima/.test(tela) && /(em dia|em haver|devendo)/.test(tela) && !/aparece quando a dona configurar/.test(tela), (tela.match(/Sarah Lima.{0,80}/) || [tela.slice(0, 160)])[0]);
+cobra('sem reais no ponto dela', !/R\$/.test(tela));
+tela = await abrir('controle'); visto.push(tela);
+cobra('Controle: as garrafas pra contar', /Acabou a garrafa/.test(tela) && /Heineken long neck/.test(tela));
+tela = await abrir('compras'); visto.push(tela);
+cobra('Lista de compras: a da cozinha, sem a barra de abas da cozinha por cima', /Lista de Compras/.test(tela) && !/Porções Estoque Fichas Garrafas/.test(tela), corpo(tela).slice(0, 140));
+tela = await abrir('porcoes'); visto.push(tela);
+cobra('Porções abre', /Porç/.test(corpo(tela)));
+tela = await abrir('fichas'); visto.push(tela);
+cobra('Fichas abre', /ficha/i.test(corpo(tela)));
+tela = await abrir('equipe'); visto.push(tela);
+cobra('Equipe: o João no turno', /João · Atendimento/.test(tela));
+tela = await abrir('extra'); visto.push(tela);
+cobra('Acesso do Extra: só o cartão do Extra', /Extra/.test(corpo(tela)) && !/Trocar a senha da dona|Atendimento.*1234/i.test(corpo(tela)), corpo(tela).slice(0, 160));
+tela = await abrir('inicio');
+cobra('e o Início volta pro cumprimento', /(Bom dia|Boa tarde|Boa noite), Sarah!/.test(tela));
+cobra('em nenhuma tela fala de Finanças, lucro ou despesas', visto.every((t) => !/Finanças|Lucro operacional|Despesas do mês|Faturamento/.test(t)));
+// Atualizar a página volta pra mesma tela, como no painel da dona.
+await abrir('controle');
+await sarah.reload({ waitUntil: 'domcontentloaded' });
+await sarah.waitForTimeout(3500);
+cobra('atualizar a página não joga ela de volta pro início', /Acabou a garrafa/.test(await texto(sarah)));
 
 // ---------------------------------------------------------------------------
 console.log('\n### FECHAR A GERENTE DERRUBA QUEM ESTAVA DENTRO');

@@ -1,13 +1,14 @@
 'use client';
 import React, { useCallback, useEffect, useState } from 'react';
-import { C, Card, Btn, Empty, SecTitle, QtdInput } from './ui';
+import { C, Card, Btn, Empty, QtdInput } from './ui';
 import { brl, limparNome } from '../lib/util';
 import { Garrafa, Passo, passo } from './ControleDoses';
 import Acessos from './Acessos';
 import CalendarioTarefas from './CalendarioTarefas';
 import AvisoReservas from './AvisoReservas';
+import AvisoPorcoes from './AvisoPorcoes';
 
-// A ABA "GERÊNCIA" — o que a gerente vê e o resto da equipe não.
+// AS TELAS DA GERENTE — o que ela vê e o resto da equipe não.
 //
 // Tudo aqui vem de /api/gerencia (e o ponto da equipe, de /api/ponto), que só
 // devolvem o que a dona liberou: meta em porcentagem, quem deve no fiado, a
@@ -235,7 +236,10 @@ function Doses({ doses, onFeito }) {
   );
 }
 
-function useGerencia() {
+// OS DADOS DA GERENTE, carregados UMA vez pela tela dela e repartidos entre
+// as telas do menu (início, fiado, controle, equipe). Assim o número de
+// tarefas no menu e a lista no calendário são sempre o mesmo número.
+export function useGerencia() {
   const [dados, setDados] = useState(null);
   const [equipe, setEquipe] = useState(null);
   const [erro, setErro] = useState('');
@@ -253,24 +257,26 @@ function useGerencia() {
   return { dados, setDados, equipe, erro, carregar };
 }
 
-// A ABA GERÊNCIA: o fiado pra cobrar, as garrafas pra contar, o acesso do
-// extra. (A meta e a equipe moram na tela inicial, que é onde ela olha
-// primeiro.)
-export default function Gerencia() {
-  const { dados, erro, carregar } = useGerencia();
-  return (
-    <div>
-      {erro && <div style={{ fontSize: 13, color: C.red, marginBottom: 10 }}>{erro}</div>}
-      {!dados ? <Empty>Carregando…</Empty> : (
-        <>
-          <Fiados fiados={dados.fiados} />
-          <Doses doses={dados.doses} onFeito={carregar} />
-        </>
-      )}
-      <SecTitle>Acesso do Extra</SecTitle>
-      <Acessos soExtra />
-    </div>
-  );
+const Carregando = ({ g }) => (
+  <>
+    {g.erro && <div style={{ fontSize: 13, color: C.red, marginBottom: 10 }}>{g.erro}</div>}
+    {!g.dados && !g.erro && <Empty>Carregando…</Empty>}
+  </>
+);
+
+// CADA PEDAÇO É UMA TELA DO MENU, igual ao painel da dona: um assunto por
+// tela, com o nome em cima, em vez de tudo empilhado numa aba só.
+export function FiadosGerente({ g }) {
+  return <><Carregando g={g} />{g.dados && <Fiados fiados={g.dados.fiados} />}</>;
+}
+export function DosesGerente({ g }) {
+  return <><Carregando g={g} />{g.dados && <Doses doses={g.dados.doses} onFeito={g.carregar} />}</>;
+}
+export function EquipeGerente({ g }) {
+  return <Equipe equipe={g.equipe || []} />;
+}
+export function ExtraGerente() {
+  return <Acessos soExtra />;
 }
 
 // ---------------------------------------------------------------------------
@@ -281,8 +287,8 @@ export default function Gerencia() {
 //
 // É a primeira coisa que ela vê ao entrar: o cumprimento, como está a meta
 // (que é o bônus dela), quem está no turno, as tarefas que a dona passou e
-// as reservas do dia. Dali, um toque leva pra Central de Operações, pra
-// cozinha ou pra gerência.
+// as reservas do dia. Dali, um toque leva pras comandas, pro caixa ou pro
+// ponto — o resto mora no menu do lado, igual ao da dona.
 // ---------------------------------------------------------------------------
 const DIAS_EXT = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
 const MESES_EXT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -293,8 +299,8 @@ function agoraBR() {
   return { hora: Number(p.hour), dia: Number(p.day), mes: Number(p.month) - 1, semana: new Date(`${iso}T12:00:00Z`).getUTCDay() };
 }
 
-export function InicioGerente({ onIr }) {
-  const { dados, setDados, equipe, erro } = useGerencia();
+export function InicioGerente({ g, onIr }) {
+  const { dados, setDados, equipe, erro } = g;
   const [marcando, setMarcando] = useState('');
   const t = agoraBR();
   const ola = t.hora >= 5 && t.hora < 12 ? 'Bom dia' : t.hora >= 12 && t.hora < 18 ? 'Boa tarde' : 'Boa noite';
@@ -319,13 +325,13 @@ export function InicioGerente({ onIr }) {
     finally { setMarcando(''); }
   };
 
-  const atalho = (area, rot, sub) => (
-    <button key={area} data-atalho={area} onClick={() => onIr && onIr(area)} style={{
+  const atalho = (area, sub, rot, dica) => (
+    <button key={`${area}-${sub || ''}`} data-atalho={sub || area} onClick={() => onIr && onIr(area, sub)} style={{
       flex: '1 1 30%', minWidth: 0, textAlign: 'left', cursor: 'pointer', borderRadius: 14, padding: '12px 12px',
       border: `1px solid ${C.line}`, background: C.panel, color: C.text,
     }}>
       <div style={{ fontSize: 14, fontWeight: 900, lineHeight: 1.2 }}>{rot}</div>
-      <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>{sub}</div>
+      <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>{dica}</div>
     </button>
   );
 
@@ -348,12 +354,13 @@ export function InicioGerente({ onIr }) {
       {erro && <div style={{ fontSize: 13, color: C.red, marginBottom: 10 }}>{erro}</div>}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        {atalho('salao', 'Central de Operações', 'mesas, balcão, caixa')}
-        {atalho('cozinha', 'Cozinha', 'compras, porções, estoque')}
-        {atalho('gerencia', 'Gerência', 'fiado, garrafas, extra')}
+        {atalho('salao', 'comandas', 'Comandas', 'mesas e balcão')}
+        {atalho('salao', 'caixa', 'Caixa', 'abrir e fechar')}
+        {atalho('ponto', '', 'Ponto', 'entrada e saída')}
       </div>
 
       <AvisoReservas />
+      <AvisoPorcoes onIr={() => onIr && onIr('porcoes')} />
 
       {!dados ? <Empty>Carregando…</Empty> : (
         <>
