@@ -5,6 +5,7 @@ import Dashboard from '../components/Dashboard';
 import Cozinha from '../components/Cozinha';
 import Garcom from '../components/Garcom';
 import Reservas from '../components/Reservas';
+import Gerente from '../components/Gerente';
 import SaiSozinho from '../components/SaiSozinho';
 
 export default function Home() {
@@ -18,5 +19,6 @@ export default function Home() {
   if (papel === 'cozinha') return <SaiSozinho><Cozinha /></SaiSozinho>;
   if (papel === 'garcom') return <SaiSozinho><Garcom /></SaiSozinho>;
   if (papel === 'reservas') return <SaiSozinho><Reservas /></SaiSozinho>;
+  if (papel === 'gerente') return <SaiSozinho><Gerente /></SaiSozinho>;
   return <LoginForm />;
 }

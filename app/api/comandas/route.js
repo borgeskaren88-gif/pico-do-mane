@@ -21,7 +21,10 @@ const CORTESIA = 'cortesia:';
 // Só a dona e o garçom mexem em comandas. A cozinha não (ela não vê valores).
 function papel() {
   const p = papelDaSessao(cookies().get(nomeCookie())?.value);
-  return p === 'dona' || p === 'garcom' ? p : null;
+  // A gerente faz tudo que o atendimento faz nas comandas. O que é só da dona
+  // continua só da dona, linha por linha: criar cliente de fiado, configurar
+  // mesas, desfazer cortesia.
+  return p === 'dona' || p === 'garcom' || p === 'gerente' ? p : null;
 }
 
 const txt = (v, max) => String(v == null ? '' : v).slice(0, max).trim();
@@ -658,7 +661,7 @@ export async function POST(request) {
         const it = novos.find((x) => x.id === itemId);
         await notificarSaidaSemVenda(sb, {
           titulo: `${motivo}: ${limparNome(it?.nome)}`,
-          descricao: `${qtd} ${it?.unidade || 'un'} · ${quem ? `${quem} · ` : ''}lançado pel${p === 'dona' ? 'a dona' : 'o atendimento'}`,
+          descricao: `${qtd} ${it?.unidade || 'un'} · ${quem ? `${quem} · ` : ''}lançado pel${p === 'dona' ? 'a dona' : p === 'gerente' ? 'a gerência' : 'o atendimento'}`,
           valor: qtd * num(it?.custo),
         });
       } catch (e) { /* push nunca quebra a baixa */ }
@@ -744,7 +747,7 @@ export async function POST(request) {
         }]);
       } catch (e) { /* o histórico é um luxo; a baixa já aconteceu */ }
       try { await notificarEstoqueCritico(sb, estoque, novoEstoque); } catch (e) { /* push nunca quebra a baixa */ }
-      try { await notificarSaidaSemVenda(sb, { titulo: `${motivoBase}: ${nomeCompleto}`, descricao: `${qtd} ${qtd === 1 ? 'unidade' : 'unidades'}${quem ? ` · ${quem}` : ''} · lançado pel${p === 'dona' ? 'a dona' : 'o atendimento'}` }); } catch (e) { /* push nunca quebra a baixa */ }
+      try { await notificarSaidaSemVenda(sb, { titulo: `${motivoBase}: ${nomeCompleto}`, descricao: `${qtd} ${qtd === 1 ? 'unidade' : 'unidades'}${quem ? ` · ${quem}` : ''} · lançado pel${p === 'dona' ? 'a dona' : p === 'gerente' ? 'a gerência' : 'o atendimento'}` }); } catch (e) { /* push nunca quebra a baixa */ }
       return NextResponse.json({ ok: true, prato: nomeCompleto, quem, id: idCortesia });
     }
 

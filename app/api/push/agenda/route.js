@@ -13,7 +13,7 @@ export const runtime = 'nodejs'; // web-push precisa do Node (crypto), não do E
 // É idempotente: o mesmo evento nunca é avisado duas vezes.
 export async function POST() {
   const p = papelDaSessao(cookies().get(nomeCookie())?.value);
-  if (p !== 'dona' && p !== 'garcom' && p !== 'cozinha' && p !== 'reservas') {
+  if (p !== 'dona' && p !== 'garcom' && p !== 'cozinha' && p !== 'reservas' && p !== 'gerente') {
     return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   }
   try {

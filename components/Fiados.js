@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { acharCliente, telefoneDoCliente } from '../lib/clientes';
+import { acharCliente, telefoneDoCliente, zapLink, primeiroNome, diaDoVencimento, msgCobranca, DIA_LIMITE_FIADO } from '../lib/clientes';
 import { C, Card, Btn, KPI, Empty, SecTitle, PageTitle, inputStyle } from './ui';
 import { brl, num, fmtDate, uid, diaOperacional, fiadoDaVenda, abertoDaVenda, classificarFiado } from '../lib/util';
 
@@ -10,35 +10,10 @@ const norm = (s) => (s || '').trim().toLowerCase();
 // Se a pessoa tem conta do mês passado em aberto, junta tudo o que ela deve
 // nessa cobrança; se ela só começou a consumir depois do dia 1º, fica toda pro
 // mês que vem. Quem faz essa conta é classificarFiado, em lib/util.
-const DIA_LIMITE = 10;
-
-// Link do WhatsApp com a mensagem pronta. Telefone brasileiro sem o 55 ganha o
-// 55 na frente; sem telefone cadastrado não dá link (aí a gente copia o texto).
-const zapLink = (telefone, msg) => {
-  const d = String(telefone || '').replace(/\D/g, '');
-  const numero = d.length >= 12 ? d : (d.length >= 10 ? '55' + d : '');
-  return numero ? `https://wa.me/${numero}?text=${encodeURIComponent(msg)}` : '';
-};
-// Só o primeiro nome: a cobrança fica pessoal sem ficar formal demais.
-const primeiroNome = (n) => (String(n || '').trim().split(/\s+/)[0] || 'tudo bem');
-// Data curtinha, do jeito que se lê no zap: 01/09.
-const ddmm = (iso) => (/^\d{4}-\d{2}-\d{2}/.test(String(iso || '')) ? `${String(iso).slice(8, 10)}/${String(iso).slice(5, 7)}` : '');
-// O dia 10 de qual mês: o deste mês pra quem está na cobrança de agora, o do
-// mês que vem pra quem só consumiu depois que o mês virou.
-const diaDoVencimento = (hoje, cobrarAgora) => {
-  const [ano, mes] = hoje.split('-').map(Number);
-  if (cobrarAgora) return `${hoje.slice(0, 7)}-${String(DIA_LIMITE).padStart(2, '0')}`;
-  const ym = mes === 12 ? `${ano + 1}-01` : `${ano}-${String(mes + 1).padStart(2, '0')}`;
-  return `${ym}-${String(DIA_LIMITE).padStart(2, '0')}`;
-};
-const msgCobranca = (nome, total, ateISO, venceISO) => (
-  `Olá ${nome}!\n`
-  + `Informamos que o seu débito está em ${brl(total)} correspondendo até o dia ${ddmm(ateISO)}. `
-  + 'O valor está sujeito a alteração até a data do pagamento.\n\n'
-  + `Lembrando a todos que o débito deve ser quitado até o dia ${ddmm(venceISO)}, `
-  + 'passando da data de pagamento a conta será encerrada.'
-);
-
+// A mensagem de cobrança e o link do WhatsApp moram em lib/clientes.js: a tela
+// da gerente cobra com o MESMO texto. Duas cópias da mensagem acabariam
+// dizendo vencimentos diferentes pro mesmo cliente.
+const DIA_LIMITE = DIA_LIMITE_FIADO;
 const FONTE_ATRASADO = 'Recebimento Atrasado';
 
 // Como a pessoa pagou o fiado. Os nomes são os mesmos do caixa, senão o valor

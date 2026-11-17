@@ -17,7 +17,10 @@ import PedidoPronto from './PedidoPronto';
 import SinoNotificacoes from './SinoNotificacoes';
 import { sairDeVez } from '../lib/pushClient';
 
-export default function Cozinha() {
+// `embutido`: a tela da GERENTE mostra esta mesma tela dentro da dela, sem o
+// cabeçalho (o dela já tem logo, tema e sair). Assim a gerente usa exatamente
+// as telas da equipe — o que mudar aqui muda lá, sem cópia pra esquecer.
+export default function Cozinha({ embutido = false }) {
   const router = useRouter();
   const [aba, setAba] = useState('ponto'); // 'ponto' | 'compras' | 'reservas' | 'porcoes' | 'estoque' | 'garrafas'
   const [itens, setItens] = useState([]);
@@ -108,7 +111,8 @@ export default function Cozinha() {
   const sair = async () => { await sairDeVez(); router.refresh(); };
 
   return (
-    <div style={{ minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={embutido ? undefined : { minHeight: '100vh', background: pageBg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {!embutido && (<>
       <PullToRefresh />
       <div style={{ padding: 'calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))', borderBottom: `1px solid ${C.hair}` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -139,7 +143,8 @@ export default function Cozinha() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
+      </>)}
+      <div style={embutido ? undefined : { maxWidth: 640, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {/* Mesa reservada hoje/amanhã: a primeira coisa que aparece ao entrar. */}
         <AvisoReservas />
         <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>

@@ -47,7 +47,7 @@ function frase(r) {
 // A GARRAFA DE TOCAR. Dez fatias: toca na altura do líquido. É assim que o
 // mercado conta garrafa aberta — décimo é o que o olho consegue, e pedir
 // mililitro seria pedir um número inventado com cara de exato.
-function Garrafa({ nivel, onNivel }) {
+export function Garrafa({ nivel, onNivel }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
       <div role="group" aria-label="Altura da garrafa aberta"
@@ -71,12 +71,12 @@ function Garrafa({ nivel, onNivel }) {
 // quando o botão foi desenhado. Dois toques rápidos no "+" liam o mesmo número
 // velho e somavam um só — e contagem que come toque é contagem errada.
 // O primeiro toque sai do "?" pro zero: zero precisa ser dito, não presumido.
-const passo = (v, d) => {
+export const passo = (v, d) => {
   const n = (v === '' || v === undefined || v === null) ? null : Math.max(0, Math.floor(Number(v) || 0));
   return String(n == null ? 0 : Math.max(0, n + d));
 };
 
-function Passo({ valor, onDelta, rotulo }) {
+export function Passo({ valor, onDelta, rotulo }) {
   const n = (valor === '' || valor === undefined || valor === null) ? null : Math.max(0, Math.floor(Number(valor) || 0));
   const bt = { width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.line}`, background: 'transparent', color: C.text, fontSize: 20, fontWeight: 800, cursor: 'pointer', lineHeight: 1 };
   return (

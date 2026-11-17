@@ -4,6 +4,7 @@ import { C, Card, Btn, PageTitle, inputStyle } from './ui';
 import { uid, todayISO, fmtDate } from '../lib/util';
 import AgendaCalendario from './AgendaCalendario';
 import AgendaMes from './AgendaMes';
+import CalendarioTarefas from './CalendarioTarefas';
 
 // O caderno: cada anotação tem um estado, e o estado é só uma bolinha colorida.
 // Tocar na bolinha empurra a nota pro próximo estado — sem arrastar, sem menu.
@@ -16,7 +17,7 @@ const COLS = [
 const ORDEM = COLS.map((c) => c[0]);
 const infoCol = (status) => COLS.find(([k]) => k === status) || COLS[0];
 
-export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }) {
+export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias, tarefasGerente = null, onTarefasGerente }) {
   // ---- Caderno de notas ----
   const [nova, setNova] = useState('');
   const [filtro, setFiltro] = useState('todos');
@@ -85,6 +86,19 @@ export default function Brain({ tarefas = [], onTarefas, ideias = [], onIdeias }
         {/* Coluna esquerda: calendário + checklist */}
         <div style={{ flex: '1 1 300px', minWidth: 0, maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <AgendaMes />
+
+          {/* AS TAREFAS DA GERENTE. "Quero que na tela inicial dela tenha um
+              calendário no qual eu possa pôr tarefas e aparece pra ela."
+              Ela marca como feita lá; aqui aparece o ✓. */}
+          {Array.isArray(tarefasGerente) && onTarefasGerente && (
+            <CalendarioTarefas
+              modo="dona"
+              titulo="Tarefas da gerente"
+              tarefas={tarefasGerente}
+              onAdicionar={(texto, data) => onTarefasGerente([{ id: uid(), texto, data, feito: false, criadoEm: Date.now() }, ...tarefasGerente])}
+              onRemover={(id) => onTarefasGerente(tarefasGerente.filter((t) => t.id !== id))}
+            />
+          )}
 
           {/* Checklist minimalista: fechado mostra só o essencial (quantas
               faltam, a barrinha e a próxima). Toca e amplia pra mexer. */}

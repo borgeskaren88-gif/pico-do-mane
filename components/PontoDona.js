@@ -10,7 +10,9 @@ const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR',
 const horasDe = horasDoTurno;
 
 // Setores que batem ponto e têm jornada esperada. 'garcom' aparece como Atendimento.
-const SETORES = [['cozinha', 'Cozinha'], ['garcom', 'Atendimento']];
+// A gerente tem escala e salário como a equipe fixa: é assim que o saldo de
+// horas dela (devendo ou sobrando) sai certo, na tela dela e na tua.
+const SETORES = [['cozinha', 'Cozinha'], ['garcom', 'Atendimento'], ['gerente', 'Gerente']];
 const DIAS = [[0, 'Dom'], [1, 'Seg'], [2, 'Ter'], [3, 'Qua'], [4, 'Qui'], [5, 'Sex'], [6, 'Sáb']];
 const horasJornada = horasJornadaLib;
 

@@ -34,7 +34,7 @@ export async function GET() {
       // No app de muitos o botão "Extra" aparece sempre: aqui não se sabe de
       // que negócio é a pessoa, e dizer "este tem extra, aquele não" seria
       // contar coisa de cliente pra quem ainda não provou nada.
-      return NextResponse.json({ ok: true, multi: true, nome: '', papeis: [...papeisParaLogin(PADRAO), ['extra', 'Extra']] });
+      return NextResponse.json({ ok: true, multi: true, nome: '', papeis: [...papeisParaLogin(PADRAO), ['gerente', 'Gerente'], ['extra', 'Extra']] });
     }
     // Instalação de um cliente só: o negócio é o da configuração do site. Isto
     // acontece ANTES de existir login, então não há crachá de onde tirar o nome.
@@ -49,6 +49,8 @@ export async function GET() {
     // não leva a lugar nenhum na tela de entrada é o tipo de coisa que a equipe
     // toca sem querer e depois pergunta por que a senha não funciona.
     const papeis = papeisParaLogin(n);
+    // A gerente segue a mesma regra: o botão só aparece com a porta aberta.
+    if (!(await acessoFechado(sb, 'gerente'))) papeis.push(['gerente', 'Gerente']);
     if (!(await acessoFechado(sb, 'extra'))) papeis.push(['extra', 'Extra']);
     return NextResponse.json({ ok: true, nome: n.nome, papeis });
   } catch {
