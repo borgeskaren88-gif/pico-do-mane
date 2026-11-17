@@ -20,9 +20,13 @@ import { sairDeVez } from '../lib/pushClient';
 // `embutido`: a tela da GERENTE mostra esta mesma tela dentro da dela, sem o
 // cabeçalho (o dela já tem logo, tema e sair). Assim a gerente usa exatamente
 // as telas da equipe — o que mudar aqui muda lá, sem cópia pra esquecer.
-export default function Cozinha({ embutido = false }) {
+export default function Cozinha({ embutido = false, so = '' }) {
   const router = useRouter();
-  const [aba, setAba] = useState('ponto'); // 'ponto' | 'compras' | 'reservas' | 'porcoes' | 'estoque' | 'garrafas'
+  const [abaInterna, setAba] = useState('ponto');
+  // `so`: a gerente abre UMA tela da cozinha pelo menu dela (ex.: a lista de
+  // compras). Aí a barra de abas e os avisos daqui somem — o menu e os avisos
+  // da tela dela já fazem esse papel.
+  const aba = so || abaInterna; // 'ponto' | 'compras' | 'reservas' | 'porcoes' | 'estoque' | 'garrafas'
   const [itens, setItens] = useState([]);
   const [tarefas, setTarefas] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -146,6 +150,7 @@ export default function Cozinha({ embutido = false }) {
       </>)}
       <div style={embutido ? undefined : { maxWidth: 640, margin: '0 auto', padding: '18px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))' }}>
         {/* Mesa reservada hoje/amanhã: a primeira coisa que aparece ao entrar. */}
+        {!so && (<>
         <AvisoReservas />
         <div style={{ display: 'flex', overflowX: 'auto', background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 3, gap: 3, marginBottom: 18 }}>
           {[['ponto', 'Ponto'], ['compras', 'Compras'], ['reservas', 'Reservas'], ['porcoes', 'Porções'], ['estoque', 'Estoque'], ['fichas', 'Fichas'], ['garrafas', 'Garrafas']].map(([v, rot]) => (
@@ -160,6 +165,7 @@ export default function Cozinha({ embutido = false }) {
         <PedidoPronto />
         {aba !== 'ponto' && <LembretePonto onIr={() => setAba('ponto')} />}
         {aba !== 'porcoes' && <AvisoPorcoes onIr={() => setAba('porcoes')} />}
+        </>)}
 
         {aba === 'compras' && (<>
         <PageTitle sub="Anote o que está faltando no bar">Lista de Compras</PageTitle>
