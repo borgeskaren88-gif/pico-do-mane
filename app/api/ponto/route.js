@@ -4,6 +4,7 @@ import { nomeCookie, acessoDaSessao } from '../../../lib/auth';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { notificarPonto } from '../../../lib/push';
 import { num } from '../../../lib/util';
+import { alternadoValido } from '../../../lib/ponto';
 
 export const dynamic = 'force-dynamic';
 
@@ -149,6 +150,13 @@ export async function POST(request) {
         if (salarioMes) limpo[key].salarioMes = salarioMes;
         if (vh) limpo[key].valorHora = vh;
         if (temJornada) { limpo[key].dias = dias; limpo[key].entrada = entrada; limpo[key].saida = saida; }
+        // "Um sim, um não" (ex.: sábados alternados). Só vale se o dia está na
+        // escala e a data-base cai mesmo nesse dia da semana — senão a conta
+        // de folga e falta sairia trocada sem ninguém perceber.
+        if (temJornada && j.alternado && typeof j.alternado === 'object') {
+          const alt = alternadoValido({ dias, alternado: { dia: Number(j.alternado.dia), base: String(j.alternado.base || '') } });
+          if (alt) limpo[key].alternado = alt;
+        }
       }
       const { error } = await sb.from('pdm_dados').upsert({ chave: 'jornadas', valor: limpo, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;

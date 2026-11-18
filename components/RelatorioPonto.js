@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, Empty, SecTitle } from './ui';
 import RelogioPonto from './RelogioPonto';
 import { fmtDate, todayISO } from '../lib/util';
+import { trabalhaNoDia } from '../lib/ponto';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch { return ''; } };
@@ -63,7 +64,7 @@ export default function RelatorioPonto({ mesInicial, negocio = '' }) {
     const ate = mesAtual ? Number(hojeISO.slice(8, 10)) - 1 : ultimoDia;
     let total = 0;
     for (let d = 1; d <= ate; d++) {
-      if (j.dias.includes(new Date(yy, mm - 1, d).getDay())) total += hd;
+      if (trabalhaNoDia(j, `${mes}-${String(d).padStart(2, '0')}`)) total += hd;
     }
     return total;
   }, [jornadas, mes]);
