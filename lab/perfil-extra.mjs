@@ -48,7 +48,7 @@ const novo = async () => {
   return pg;
 };
 const entrarPelaTela = async (pg, botao, senha) => {
-  await pg.locator(`button:text-is("${botao}")`).first().click();
+  await pg.locator('select[data-quem]').selectOption({ label: `${botao}` });
   await pg.locator('input[type="password"]').first().fill(senha);
   await pg.locator('button:has-text("Entrar")').first().click();
   await pg.waitForTimeout(3800);
@@ -63,14 +63,20 @@ const pedir = (pg, url, corpo) => pg.evaluate(async (x) => {
   let j = null; try { j = await r.json(); } catch { /* sem corpo */ }
   return { status: r.status, j };
 }, { url, corpo });
-const botoesDaEntrada = (pg) => pg.evaluate(() => [...document.querySelectorAll('button[type="button"]')].map((e) => (e.innerText || '').trim()).filter(Boolean));
+// Os logins da tela de entrada: as opções da caixa com setinha. Se a caixa não
+// estiver lá, a lista vem vazia — e aí o "não aparece" também falha, em vez de
+// passar por não ter achado nada.
+const botoesDaEntrada = (pg) => pg.evaluate(() => {
+  const sel = document.querySelector('select[data-quem]');
+  return sel ? [...sel.options].map((o) => (o.text || '').trim()).filter(Boolean) : [];
+});
 
 // ---------------------------------------------------------------------------
 console.log('\n### A PORTA NASCE FECHADA');
 const rua = await novo();   // ninguém logado: a internet
 let nomes = (await pedir(rua, '/api/negocio')).j.papeis.map((x) => x[0]);
 cobra('a tela de entrada não oferece "Extra"', !nomes.includes('extra'), nomes.join(','));
-cobra('e o botão não aparece', !(await botoesDaEntrada(rua)).includes('Extra'), (await botoesDaEntrada(rua)).join(' | '));
+cobra('e o Extra não aparece na lista da entrada', (await botoesDaEntrada(rua)).length > 0 && !(await botoesDaEntrada(rua)).includes('Extra'), (await botoesDaEntrada(rua)).join(' | '));
 // As senhas que um curioso tentaria primeiro.
 cobra('"1234" não abre o extra', (await tentar(rua, 'extra', '1234')) === 401, String(await tentar(rua, 'extra', '1234')));
 cobra('a senha da dona não abre o extra', (await tentar(rua, 'extra', 'Teste@123')) === 401);
@@ -129,7 +135,7 @@ cobra('nem a cozinha', (await tentar(rua, 'cozinha', SENHA_EXTRA)) === 401);
 console.log('\n### ELE ENTRA PELO BOTÃO E CAI NA TELA DO ATENDIMENTO');
 const extra = await novo();
 extra.on('pageerror', (e) => { console.log('[pageerror extra]', e.message.slice(0, 160)); ruim++; });
-cobra('o botão "Extra" está na tela de entrada', (await botoesDaEntrada(extra)).includes('Extra'), (await botoesDaEntrada(extra)).join(' | '));
+cobra('o "Extra" está na lista da tela de entrada', (await botoesDaEntrada(extra)).includes('Extra'), (await botoesDaEntrada(extra)).join(' | '));
 await entrarPelaTela(extra, 'Extra', SENHA_EXTRA);
 const telaExtra = limpa(await extra.locator('body').innerText());
 // A tela do atendimento abre na aba Ponto, com Caixa e Comandas ao lado.

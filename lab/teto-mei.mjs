@@ -56,7 +56,7 @@ await gravar({ ...p0, receitas: [receita('r1', '2026-03-10', 20000)], despesas: 
 
 await pg.goto(BASE, { waitUntil: 'domcontentloaded' });
 await pg.waitForTimeout(1600);
-await pg.locator('button:text-is("Dona")').first().click();
+await pg.locator('select[data-quem]').selectOption({ label: 'Dona' });
 await pg.locator('input[type="password"]').first().fill('Teste@123');
 await pg.locator('button:has-text("Entrar")').first().click();
 await pg.waitForTimeout(3800);

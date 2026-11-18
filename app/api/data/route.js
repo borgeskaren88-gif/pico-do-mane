@@ -98,14 +98,18 @@ export async function POST(request) {
     // cópia velha da dona não pode apagar a contagem que ela fez no meio —
     // então os registros dos dois lados se juntam, pelo id.
     if (dados.controleDoses && typeof dados.controleDoses === 'object' && anterior.controleDoses && typeof anterior.controleDoses === 'object') {
+      // Contagem desfeita não volta: a lista de desfeitas dos dois lados se
+      // junta, e quem está nela fica de fora mesmo que a cópia velha a tenha.
+      const desfeitos = new Set([...(Array.isArray(anterior.controleDoses.desfeitos) ? anterior.controleDoses.desfeitos : []), ...(Array.isArray(dados.controleDoses.desfeitos) ? dados.controleDoses.desfeitos : [])]);
       const juntos = new Map();
       for (const r of [...(Array.isArray(anterior.controleDoses.registros) ? anterior.controleDoses.registros : []), ...(Array.isArray(dados.controleDoses.registros) ? dados.controleDoses.registros : [])]) {
-        if (r && r.id) juntos.set(r.id, r);
+        if (r && r.id && !desfeitos.has(r.id)) juntos.set(r.id, r);
       }
       valor.controleDoses = {
         ...dados.controleDoses,
         tamanhos: { ...(anterior.controleDoses.tamanhos || {}), ...(dados.controleDoses.tamanhos || {}) },
         registros: [...juntos.values()].sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0)).slice(0, 400),
+        desfeitos: [...desfeitos].slice(-2000),
       };
     }
     if (!('cardapio' in valor) && Array.isArray(anterior.cardapio)) valor.cardapio = anterior.cardapio;

@@ -73,7 +73,7 @@ const novo = async () => {
   return pg;
 };
 const entrar = async (pg, botao, senha) => {
-  await pg.locator(`button:text-is("${botao}")`).first().click();
+  await pg.locator('select[data-quem]').selectOption({ label: `${botao}` });
   await pg.locator('input[type="password"]').first().fill(senha);
   await pg.locator('button:has-text("Entrar")').first().click();
   await pg.waitForTimeout(4000);
@@ -127,9 +127,14 @@ cobra('a tarefa foi salva pra hoje', tg.length === 1 && tg[0].texto === 'Conferi
 // ---------------------------------------------------------------------------
 console.log('\n### A SARAH ENTRA E CAI NA TELA INICIAL DELA');
 const sarah = await novo();
-cobra('o botão "Gerente" está na tela de entrada', await sarah.locator('button:text-is("Gerente")').count() > 0);
+// "Tá ficando muito login, aí fica poluído": uma caixa com setinha, não um
+// botão por login.
+const opcoes = await sarah.locator('select[data-quem] option').allInnerTexts();
+cobra('a tela de entrada tem UMA caixa com setinha, e o Gerente está na lista', opcoes.includes('Gerente') && (await sarah.locator('select[data-quem]').count()) === 1, opcoes.join(','));
+cobra('e nenhum botão por login', (await sarah.locator('button:text-is("Gerente"), button:text-is("Atendimento"), button:text-is("Cozinha")').count()) === 0);
 await entrar(sarah, 'Gerente', SENHA);
 await sarah.waitForTimeout(1500);
+cobra('o aparelho dela lembra que quem entrou foi a Gerente', (await sarah.evaluate(() => localStorage.getItem('picoos-ultimo-papel'))) === 'gerente');
 let tela = await texto(sarah);
 cobra('a tela inicial cumprimenta pelo nome', /(Bom dia|Boa tarde|Boa noite), Sarah!/.test(tela), (tela.match(/[^\n]*(Bom dia|Boa tarde|Boa noite)[^\n]*/) || ['(sem cumprimento)'])[0]);
 cobra('e avisa da tarefa de hoje', /Tu tens 1 tarefa pra hoje/.test(tela), (tela.match(/[^\n]*tarefa[^\n]*/) || [''])[0]);
@@ -221,6 +226,7 @@ const res = (ds.j?.resultados || [])[0] || {};
 cobra('volta o veredito, sem custo, venda nem saldo esperado', res.estado === 'partida' && !('custo' in res) && !('venda' in res) && !('esperado' in res), JSON.stringify(res));
 const reg = (((await painel()).controleDoses || {}).registros || [])[0] || {};
 cobra('e a dona recebe o registro completo, marcado como da gerência', reg.por === 'gerente' && reg.estoqueId === 'hei' && 'custo' in reg, JSON.stringify({ por: reg.por, custo: reg.custo }));
+cobra('desfazer contagem é só com a dona', (await pedir(sarah, '/api/estoque', { acao: 'desfazerContagens' })).status === 403);
 cobra('o estoque foi acertado pro que ela contou', Number(((await painel()).estoque || []).find((x) => x.id === 'hei')?.saldo) === 18);
 
 console.log('\n### O EXTRA: ELA ABRE, E SÓ ELE');
@@ -286,6 +292,21 @@ cobra('a geração da gerente subiu', (((await linha('acessosGeracoes')) || {}).
 cobra('a senha antiga não entra', (await tentar(rua, 'gerente', SENHA)) === 401);
 await rua.waitForTimeout(32000);
 cobra('o aparelho da Sarah caiu', (await pedir(sarah, '/api/comandas')).status === 401);
+// O aparelho lembrava "Gerente", mas essa porta fechou: a caixa não pode
+// ficar escolhida num login que não existe mais.
+await sarah.reload({ waitUntil: 'domcontentloaded' });
+await sarah.waitForTimeout(3500);
+const escolhido = await sarah.locator('select[data-quem]').inputValue().catch(() => '(sem tela de entrada)');
+cobra('na tela de entrada dela a caixa volta pra um login que existe', escolhido !== 'gerente' && !(await sarah.locator('select[data-quem] option').allInnerTexts()).includes('Gerente'), escolhido);
+// O que conta é o que VAI pro login, não só o que aparece: a caixa mostra
+// "Karen", então a senha da Karen tem que entrar sem mexer em nada.
+const mostra = await sarah.locator('select[data-quem]').evaluate((el) => el.options[el.selectedIndex]?.text || '');
+let mandou = '';
+sarah.on('request', (r) => { if (r.url().endsWith('/api/login') && r.method() === 'POST') { try { mandou = JSON.parse(r.postData() || '{}').papel || ''; } catch { /* nada */ } } });
+await sarah.locator('input[type="password"]').first().fill('Teste@123');
+await sarah.locator('button:has-text("Entrar")').first().click();
+await sarah.waitForTimeout(3000);
+cobra('e entra como quem aparece escolhido (sem mexer na caixa)', mostra === 'Karen' && mandou === 'dona', `mostra=${mostra} mandou=${mandou}`);
 cobra('e o atendimento continua dentro', (await pedir(joao, '/api/comandas')).status === 200);
 
 await b.close();

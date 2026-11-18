@@ -7,6 +7,7 @@ import { separarSacos, abastecerLinha, contarPorcao } from '../../../lib/porcoes
 import { limparNome, num, numQtd, todayISO } from '../../../lib/util';
 import { notificarEstoqueCritico, notificarSaidaSemVenda } from '../../../lib/push';
 import { lerNegocio, nomeDoPapel } from '../../../lib/negocio';
+import { desfazerContagensDoDia } from '../../../lib/controleDoses';
 
 export const dynamic = 'force-dynamic';
 
@@ -118,6 +119,34 @@ export async function POST(request) {
         } catch (e) { /* push nunca quebra o movimento */ }
       }
       return NextResponse.json({ ok: true, itens: arr(novo.estoque) });
+    }
+
+    // DESFAZER AS CONTAGENS DE UM DIA DO CONTROLE DE DOSES — só a dona.
+    //
+    // Estoque e registro mudam juntos, numa gravação só, lendo o painel
+    // fresco: se um dos dois mudasse sem o outro, o saldo voltaria e a
+    // contagem continuaria na lista (ou o contrário).
+    if (acao === 'desfazerContagens') {
+      if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Só a dona desfaz contagem.' }, { status: 403 });
+      // O dia vem da tela (o da última rodada de contagens). "Fiz tudo errado"
+      // pode ser dito no dia seguinte — a Karen contou na terça à noite e
+      // pediu pra desfazer depois da meia-noite.
+      const data = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.data || '')) ? String(body.data) : todayISO();
+      let quantas = 0;
+      const novo = await gravarEstoque(sb, blob, (base) => {
+        const d = desfazerContagensDoDia(arr(base.estoque), base.controleDoses, data);
+        if (!d) return {};
+        quantas = d.quantas;
+        const soma = new Map(d.ajustes.map((a) => [a.estoqueId, a.soma]));
+        const estoque = arr(base.estoque).map((it) => {
+          if (!it || !soma.has(it.id) || Math.abs(soma.get(it.id)) < 1e-9) return it;
+          const saldo = Math.max(0, Math.round((num(it.saldo) - soma.get(it.id)) * 1000) / 1000);
+          return aplicarMovimentoItem(it, 'contagem', saldo, 'Desfeita a contagem do controle de doses');
+        });
+        return { estoque, controleDoses: d.controleDoses };
+      });
+      if (!quantas) return NextResponse.json({ ok: false, erro: 'Não tem contagem desse dia pra desfazer.' }, { status: 400 });
+      return NextResponse.json({ ok: true, quantas, itens: arr(novo.estoque), controleDoses: novo.controleDoses });
     }
 
     // VÁRIAS ENTRADAS DE UMA VEZ (é o que a entrada por voz usa).

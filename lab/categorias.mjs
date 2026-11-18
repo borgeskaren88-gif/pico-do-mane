@@ -39,7 +39,7 @@ const entrar = async (papel, senha) => {
   await pg.evaluate(async () => { await fetch('/api/logout', { method: 'POST' }); });
   await pg.goto(BASE, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(1800);
-  await pg.locator(`button:text-is("${papel}")`).first().click();
+  await pg.locator('select[data-quem]').selectOption({ label: `${papel}` });
   await pg.locator('input[type="password"]').first().fill(senha);
   await pg.locator('button:has-text("Entrar")').first().click();
   await pg.waitForTimeout(3500);

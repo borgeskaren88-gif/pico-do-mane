@@ -57,7 +57,7 @@ pg.on('console', (m) => { const x = m.text(); if (m.type() === 'error' && !/stat
 
 await pg.goto(BASE, { waitUntil: 'domcontentloaded' });
 await pg.waitForTimeout(1600);
-await pg.locator('button:text-is("Dona")').first().click();
+await pg.locator('select[data-quem]').selectOption({ label: 'Dona' });
 await pg.locator('input[type="password"]').first().fill('Teste@123');
 await pg.locator('button:has-text("Entrar")').first().click();
 await pg.waitForTimeout(3800);

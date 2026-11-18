@@ -78,7 +78,7 @@ pg.on('console', (m) => { const x = m.text(); if (m.type() === 'error' && !/stat
 // Quem precisa disto no salão é o ATENDIMENTO — então o teste entra como ele.
 await pg.goto(BASE, { waitUntil: 'domcontentloaded' });
 await pg.waitForTimeout(1800);
-await pg.locator('button:text-is("Atendimento")').first().click();
+await pg.locator('select[data-quem]').selectOption({ label: 'Atendimento' });
 await pg.locator('input[type="password"]').first().fill('1234');
 await pg.locator('button:has-text("Entrar")').first().click();
 await pg.waitForTimeout(3800);

@@ -83,7 +83,7 @@ pg.on('console', (m) => { const x = m.text(); if (m.type() === 'error' && !/stat
 
 await pg.goto(BASE, { waitUntil: 'domcontentloaded' });
 await pg.waitForTimeout(1800);
-await pg.locator('button:text-is("Karen")').first().click();
+await pg.locator('select[data-quem]').selectOption({ label: 'Karen' });
 await pg.locator('input[type="password"]').first().fill('Teste@123');
 await pg.locator('button:has-text("Entrar")').first().click();
 await pg.waitForTimeout(3800);
@@ -253,6 +253,8 @@ cobra('contou a tônica: 5 fechadas, nenhuma aberta', await contarSemana('ton', 
 await pg.waitForTimeout(500);
 txt = await texto();
 cobra('a tela repete o que ela marcou: 5 de 10', /5 de 10 na aberta/i.test(txt), (txt.match(/[^\n]*de 10 na aberta[^\n]*/i) || ['(não repete)'])[0]);
+cobra('e escreve a conta em palavras: 1 fechada + a aberta pela metade = 1,5', /1 fechada \+ a aberta pela metade = 1,5 garrafa/i.test(txt), (txt.match(/[^\n]*fechada \+[^\n]*/i) || ['(sem conta)'])[0]);
+cobra('e a da tônica: 5 fechadas + nenhuma aberta = 5', /5 fechadas \+ nenhuma aberta = 5 garrafas/i.test(txt), (txt.match(/[^\n]*fechadas \+[^\n]*/i) || ['(sem conta)'])[0]);
 // As que ela não contou ficam de fora — sem inventar zero pra ninguém.
 cobra('o botão diz que vai conferir só as 2 contadas', await tocar('Conferir 2 garrafas'));
 await pg.waitForTimeout(3200);
@@ -274,8 +276,9 @@ await pg.waitForTimeout(400);
 await tocar('Conferir 2 garrafas');
 await pg.waitForTimeout(3200);
 res = await resultado();
-const linhaDe = (nome) => { const ls = res.split('\n'); const i = ls.findIndex((l) => l.includes(nome)); return i < 0 ? '' : `${ls[i]} ${ls[i + 1] || ''}`; };
-cobra('o gin bateu', /bateu/i.test(linhaDe('Gin Tanqueray')), linhaDe('Gin Tanqueray') || '(sem linha)');
+const linhaDe = (nome) => { const ls = res.split('\n'); const i = ls.findIndex((l) => l.includes(nome)); return i < 0 ? '' : `${ls[i]} ${ls[i + 1] || ''} ${ls[i + 2] || ''}`; };
+cobra('o gin: "Tudo certo"', /tudo certo/i.test(linhaDe('Gin Tanqueray')), linhaDe('Gin Tanqueray') || '(sem linha)');
+cobra('a tônica: "Sobrou bebida — não é prejuízo"', /sobrou bebida — não é prejuízo/i.test(linhaDe('Água tônica lata')), linhaDe('Água tônica lata') || '(sem linha)');
 cobra('a tônica tem 2 A MAIS — e a tela diz o motivo provável', /tem 2 doses de gin tônica a mais/i.test(linhaDe('Água tônica lata')) && /compra que não foi lançada/i.test(linhaDe('Água tônica lata')),
   linhaDe('Água tônica lata') || '(sem linha)');
 
@@ -295,6 +298,74 @@ await pg.evaluate(() => { const l = document.querySelector('[data-item="ton"]');
 await pg.waitForTimeout(900);
 const depois = await pg.evaluate(() => [...document.querySelectorAll('[data-item]')].map((x) => x.getAttribute('data-item')));
 cobra('a tônica saiu da lista da semana', !depois.includes('ton') && depois.includes('gin'), depois.join(','));
+
+console.log('\n### "FIZ TUDO ERRADO": DESFAZER AS CONTAGENS DE HOJE');
+// O estoque de cada garrafa volta pro que seria SEM as contagens — e as vendas
+// que a comanda baixou depois continuam valendo. Não é voltar pro número
+// de antes: é tirar do saldo de agora a diferença que cada contagem fez.
+{
+  const antes = await painel();
+  const velhaCfg = antes.controleDoses;
+  const deHoje = (velhaCfg.registros || []).filter((x) => x.data === HOJE);
+  const soma = {};
+  for (const x of deHoje) soma[x.estoqueId] = (soma[x.estoqueId] || 0) + x.diferenca;
+  const esperado = {};
+  for (const it of antes.estoque || []) if (soma[it.id] != null) esperado[it.id] = num3(Math.max(0, num3(it.saldo) - soma[it.id]));
+  pg.on('dialog', (d) => d.accept());
+  txt = await texto();
+  cobra(`a tela oferece desfazer as ${deHoje.length} contagens de hoje`, new RegExp(`Desfazer as ${deHoje.length} contagens de hoje`, 'i').test(txt), (txt.match(/[^\n]*Desfazer[^\n]*/i) || ['(sem botão)'])[0]);
+  await tocar(`Desfazer as ${deHoje.length} contagens de hoje`);
+  await pg.waitForTimeout(3500);
+  const depois = await painel();
+  cobra('as contagens de hoje saíram da lista', ((depois.controleDoses || {}).registros || []).every((x) => x.data !== HOJE), JSON.stringify(((depois.controleDoses || {}).registros || []).map((x) => x.data)));
+  const voltou = Object.keys(esperado).map((id) => [id, num3((depois.estoque || []).find((x) => x.id === id)?.saldo), esperado[id]]);
+  cobra('e o estoque de cada garrafa voltou, com as vendas de depois descontadas', voltou.every(([, tem, quer]) => tem === quer), JSON.stringify(voltou));
+  // 'gin': contou 1,5 do nada (partida), vendeu 0,4, contou 1,1 (bateu).
+  // Sem as contagens: o cadastro menos o que vendeu.
+  txt = await texto();
+  cobra('a tela avisa que desfez', /desfiz as \d+ contagens de hoje/i.test(txt), (txt.match(/[^\n]*desfiz[^\n]*/i) || ['(sem aviso)'])[0]);
+  cobra('e o botão de desfazer sumiu', !/Desfazer as \d+ contagens de hoje/i.test(txt));
+  // Uma tela velha da dona, aberta antes do desfazer, salva o painel com as
+  // contagens ainda na memória: elas NÃO podem voltar.
+  const r2 = await pg.evaluate(async (cfg) => (await fetch('/api/data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ controleDoses: cfg }) })).status, velhaCfg);
+  await pg.waitForTimeout(600);
+  const final = await painel();
+  cobra('uma tela velha salvando por cima não traz as contagens de volta', r2 === 200 && ((final.controleDoses || {}).registros || []).every((x) => x.data !== HOJE), `status=${r2} ${JSON.stringify(((final.controleDoses || {}).registros || []).map((x) => x.data))}`);
+}
+
+console.log('\n### O RESULTADO DIZ PRIMEIRO SE É BOM OU RUIM');
+{
+  // Uma contagem nova depois do desfazer é de novo a primeira.
+  await tocar('Acabou a garrafa');
+  await pg.waitForTimeout(600);
+  await acabou('vdk', 1);
+  const res2 = await resultado();
+  cobra('a vodka, contada de novo, é primeira contagem outra vez', /primeira contagem — anotado/i.test(res2), res2.split('\n').slice(0, 4).join(' | '));
+}
+
+console.log('\n### "FIZ TUDO ERRADO" DEPOIS DA MEIA-NOITE: DESFAZ AS DE ONTEM');
+// Ela contou na terça à noite e pediu pra desfazer na quarta, 0h20. A rodada
+// de ontem é a que o botão oferece — não "nada pra desfazer hoje".
+{
+  await pg.waitForTimeout(2600);
+  const ONTEM = (() => { const d = new Date(`${HOJE}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })();
+  const p = await painel();
+  const saldoGin = num3((p.estoque || []).find((x) => x.id === 'gin')?.saldo);
+  // Tira a contagem de hoje (a da vodka) e põe uma de ontem, do gin: +0,5.
+  const ontem = { id: 'ontem1', estoqueId: 'gin', nome: 'Gin Tanqueray', unidade: 'grf', data: ONTEM, ts: Date.now() - 864e5, tipo: 'semanal', esperado: saldoGin - 0.5, contado: saldoGin, diferenca: 0.5, estado: 'sobrou', doses: 7.5 };
+  await gravar({ ...p, controleDoses: { ...p.controleDoses, registros: [ontem, ...(p.controleDoses.registros || []).filter((x) => x.data !== HOJE)] } });
+  await pg.reload({ waitUntil: 'domcontentloaded' });
+  await pg.waitForTimeout(3600);
+  await abrirControle();
+  const ddmm = `${ONTEM.slice(8, 10)}/${ONTEM.slice(5, 7)}`;
+  txt = await texto();
+  cobra(`o botão oferece desfazer a contagem de ontem (${ddmm})`, txt.includes(`Desfazer a contagem de ontem (${ddmm})`), (txt.match(/[^\n]*Desfazer[^\n]*/i) || ['(sem botão)'])[0]);
+  await tocar(`Desfazer a contagem de ontem (${ddmm})`);
+  await pg.waitForTimeout(3500);
+  const depois = await painel();
+  cobra('a de ontem saiu da lista', !((depois.controleDoses || {}).registros || []).some((x) => x.id === 'ontem1'));
+  cobra('e o gin voltou 0,5', num3((depois.estoque || []).find((x) => x.id === 'gin')?.saldo) === num3(saldoGin - 0.5), `${num3((depois.estoque || []).find((x) => x.id === 'gin')?.saldo)} (era ${saldoGin})`);
+}
 
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
