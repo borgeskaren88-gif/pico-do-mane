@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, Empty, SecTitle, PageTitle, KPI } from './ui';
 import RelogioPonto from './RelogioPonto';
 import { fmtDate, todayISO, mesLabel, brl, num } from '../lib/util';
-import { saldoDaPessoa, saldoAcumulado, emReais, valorHoraDoMes, diasDeEscalaDoMes, horasJornada as horasJornadaLib, horasDoTurno, fmtHoras, recadoDoSaldo, aPagarNoMes, saldoAntesDoMes } from '../lib/ponto';
+import { saldoDaPessoa, saldoAcumulado, emReais, valorHoraDoMes, diasDeEscalaDoMes, horasJornada as horasJornadaLib, horasDoTurno, fmtHoras, recadoDoSaldo, aPagarNoMes, saldoAntesDoMes, alternadoValido, diasPorSemana, proximosAlternados } from '../lib/ponto';
 
 const norm = (s) => (s || '').trim().toLowerCase();
 const horaBR = (iso) => { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch { return ''; } };
@@ -14,6 +14,9 @@ const horasDe = horasDoTurno;
 // horas dela (devendo ou sobrando) sai certo, na tela dela e na tua.
 const SETORES = [['cozinha', 'Cozinha'], ['garcom', 'Atendimento'], ['gerente', 'Gerente']];
 const DIAS = [[0, 'Dom'], [1, 'Seg'], [2, 'Ter'], [3, 'Qua'], [4, 'Qui'], [5, 'Sex'], [6, 'Sáb']];
+const DIA_NOME = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+const DIA_PLURAL = ['domingos', 'segundas', 'terças', 'quartas', 'quintas', 'sextas', 'sábados'];
+const fmtDiaMes = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const horasJornada = horasJornadaLib;
 
 // Ponto na visão da DONA: horas trabalhadas por pessoa no mês + saldo (em haver /
@@ -53,14 +56,16 @@ export default function PontoDona() {
   const abrirConfig = () => {
     const base = {};
     for (const [k] of SETORES) base[k] = jornadas[k]
-      ? { nome: jornadas[k].nome || '', dias: [...(jornadas[k].dias || [])], entrada: jornadas[k].entrada || '16:00', saida: jornadas[k].saida || '00:00', salarioMes: jornadas[k].salarioMes ? String(jornadas[k].salarioMes).replace('.', ',') : '' }
+      ? { nome: jornadas[k].nome || '', dias: [...(jornadas[k].dias || [])], entrada: jornadas[k].entrada || '16:00', saida: jornadas[k].saida || '00:00', salarioMes: jornadas[k].salarioMes ? String(jornadas[k].salarioMes).replace('.', ',') : '', alternado: jornadas[k].alternado || null }
       : { nome: '', dias: [], entrada: '16:00', saida: '00:00', salarioMes: '' };
     setForm(base); setMsg(''); setConfigAberto(true);
   };
   const toggleDia = (setor, d) => setForm((f) => {
     const j = f[setor] || { dias: [], entrada: '16:00', saida: '00:00' };
     const dias = j.dias.includes(d) ? j.dias.filter((x) => x !== d) : [...j.dias, d].sort((a, b) => a - b);
-    return { ...f, [setor]: { ...j, dias } };
+    // Tirou o dia que era "um sim, um não": a regra sai junto.
+    const alternado = j.alternado && dias.includes(Number(j.alternado.dia)) ? j.alternado : null;
+    return { ...f, [setor]: { ...j, dias, alternado } };
   });
   const setHora = (setor, campo, v) => setForm((f) => ({ ...f, [setor]: { ...(f[setor] || { dias: [], entrada: '16:00', saida: '00:00' }), [campo]: v } }));
   const salvarJornadas = async () => {
@@ -304,7 +309,7 @@ export default function PontoDona() {
               const j = form[k] || { dias: [], entrada: '16:00', saida: '00:00' };
               const h = horasJornada(j);
               return (
-                <div key={k} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 12, marginTop: 12 }}>
+                <div key={k} data-jornada={k} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 12, marginTop: 12 }}>
                   <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>{rot}</div>
                   <div style={{ marginBottom: 10 }}>
                     <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginBottom: 4 }}>Nome do funcionário</div>
@@ -343,8 +348,44 @@ export default function PontoDona() {
                     <label style={{ fontSize: 13, color: C.muted, display: 'flex', alignItems: 'center', gap: 6 }}>Sai
                       <input type="time" value={j.saida} onChange={(e) => setHora(k, 'saida', e.target.value)} style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 8, padding: '6px 8px', fontSize: 14 }} />
                     </label>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: C.accent }}>{j.dias.length ? `${j.dias.length} dia(s) × ${fmtHoras(h)} = ${fmtHoras(h * j.dias.length)}/semana` : 'sem dias'}</span>
+                    <span data-jornada-semana={k} style={{ fontSize: 12, fontWeight: 700, color: C.accent }}>{j.dias.length
+                      ? (alternadoValido(j)
+                        ? `${String(diasPorSemana(j)).replace('.', ',')} dias × ${fmtHoras(h)} = ${fmtHoras(h * diasPorSemana(j))}/semana, em média`
+                        : `${j.dias.length} dia(s) × ${fmtHoras(h)} = ${fmtHoras(h * j.dias.length)}/semana`)
+                      : 'sem dias'}</span>
                   </div>
+                  {/* UM SIM, UM NÃO: "a Sarah folga dois sábados no mês". */}
+                  {j.dias.length > 0 && (() => {
+                    const alt = j.alternado || null;
+                    const valido = alternadoValido(j);
+                    const prox = valido ? proximosAlternados(j, todayISO(), 3) : [];
+                    const setAlt = (v) => setForm((f) => ({ ...f, [k]: { ...(f[k] || j), alternado: v } }));
+                    return (
+                      <div data-alternado={k} style={{ marginTop: 10, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: '10px 12px' }}>
+                        <label style={{ fontSize: 12.5, color: C.muted, fontWeight: 700, display: 'block', marginBottom: 6 }}>Algum desses dias é <b style={{ color: C.text }}>um sim, um não</b>?</label>
+                        <select value={alt ? String(alt.dia) : ''} onChange={(e) => setAlt(e.target.value === '' ? null : { dia: Number(e.target.value), base: '' })}
+                          style={{ background: C.panel, border: `1px solid ${C.line}`, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 14, width: '100%' }}>
+                          <option value="">Não — trabalha todos esses dias, toda semana</option>
+                          {j.dias.map((d) => <option key={d} value={String(d)}>{`${DIA_PLURAL[d][0].toUpperCase()}${DIA_PLURAL[d].slice(1)}: um sim, um não`}</option>)}
+                        </select>
+                        {alt && (
+                          <div style={{ marginTop: 8 }}>
+                            <label style={{ fontSize: 12.5, color: C.muted, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              Um {DIA_NOME[alt.dia]} em que ela TRABALHA:
+                              <input type="date" value={alt.base || ''} onChange={(e) => setAlt({ ...alt, base: e.target.value })}
+                                style={{ background: C.panel, border: `1px solid ${C.line}`, color: C.text, borderRadius: 8, padding: '6px 8px', fontSize: 14 }} />
+                            </label>
+                            {alt.base && !valido && <div style={{ fontSize: 12, color: C.red, marginTop: 6, fontWeight: 700 }}>Essa data não é um {DIA_NOME[alt.dia]}. Escolhe um {DIA_NOME[alt.dia]} em que ela trabalha.</div>}
+                            {valido && (
+                              <div data-proximos={k} style={{ fontSize: 12.5, color: C.text, marginTop: 6, lineHeight: 1.5 }}>
+                                Próximos {DIA_PLURAL[alt.dia]} dela: <b>{prox.map(fmtDiaMes).join(', ')}</b>. Nos outros, folga.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
