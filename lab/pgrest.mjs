@@ -30,6 +30,11 @@ const marcar = (rotulo, bytes) => {
 function filtrar(qs) {
   const f = qs.get('chave') || '';
   if (f.startsWith('eq.')) { const k = f.slice(3); return (ch) => ch === k; }
+  // `chave=in.("a","b")` — o rádio lê e apaga vários recados de uma vez.
+  if (f.startsWith('in.(') && f.endsWith(')')) {
+    const ks = new Set(f.slice(4, -1).split(',').map((x) => x.trim().replace(/^"(.*)"$/, '$1')).filter(Boolean));
+    return (ch) => ks.has(ch);
+  }
   if (f.startsWith('like.')) {
     const p = f.slice(5).replace(/[%*]$/, '');
     return (ch) => ch.startsWith(p);

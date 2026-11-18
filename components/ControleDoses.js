@@ -255,18 +255,23 @@ export default function ControleDoses({ estoque = [], fichas = [], cardapio = []
   const ultimaSemanal = cfg.registros.filter((r) => r.tipo === 'semanal').sort((a, b) => (b.ts || 0) - (a.ts || 0))[0] || null;
   const diasSemConferir = diasDesde(ultimaSemanal && ultimaSemanal.ts);
   const historico = cfg.registros.slice(0, 25);
-  const deHoje = cfg.registros.filter((r) => r.data === hoje).length;
+  // A ÚLTIMA RODADA DE CONTAGENS: o dia mais recente que tem contagem, se foi
+  // nos últimos 3 dias. "Fiz tudo errado" às vezes é dito depois da meia-noite.
+  const ultimoDia = cfg.registros.reduce((m, r) => (r.data && r.data > m ? r.data : m), '');
+  const diasAtras = ultimoDia ? Math.round((new Date(`${hoje}T12:00:00Z`) - new Date(`${ultimoDia}T12:00:00Z`)) / 864e5) : 99;
+  const daRodada = diasAtras <= 3 ? cfg.registros.filter((r) => r.data === ultimoDia).length : 0;
+  const quando = diasAtras === 0 ? 'de hoje' : diasAtras === 1 ? `de ontem (${fmtDate(ultimoDia).slice(0, 5)})` : `de ${fmtDate(ultimoDia).slice(0, 5)}`;
 
   const desfazerHoje = async () => {
-    if (busy || !deHoje) return;
-    if (typeof window !== 'undefined' && !window.confirm(`Desfazer as ${deHoje} contagens de hoje? O estoque de cada garrafa volta pro que era antes delas.`)) return;
+    if (busy || !daRodada) return;
+    if (typeof window !== 'undefined' && !window.confirm(`Desfazer ${daRodada === 1 ? 'a contagem' : `as ${daRodada} contagens`} ${quando}? O estoque de cada garrafa volta pro que era antes delas.`)) return;
     setBusy(true); setErro(''); setDesfeito('');
-    const j = await onAcao({ acao: 'desfazerContagens' });
+    const j = await onAcao({ acao: 'desfazerContagens', data: ultimoDia });
     setBusy(false);
     if (!j || !j.ok) { setErro((j && j.erro) || 'Não consegui desfazer. Tenta de novo.'); return; }
     onControle(lerConfig(j.controleDoses));
     setSaidas([]);
-    setDesfeito(`Pronto: desfiz ${j.quantas === 1 ? 'a contagem' : `as ${j.quantas} contagens`} de hoje. O estoque voltou. Pode contar de novo quando quiser.`);
+    setDesfeito(`Pronto: desfiz ${j.quantas === 1 ? 'a contagem' : `as ${j.quantas} contagens`} ${quando}. O estoque voltou. Pode contar de novo quando quiser.`);
   };
 
   const pill = (on) => ({
@@ -425,12 +430,12 @@ export default function ControleDoses({ estoque = [], fichas = [], cardapio = []
       )}
 
       <SecTitle>Últimas contagens</SecTitle>
-      {/* "FIZ TUDO ERRADO." Desfazer as contagens de hoje: o estoque de cada
+      {/* "FIZ TUDO ERRADO." Desfazer a última rodada de contagens: o estoque de cada
           garrafa volta pro que seria sem elas (as vendas de depois continuam
           valendo), e as contagens saem da lista. */}
-      {deHoje > 0 && (
+      {daRodada > 0 && (
         <div data-desfazer style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-          <Btn small kind="ghost" disabled={busy} onClick={desfazerHoje}>Desfazer as {deHoje === 1 ? 'contagem' : `${deHoje} contagens`} de hoje</Btn>
+          <Btn small kind="ghost" disabled={busy} onClick={desfazerHoje}>{daRodada === 1 ? 'Desfazer a contagem' : `Desfazer as ${daRodada} contagens`} {quando}</Btn>
           <span style={{ fontSize: 12, color: C.faint }}>o estoque volta pro que era antes</span>
         </div>
       )}

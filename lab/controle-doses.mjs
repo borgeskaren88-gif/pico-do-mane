@@ -343,6 +343,30 @@ console.log('\n### O RESULTADO DIZ PRIMEIRO SE É BOM OU RUIM');
   cobra('a vodka, contada de novo, é primeira contagem outra vez', /primeira contagem — anotado/i.test(res2), res2.split('\n').slice(0, 4).join(' | '));
 }
 
+console.log('\n### "FIZ TUDO ERRADO" DEPOIS DA MEIA-NOITE: DESFAZ AS DE ONTEM');
+// Ela contou na terça à noite e pediu pra desfazer na quarta, 0h20. A rodada
+// de ontem é a que o botão oferece — não "nada pra desfazer hoje".
+{
+  await pg.waitForTimeout(2600);
+  const ONTEM = (() => { const d = new Date(`${HOJE}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })();
+  const p = await painel();
+  const saldoGin = num3((p.estoque || []).find((x) => x.id === 'gin')?.saldo);
+  // Tira a contagem de hoje (a da vodka) e põe uma de ontem, do gin: +0,5.
+  const ontem = { id: 'ontem1', estoqueId: 'gin', nome: 'Gin Tanqueray', unidade: 'grf', data: ONTEM, ts: Date.now() - 864e5, tipo: 'semanal', esperado: saldoGin - 0.5, contado: saldoGin, diferenca: 0.5, estado: 'sobrou', doses: 7.5 };
+  await gravar({ ...p, controleDoses: { ...p.controleDoses, registros: [ontem, ...(p.controleDoses.registros || []).filter((x) => x.data !== HOJE)] } });
+  await pg.reload({ waitUntil: 'domcontentloaded' });
+  await pg.waitForTimeout(3600);
+  await abrirControle();
+  const ddmm = `${ONTEM.slice(8, 10)}/${ONTEM.slice(5, 7)}`;
+  txt = await texto();
+  cobra(`o botão oferece desfazer a contagem de ontem (${ddmm})`, txt.includes(`Desfazer a contagem de ontem (${ddmm})`), (txt.match(/[^\n]*Desfazer[^\n]*/i) || ['(sem botão)'])[0]);
+  await tocar(`Desfazer a contagem de ontem (${ddmm})`);
+  await pg.waitForTimeout(3500);
+  const depois = await painel();
+  cobra('a de ontem saiu da lista', !((depois.controleDoses || {}).registros || []).some((x) => x.id === 'ontem1'));
+  cobra('e o gin voltou 0,5', num3((depois.estoque || []).find((x) => x.id === 'gin')?.saldo) === num3(saldoGin - 0.5), `${num3((depois.estoque || []).find((x) => x.id === 'gin')?.saldo)} (era ${saldoGin})`);
+}
+
 await b.close();
 console.log(ruim === 0 ? '\nTUDO OK' : `\n${ruim} COISA(S) RUIM(NS)`);
 process.exit(ruim === 0 ? 0 : 1);
