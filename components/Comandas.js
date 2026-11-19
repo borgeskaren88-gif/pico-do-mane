@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, PageTitle } from './ui';
 import { brl, num } from '../lib/util';
+import { gerarCupomPdf } from '../lib/cupomPdf';
 
 // A LISTA FIXA QUE MORAVA AQUI FOI EMBORA.
 //
@@ -301,6 +302,8 @@ export default function Comandas({ papel = 'dona' }) {
   useEffect(() => { setAddQtds({}); }, [addDe]);
   const [dividirPor, setDividirPor] = useState(2); // divisor da conta (quantas pessoas rachando)
   const [info, setInfo] = useState({ nome: '', pessoas: '', obs: '' });
+  const [negocio, setNegocio] = useState({ nome: '', cidade: '' });
+  const [pdfMsg, setPdfMsg] = useState('');
   const infoDe = useRef(null); // id da comanda cujo info está carregado
   const editandoRef = useRef(false);
 
@@ -315,7 +318,7 @@ export default function Comandas({ papel = 'dona' }) {
       if (j.ok) {
         setComandas(j.comandas || []);
         setCaixaAberto(j.caixaAberto !== false);
-        if (!j.leve) { setCardapio(j.cardapio || []); setCats(j.cardapioCategorias || null); setClientes(j.clientes || []); if (j.mesasQtd) setMesasQtd(j.mesasQtd); }
+        if (!j.leve) { setCardapio(j.cardapio || []); setCats(j.cardapioCategorias || null); setClientes(j.clientes || []); if (j.mesasQtd) setMesasQtd(j.mesasQtd); if (j.negocio) setNegocio(j.negocio); }
         setErro('');
       } else setErro(j.erro || 'Erro ao carregar.');
     } catch { setErro('Sem conexão.'); }
@@ -739,6 +742,43 @@ export default function Comandas({ papel = 'dona' }) {
     );
   }
 
+  // A CONTA EM PDF. "O cliente pediu a conta impressa e eu não consegui."
+  //
+  // No celular vai pra folha de compartilhar (Imprimir, WhatsApp, Salvar) —
+  // o "imprimir" do navegador não funciona no iPhone com o app instalado. No
+  // computador abre o PDF numa aba, que é onde a impressora está.
+  const contaEmPdf = async () => {
+    if (!sel) return;
+    setPdfMsg('');
+    const conta = contaDe(sel);
+    const agora = new Date();
+    const quando = agora.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+    const bytes = gerarCupomPdf({
+      negocio: negocio.nome, cidade: negocio.cidade, mesa: sel.mesa,
+      cliente: (info.nome || sel.nome || '').trim(), pessoas: Number(info.pessoas) || Number(sel.pessoas) || 0,
+      quando, itens: sel.itens || [], subtotal: conta.subtotal, servicoVal: conta.servicoVal, total: conta.total,
+      jaPago: somaParciais(sel), titulo: `Conta da mesa ${sel.mesa}`,
+    });
+    const carimbo = quando.replace(/[^0-9]/g, '').slice(0, 4) + '-' + quando.replace(/[^0-9]/g, '').slice(8, 12);
+    const nome = `Conta-mesa-${String(sel.mesa).replace(/[^a-zA-Z0-9]/g, '') || 'balcao'}-${carimbo}.pdf`;
+    const arq = new File([bytes], nome, { type: 'application/pdf' });
+    const ua = navigator.userAgent || '';
+    const celular = /Android|iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (celular && navigator.canShare && navigator.canShare({ files: [arq] })) {
+      try { await navigator.share({ files: [arq], title: `Conta da mesa ${sel.mesa}` }); return; } catch (e) {
+        if (e && e.name === 'AbortError') return; // fechou a folha de compartilhar: tudo bem
+      }
+    }
+    const url = URL.createObjectURL(arq);
+    const aba = window.open(url, '_blank');
+    if (!aba) {
+      const a = document.createElement('a');
+      a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+      setPdfMsg('O PDF foi baixado. Abre ele pra imprimir.');
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  };
+
   // ---- Detalhe de uma comanda (só o que foi pedido) ----
   if (sel) {
     const conta = contaDe(sel);
@@ -748,7 +788,17 @@ export default function Comandas({ papel = 'dona' }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <button onClick={() => setSelId(null)} style={{ background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>‹ Mesas</button>
           <div style={{ fontSize: 20, fontWeight: 900 }}>Mesa {sel.mesa}</div>
+          {sel.itens.length > 0 && (
+            <button data-conta-pdf onClick={contaEmPdf} title="A conta em PDF, pra imprimir ou mandar pro cliente" style={{
+              marginLeft: 'auto', background: 'transparent', border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 10,
+              padding: '7px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2" /><path d="M6 14h12v7H6z" /></svg>
+              Conta em PDF
+            </button>
+          )}
         </div>
+        {pdfMsg && <div data-conta-pdf-msg style={{ fontSize: 12.5, color: C.green, fontWeight: 700, margin: '-6px 0 10px' }}>{pdfMsg}</div>}
 
         <Card style={{ marginBottom: 14, padding: 14 }}>
           <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>
