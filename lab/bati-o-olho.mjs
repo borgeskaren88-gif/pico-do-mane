@@ -100,7 +100,7 @@ const bloco = (sel) => pg.evaluate((s) => { const x = document.querySelector(s);
 // ---------------------------------------------------------------------------
 console.log('\n### O PLACAR: QUANTO SAIU SEM VENDER');
 await irPara('Abastecimento');
-await irPara('Cortesia / Consumo');
+await irPara('Saiu sem vender');
 await pg.waitForTimeout(1200);
 let placar = await bloco('[data-placar="sem-vender"]');
 cobra('o placar está no topo da tela', !!placar, placar.slice(0, 120) || '(não achou)');
@@ -108,8 +108,10 @@ cobra('o placar está no topo da tela', !!placar, placar.slice(0, 120) || '(não
 cobra('total do mês: R$ 68,50', /R\$ 68,50/.test(placar), placar.slice(0, 200));
 cobra('cortesia: R$ 30,00, 1 vez', /R\$ 30,00 1 vez/.test(await bloco('[data-balde="cortesia"]')), await bloco('[data-balde="cortesia"]'));
 cobra('consumo da casa: R$ 15,00, 1 vez', /R\$ 15,00 1 vez/.test(await bloco('[data-balde="consumo"]')), await bloco('[data-balde="consumo"]'));
-// Quebra, desperdício e vencido caem todos em perda: 7,50 + 12,00 + 4,00.
-cobra('perda: R$ 23,50, 3 vezes', /R\$ 23,50 3 vezes/.test(await bloco('[data-balde="perda"]')), await bloco('[data-balde="perda"]'));
+// A quebra tem balde próprio agora ("quebrou, congelou..."): 7,50.
+cobra('quebrou: R$ 7,50, 1 vez', /R\$ 7,50 1 vez/.test(await bloco('[data-balde="quebra"]')), await bloco('[data-balde="quebra"]'));
+// Desperdício e vencido ficam em perda: 12,00 + 4,00.
+cobra('perda: R$ 16,00, 2 vezes', /R\$ 16,00 2 vezes/.test(await bloco('[data-balde="perda"]')), await bloco('[data-balde="perda"]'));
 // A venda de 50 (375,00) e a cortesia do mês passado (75,00) não podem entrar.
 cobra('a venda e o mês passado ficaram de fora', !/R\$ 443,50|R\$ 143,50|R\$ 105,00/.test(placar), placar.slice(0, 200));
 cobra('avisa que 1 saída ficou de fora por falta de custo', /1 saída ficou de fora dessa soma porque o item não tem custo/.test(placar), (placar.match(/\d+ saída[^.]*\./) || ['(não avisa)'])[0]);
