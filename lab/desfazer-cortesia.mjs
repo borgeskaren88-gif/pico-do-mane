@@ -91,7 +91,7 @@ const escrever = (valor) => pg.evaluate((v) => {
 }, valor);
 
 await irPara('Abastecimento');
-await irPara('Cortesia / Consumo');
+await irPara('Saiu sem vender');
 await pg.waitForTimeout(1200);
 
 console.log('\n### O DEDO ERRADO: 11 HEINEKEN EM VEZ DE 1');
