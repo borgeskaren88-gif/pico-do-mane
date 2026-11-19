@@ -6,6 +6,7 @@ import { disponibilidadeCardapio, aplicarBaixasVendas, aplicarMovimentoItem, qtd
 import { num, limparNome, fiadoDaVenda, abertoDaVenda, brl, diaOperacional } from '../../../lib/util';
 import { precoAgora, promoValeAgora } from '../../../lib/promocao';
 import { fiadoEmAberto, situacaoFiado } from '../../../lib/clientes';
+import { lerNegocio } from '../../../lib/negocio';
 import { enviarPush, notificarEstoqueCritico, notificarComandaFechada, notificarSaidaSemVenda } from '../../../lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -514,7 +515,10 @@ export async function GET(request) {
     // ela aqui, a tela do garçom voltaria a usar uma lista fixa própria — e
     // duas listas que precisam concordar sempre acabam discordando.
     const cardapioCategorias = Array.isArray(blob.cardapioCategorias) ? blob.cardapioCategorias : null;
-    return NextResponse.json({ ok: true, comandas, cardapio, cardapioCategorias, mesasQtd: mesasDe(blob), clientes, estoqueItens, caixaAberto });
+    // O nome e a cidade do bar, pro topo da conta em PDF que vai pro cliente.
+    const neg = lerNegocio(blob);
+    const negocio = { nome: neg.nome || '', cidade: neg.cidade || '' };
+    return NextResponse.json({ ok: true, comandas, cardapio, cardapioCategorias, mesasQtd: mesasDe(blob), clientes, estoqueItens, caixaAberto, negocio });
   } catch (e) {
     return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao carregar comandas.' }, { status: 500 });
   }

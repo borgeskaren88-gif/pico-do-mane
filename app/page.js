@@ -7,7 +7,6 @@ import Garcom from '../components/Garcom';
 import Reservas from '../components/Reservas';
 import Gerente from '../components/Gerente';
 import SaiSozinho from '../components/SaiSozinho';
-import Radio from '../components/Radio';
 
 export default function Home() {
   const valorCookie = cookies().get(nomeCookie())?.value;
@@ -16,13 +15,10 @@ export default function Home() {
   // No computador ninguém fica logado: fechou e voltou, cai na tela de entrar e
   // cada um entra com o login dele. O notebook do balcão passa de mão em mão.
   // No celular e no tablet continua logado, que são aparelhos de uma pessoa só.
-  //
-  // O <Radio /> (o botão redondo do canto) vai em todas as telas da equipe:
-  // quem está na cozinha fala com quem está no salão, e a dona com todo mundo.
-  if (papel === 'dona') return <SaiSozinho><Dashboard /><Radio /></SaiSozinho>;
-  if (papel === 'cozinha') return <SaiSozinho><Cozinha /><Radio /></SaiSozinho>;
-  if (papel === 'garcom') return <SaiSozinho><Garcom /><Radio /></SaiSozinho>;
-  if (papel === 'reservas') return <SaiSozinho><Reservas /><Radio /></SaiSozinho>;
-  if (papel === 'gerente') return <SaiSozinho><Gerente /><Radio /></SaiSozinho>;
+  if (papel === 'dona') return <SaiSozinho><Dashboard /></SaiSozinho>;
+  if (papel === 'cozinha') return <SaiSozinho><Cozinha /></SaiSozinho>;
+  if (papel === 'garcom') return <SaiSozinho><Garcom /></SaiSozinho>;
+  if (papel === 'reservas') return <SaiSozinho><Reservas /></SaiSozinho>;
+  if (papel === 'gerente') return <SaiSozinho><Gerente /></SaiSozinho>;
   return <LoginForm />;
 }

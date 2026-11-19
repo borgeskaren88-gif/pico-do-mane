@@ -3,7 +3,7 @@
 // "trava" numa versão antiga) e só cai no cache quando está offline / sem
 // internet. As chamadas de dados (/api/...) nunca são cacheadas, pra não
 // mostrar número velho nem atrapalhar o salvamento.
-const CACHE = 'picoos-v5';
+const CACHE = 'picoos-v6';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
@@ -75,17 +75,7 @@ self.addEventListener('push', (e) => {
     tag: data.tag || undefined,
     renotify: !!data.tag,
   };
-  // RECADO DO RÁDIO: se o PicoOS estiver aberto em alguma tela, ele mesmo
-  // toca o recado (no fone, sem ninguém tocar em nada). A notificação aparece
-  // de qualquer jeito — o celular exige, e é ela que fica pra quem estava com
-  // a tela apagada.
-  const radio = data.dados && data.dados.radio;
-  const avisarTelas = radio
-    ? self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((lista) => { for (const c of lista) c.postMessage({ tipo: 'radio', id: radio }); })
-      .catch(() => {})
-    : Promise.resolve();
-  e.waitUntil(Promise.all([avisarTelas, self.registration.showNotification(title, options)]));
+  e.waitUntil(self.registration.showNotification(title, options));
 });
 
 // Tocar na notificação: foca uma aba já aberta ou abre o app na tela certa.
