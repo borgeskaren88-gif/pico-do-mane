@@ -142,17 +142,19 @@ export default function VendasDoDia({ vendas = [], fichas = [], estoque = [], po
   const [corrFeito, setCorrFeito] = useState({ id: '', texto: '' });
   const abrirCorrecao = (v) => { setCorrId(v.id); setQtds((v.itens || []).map((it) => Number(it.qtd) || 0)); setMotivoCorr(''); setCorrErro(''); setCorrFeito({ id: '', texto: '' }); };
   const salvarCorrecao = async (v) => {
+    const prev = corrigirVenda(v, qtds);
+    if (prev.cancelada && typeof window !== 'undefined' && !window.confirm(`Cancelar a venda inteira da mesa ${v.mesa || '—'} (${brl(Number(v.total) || 0)})? O que foi lançado volta pro estoque e o valor sai do caixa.`)) return;
     setCorrBusy(true); setCorrErro('');
     try {
       const r = await fetch('/api/vendas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'corrigir', id: v.id, qtds, motivo: motivoCorr }) });
       const j = await r.json();
       if (!j.ok) { setCorrErro(j.erro || 'Não consegui corrigir.'); return; }
-      const partes = [`O total foi de ${brl(Number(v.total) || 0)} pra ${brl(j.venda.total)}`];
+      const partes = [j.cancelada ? `Venda da mesa ${v.mesa || '—'} cancelada (${brl(Number(v.total) || 0)})` : `O total foi de ${brl(Number(v.total) || 0)} pra ${brl(j.venda.total)}`];
       const formas = Object.entries(j.reducoes || {}).map(([f, x]) => `${f} −${brl(x)}`).join(', ');
       if (formas) partes.push(`saiu do pagamento: ${formas}`);
       if ((j.devolvidos || []).length) partes.push(`voltou pro estoque: ${j.devolvidos.map((d) => `${String(d.qtd).replace('.', ',')} ${d.unidade} de ${d.nome}`).join(', ')}`);
       if (j.caixaAjustado) partes.push('o caixa daquele dia foi refeito');
-      setCorrFeito({ id: v.id, texto: `Corrigido. ${partes.join(' · ')}.` });
+      setCorrFeito({ id: j.cancelada ? 'topo' : v.id, texto: `${j.cancelada ? 'Pronto.' : 'Corrigido.'} ${partes.join(' · ')}.` });
       setCorrId('');
       if (onCorrigido) await onCorrigido(j);
     } catch { setCorrErro('Sem conexão.'); }
@@ -368,6 +370,7 @@ export default function VendasDoDia({ vendas = [], fichas = [], estoque = [], po
             </Card>
           )}
 
+          {corrFeito.id === 'topo' && <div data-corrigido style={{ fontSize: 13, color: C.green, fontWeight: 700, margin: '0 0 10px', lineHeight: 1.45 }}>{corrFeito.texto}</div>}
           {visao === 'comanda' && filtradas.map((v) => {
             const itens = itensJuntos(v.itens);
             const subtotal = Number(v.subtotal) || itens.reduce((s, it) => s + it.qtd * it.preco, 0);
@@ -455,7 +458,10 @@ export default function VendasDoDia({ vendas = [], fichas = [], estoque = [], po
                   return (
                     <div data-painel-correcao style={{ marginTop: 10, border: `1px solid ${C.amber}`, borderRadius: 10, padding: 12 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 800, marginBottom: 2 }}>O que foi vendido de verdade?</div>
-                      <div style={{ fontSize: 12, color: C.faint, marginBottom: 8, lineHeight: 1.45 }}>Diminui o que foi lançado a mais. O que sair volta pro estoque, e o valor sai do pagamento.</div>
+                      <div style={{ fontSize: 12, color: C.faint, marginBottom: 8, lineHeight: 1.45 }}>
+                        Diminui o que foi lançado a mais. O que sair volta pro estoque, e o valor sai do pagamento.
+                        {' '}<b style={{ color: C.muted }}>Venda repetida</b> (a mesma conta fechada duas vezes)? Põe tudo em 0 que ela é cancelada inteira.
+                      </div>
                       {(v.itens || []).map((it, i) => {
                         const max = Number(it.qtd) || 0;
                         const q = qtds[i] ?? max;
@@ -471,7 +477,9 @@ export default function VendasDoDia({ vendas = [], fichas = [], estoque = [], po
                       <div style={{ marginTop: 8 }}><TextInput value={motivoCorr} onChange={setMotivoCorr} placeholder="Por quê? (opcional) Ex.: lançou 2, vendeu 1" /></div>
                       {prev.venda ? (
                         <div data-previa style={{ fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>
-                          Novo total: <b>{brl(prev.venda.total)}</b> <span style={{ color: C.amber }}>(−{brl(prev.reducao)})</span><br />
+                          {prev.cancelada
+                            ? <><b style={{ color: C.red }}>A venda inteira vai ser cancelada</b> ({brl(prev.reducao)}).</>
+                            : <>Novo total: <b>{brl(prev.venda.total)}</b> <span style={{ color: C.amber }}>(−{brl(prev.reducao)})</span></>}<br />
                           Sai do pagamento: {Object.entries(prev.reducoes).map(([f, x]) => `${f} −${brl(x)}`).join(', ')}
                         </div>
                       ) : (
@@ -479,7 +487,7 @@ export default function VendasDoDia({ vendas = [], fichas = [], estoque = [], po
                       )}
                       {corrErro && <div style={{ fontSize: 12.5, color: C.red, fontWeight: 700, marginTop: 6 }}>{corrErro}</div>}
                       <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                        <Btn small kind="ok" disabled={corrBusy || !prev.venda} onClick={() => salvarCorrecao(v)}>{corrBusy ? 'Salvando…' : 'Salvar correção'}</Btn>
+                        <Btn small kind={prev.cancelada ? 'danger' : 'ok'} disabled={corrBusy || !prev.venda} onClick={() => salvarCorrecao(v)}>{corrBusy ? 'Salvando…' : prev.cancelada ? 'Cancelar a venda inteira' : 'Salvar correção'}</Btn>
                         <Btn small kind="ghost" onClick={() => setCorrId('')}>Voltar</Btn>
                       </div>
                     </div>
