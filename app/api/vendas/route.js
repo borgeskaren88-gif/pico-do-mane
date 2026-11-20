@@ -288,8 +288,18 @@ export async function POST(request) {
       if (!v) return NextResponse.json({ ok: false, erro: 'Venda não encontrada.' }, { status: 404 });
       const r = corrigirVenda(v, Array.isArray(body?.qtds) ? body.qtds.map(Number) : null, { motivo: txt(body?.motivo, 120), por: 'dona' });
       if (r.erro) return NextResponse.json({ ok: false, erro: r.erro }, { status: 400 });
-      const { error: eV } = await sb.from('pdm_dados').upsert({ chave, valor: r.venda, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
-      if (eV) throw eV;
+      if (r.cancelada) {
+        // Venda repetida: sai da lista de vendas (senão contaria como uma
+        // comanda de R$ 0 no ticket médio e nas pessoas atendidas), mas não
+        // some sem rastro — fica guardada à parte, com o que foi cancelado.
+        const { error: eA } = await sb.from('pdm_dados').upsert({ chave: 'vendaCancelada:' + v.id, valor: r.venda, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+        if (eA) throw eA;
+        const { error: eD } = await sb.from('pdm_dados').delete().eq('chave', chave);
+        if (eD) throw eD;
+      } else {
+        const { error: eV } = await sb.from('pdm_dados').upsert({ chave, valor: r.venda, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+        if (eV) throw eV;
+      }
 
       // A DOSE VOLTA PRO ESTOQUE — só se esta venda chegou a baixar o estoque
       // (venda antiga, de antes das fichas, nunca tirou nada; devolver criaria
@@ -302,7 +312,7 @@ export async function POST(request) {
         if (baixou) {
           const fichas = new Map((Array.isArray(blob.fichas) ? blob.fichas : []).filter((f) => f && f.cardapioId).map((f) => [f.cardapioId, Array.isArray(f.itens) ? f.itens : []]));
           const estoque = (Array.isArray(blob.estoque) ? blob.estoque : []).slice();
-          const motivo = `Estorno · venda corrigida (Mesa ${v.mesa || '—'})`;
+          const motivo = `Estorno · venda ${r.cancelada ? 'cancelada' : 'corrigida'} (Mesa ${v.mesa || '—'})`;
           const tocados = new Set();
           for (const rem of r.removidos) {
             for (const ing of [...(fichas.get(rem.cardapioId) || []), ...rem.extras]) {
@@ -344,7 +354,7 @@ export async function POST(request) {
           if (menos > 0.004) receitaAjuste = { refCaixa: v.caixaId, menos, mesa: v.mesa || '' };
         }
       }
-      return NextResponse.json({ ok: true, venda: r.venda, reducao: r.reducao, reducoes: r.reducoes, devolvidos, caixaAjustado, receitaAjuste });
+      return NextResponse.json({ ok: true, venda: r.venda, cancelada: !!r.cancelada, reducao: r.reducao, reducoes: r.reducoes, devolvidos, caixaAjustado, receitaAjuste });
     }
 
     // Excluir uma venda (ex.: lançada por engano).
