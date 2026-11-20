@@ -368,12 +368,25 @@ export default function Comandas({ papel = 'dona' }) {
     }
   };
 
+  // "ACHOU QUE NÃO TINHA IDO." O servidor recusa fechar uma conta igual a
+  // uma fechada há poucos minutos; aqui a pessoa decide. Só fecha de novo se
+  // for mesmo outra conta igual (outra mesa pedindo a mesma coisa).
+  const confirmaRepetida = (j) => typeof window !== 'undefined' && window.confirm(
+    `${j.erro}\n\nEssa já foi! Se foi a mesma conta, NÃO feche de novo — toque em Cancelar.\n\nSó toque em OK se for OUTRA conta igual (outra pessoa pedindo a mesma coisa).`,
+  );
+  const AVISO_REPETIDA = (j) => `Não fechei de novo: a conta das ${j.repetida.hora} já tinha ido. Se esta comanda é a repetida, tira os itens dela (–) e exclui a mesa.`;
+
   const acao = (payload, { manterSel = true } = {}) => {
     const run = async () => {
       setBusy(true);
       try {
         const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        const j = await r.json();
+        let j = await r.json();
+        if (!j.ok && j.repetida) {
+          if (!confirmaRepetida(j)) { setErro(AVISO_REPETIDA(j)); return null; }
+          const r2 = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, confirmarRepetida: true }) });
+          j = await r2.json();
+        }
         if (!j.ok) { setErro(j.erro || 'Erro.'); return null; }
         if (j.comanda) {
           setComandas((cs) => {
@@ -466,8 +479,14 @@ export default function Comandas({ papel = 'dona' }) {
     // por conta própria, e o relatório da dona virava ficção.
     if (!(Number(fecharForm.pessoas) >= 1)) { setErro('Conta quantas pessoas estavam na mesa — é um toque, ali em cima.'); setFechando(false); return; }
     try {
-      const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: nomeCli, descontoPct: num(fecharForm.descontoPct || 0) }) });
-      const j = await r.json();
+      const corpo = { acao: 'fechar', comandaId: selId, pagamentos, pessoas: fecharForm.pessoas, nome: nomeCli, descontoPct: num(fecharForm.descontoPct || 0) };
+      const r = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+      let j = await r.json();
+      if (!j.ok && j.repetida) {
+        if (!confirmaRepetida(j)) { setFecharForm(null); setErro(AVISO_REPETIDA(j)); return; }
+        const r2 = await fetch('/api/comandas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...corpo, confirmarRepetida: true }) });
+        j = await r2.json();
+      }
       if (!j.ok) {
         // A conta já não existe? Provável: um toque anterior já fechou e a
         // resposta se perdeu no agito. Trata como fechada — não assusta.
