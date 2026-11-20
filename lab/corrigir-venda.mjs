@@ -40,6 +40,10 @@ const L = await import('data:text/javascript;base64,' + Buffer.from(fonte).toStr
   const d = L.corrigirVenda({ id: 'd', itens: [{ nome: 'A', qtd: 2, preco: 50 }], subtotal: 100, servico: 10, descontoPct: 10, desconto: 11, total: 99, pagamentos: [{ forma: 'Pix', valor: 99 }] }, [1]);
   cobra('desconto de 10% acompanha: 50 + 5 − 5,50 = 49,50', d.venda && d.venda.total === 49.5 && d.venda.desconto === 5.5 && d.reducoes.Pix === 49.5, JSON.stringify(d.venda && { total: d.venda.total, desconto: d.venda.desconto }));
   cobra('aumentar não pode', !!L.corrigirVenda(v, [4]).erro);
+  // Esperto: tira 2 chopps e põe 1 caipirinha a mais — o total cai, mas a
+  // caipirinha seria cobrada de quem já foi embora.
+  const mix = { id: 'm', itens: [{ nome: 'Chopp', qtd: 3, preco: 10 }, { nome: 'Caipirinha', qtd: 1, preco: 15 }], subtotal: 45, servico: 0, total: 45, pagamentos: [{ forma: 'Pix', valor: 45 }] };
+  cobra('nem aumentar um item escondido no meio de outro que diminuiu', /Só dá pra diminuir: Caipirinha/.test(L.corrigirVenda(mix, [1, 2]).erro || ''), L.corrigirVenda(mix, [1, 2]).erro || '(passou!)');
   cobra('zerar tudo não pode (aí é apagar a venda)', /apaga a venda/.test(L.corrigirVenda(v, [0]).erro || ''));
   cobra('sem mudança não pode', !!L.corrigirVenda(v, [3]).erro);
   const p = L.corrigirVenda({ id: 'p', itens: [{ nome: 'A', qtd: 2, preco: 20 }], subtotal: 40, servico: 0, total: 40, pagamentos: [{ forma: 'Pix', valor: 15, parcial: true }, { forma: 'Dinheiro', valor: 25 }] }, [1]);
