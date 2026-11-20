@@ -5,6 +5,8 @@ import { bancoDaSessao } from '../../../lib/negocioAtual';
 // `limparNome` e `abertoDaVenda` entram aqui pelo 'juntar'. O build NÃO acusa
 // identificador solto — só quebra na hora de rodar, com ela na frente.
 import { limparNome, abertoDaVenda } from '../../../lib/util';
+import { corrigirVenda, ajustarCaixaFechado } from '../../../lib/corrigirVenda';
+import { aplicarMovimentoItem, qtdNaUnidadeDoItem } from '../../../lib/estoque';
 
 export const dynamic = 'force-dynamic';
 
@@ -274,6 +276,75 @@ export async function POST(request) {
       const { error } = await sb.from('pdm_dados').upsert({ chave, valor: v, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
       if (error) throw error;
       return NextResponse.json({ ok: true, venda: v, aplicado: falta > 0.005 ? falta : 0, ref: ref || null });
+    }
+
+    // CORRIGIR: tirar o que não foi vendido ("lançou duas doses, vendeu uma").
+    // A conta mora em lib/corrigirVenda.js; aqui ficam as três coisas que
+    // precisam do banco: a venda, o estoque (a dose volta pra prateleira) e o
+    // caixa já fechado (a sobra/falta da gaveta é refeita).
+    if (acao === 'corrigir') {
+      const { data } = await sb.from('pdm_dados').select('valor').eq('chave', chave).maybeSingle();
+      const v = data?.valor;
+      if (!v) return NextResponse.json({ ok: false, erro: 'Venda não encontrada.' }, { status: 404 });
+      const r = corrigirVenda(v, Array.isArray(body?.qtds) ? body.qtds.map(Number) : null, { motivo: txt(body?.motivo, 120), por: 'dona' });
+      if (r.erro) return NextResponse.json({ ok: false, erro: r.erro }, { status: 400 });
+      const { error: eV } = await sb.from('pdm_dados').upsert({ chave, valor: r.venda, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+      if (eV) throw eV;
+
+      // A DOSE VOLTA PRO ESTOQUE — só se esta venda chegou a baixar o estoque
+      // (venda antiga, de antes das fichas, nunca tirou nada; devolver criaria
+      // garrafa do nada).
+      const devolvidos = [];
+      try {
+        const { data: pd } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
+        const blob = (pd?.valor && typeof pd.valor === 'object') ? pd.valor : {};
+        const baixou = Array.isArray(blob.estoqueBaixas) && blob.estoqueBaixas.includes(v.id);
+        if (baixou) {
+          const fichas = new Map((Array.isArray(blob.fichas) ? blob.fichas : []).filter((f) => f && f.cardapioId).map((f) => [f.cardapioId, Array.isArray(f.itens) ? f.itens : []]));
+          const estoque = (Array.isArray(blob.estoque) ? blob.estoque : []).slice();
+          const motivo = `Estorno · venda corrigida (Mesa ${v.mesa || '—'})`;
+          const tocados = new Set();
+          for (const rem of r.removidos) {
+            for (const ing of [...(fichas.get(rem.cardapioId) || []), ...rem.extras]) {
+              const i = estoque.findIndex((x) => x && x.id === ing.estoqueId);
+              if (i < 0) continue;
+              const qtd = Math.round(rem.qtd * qtdNaUnidadeDoItem(ing.qtd, ing.unidade, estoque[i]) * 1000) / 1000;
+              if (!(qtd > 0)) continue;
+              estoque[i] = aplicarMovimentoItem(estoque[i], 'entrada', qtd, motivo, undefined, { por: 'dona', estorno: v.id });
+              tocados.add(estoque[i].id);
+              devolvidos.push({ nome: limparNome(estoque[i].nome), qtd, unidade: estoque[i].unidade || 'un' });
+            }
+          }
+          if (devolvidos.length) {
+            // Relê o painel na hora de gravar e troca SÓ o estoque.
+            const { data: atual } = await sb.from('pdm_dados').select('valor').eq('chave', 'painel').maybeSingle();
+            const base = (atual?.valor && typeof atual.valor === 'object') ? atual.valor : blob;
+            const porId = new Map(estoque.map((x) => [x.id, x]));
+            const estoqueFinal = (Array.isArray(base.estoque) ? base.estoque : []).map((x) => (x && tocados.has(x.id) ? porId.get(x.id) : x));
+            const { error: eE } = await sb.from('pdm_dados').upsert({ chave: 'painel', valor: { ...base, estoque: estoqueFinal }, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+            if (eE) throw eE;
+          }
+        }
+      } catch (e) { /* a venda já está certa; o estoque se acerta na contagem */ }
+
+      // O CAIXA. Aberto: soma sozinho. Fechado: refaz os números guardados.
+      let caixaAjustado = false;
+      let receitaAjuste = null;
+      if (v.caixaId) {
+        const { data: cx } = await sb.from('pdm_dados').select('valor').eq('chave', 'caixa:' + v.caixaId).maybeSingle();
+        const novo = ajustarCaixaFechado(cx?.valor, r.reducoes, Math.max(0, r.servicoAntes - r.servicoDepois));
+        if (novo) {
+          const { error: eC } = await sb.from('pdm_dados').upsert({ chave: 'caixa:' + v.caixaId, valor: novo, atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+          if (eC) throw eC;
+          caixaAjustado = true;
+          const menos = Math.round(Object.entries(r.reducoes).filter(([f]) => f !== 'Fiado').reduce((s2, [, x]) => s2 + x, 0) * 100) / 100;
+          // A receita "Fechamento do caixa" (se já foi lançada) é da tela da
+          // dona: quem acerta é ela, pelo caminho normal de salvar — senão a
+          // tela aberta salvaria por cima o valor antigo.
+          if (menos > 0.004) receitaAjuste = { refCaixa: v.caixaId, menos, mesa: v.mesa || '' };
+        }
+      }
+      return NextResponse.json({ ok: true, venda: r.venda, reducao: r.reducao, reducoes: r.reducoes, devolvidos, caixaAjustado, receitaAjuste });
     }
 
     // Excluir uma venda (ex.: lançada por engano).

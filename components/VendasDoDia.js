@@ -1,8 +1,9 @@
 'use client';
 import React, { useMemo, useState } from 'react';
-import { C, Card, Empty, PageTitle, TextInput } from './ui';
+import { C, Card, Empty, PageTitle, TextInput, Btn } from './ui';
 import { brl, num, fmtDate, diaOperacional } from '../lib/util';
 import { custoDoItemVendido } from '../lib/cmv';
+import { corrigirVenda } from '../lib/corrigirVenda';
 
 // O QUE FOI VENDIDO, COMANDA POR COMANDA, NO DIA QUE ELA ESCOLHER.
 //
@@ -130,7 +131,33 @@ const Linha = ({ esq, dir, cor, forte }) => (
   </div>
 );
 
-export default function VendasDoDia({ vendas = [], fichas = [], estoque = [] }) {
+export default function VendasDoDia({ vendas = [], fichas = [], estoque = [], podeCorrigir = false, onCorrigido }) {
+  // CORRIGIR UMA VENDA FECHADA. "Lançou duas doses e fechou em dinheiro, mas
+  // vendeu uma só." Uma venda por vez: a que está aberta pra correção.
+  const [corrId, setCorrId] = useState('');
+  const [qtds, setQtds] = useState([]);
+  const [motivoCorr, setMotivoCorr] = useState('');
+  const [corrBusy, setCorrBusy] = useState(false);
+  const [corrErro, setCorrErro] = useState('');
+  const [corrFeito, setCorrFeito] = useState({ id: '', texto: '' });
+  const abrirCorrecao = (v) => { setCorrId(v.id); setQtds((v.itens || []).map((it) => Number(it.qtd) || 0)); setMotivoCorr(''); setCorrErro(''); setCorrFeito({ id: '', texto: '' }); };
+  const salvarCorrecao = async (v) => {
+    setCorrBusy(true); setCorrErro('');
+    try {
+      const r = await fetch('/api/vendas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'corrigir', id: v.id, qtds, motivo: motivoCorr }) });
+      const j = await r.json();
+      if (!j.ok) { setCorrErro(j.erro || 'Não consegui corrigir.'); return; }
+      const partes = [`O total foi de ${brl(Number(v.total) || 0)} pra ${brl(j.venda.total)}`];
+      const formas = Object.entries(j.reducoes || {}).map(([f, x]) => `${f} −${brl(x)}`).join(', ');
+      if (formas) partes.push(`saiu do pagamento: ${formas}`);
+      if ((j.devolvidos || []).length) partes.push(`voltou pro estoque: ${j.devolvidos.map((d) => `${String(d.qtd).replace('.', ',')} ${d.unidade} de ${d.nome}`).join(', ')}`);
+      if (j.caixaAjustado) partes.push('o caixa daquele dia foi refeito');
+      setCorrFeito({ id: v.id, texto: `Corrigido. ${partes.join(' · ')}.` });
+      setCorrId('');
+      if (onCorrigido) await onCorrigido(j);
+    } catch { setCorrErro('Sem conexão.'); }
+    finally { setCorrBusy(false); }
+  };
   const [dia, setDia] = useState(() => diaOperacional());
   const [visao, setVisao] = useState('comanda'); // 'comanda' | 'produto'
   const [busca, setBusca] = useState('');
@@ -396,12 +423,68 @@ export default function VendasDoDia({ vendas = [], fichas = [], estoque = [] }) 
                   <Linha esq="Total" dir={brl(Number(v.total) || 0)} forte />
                 </div>
 
+                {/* O RASTRO DA CORREÇÃO: venda mexida depois de fechada diz
+                    que foi mexida, o quê e quanto. */}
+                {Array.isArray(v.correcoes) && v.correcoes.length > 0 && (
+                  <div data-correcao style={{ marginTop: 8, borderLeft: `3px solid ${C.amber}`, background: `color-mix(in srgb, ${C.amber} 9%, transparent)`, borderRadius: 8, padding: '6px 10px', fontSize: 12, lineHeight: 1.5 }}>
+                    {v.correcoes.map((cr, ci) => (
+                      <div key={ci}>
+                        <b style={{ color: C.amber }}>Corrigida</b> em {new Date(cr.em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às')}: tirou {cr.removidos.map((x) => `${String(x.qtd).replace('.', ',')}× ${x.nome}`).join(', ')} (−{brl(Number(cr.de) - Number(cr.para))}){cr.motivo ? ` — ${cr.motivo}` : ''}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
                   {pags.length > 1
                     ? <>Pagou dividido: {pags.map((p) => `${p.forma} ${brl(Number(p.valor) || 0)}`).join(' · ')}</>
                     : <>Pagou em <b style={{ color: C.text }}>{v.pagamento || (pags[0] && pags[0].forma) || '—'}</b></>}
                   {fiado > 0.005 && <span style={{ color: C.amber, fontWeight: 700 }}> · {brl(fiado)} no fiado</span>}
                 </div>
+
+                {corrFeito.id === v.id && <div data-corrigido style={{ fontSize: 12.5, color: C.green, fontWeight: 700, marginTop: 8, lineHeight: 1.45 }}>{corrFeito.texto}</div>}
+
+                {podeCorrigir && (v.itens || []).length > 0 && corrId !== v.id && (
+                  <button data-corrigir={v.id} onClick={() => abrirCorrecao(v)} style={{ marginTop: 8, background: 'none', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, padding: '6px 11px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
+                    Corrigir venda
+                  </button>
+                )}
+
+                {corrId === v.id && (() => {
+                  const prev = corrigirVenda(v, qtds);
+                  return (
+                    <div data-painel-correcao style={{ marginTop: 10, border: `1px solid ${C.amber}`, borderRadius: 10, padding: 12 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, marginBottom: 2 }}>O que foi vendido de verdade?</div>
+                      <div style={{ fontSize: 12, color: C.faint, marginBottom: 8, lineHeight: 1.45 }}>Diminui o que foi lançado a mais. O que sair volta pro estoque, e o valor sai do pagamento.</div>
+                      {(v.itens || []).map((it, i) => {
+                        const max = Number(it.qtd) || 0;
+                        const q = qtds[i] ?? max;
+                        return (
+                          <div key={i} data-linha-correcao={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? `1px solid ${C.hair}` : 'none' }}>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: q < max ? C.amber : C.text }}>{it.nome}{q < max ? <span style={{ fontSize: 11.5 }}> (era {max})</span> : null}</span>
+                            <button aria-label="menos" onClick={() => setQtds((a) => a.map((x, k) => (k === i ? Math.max(0, x - 1) : x)))} style={{ width: 32, height: 32, borderRadius: 9, border: `1px solid ${C.line}`, background: 'transparent', color: C.text, fontSize: 18, fontWeight: 800, cursor: 'pointer' }}>–</button>
+                            <b style={{ minWidth: 22, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{q}</b>
+                            <button aria-label="mais" disabled={q >= max} onClick={() => setQtds((a) => a.map((x, k) => (k === i ? Math.min(max, x + 1) : x)))} style={{ width: 32, height: 32, borderRadius: 9, border: `1px solid ${C.line}`, background: 'transparent', color: q >= max ? C.faint : C.text, fontSize: 18, fontWeight: 800, cursor: q >= max ? 'default' : 'pointer', opacity: q >= max ? 0.4 : 1 }}>+</button>
+                          </div>
+                        );
+                      })}
+                      <div style={{ marginTop: 8 }}><TextInput value={motivoCorr} onChange={setMotivoCorr} placeholder="Por quê? (opcional) Ex.: lançou 2, vendeu 1" /></div>
+                      {prev.venda ? (
+                        <div data-previa style={{ fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>
+                          Novo total: <b>{brl(prev.venda.total)}</b> <span style={{ color: C.amber }}>(−{brl(prev.reducao)})</span><br />
+                          Sai do pagamento: {Object.entries(prev.reducoes).map(([f, x]) => `${f} −${brl(x)}`).join(', ')}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: C.faint, marginTop: 8 }}>{prev.erro}</div>
+                      )}
+                      {corrErro && <div style={{ fontSize: 12.5, color: C.red, fontWeight: 700, marginTop: 6 }}>{corrErro}</div>}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                        <Btn small kind="ok" disabled={corrBusy || !prev.venda} onClick={() => salvarCorrecao(v)}>{corrBusy ? 'Salvando…' : 'Salvar correção'}</Btn>
+                        <Btn small kind="ghost" onClick={() => setCorrId('')}>Voltar</Btn>
+                      </div>
+                    </div>
+                  );
+                })()}
               </Card>
             );
           })}

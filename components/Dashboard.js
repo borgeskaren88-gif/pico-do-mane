@@ -1179,7 +1179,18 @@ export default function Dashboard() {
               ))}
             </div>
             {subSalao === 'comandas' && <Comandas papel="dona" />}
-            {subSalao === 'vendas' && <VendasDoDia vendas={vendas} fichas={fichas} estoque={estoque} />}
+            {subSalao === 'vendas' && <VendasDoDia vendas={vendas} fichas={fichas} estoque={estoque} podeCorrigir onCorrigido={async (j) => {
+              await carregarVendas();
+              carregarEstoque({});
+              // A receita "Fechamento do caixa" daquele dia, se já foi lançada,
+              // desce junto — pelo salvamento normal da tela.
+              const ra = j && j.receitaAjuste;
+              if (ra && Array.isArray(receitas) && receitas.some((r) => r && r.refCaixa === ra.refCaixa)) {
+                upd.receitas(receitas.map((r) => (r && r.refCaixa === ra.refCaixa
+                  ? { ...r, valor: Math.round((num(r.valor) - ra.menos) * 100) / 100, obs: `${r.obs ? `${r.obs} · ` : ''}corrigido −${brl(ra.menos)} (venda da mesa ${ra.mesa || '—'})` }
+                  : r)));
+              }
+            }} />}
             {subSalao === 'caixa' && <Caixa receitas={receitas} onReceitas={upd.receitas} />}
             {subSalao === 'cardapio' && <Cardapio dados={cardapio} onChange={upd.cardapio} estoque={estoque} categorias={cardapioCategorias} onCategorias={upd.cardapioCategorias} />}
             {subSalao === 'fiados' && <Fiados onMudou={carregarVendas} clientes={clientes} receitas={receitas} onReceitas={upd.receitas} />}
