@@ -9,7 +9,7 @@
 //   - no desenho: um bonequinho sentado por pessoa (até 4 por mesa, e "+3"
 //     pra quem passa disso), um em pé com o nome pra cada um da equipe;
 //   - tocar na mesa mostra quem está, há quanto tempo e quanto já deu;
-//   - a dona e a gerente olham; o atendimento não.
+//   - só a dona olha ("põe só no meu perfil").
 import { chromium } from 'playwright';
 
 const BASE = 'http://127.0.0.1:3100';
@@ -87,7 +87,9 @@ await pedir(dona, '/api/aovivo');
 await dona.evaluate(async () => fetch('/api/acessos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'senha', papel: 'gerente', nova: 'Sarah@2026' }) }));
 const sarah = await novo();
 await entrar(sarah, 'gerente', 'Sarah@2026');
-cobra('a gerente olha', (await pedir(sarah, '/api/aovivo')).j?.pessoasNoBar === 16);
+// "Põe só no meu perfil."
+cobra('a gerente não (é só da dona)', (await pedir(sarah, '/api/aovivo')).status === 401);
+cobra('nem aparece no menu dela', (await sarah.locator('[data-nav="aovivo"]').count()) === 0);
 const joao = await novo();
 await entrar(joao, 'garcom', '1234');
 cobra('o atendimento não', (await pedir(joao, '/api/aovivo')).status === 401);

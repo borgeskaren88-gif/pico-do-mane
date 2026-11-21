@@ -9,10 +9,10 @@ export const dynamic = 'force-dynamic';
 
 // O BAR AO VIVO: comandas abertas + quem está no turno, numa resposta leve,
 // pra tela que se atualiza sozinha a cada poucos segundos. A conta está em
-// lib/aoVivo.js. Só a dona e a gerente olham o bar inteiro.
+// lib/aoVivo.js. Só a dona olha ("põe só no meu perfil").
 export async function GET() {
   const p = papelDaSessao(cookies().get(nomeCookie())?.value);
-  if (p !== 'dona' && p !== 'gerente') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
+  if (p !== 'dona') return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
   try {
     const sb = bancoDaSessao();
     const [painel, cmd, pto] = await Promise.all([

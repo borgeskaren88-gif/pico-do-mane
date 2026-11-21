@@ -18,7 +18,6 @@ import PedidoPronto from './PedidoPronto';
 import LembretePonto from './LembretePonto';
 import LembreteAgenda from './LembreteAgenda';
 import Cozinha from './Cozinha';
-import BarAoVivo from './BarAoVivo';
 import {
   useGerencia, InicioGerente, FiadosGerente, DosesGerente, EquipeGerente, ExtraGerente,
 } from './Gerencia';
@@ -39,7 +38,7 @@ import { sairDeVez } from '../lib/pushClient';
 // que mudar pra equipe muda aqui junto, e ela aprende exatamente o que o
 // pessoal usa.
 const GRUPOS = [
-  { titulo: 'Início', itens: [['inicio', 'Início'], ['aovivo', 'Bar ao vivo']] },
+  { titulo: 'Início', itens: [['inicio', 'Início']] },
   { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['reservas', 'Reservas'], ['controle', 'Controle'], ['ponto', 'Ponto']] },
   { titulo: 'Cozinha', itens: [['compras', 'Lista de compras'], ['porcoes', 'Porções'], ['estoque', 'Estoque'], ['fichas', 'Fichas']] },
   { titulo: 'Gestão', itens: [['equipe', 'Equipe hoje'], ['extra', 'Acesso do Extra'], ['avisos', 'Avisos']] },
@@ -160,7 +159,6 @@ export default function Gerente() {
             {tela !== 'ponto' && <LembretePonto onIr={() => ir('ponto')} />}
 
             {tela === 'inicio' && <InicioGerente g={g} onIr={ir} />}
-            {tela === 'aovivo' && <BarAoVivo />}
 
             {tela === 'salao' && (<>
               <PageTitle sub="Mesas, balcão e caixa — a mesma tela do atendimento">Central de Operações</PageTitle>
