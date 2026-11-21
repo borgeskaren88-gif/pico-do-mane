@@ -247,7 +247,7 @@ async function vendaParecida(sb, c, total) {
   const hora = new Date(igual.fechadaEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
   const resumo = (Array.isArray(igual.itens) ? igual.itens : []).filter((it) => Number(it.qtd) > 0)
     .map((it) => `${String(it.qtd).replace('.', ',')} ${it.nome || 'item'}`).join(', ');
-  return { id: igual.id, hora, mesa: igual.mesa || '', total: Number(igual.total) || 0, resumo };
+  return { id: igual.id, hora, mesa: igual.balcao ? 'Balcão' : (igual.mesa || ''), total: Number(igual.total) || 0, resumo };
 }
 
 async function fecharComanda(sb, c, body, p) {

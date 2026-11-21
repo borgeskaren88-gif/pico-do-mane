@@ -818,6 +818,9 @@ export default function Comandas({ papel = 'dona' }) {
           )}
         </div>
         {pdfMsg && <div data-conta-pdf-msg style={{ fontSize: 12.5, color: C.green, fontWeight: 700, margin: '-6px 0 10px' }}>{pdfMsg}</div>}
+        {/* O erro também aparece DENTRO da mesa: antes ele só existia na tela
+            das mesas, e quem estava fechando a conta não via o porquê. */}
+        {erro && <div data-erro-mesa style={{ fontSize: 13, color: C.red, fontWeight: 700, marginBottom: 10, lineHeight: 1.45 }}>{erro}</div>}
 
         <Card style={{ marginBottom: 14, padding: 14 }}>
           <div style={{ fontSize: 12, color: C.faint, marginBottom: 12 }}>

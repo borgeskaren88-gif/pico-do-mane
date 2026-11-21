@@ -142,7 +142,7 @@ cobra('e avisa da tarefa de hoje', /Tu tens 1 tarefa pra hoje/.test(tela), (tela
 const grupos = await sarah.locator('.pos-group-title').allInnerTexts();
 cobra('o menu do lado tem os grupos do menu da dona: Início, Operação, Cozinha, Gestão', grupos.map((x) => x.trim().toLowerCase()).join(',') === 'início,operação,cozinha,gestão', grupos.join(','));
 const itens = await sarah.locator('[data-nav]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav')));
-cobra('com cada tela no seu lugar', itens.join(',') === 'inicio,salao,reservas,controle,ponto,compras,porcoes,estoque,fichas,equipe,extra,avisos', itens.join(','));
+cobra('com cada tela no seu lugar', itens.join(',') === 'inicio,aovivo,salao,reservas,controle,ponto,compras,porcoes,estoque,fichas,equipe,extra,avisos', itens.join(','));
 const badge = limpa(await sarah.locator('[data-nav="inicio"] .pos-badge').innerText().catch(() => ''));
 cobra('e o Início mostra no menu que tem 1 tarefa esperando', badge === '1', badge || '(sem número)');
 // 12.345,67 de 50.000 = 24,69% -> 25%.
