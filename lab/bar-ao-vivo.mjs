@@ -27,6 +27,7 @@ const ag = Date.now();
 const cm = (id, mesa, pessoas, min, itens, extra = {}) => grava(`comanda:${id}`, { id, mesa: String(mesa), status: 'aberta', pessoas, abertaEm: new Date(ag - min * 60000).toISOString(), itens: itens.map(([n, q, p]) => ({ id: n, nome: n, qtd: q, preco: p })), nome: '', ...extra });
 await cm('c1', 1, 4, 95, [['Heineken', 6, 14], ['Batata', 1, 39.9]]);
 await cm('c2', 3, 7, 40, [['Chopp', 8, 14.99]], { nome: 'Aniversário da Tamara' });
+await cm('c5', 4, 2, 30, [['Narguilé Zomo', 1, 45]]);
 await cm('c3', 6, 2, 12, [['Caipirinha', 2, 18]], { servico: false });
 await cm('c4', 15, 3, 65, [['Porção', 1, 69.9]]);       // mesa acima das 12 do cadastro
 const pt = (id, nome, papel, min, saida = null) => grava(`ponto:${id}`, { id, nome, papel, entrada: new Date(ag - min * 60000).toISOString(), saida, data: '2026-11-21' });
@@ -37,7 +38,7 @@ await pt('p4', 'Bruno', 'extra', 60);
 await pt('p5', 'Tamires', 'garcom', 300, new Date(ag - 30 * 60000).toISOString()); // já saiu
 await pt('p6', 'Zeca', 'garcom', 20 * 60);                                         // esqueceu o ponto aberto
 await pt('p7', 'joão', 'garcom', 170);                                             // o mesmo João, toque repetido
-// 4 + 7 + 2 + 3 = 16 pessoas · 4 mesas de 13 · equipe: Sarah, João, Ana, Bruno
+// 4 + 7 + 2 + 3 + 2 = 18 pessoas · 5 mesas de 13 · equipe: Sarah, João, Ana, Bruno
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const novo = async () => { const c = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' }); const pg = await c.newPage(); pg.on('pageerror', (e) => { console.log('[pageerror]', e.message.slice(0, 160)); ruim++; }); return pg; };
@@ -54,8 +55,8 @@ console.log('\n### OS NÚMEROS');
 const dona = await novo();
 await entrar(dona, 'dona', 'Teste@123');
 const j = (await pedir(dona, '/api/aovivo')).j;
-cobra('16 pessoas no bar', j.pessoasNoBar === 16, String(j.pessoasNoBar));
-cobra('4 mesas ocupadas de 13 (a mesa 15 aparece mesmo acima do cadastro)', j.mesasOcupadas === 4 && j.mesasTotal === 13 && j.mesas.some((m) => m.numero === '15' && m.ocupada), `${j.mesasOcupadas}/${j.mesasTotal}`);
+cobra('18 pessoas no bar', j.pessoasNoBar === 18, String(j.pessoasNoBar));
+cobra('5 mesas ocupadas de 13 (a mesa 15 aparece mesmo acima do cadastro)', j.mesasOcupadas === 5 && j.mesasTotal === 13 && j.mesas.some((m) => m.numero === '15' && m.ocupada), `${j.mesasOcupadas}/${j.mesasTotal}`);
 cobra('equipe: Sarah, João, Ana e Bruno (sem quem saiu, sem o ponto esquecido, sem repetir o João)', j.equipe.map((p) => p.nome).sort().join(',') === 'Ana,Bruno,João,Sarah Lima', j.equipe.map((p) => p.nome).join(','));
 const m3 = j.mesas.find((m) => m.numero === '3');
 cobra('a mesa 3: 7 pessoas, 8 itens, R$ 131,91 com os 10%', m3.pessoas === 7 && m3.itens === 8 && m3.total === 131.91, JSON.stringify(m3));
@@ -65,22 +66,24 @@ cobra('a que está há mais tempo: mesa 1, 1h35', j.maisAntiga?.numero === '1' &
 console.log('\n### NA TELA');
 cobra('o menu tem "Bar ao vivo"', await tocar(dona, 'Bar ao vivo'));
 await dona.waitForTimeout(2500);
-cobra('em cima: 16 pessoas no bar, 4/13 mesas, 4 na equipe',
-  /16/.test(limpa(await dona.locator('[data-stat="pessoas"]').innerText())) && /4\/13/.test(limpa(await dona.locator('[data-stat="mesas"]').innerText())) && /4/.test(limpa(await dona.locator('[data-stat="equipe"]').innerText())));
+cobra('em cima: 18 pessoas no bar, 5/13 mesas, 4 na equipe',
+  /18/.test(limpa(await dona.locator('[data-stat="pessoas"]').innerText())) && /5\/13/.test(limpa(await dona.locator('[data-stat="mesas"]').innerText())) && /4/.test(limpa(await dona.locator('[data-stat="equipe"]').innerText())));
 const fila = limpa(await dona.locator('[data-equipe-fila]').innerText());
 cobra('a fila da equipe com os nomes', ['Sarah', 'João', 'Ana', 'Bruno'].every((n) => fila.includes(n)) && !/Tamires|Zeca/.test(fila), fila);
 const naCena = await dona.locator('[data-pessoa-equipe]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-pessoa-equipe')}:${e.getAttribute('data-setor')}`));
 cobra('no desenho, 4 bonequinhos da equipe, cada um com o setor', naCena.length === 4 && naCena.includes('Ana:cozinha') && naCena.includes('Sarah Lima:gerente'), naCena.join(' '));
 cobra('e a plaquinha com o nome de cada um', (await dona.locator('[data-placa]').count()) === 4);
 const sentados = await dona.locator('[data-sentado]').count();
-cobra('um bonequinho sentado por pessoa, até 4 por mesa: 4 + 4 + 2 + 3 = 13', sentados === 13, String(sentados));
+cobra('um bonequinho sentado por pessoa, até 4 por mesa: 4 + 4 + 2 + 3 + 2 = 15', sentados === 15, String(sentados));
 cobra('e "+3" na mesa 3 (7 pessoas)', (await dona.locator('[data-mesa="3"] [data-mais="3"]').count()) === 1);
-cobra('plaquinha nas 4 mesas ocupadas, e as livres sem plaquinha', (await dona.locator('[data-rotulo-mesa]').count()) === 4 && (await dona.locator('[data-mesa][data-ocupada="0"]').count()) === 9);
+cobra('plaquinha nas 5 mesas ocupadas, e as livres sem plaquinha', (await dona.locator('[data-rotulo-mesa]').count()) === 5 && (await dona.locator('[data-mesa][data-ocupada="0"]').count()) === 8);
+cobra('narguilé na comanda da mesa 4: ele aparece aceso na mesa (e só nela)', (await dona.locator('[data-mesa="4"] [data-narguile]').count()) === 1 && (await dona.locator('[data-narguile]').count()) === 1);
+cobra('e o cenário do Pico: o varal de lâmpadas', (await dona.locator('[data-lampada]').count()) >= 20);
 await dona.locator('[data-rotulo-mesa="3"]').click(); await dona.waitForTimeout(300);
 const det = limpa(await dona.locator('[data-mesa-detalhe]').innerText());
 cobra('tocar na mesa 3 mostra: Aniversário da Tamara, 7 pessoas, 40 min, R$ 131,91', /Mesa 3 · Aniversário da Tamara/.test(det) && /7 pessoas/.test(det) && /40 min/.test(det) && /R\$ 131,91/.test(det), det);
 const lista = await dona.locator('[data-aberta]').evaluateAll((els) => els.map((e) => e.getAttribute('data-aberta')));
-cobra('a lista "Mesas abertas" começa pela que está há mais tempo', lista.join(',') === '1,15,3,6', lista.join(','));
+cobra('a lista "Mesas abertas" começa pela que está há mais tempo', lista.join(',') === '1,15,3,4,6', lista.join(','));
 
 console.log('\n### QUEM PODE OLHAR');
 await pedir(dona, '/api/aovivo');
