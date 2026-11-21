@@ -215,6 +215,41 @@ function porNaLista(itens, m) {
 // comanda em memória e passa por AQUI, pelas mesmas travas.
 //
 // Devolve { venda } ou { falhou: true, erro, status, ... }.
+// A "cara" de uma conta: que itens e quantos de cada, sem ordem.
+function assinaturaItens(itens) {
+  const m = new Map();
+  for (const it of (Array.isArray(itens) ? itens : [])) {
+    const q = Number(it && it.qtd) || 0;
+    if (q <= 0) continue;
+    const k = `${it.cardapioId || it.nome || ''}|${it.sabor || ''}`;
+    m.set(k, Math.round(((m.get(k) || 0) + q) * 1000) / 1000);
+  }
+  return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([k, q]) => `${k}x${q}`).join(';');
+}
+// Mesa: 15 minutos. Balcão: 3 — ali é normal duas pessoas pedirem a mesma
+// cerveja com poucos minutos de diferença, e a repetida por engano acontece
+// logo em seguida (a pessoa toca de novo achando que não foi).
+const JANELA_MESA = 15 * 60 * 1000;
+const JANELA_BALCAO = 3 * 60 * 1000;
+async function vendaParecida(sb, c, total) {
+  const assin = assinaturaItens(c.itens);
+  if (!assin) return null;
+  const balcao = !!c.balcao;
+  const janela = balcao ? JANELA_BALCAO : JANELA_MESA;
+  const { data } = await sb.from('pdm_dados').select('valor').like('chave', 'venda:%');
+  const agora = Date.now();
+  const igual = (data || []).map((r) => r && r.valor)
+    .filter((v) => v && v.fechadaEm && agora - Date.parse(v.fechadaEm) < janela
+      && (balcao ? !!v.balcao : (!v.balcao && String(v.mesa) === String(c.mesa)))
+      && Math.abs((Number(v.total) || 0) - total) < 0.01 && assinaturaItens(v.itens) === assin)
+    .sort((a, b) => String(b.fechadaEm).localeCompare(String(a.fechadaEm)))[0];
+  if (!igual) return null;
+  const hora = new Date(igual.fechadaEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+  const resumo = (Array.isArray(igual.itens) ? igual.itens : []).filter((it) => Number(it.qtd) > 0)
+    .map((it) => `${String(it.qtd).replace('.', ',')} ${it.nome || 'item'}`).join(', ');
+  return { id: igual.id, hora, mesa: igual.balcao ? 'Balcão' : (igual.mesa || ''), total: Number(igual.total) || 0, resumo };
+}
+
 async function fecharComanda(sb, c, body, p) {
 
     const subtotal = totalDe(c);
@@ -323,6 +358,22 @@ async function fecharComanda(sb, c, body, p) {
         if (abertoAtual + fiado > limite + 0.005) {
           return { falhou: true, bloqueado: true, erro: `${cli.nome} atingiu o limite de fiado (${fmt(limite)}). Em aberto: ${fmt(abertoAtual)}. Não dá pra fiar mais ${fmt(fiado)}.`, status: 400 };
         }
+      }
+    }
+    // VENDA REPETIDA?
+    //
+    // "Ela fez uma e aí fez outra porque achou que não tinha ido." A mesma
+    // conta fechada duas vezes vira duas vendas — o caixa espera dinheiro que
+    // não entrou e a garrafa baixa dose que não saiu. Se a MESMA mesa (ou o
+    // balcão) acabou de fechar uma conta com OS MESMOS itens e o MESMO total,
+    // o app pergunta antes. Confirmou (é outra conta igual)? Fecha.
+    if (!body?.confirmarRepetida) {
+      const repetida = await vendaParecida(sb, c, total);
+      if (repetida) {
+        return {
+          falhou: true, status: 409, repetida,
+          erro: `Essa conta parece igual à que foi fechada às ${repetida.hora}${repetida.mesa ? ` (${repetida.mesa === 'Balcão' ? 'balcão' : `mesa ${repetida.mesa}`})` : ''}: ${repetida.resumo}, ${brlS(repetida.total)}.`,
+        };
       }
     }
     // Liga a venda ao caixa aberto (se houver), pro fechamento do caixa somar.

@@ -18,6 +18,7 @@ import Hoje from './Hoje';
 import ResumoDoDia from './ResumoDoDia';
 import Pasta from './Pasta';
 import EstiloShell from './EstiloShell';
+import BarAoVivo from './BarAoVivo';
 import Diario from './Diario';
 import Marketing from './Marketing';
 import PontoDona from './PontoDona';
@@ -719,7 +720,7 @@ export default function Dashboard() {
     && !diario.length && !receitas.length && !despesas.length && !compras.length && !cardapio.length;
 
   const tabs = [
-    ['darci', 'Darci'], ['brain', 'Brain'], ['hoje', 'Dashboard'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
+    ['darci', 'Darci'], ['brain', 'Brain'], ['hoje', 'Dashboard'], ['aovivo', 'Bar ao vivo'], ['diario', 'Log Operacional'], ['financas', 'Finanças'],
     ['abastecimento', 'Abastecimento'], ['previsao', 'Previsão'], ['garrafas', 'Controle'],
     ['salao', 'Central de Operações'], ['despesarapida', 'Despesa Rápida'],
     ['ponto', 'Ponto'], ['pasta', 'Pasta'], ['marketing', 'Marketing'], ['notificacoes', 'Notificações'], ['widget', 'Widget'], ['acessos', 'Acessos'], ['backup', 'Backup'], ['negocio', 'Meu negócio'], ['guia', 'Como usar'], ['reservas', 'Reservas'],
@@ -734,7 +735,7 @@ export default function Dashboard() {
   useEffect(() => { try { if (localStorage.getItem('picoos-lateral') === 'recolhida') setLateralRecolhida(true); } catch { /* ignora */ } }, []);
   const recolherLateral = (v) => setLateralRecolhida((cur) => { const nv = v == null ? !cur : v; try { localStorage.setItem('picoos-lateral', nv ? 'recolhida' : 'aberta'); } catch { /* ignora */ } return nv; });
   const grupos = [
-    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ...(temDarci ? [['darci', 'Darci']] : []), ['brain', 'Brain']] },
+    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ['aovivo', 'Bar ao vivo'], ...(temDarci ? [['darci', 'Darci']] : []), ['brain', 'Brain']] },
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['reservas', 'Reservas'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento'], ['previsao', 'Previsão']] },
     { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
@@ -1042,6 +1043,7 @@ export default function Dashboard() {
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
             ficha técnica de prato e de drink. As duas leem e escrevem. */}
         {tab === 'pasta' && <Pasta />}
+        {tab === 'aovivo' && <BarAoVivo />}
         {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onIrPara={irParaTab} onPerguntar={temDarci ? () => setTab('darci') : null} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={temDarci ? <DarciFlutuante {...propsDarci} /> : null} metas={metas} onMetas={upd.metas} dona={(negocio && (negocio.dona || (negocio.papeis && negocio.papeis.dona))) || ''} fotoDona={(negocio && negocio.fotoDona) || ''} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} vendas={vendas} />}
         {tab === 'financas' && (
