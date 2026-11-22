@@ -30,7 +30,7 @@ const ATALHOS = [
   ['widget', 'Widget', 'O quadrinho na tela do iPad'],
 ];
 
-export default function Config({ aberto, onFechar, tema, onTema, cor, onCor, onIr, modulos, onModulos, recursos }) {
+export default function Config({ aberto, onFechar, tema, onTema, cor, onCor, onIr, modulos, onModulos, recursos, temAssinatura = false }) {
   if (!aberto) return null;
   const ir = (id) => { onIr(id); onFechar(); };
 
@@ -130,7 +130,7 @@ export default function Config({ aberto, onFechar, tema, onTema, cor, onCor, onI
         {/* ATALHOS */}
         <div style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.07em', color: C.muted, fontWeight: 700, marginBottom: 8 }}>Ajustes do sistema</div>
         <div style={{ display: 'grid', gap: 8 }}>
-          {ATALHOS.map(([id, nome, sub]) => (
+          {[...(temAssinatura ? [['assinatura', 'Assinatura', 'Teste grátis, mensalidade e pagamento']] : []), ...ATALHOS].map(([id, nome, sub]) => (
             <button key={id} onClick={() => ir(id)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,

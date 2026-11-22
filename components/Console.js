@@ -37,13 +37,18 @@ export default function Console() {
   const [novo, setNovo] = useState({ codigo: '', nome: '', senha: '' });
   const [criando, setCriando] = useState(false);
   const [recemCriado, setRecemCriado] = useState(null);
+  const [config, setConfig] = useState(null);
+  const [precoTxt, setPrecoTxt] = useState('');
 
   const carregar = useCallback(async () => {
     try {
       const r = await fetch('/api/admin/negocios', { cache: 'no-store' });
       if (r.status === 401) { setDentro(false); return; }
       const j = await r.json();
-      if (j.ok) { setNegocios(j.negocios || []); setDentro(true); }
+      if (j.ok) {
+        setNegocios(j.negocios || []); setDentro(true);
+        if (j.config) { setConfig(j.config); setPrecoTxt(String(j.config.preco).replace('.', ',')); }
+      }
     } catch { setErro('Sem conexão.'); }
   }, []);
 
@@ -157,6 +162,26 @@ export default function Console() {
           </Card>
         )}
 
+        {config && (
+          <Card style={{ marginBottom: 18 }} data-config-venda>
+            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Cadastro sozinho e mensalidade</div>
+            <div style={{ fontSize: 12.5, color: C.faint, marginBottom: 12, lineHeight: 1.5 }}>
+              Quem lê o QR code cria o bar em <b>/criar</b>, ganha {14} dias grátis e assina pelo app.
+              O preço novo vale pra quem assinar daqui pra frente.
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+              <span style={{ fontSize: 13.5, color: C.muted }}>Mensalidade R$</span>
+              <input value={precoTxt} onChange={(e) => setPrecoTxt(e.target.value)} inputMode="decimal" data-preco
+                style={{ ...inputStyle, width: 110 }} />
+              <Btn small onClick={() => agir({ acao: 'config', preco: precoTxt })}>Salvar preço</Btn>
+            </div>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13.5, color: C.muted, cursor: 'pointer' }}>
+              <input type="checkbox" checked={config.cadastroAberto} onChange={(e) => agir({ acao: 'config', cadastroAberto: e.target.checked })} data-cadastro-aberto />
+              Cadastro aberto (desmarca pra ninguém novo conseguir se cadastrar)
+            </label>
+          </Card>
+        )}
+
         <Card style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Novo negócio</div>
           <div style={{ fontSize: 12.5, color: C.faint, marginBottom: 14, lineHeight: 1.5 }}>
@@ -179,6 +204,14 @@ export default function Console() {
                   código <b>{n.codigo}</b> · desde {dataBR(n.criadoEm)} · {faz(n.ultimoMovimento)}
                 </div>
                 {!n.ativo && <div style={{ fontSize: 12.5, color: C.red, marginTop: 4, fontWeight: 700 }}>Suspenso — não consegue entrar. Os dados estão todos aqui.</div>}
+                {n.ativo && n.situacao && <SeloAssinatura n={n} />}
+                {n.contato && (n.contato.nome || n.contato.whatsapp) && (
+                  <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>
+                    {n.contato.nome}{n.contato.cidade ? ` · ${n.contato.cidade}` : ''}
+                    {n.contato.whatsapp && <> · <a href={`https://wa.me/${n.contato.whatsapp}`} target="_blank" rel="noopener noreferrer" style={{ color: C.accent }}>WhatsApp</a></>}
+                    {n.contato.email ? ` · ${n.contato.email}` : ''}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => agir({ acao: n.ativo ? 'suspender' : 'religar', codigo: n.codigo })}
@@ -186,14 +219,39 @@ export default function Console() {
                 {n.ativo ? 'Suspender' : 'Religar'}
               </button>
             </div>
-            <div style={{ marginTop: 12, borderTop: `1px solid ${C.hair}`, paddingTop: 10 }}>
+            <div style={{ marginTop: 12, borderTop: `1px solid ${C.hair}`, paddingTop: 10, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
               <SenhaNova codigo={n.codigo} onTrocar={agir} />
+              {n.situacao && n.situacao.estado !== 'isento' && (<>
+                <button data-mais-dias={n.codigo} onClick={() => agir({ acao: 'maisDias', codigo: n.codigo, dias: 7 })} style={LINK}>+7 dias</button>
+                <button onClick={() => agir({ acao: 'maisDias', codigo: n.codigo, dias: 30 })} style={LINK}>+30 dias (pagou por fora)</button>
+                <button data-isentar={n.codigo} onClick={() => { if (window.confirm(`${n.nome} deixa de pagar mensalidade?`)) agir({ acao: 'isentar', codigo: n.codigo }); }} style={LINK}>Isentar</button>
+              </>)}
+              {n.situacao && n.situacao.estado === 'isento' && n.origem === 'cadastro' && (
+                <button onClick={() => { if (window.confirm(`${n.nome} volta a pagar mensalidade?`)) agir({ acao: 'cobrar', codigo: n.codigo }); }} style={LINK}>Voltar a cobrar</button>
+              )}
             </div>
           </Card>
         ))}
       </div>
     </div>
   );
+}
+
+const LINK = { background: 'none', border: 'none', color: C.faint, fontSize: 12.5, cursor: 'pointer', padding: 0 };
+
+// Em que pé está a assinatura de cada bar, numa linha colorida.
+function SeloAssinatura({ n }) {
+  const s = n.situacao;
+  const ate = s.liberadoAte ? dataBR(s.liberadoAte) : '';
+  const txt = {
+    isento: 'Sem mensalidade',
+    teste: `Teste grátis até ${ate} (${s.dias} ${s.dias === 1 ? 'dia' : 'dias'})`,
+    em_dia: `Pago até ${ate}${n.cancelada ? ' · cancelou' : ''}`,
+    atrasado: `Atrasado desde ${ate} · fecha em ${s.dias} ${s.dias === 1 ? 'dia' : 'dias'}`,
+    bloqueado: `Pausado por falta de pagamento (venceu ${ate})`,
+  }[s.estado] || s.estado;
+  const cor = { isento: C.faint, teste: C.accent, em_dia: C.green, atrasado: C.red, bloqueado: C.red }[s.estado] || C.muted;
+  return <div data-selo={n.codigo} style={{ fontSize: 12.5, color: cor, marginTop: 4, fontWeight: 700 }}>{txt}</div>;
 }
 
 // Trocar a senha da dona de um negócio — pra quando o cliente perde a dele.

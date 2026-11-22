@@ -1,4 +1,7 @@
 import Apresentacao from '../../components/Apresentacao';
+import { lerConfigVenda } from '../../lib/negocios';
+
+export const dynamic = 'force-dynamic';
 
 // A PÁGINA QUE O DONO DO OUTRO BAR VÊ ANTES DE DIZER SIM.
 //
@@ -17,6 +20,8 @@ export const metadata = {
   description: 'O sistema que avisa quando o número está errado, em vez de mostrar errado calado. Estoque, ficha técnica, CMV, preço e comanda.',
 };
 
-export default function Conheca() {
-  return <Apresentacao />;
+export default async function Conheca() {
+  // O preço vem da sala de máquinas: mudou lá, muda aqui.
+  const cfg = await lerConfigVenda().catch(() => ({ preco: 99.9 }));
+  return <Apresentacao preco={cfg.preco} />;
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { situacao } from './lib/assinatura';
 
 // O PORTEIRO: confere se o crachá ainda vale, antes de qualquer tela ou pedido.
 //
@@ -69,6 +70,43 @@ async function geracoes(negocio) {
   }
 }
 
+// A PORTA DA ASSINATURA: o bar que passou do teste (ou da carência) sem pagar
+// não usa o app — nem quem já estava logado no celular há semanas. Suspenso
+// pela Karen, idem. A tela (app/page.js) mostra o porquê; aqui o porteiro só
+// recusa os pedidos de dados.
+//
+// Lê a lista de negócios (uma linha só) e guarda um minuto na memória. Se o
+// banco engasgar, deixa passar: um soluço de rede não pode trancar um bar que
+// está pago — muito menos o Pico do Mané, que nem tem assinatura (é isento).
+const cacheLista = { lista: null, em: 0 };
+async function listaDeNegocios() {
+  const agora = Date.now();
+  // LISTA_CACHE_MS existe só pro laboratório (que precisa ver a porta fechar na
+  // hora); em produção fica o minuto.
+  const validade = process.env.LISTA_CACHE_MS != null && process.env.LISTA_CACHE_MS !== '' ? Number(process.env.LISTA_CACHE_MS) : 60 * 1000;
+  if (cacheLista.lista && agora - cacheLista.em < validade) return cacheLista.lista;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return cacheLista.lista;
+  try {
+    const r = await fetch(`${url}/rest/v1/pdm_dados?select=valor&chave=eq.${encodeURIComponent('adm:negocios')}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: 'no-store',
+    });
+    if (!r.ok) return cacheLista.lista;
+    const linhas = await r.json();
+    const v = (Array.isArray(linhas) && linhas[0] && linhas[0].valor) || {};
+    cacheLista.lista = v;
+    cacheLista.em = agora;
+    return v;
+  } catch {
+    return cacheLista.lista;
+  }
+}
+// O que continua respondendo com o app pausado: sair, ver/pagar a assinatura
+// e as rotas da tela de entrada.
+const LIVRES = ['/api/assinatura', '/api/logout', '/api/login', '/api/negocio', '/api/versao', '/api/sessao', '/api/cadastro'];
+
 // sha256 em hexadecimal, com o que existe no runtime do porteiro (o mesmo
 // resultado do crypto do Node, que é quem emite os crachás).
 async function sha256hex(txt) {
@@ -97,6 +135,21 @@ export async function middleware(req) {
   const doCracha = barra < 0 ? '' : cookie.slice(0, barra);
   const dosDados = doCracha || String(process.env.NEGOCIO_UNICO || '').trim().toLowerCase();
   const semNegocio = barra < 0 ? cookie : cookie.slice(barra + 1);
+
+  if (doCracha && req.nextUrl.pathname.startsWith('/api/') && !LIVRES.some((l) => req.nextUrl.pathname === l || req.nextUrl.pathname.startsWith(l + '/'))) {
+    const lista = await listaDeNegocios();
+    // Só fecha com a lista lida E o bar nela. Bar que não está na lista não é
+    // assunto daqui (o login e o crachá cuidam).
+    if (lista && lista[doCracha]) {
+      const s = situacao({ codigo: doCracha, ...lista[doCracha] });
+      if (!s.podeUsar) {
+        return NextResponse.json({
+          ok: false, pausado: s.estado,
+          erro: s.estado === 'suspenso' ? 'O acesso deste bar está pausado.' : 'O teste ou a mensalidade venceu. A dona precisa pagar pra liberar.',
+        }, { status: 402 });
+      }
+    }
+  }
 
   const atuais = await geracoes(dosDados);
   // Sem leitura ou com tudo na geração 1: nada foi cortado, nada pode estar
