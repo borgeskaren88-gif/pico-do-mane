@@ -1,6 +1,7 @@
 {
   "crons": [
-    { "path": "/api/push/cron", "schedule": "0 10 * * *" }
+    { "path": "/api/push/cron", "schedule": "0 10 * * *" },
+    { "path": "/api/push/semana", "schedule": "0 11 * * 1" }
   ],
   "git": {
     "deploymentEnabled": {

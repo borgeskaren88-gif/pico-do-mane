@@ -177,6 +177,20 @@ ia.falhar = false;
 const r4 = await pg.evaluate(async () => (await fetch('/api/darci/relatorio?semana=passada')).json());
 cobra('IA voltou: abrir de novo refaz com a análise (não fica preso no automático)', r4.ok && r4.motor === 'claude' && !r4.guardado);
 
+console.log('\n— segunda, 8h: a notificação —');
+const vj = JSON.parse((await import('fs')).readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+cobra('o despertador está marcado pra segunda 8h de Brasília (11h UTC)', vj.crons.some((c) => c.path === '/api/push/semana' && c.schedule === '0 11 * * 1'));
+const nAntesPush = doRelatorio().length;
+const s1 = await (await fetch(`${BASE}/api/push/semana`, { headers: { 'user-agent': 'vercel-cron/1.0' } })).json();
+const doPico = (s1.negocios || []).find((x) => x.negocio === 'pico-do-mane') || {};
+cobra('manda pro bar da casa, com a frase da semana do Darci', doPico.enviado === true && doPico.frase === 'A semana veio 44% acima da anterior, puxada pelo sábado.', JSON.stringify(doPico));
+cobra('usou o relatório já guardado (não chamou a IA de novo)', doRelatorio().length === nAntesPush);
+const s2 = await (await fetch(`${BASE}/api/push/semana`, { headers: { 'user-agent': 'vercel-cron/1.0' } })).json();
+cobra('se o despertador bater de novo, não manda outra', ((s2.negocios || [])[0] || {}).enviado === false);
+await pg.goto(`${BASE}/?tela=relatorio`);
+await pg.waitForSelector('[data-relatorio-texto]', { timeout: 30000 });
+cobra('tocar na notificação abre o relatório já aberto, dentro do Darci', /O que eu faria esta semana/.test(await pg.locator('[data-relatorio-semana]').innerText()));
+
 console.log('\n— só a dona —');
 const garcom = await fetch(`${BASE}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ papel: 'garcom', senha: '1234', lembrar: true }) });
 const cg = (garcom.headers.getSetCookie ? garcom.headers.getSetCookie() : [garcom.headers.get('set-cookie')]).map((c) => c.split(';')[0]).join('; ');

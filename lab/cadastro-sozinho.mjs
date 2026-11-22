@@ -23,6 +23,8 @@
 // LAB_ENV: ASAAS_URL=http://127.0.0.1:54400
 // LAB_ENV: ASAAS_WEBHOOK_TOKEN=senha-do-aviso
 // LAB_ENV: LISTA_CACHE_MS=0
+// LAB_ENV: ANTHROPIC_API_KEY=chave-de-mentira
+// LAB_ENV: ANTHROPIC_BASE_URL=http://127.0.0.1:9
 import http from 'http';
 import { readFileSync } from 'fs';
 import { chromium } from 'playwright';
@@ -140,6 +142,12 @@ const dadosAna = await api('/api/data', cookieAna);
 const txtAna = JSON.stringify(dadosAna.j);
 cobra('o bar novo NÃO enxerga nada do Pico do Mané', dadosAna.status === 200 && !/Heineken|Pico do Man/.test(txtAna), String(dadosAna.status));
 
+console.log('\n— o Darci é só do bar da casa —');
+// "O Darci vai ter somente no meu bar." Cada pergunta é IA paga pela chave da Karen.
+cobra('o bar novo não tem o Darci na tela', (await api('/api/recursos', cookieAna)).j.darci === false);
+cobra('nem pelo endereço direto (pergunta, relatório, voz)', (await api('/api/darci/perguntar', cookieAna, { pergunta: 'oi' })).status === 403
+  && (await api('/api/darci/relatorio?semana=passada', cookieAna)).status === 403 && (await api('/api/darci/prefs', cookieAna)).status === 403);
+
 console.log('\n— robôs e cadastro repetido —');
 const cad = (corpo, ip) => fetch(`${BASE}/api/cadastro`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip }, body: JSON.stringify({ nomeBar: 'Boteco da Ana', cidade: 'X', dona: 'Outra Ana', whatsapp: '48988887777', senha: 'Senha@123', aceite: true, ...corpo }) }).then(async (r) => ({ status: r.status, j: await r.json().catch(() => ({})) }));
 const dois = await cad({}, '10.2.2.2');
@@ -248,6 +256,7 @@ const cPico = pico.cookie;
 const sPico = await api('/api/assinatura', cPico);
 cobra('a assinatura do Pico responde "isento"', sPico.j.estado === 'isento', JSON.stringify(sPico.j));
 cobra('o Pico puxa os dados normalmente', (await api('/api/data', cPico)).status === 200);
+cobra('o Pico tem o Darci', (await api('/api/recursos', cPico)).j.darci === true);
 cobra('o Pico não consegue "assinar" (não tem cobrança)', (await api('/api/assinatura', cPico, { acao: 'assinar', documento: '52998224725' })).status === 400);
 const ctxP = await browser.newContext(iphone);
 await ctxP.addCookies(cPico.split('; ').filter(Boolean).map((kv) => { const i = kv.indexOf('='); return { name: kv.slice(0, i), value: kv.slice(i + 1), url: BASE }; }));

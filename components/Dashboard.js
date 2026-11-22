@@ -765,6 +765,14 @@ export default function Dashboard() {
       const q = new URLSearchParams(window.location.search);
       const txt = q.get('despesa');
       const tela = (q.get('tela') || q.get('add') || '').toLowerCase();
+      // A notificação de segunda ("📊 Relatório da semana") abre direto o
+      // relatório, já aberto dentro do Darci.
+      if (tela === 'relatorio') {
+        try { sessionStorage.setItem('picoos-abrir-relatorio', '1'); } catch { /* ignora */ }
+        setTab('darci');
+        window.history.replaceState({}, '', window.location.pathname);
+        return;
+      }
       if (txt != null || tela === 'despesa' || tela === 'despesarapida') {
         if (txt) setDespesaInicial(txt);
         setTab('despesarapida');
