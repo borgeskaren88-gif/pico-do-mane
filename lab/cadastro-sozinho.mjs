@@ -90,8 +90,8 @@ await new Promise((ok) => srv.listen(54400, '127.0.0.1', ok));
 await gravarCrua('adm:negocios', { 'pico-do-mane': { nome: 'Pico do Mané', ativo: true, criadoEm: '2026-01-01T00:00:00.000Z' } });
 
 const cookieDe = (r) => (r.headers.getSetCookie ? r.headers.getSetCookie() : [r.headers.get('set-cookie')]).filter(Boolean).map((c) => c.split(';')[0]).join('; ');
-async function entrar(codigo, papel, senha) {
-  const r = await fetch(`${BASE}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codigo, papel, senha, lembrar: true }) });
+async function entrar(codigo, papel, senha, nome) {
+  const r = await fetch(`${BASE}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codigo, papel, senha, nome, lembrar: true }) });
   return { ok: r.ok, cookie: cookieDe(r) };
 }
 const api = async (caminho, cookie, corpo, metodo) => {
@@ -215,6 +215,10 @@ asaas.cobrancas = [
 const pg4 = await api('/api/assinatura', cookieAna, { acao: 'pagar' });
 cobra('atrasada: o link é o da atrasada, não o da próxima', pg4.j.link === 'https://sandbox.asaas.com/i/pay_lab2', JSON.stringify(pg4.j));
 
+// A equipe do bar novo é por pessoa: a dona cria o login antes de tudo.
+const criouBia = await api('/api/acessos', cookieAna, { acao: 'criarLogin', nome: 'Bia', tipo: 'garcom', senha: 'bia123' });
+cobra('a dona cria o login da Bia (Atendimento)', criouBia.j.ok === true, JSON.stringify(criouBia.j));
+
 console.log('\n— venceu: a porta fecha, nada se apaga —');
 const mexer = async (codigo, mud) => { const l = await linhaCrua('adm:negocios'); l[codigo] = mud(l[codigo]); await gravarCrua('adm:negocios', l); };
 await mexer('boteco-da-ana', (n) => ({ ...n, assinatura: { ...n.assinatura, testeAte: new Date(Date.now() - 50 * DIA).toISOString(), pagoAte: new Date(Date.now() - 2 * DIA).toISOString() } }));
@@ -233,8 +237,8 @@ cobra('bloqueado: a dona vê "O app está pausado" e o botão de pagar', /O app 
 const dBloq = await api('/api/data', cookieAna);
 cobra('bloqueado: os pedidos de dados são recusados (402)', dBloq.status === 402 && dBloq.j.pausado === 'bloqueado', String(dBloq.status));
 cobra('bloqueado: a tela de assinatura continua respondendo', (await api('/api/assinatura', cookieAna)).j.estado === 'bloqueado');
-const garcom = await entrar('boteco-da-ana', 'garcom', '1234');
-cobra('a equipe ainda entra com o código e 1234 (pra ver o aviso)', garcom.ok);
+const garcom = await entrar('boteco-da-ana', 'equipe', 'bia123', 'Bia');
+cobra('a equipe ainda entra com o nome e a senha dela (pra ver o aviso)', garcom.ok);
 const ctxG = await browser.newContext(iphone);
 await ctxG.addCookies(garcom.cookie.split('; ').map((kv) => { const i = kv.indexOf('='); return { name: kv.slice(0, i), value: kv.slice(i + 1), url: BASE }; }));
 const pgG = await ctxG.newPage();

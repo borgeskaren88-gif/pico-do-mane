@@ -69,7 +69,7 @@ export default function CriarBar() {
           </div>
           <div data-codigo style={{ fontSize: 26, fontWeight: 900, textAlign: 'center', margin: '16px 0 6px', padding: '12px', border: `2px dashed ${C.accent}`, borderRadius: 12, letterSpacing: '.02em' }}>{pronto.codigo}</div>
           <div style={{ fontSize: 12.5, color: C.faint, textAlign: 'center', lineHeight: 1.5 }}>
-            A equipe entra com o mesmo código e a senha <b>1234</b>. O app pede pra trocar depois.
+            A tua equipe tu cadastras depois, em <b>Configurações → Acessos</b>: até 5 pessoas, cada uma com nome e senha.
           </div>
         </Card>
         <Card style={{ marginBottom: 14 }}>

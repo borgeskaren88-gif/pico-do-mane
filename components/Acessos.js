@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { C, Card, Btn, Empty, PageTitle } from './ui';
 import TrocarSenha from './TrocarSenha';
+import LoginsEquipe from './LoginsEquipe';
 
 // QUEM ENTRA NO PICOOS — e como tirar alguém daqui.
 //
@@ -28,6 +29,8 @@ const RECADOS = {
 // do Extra — sem o texto de dona, sem a troca da senha da dona.
 export default function Acessos({ soExtra = false }) {
   const [lista, setLista] = useState([]);
+  // Bar novo: a equipe é por pessoa (até 5 logins com nome), não por cargo.
+  const [pessoas, setPessoas] = useState(null);
   const [carregado, setCarregado] = useState(false);
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
@@ -38,7 +41,10 @@ export default function Acessos({ soExtra = false }) {
     try {
       const r = await fetch('/api/acessos', { cache: 'no-store' });
       const j = await r.json();
-      if (j.ok) setLista(Array.isArray(j.acessos) ? j.acessos : []);
+      if (j.ok) {
+        setLista(Array.isArray(j.acessos) ? j.acessos : []);
+        setPessoas(j.modo === 'pessoas' ? { logins: j.logins || [], max: j.max || 5, tipos: j.tipos || {} } : null);
+      }
     } catch { /* offline */ }
     finally { setCarregado(true); }
   }, []);
@@ -80,6 +86,17 @@ export default function Acessos({ soExtra = false }) {
   };
 
   if (!carregado) return <Empty>Carregando…</Empty>;
+
+  if (pessoas && !soExtra) {
+    return (
+      <div>
+        <PageTitle sub="Quem entra no PicoOS">Acessos da equipe</PageTitle>
+        <TrocarSenha titulo="A TUA senha" quem="tua — a de entrar e a de destravar a tela" />
+        <div style={{ height: 14 }} />
+        <LoginsEquipe logins={pessoas.logins} max={pessoas.max} tipos={pessoas.tipos} onMudou={carregar} />
+      </div>
+    );
+  }
 
   return (
     <div>

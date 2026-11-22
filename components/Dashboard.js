@@ -198,11 +198,13 @@ export default function Dashboard() {
   // O que este negócio usa, e o que esta instalação consegue fazer. O Darci
   // depende dos dois: ele custa por pergunta e precisa de chave no servidor.
   const [modulos, setModulos] = useState(lerModulos({}));
-  const [recursos, setRecursos] = useState({ darci: true, voz: true });
+  const [recursos, setRecursos] = useState({ darci: true, voz: true, casa: true });
   // Acessos que ainda entram com "1234". O padrão de fábrica é de propósito —
   // a pessoa precisa entrar no primeiro dia —, mas um 1234 esquecido é outra
   // coisa. A tela cobra até trocar.
   const [senhasDeFabrica, setSenhasDeFabrica] = useState([]);
+  // Bar novo: quantos logins com nome a equipe já tem (null = bar da casa).
+  const [loginsEquipe, setLoginsEquipe] = useState(null);
   const [escondeuAvisoSenha, setEscondeuAvisoSenha] = useState(false);
   const [tarefasCozinha, setTarefasCozinha] = useState([]);
   const [tarefasGerente, setTarefasGerente] = useState([]);
@@ -341,6 +343,7 @@ export default function Dashboard() {
         const r = await fetch('/api/acessos', { cache: 'no-store' });
         const j = await r.json();
         if (j?.ok) setSenhasDeFabrica((j.acessos || []).filter((a) => a.deFabrica).map((a) => a.nome || a.papel));
+        if (j?.ok) setLoginsEquipe(j.modo === 'pessoas' ? (j.logins || []).length : null);
       } catch { /* sem aviso é melhor do que aviso errado */ }
     })();
   }, [tab]);
@@ -352,7 +355,7 @@ export default function Dashboard() {
       try {
         const r = await fetch('/api/recursos', { cache: 'no-store' });
         const j = await r.json();
-        if (j?.ok) setRecursos({ darci: !!j.darci, voz: !!j.voz });
+        if (j?.ok) setRecursos({ darci: !!j.darci, voz: !!j.voz, casa: j.casa !== false });
       } catch { /* na dúvida, deixa como está */ }
     })();
   }, []);
@@ -737,7 +740,8 @@ export default function Dashboard() {
   useEffect(() => { try { if (localStorage.getItem('picoos-lateral') === 'recolhida') setLateralRecolhida(true); } catch { /* ignora */ } }, []);
   const recolherLateral = (v) => setLateralRecolhida((cur) => { const nv = v == null ? !cur : v; try { localStorage.setItem('picoos-lateral', nv ? 'recolhida' : 'aberta'); } catch { /* ignora */ } return nv; });
   const grupos = [
-    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ['aovivo', 'Bar ao vivo'], ...(temDarci ? [['darci', 'Darci']] : []), ['brain', 'Brain']] },
+    // O Bar ao vivo é só do bar da casa (o Pico).
+    { titulo: 'Início', itens: [['hoje', 'Dashboard'], ...(recursos.casa ? [['aovivo', 'Bar ao vivo']] : []), ...(temDarci ? [['darci', 'Darci']] : []), ['brain', 'Brain']] },
     { titulo: 'Operação', itens: [['salao', 'Central de Operações'], ['reservas', 'Reservas'], ['garrafas', 'Controle'], ['ponto', 'Ponto']] },
     { titulo: 'Estoque', itens: [['abastecimento', 'Abastecimento'], ['previsao', 'Previsão']] },
     { titulo: 'Financeiro', itens: [['despesarapida', 'Despesa Rápida'], ['financas', 'Finanças'], ['diario', 'Log Operacional']] },
@@ -1056,7 +1060,7 @@ export default function Dashboard() {
         {/* A mesma pasta de textos que a Mari alimenta — modelo de cobrança,
             ficha técnica de prato e de drink. As duas leem e escrevem. */}
         {tab === 'pasta' && <Pasta />}
-        {tab === 'aovivo' && <BarAoVivo />}
+        {tab === 'aovivo' && recursos.casa && <BarAoVivo />}
         {tab === 'hoje' && <Hoje resumo={<ResumoDoDia {...propsDarci} onIrPara={irParaTab} onPerguntar={temDarci ? () => setTab('darci') : null} />} diario={diario} receitas={receitas} despesas={despesas} compras={compras} garrafas={garrafas} tarefas={tarefas} estoque={estoque} vendas={vendas} setTab={irParaTab} darci={temDarci ? <DarciFlutuante {...propsDarci} /> : null} metas={metas} onMetas={upd.metas} dona={(negocio && (negocio.dona || (negocio.papeis && negocio.papeis.dona))) || ''} fotoDona={(negocio && negocio.fotoDona) || ''} />}
         {tab === 'diario' && <Diario dados={diario} onChange={upd.diario} receitas={receitas} onReceitas={upd.receitas} visitantes={visitantes} onVisitantes={upd.visitantes} onRepor={reporLista} pessoasPorDia={pessoasPorDia} pedidosPorDia={pedidosPorDia} fiadosPorDia={fiadosPorDia} vendas={vendas} />}
         {tab === 'financas' && (
@@ -1177,6 +1181,7 @@ export default function Dashboard() {
             receitas={receitas} estoque={estoque} compras={compras} fichas={fichas}
             temMeta={metaDoMes(metas, ymOf(todayISO())) > 0}
             senhasDeFabrica={senhasDeFabrica}
+            loginsEquipe={loginsEquipe}
           />
         )}
         {tab === 'garrafas' && <ControleDoses estoque={estoque} fichas={fichas} cardapio={cardapio} vendas={vendas} compras={compras} controle={controleDoses} onControle={upd.controleDoses} onAcao={estoqueAcao} onRepor={reporLista} antigas={garrafas} />}
