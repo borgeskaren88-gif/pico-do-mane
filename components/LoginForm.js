@@ -162,6 +162,13 @@ export default function LoginForm() {
         <div style={{ textAlign: 'center', fontSize: 12, color: C.faint, marginTop: 16, lineHeight: 1.5 }}>
           Acesso restrito à gestão do PicoOS.
         </div>
+        {/* No app de muitos: quem chegou aqui sem conta (pelo QR code, por
+            exemplo) acha o caminho do cadastro, em vez de ir embora. */}
+        {multi && (
+          <div style={{ textAlign: 'center', fontSize: 13, color: C.muted, marginTop: 10 }}>
+            Ainda não usa o PicoOS? <a href="/criar" data-link-criar style={{ color: C.accent, fontWeight: 700 }}>Criar meu bar grátis</a>
+          </div>
+        )}
       </div>
     </div>
   );

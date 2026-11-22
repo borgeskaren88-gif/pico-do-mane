@@ -48,13 +48,20 @@ const faz = [
   ['Teto do MEI', 'Avisa pelo ritmo do ano, antes de estourar, não em dezembro quando não dá mais pra fazer nada.'],
 ];
 
+const BOTAO_CRIAR = {
+  display: 'inline-block', textDecoration: 'none',
+  background: 'var(--c-accent)', color: '#06101F',
+  fontWeight: 900, fontSize: 16, padding: '14px 30px', borderRadius: 999,
+};
+
 const S = {
   secao: { maxWidth: 880, margin: '0 auto', padding: '0 20px' },
   h2: { fontSize: 'clamp(21px, 4.4vw, 29px)', fontWeight: 900, lineHeight: 1.2, margin: '0 0 10px', letterSpacing: '-.02em' },
   p: { fontSize: 'clamp(14.5px, 2.6vw, 16px)', lineHeight: 1.65, color: 'var(--c-muted)', margin: 0 },
 };
 
-export default function Apresentacao() {
+export default function Apresentacao({ preco = 99.9 }) {
+  const precoTxt = (Number(preco) || 99.9).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const contato = WHATSAPP
     ? `https://wa.me/${WHATSAPP}`
     : (EMAIL ? `mailto:${EMAIL}` : null);
@@ -80,6 +87,12 @@ export default function Apresentacao() {
           Ele não te entrega uma planilha bonita — ele te cutuca quando a conta não fecha,
           e te mostra onde.
         </p>
+        {/* O BOTÃO QUE NÃO DEPENDE DA KAREN: quem leu o QR code cria o bar
+            sozinho e já entra com 14 dias grátis. */}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginTop: 24 }}>
+          <a href="/criar" data-criar-bar style={BOTAO_CRIAR}>Criar meu bar grátis</a>
+          <span style={{ fontSize: 13.5, color: 'var(--c-faint)' }}>14 dias grátis · depois {precoTxt}/mês · cancela quando quiser</span>
+        </div>
       </div>
 
       {/* OS AVISOS — o coração da coisa */}
@@ -142,15 +155,16 @@ export default function Apresentacao() {
 
       {/* CHAMADA */}
       <div style={{ ...S.secao, marginTop: 50, textAlign: 'center' }}>
-        <h2 style={S.h2}>Quer ver rodando?</h2>
+        <h2 style={S.h2}>Bora testar no teu bar?</h2>
         <p style={{ ...S.p, maxWidth: 480, margin: '0 auto 20px' }}>
-          Me chama que eu te mostro com os números do teu bar, não com dados de mentira.
+          Cria o teu bar agora e usa tudo por 14 dias, sem cartão. Prefere conversar antes? Me chama.
         </p>
+        <div style={{ marginBottom: 14 }}><a href="/criar" style={BOTAO_CRIAR}>Criar meu bar grátis</a></div>
         {contato ? (
           <a href={contato} style={{
             display: 'inline-block', textDecoration: 'none',
-            background: 'var(--c-accent)', color: '#06101F',
-            fontWeight: 900, fontSize: 15.5, padding: '13px 30px', borderRadius: 999,
+            background: 'transparent', color: 'var(--c-text)', border: '1px solid var(--c-line)',
+            fontWeight: 800, fontSize: 14.5, padding: '11px 26px', borderRadius: 999,
           }}>Falar com a Karen</a>
         ) : (
           /* Sem número de verdade, botão nenhum. Telefone inventado numa página
