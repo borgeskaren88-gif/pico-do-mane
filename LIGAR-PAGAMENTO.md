@@ -1,5 +1,7 @@
 # Ligar o pagamento automático (Asaas)
 
+> **Situação (22/11/2026):** conta criada, `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` salvas no projeto **picoos** (Production), webhook "PicoOS" ativo no Asaas com os eventos de cobrança recebida e confirmada. Falta só testar o "Assinar" com um bar de teste.
+
 O cadastro sozinho já funciona **sem isto**: a pessoa cria o bar e ganha 14 dias.
 Enquanto o pagamento não estiver ligado, o botão "Assinar" mostra o teu WhatsApp.
 
