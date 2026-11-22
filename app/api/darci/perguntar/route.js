@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { nomeCookie, papelDaSessao } from '../../../../lib/auth';
 import { bancoDaSessao } from '../../../../lib/negocioAtual';
-import { fichaDoBar, INSTRUCOES } from '../../../../lib/ficha';
+import { fichaDoBar, instrucoesDarci } from '../../../../lib/ficha';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -73,23 +73,23 @@ async function lerTudo(sb) {
   };
 }
 
-const sistema = (ficha, jeito) => `${INSTRUCOES}${jeito ? '\n- ' + jeito : ''}\n\n===== FICHA DO BAR =====\n${ficha}\n===== FIM DA FICHA =====`;
+const sistema = (ficha, jeito, dados) => `${instrucoesDarci(dados)}${jeito ? '\n- ' + jeito : ''}\n\n===== FICHA DO BAR =====\n${ficha}\n===== FIM DA FICHA =====`;
 
-async function perguntarClaude(ficha, jeito, antes, pergunta) {
+async function perguntarClaude(ficha, jeito, antes, pergunta, dados) {
   const client = new Anthropic({ timeout: 25000, maxRetries: 1 });
   const r = await client.messages.create({
     model: MODELO_CLAUDE,
     max_tokens: 4000,
     // Pergunta de bar, resposta curta: esforço baixo responde bem e sai barato.
     output_config: { effort: 'low' },
-    system: sistema(ficha, jeito),
+    system: sistema(ficha, jeito, dados),
     messages: [...antes, { role: 'user', content: pergunta }],
   });
   if (r.stop_reason === 'refusal') return '';
   return r.content.filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
 }
 
-async function perguntarOpenAI(ficha, jeito, antes, pergunta) {
+async function perguntarOpenAI(ficha, jeito, antes, pergunta, dados) {
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -98,7 +98,7 @@ async function perguntarOpenAI(ficha, jeito, antes, pergunta) {
       max_tokens: 700,
       temperature: 0.3,
       messages: [
-        { role: 'system', content: sistema(ficha, jeito) },
+        { role: 'system', content: sistema(ficha, jeito, dados) },
         ...antes, { role: 'user', content: pergunta },
       ],
     }),
@@ -251,8 +251,8 @@ export async function POST(request) {
     const antes = historico(body?.antes);
     const jeito = JEITO[String(body?.sotaque || 'manezinho')] || '';
     const resposta = motor === 'claude'
-      ? await perguntarClaude(ficha, jeito, antes, pergunta)
-      : await perguntarOpenAI(ficha, jeito, antes, pergunta);
+      ? await perguntarClaude(ficha, jeito, antes, pergunta, dados)
+      : await perguntarOpenAI(ficha, jeito, antes, pergunta, dados);
     // Resposta vazia (recusa, corte) conta como falha: a tela usa o jeito antigo.
     if (!resposta) return NextResponse.json({ ok: false, erro: 'Resposta vazia.' }, { status: 502 });
     return NextResponse.json({ ok: true, resposta, motor });

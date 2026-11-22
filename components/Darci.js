@@ -8,6 +8,7 @@ import { podeOuvir, lerEscuta, salvarEscuta, temVoz, ehPt, ehMelhor, listarVozes
 import useReservas from '../lib/useReservas';
 import { resolverDarci, testarIA } from '../lib/perguntarDarci';
 import CamposPedido, { podeGravarPedido } from './CamposPedido';
+import RelatorioSemana from './RelatorioSemana';
 
 // Tela cheia do Darci: a onda de voz dele, a conversa e os ajustes de voz.
 // O cérebro (os números e as respostas) mora em lib/darci.js, e a voz em
@@ -428,6 +429,10 @@ export default function Darci({ onAnotar, ...dados }) {
           </div>
         )}
       </div>
+
+      {/* O RELATÓRIO DA SEMANA: o Darci lendo a semana como um CEO. Fica
+          fechado até ela tocar — abrir esta tela não gasta IA sozinho. */}
+      <RelatorioSemana />
 
       {/* O que precisa de atenção agora. Vem antes de tudo porque é o motivo
           de ela ter aberto o app — conta vencida, salário, estoque no fim. */}
