@@ -1166,7 +1166,7 @@ export default function Dashboard() {
             {subAbast === 'margem' && <Margem cardapio={cardapio} fichas={fichas} estoque={estoque} vendas={vendas} compras={compras} />}
             {subAbast === 'preco' && <PrecoCerto cardapio={cardapio} fichas={fichas} estoque={estoque} compras={compras} despesas={despesas} vendas={vendas} base={precoBase} onBase={upd.precoBase} onCardapio={upd.cardapio} onAcao={estoqueAcao} />}
             {subAbast === 'fornecedores' && <Fornecedores compras={compras} />}
-            {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} estoque={estoque} compras={compras} />}
+            {subAbast === 'cotacoes' && <Cotacoes dados={cotacoes} onChange={upd.cotacoes} estoque={estoque} compras={compras} listaCompras={listaCompras} />}
           </>
         )}
         {tab === 'negocio' && <MeuNegocio negocio={negocio} onChange={upd.negocio} />}
