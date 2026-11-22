@@ -4,8 +4,9 @@ import { C, Card, Btn, KPI, Field, TextInput, NumInput, QtdInput, Select, Area, 
 import { brl, num, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, uid, limparNome, FONTES_RECEITA, CUSTO_VARIAVEL, DESPESA_OPERACIONAL, CATEGORIAS_DESPESA, CATEGORIAS_PRODUTO, DIAS, MESES } from '../lib/util';
 import MicBtn from './MicBtn';
 import { EMBALAGENS, melhorCompra, precoUnitario, descreveEmbalagem } from '../lib/cotacao';
+import CompradorEsperto from './CompradorEsperto';
 
-export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }) {
+export default function Cotacoes({ dados, onChange, estoque = [], compras = [], listaCompras = [] }) {
   // Embalagem + quantas unidades vêm: sem isso, "caixa de 12 a R$ 95" parece
   // mais cara que "unidade a R$ 8,50" — quando é o contrário.
   const vazio = { data: todayISO(), produto: '', fornecedor: '', preco: '', categoria: '', embalagem: 'un', conteudo: '', prazoPag: '', minPedido: '', prazoEntrega: '' };
@@ -67,6 +68,9 @@ export default function Cotacoes({ dados, onChange, estoque = [], compras = [] }
         { t: 'Produtos', v: grupos.length },
         { t: 'Preços cadastrados', v: dados.length },
       ]} />
+
+      {/* Onde comprar mais barato, pelas notas de Compras + as cotações. */}
+      <CompradorEsperto compras={compras} cotacoes={dados} estoque={estoque} listaCompras={listaCompras} />
 
       <Card style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editId ? 'Editar cotação' : 'Comparação de fornecedores'}</div>
