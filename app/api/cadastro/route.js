@@ -67,7 +67,7 @@ export async function POST(request) {
   const email = String(b.email || '').trim().toLowerCase().slice(0, 90);
   const senha = String(b.senha || '');
 
-  if (nomeBar.length < 2) return erro('Escreve o nome do bar.');
+  if (nomeBar.length < 2) return erro('Escreve o nome do negócio.');
   if (dona.length < 2) return erro('Escreve o teu nome.');
   if (whatsapp.length < 10 || whatsapp.length > 13) return erro('O WhatsApp precisa do DDD. Ex: 48 99999-9999.');
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return erro('Esse e-mail não parece certo.');

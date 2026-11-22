@@ -28,8 +28,8 @@ export default function AppPausado({ papel, estado }) {
             <div style={{ fontSize: 17, fontWeight: 900, marginBottom: 8 }}>O app está pausado</div>
             <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.6 }}>
               {suspenso
-                ? 'O acesso deste bar foi pausado. Nada foi apagado.'
-                : 'O teste ou a mensalidade do PicoOS venceu. Avisa o dono ou a dona do bar: assim que pagar, tudo volta como estava.'}
+                ? 'O acesso deste negócio foi pausado. Nada foi apagado.'
+                : 'O teste ou a mensalidade do PicoOS venceu. Avisa o dono ou a dona do negócio: assim que pagar, tudo volta como estava.'}
             </div>
           </Card>
         )}

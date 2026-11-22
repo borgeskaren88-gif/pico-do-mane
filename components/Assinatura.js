@@ -61,7 +61,7 @@ export default function Assinatura() {
 
   if (!s) return <Card><div style={{ color: C.muted, fontSize: 14 }}>Carregando a assinatura…</div></Card>;
   if (s.estado === 'isento') {
-    return <Card><div style={{ fontSize: 14, color: C.muted }}>Este bar não tem mensalidade.</div></Card>;
+    return <Card><div style={{ fontSize: 14, color: C.muted }}>Este negócio não tem mensalidade.</div></Card>;
   }
 
   const agir = async (corpo) => {

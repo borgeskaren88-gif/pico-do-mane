@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 // operação de um bar que está funcionando pra resolver um problema que ainda
 // não existe.
 export const metadata = {
-  title: 'PicoOS — gestão pra bar, em português de gente',
+  title: 'PicoOS — gestão pro teu negócio, em português de gente',
   description: 'O sistema que avisa quando o número está errado, em vez de mostrar errado calado. Estoque, ficha técnica, CMV, preço e comanda.',
 };
 
