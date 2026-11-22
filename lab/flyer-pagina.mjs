@@ -22,7 +22,7 @@ const html = await (await fetch(`${BASE}/flyer`)).text();
 const res = await fetch(`${BASE}/flyer`);
 cobra('/flyer responde 200 sem estar logada', res.status === 200, String(res.status));
 cobra('a prévia do WhatsApp aponta pro flyer (og:image com endereço completo)', /property="og:image" content="https:\/\/pico-do-mane\.vercel\.app\/divulgar\/picoos-flyer\.png"/.test(html));
-cobra('o título da prévia fala dos 14 dias grátis', /og:title" content="PicoOS — teu bar no controle/.test(html) && /<title>PicoOS — 14 dias grátis<\/title>/.test(html));
+cobra('o título da prévia fala dos 14 dias grátis', /og:title" content="PicoOS — teu negócio no controle/.test(html) && /<title>PicoOS — 14 dias grátis<\/title>/.test(html));
 
 console.log('\n— os arquivos —');
 const png = await fetch(`${BASE}/divulgar/picoos-flyer.png`);

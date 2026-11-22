@@ -17,9 +17,9 @@ const SITE = 'https://pico-do-mane.vercel.app';
 export const metadata = {
   metadataBase: new URL(SITE),
   title: 'PicoOS — 14 dias grátis',
-  description: 'Teu bar no controle, direto do celular. Comanda, estoque, ficha técnica, caixa e ponto da equipe. Cria o teu bar e testa 14 dias grátis, sem cartão.',
+  description: 'Teu negócio no controle, direto do celular. Comanda, estoque, ficha técnica, caixa e ponto da equipe. Cria o teu bar e testa 14 dias grátis, sem cartão.',
   openGraph: {
-    title: 'PicoOS — teu bar no controle, direto do celular',
+    title: 'PicoOS — teu negócio no controle, direto do celular',
     description: 'Testa 14 dias grátis, sem cartão. Aponta a câmera pro QR code ou toca no link.',
     url: '/flyer',
     siteName: 'PicoOS',

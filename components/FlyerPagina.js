@@ -33,7 +33,7 @@ export default function FlyerPagina() {
       const blob = await r.blob();
       const arquivo = new File([blob], 'picoos-flyer.png', { type: 'image/png' });
       if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
-        await navigator.share({ files: [arquivo], title: 'PicoOS — 14 dias grátis', text: `Teu bar no controle, direto do celular. Testa 14 dias grátis: ${LINK_SITE}` });
+        await navigator.share({ files: [arquivo], title: 'PicoOS — 14 dias grátis', text: `Teu negócio no controle, direto do celular. Testa 14 dias grátis: ${LINK_SITE}` });
         return;
       }
     } catch (e) { if (e && e.name === 'AbortError') return; }
@@ -53,7 +53,7 @@ export default function FlyerPagina() {
 
         {/* A imagem inteira, do tamanho da tela. Tocar nela abre em tamanho cheio. */}
         <a href={IMAGEM} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
-          <img data-flyer-imagem src={IMAGEM} alt="Flyer do PicoOS: teu bar no controle, direto do celular. 14 dias grátis. QR code e link pico-do-mane.vercel.app/conheca"
+          <img data-flyer-imagem src={IMAGEM} alt="Flyer do PicoOS: teu negócio no controle, direto do celular. 14 dias grátis. QR code e link pico-do-mane.vercel.app/conheca"
             width={1588} height={2246}
             style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 14, border: `1px solid ${C.line}`, boxShadow: '0 18px 50px rgba(0,0,0,.35)' }} />
         </a>
