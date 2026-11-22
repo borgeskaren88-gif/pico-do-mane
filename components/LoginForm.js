@@ -210,7 +210,7 @@ export default function LoginForm() {
             exemplo) acha o caminho do cadastro, em vez de ir embora. */}
         {multi && (
           <div style={{ textAlign: 'center', fontSize: 13, color: C.muted, marginTop: 10 }}>
-            Ainda não usa o PicoOS? <a href="/criar" data-link-criar style={{ color: C.accent, fontWeight: 700 }}>Criar meu bar grátis</a>
+            Ainda não usa o PicoOS? <a href="/criar" data-link-criar style={{ color: C.accent, fontWeight: 700 }}>Criar meu negócio grátis</a>
           </div>
         )}
       </div>

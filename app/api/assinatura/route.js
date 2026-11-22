@@ -46,13 +46,13 @@ export async function GET() {
 
 export async function POST(request) {
   const { papel, negocio } = sessao();
-  if (papel !== 'dona' || !negocio) return erro('Só a dona do bar mexe na assinatura.', 401);
+  if (papel !== 'dona' || !negocio) return erro('Só a dona do negócio mexe na assinatura.', 401);
   let b = {};
   try { b = await request.json(); } catch { return erro('Requisição inválida.'); }
   const n = await lerNegocio(negocio);
-  if (!n) return erro('Bar não encontrado.', 404);
+  if (!n) return erro('Negócio não encontrado.', 404);
   const s = situacao(n);
-  if (s.estado === 'isento') return erro('Este bar não tem cobrança.');
+  if (s.estado === 'isento') return erro('Este negócio não tem cobrança.');
   if (!asaasLigado()) return erro('O pagamento pelo app ainda não está ligado. Fala com a gente pelo WhatsApp.', 503);
   const a = n.assinatura || {};
   const acao = String(b.acao || '');

@@ -48,7 +48,7 @@ export default function CriarBar() {
       <LogoMark size={36} radius={10} />
       <div>
         <div style={{ fontSize: 18, fontWeight: 900 }}>PicoOS</div>
-        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.13em', color: C.accent }}>CRIAR MEU BAR</div>
+        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.13em', color: C.accent }}>CRIAR MEU NEGÓCIO</div>
       </div>
     </div>
   );
@@ -65,7 +65,7 @@ export default function CriarBar() {
         <Card style={{ marginBottom: 14, borderColor: C.accent }}>
           <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 8 }}>Pronto, o {pronto.nome} já está no PicoOS!</div>
           <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.6 }}>
-            Tens <b>{pronto.testeDias} dias grátis</b> pra usar tudo. Guarda o código do teu bar. É ele que tu e a tua equipe digitam pra entrar:
+            Tens <b>{pronto.testeDias} dias grátis</b> pra usar tudo. Guarda o código do teu negócio. É ele que tu e a tua equipe digitam pra entrar:
           </div>
           <div data-codigo style={{ fontSize: 26, fontWeight: 900, textAlign: 'center', margin: '16px 0 6px', padding: '12px', border: `2px dashed ${C.accent}`, borderRadius: 12, letterSpacing: '.02em' }}>{pronto.codigo}</div>
           <div style={{ fontSize: 12.5, color: C.faint, textAlign: 'center', lineHeight: 1.5 }}>
@@ -92,7 +92,7 @@ export default function CriarBar() {
     return casca(
       <Card>
         <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>O cadastro está fechado agora</div>
-        <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.6, marginBottom: 14 }}>Fala com a gente que a gente cria o teu bar.</div>
+        <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.6, marginBottom: 14 }}>Fala com a gente que a gente cria o teu negócio.</div>
         <Btn href="https://wa.me/5548988784016?text=Oi!%20Quero%20usar%20o%20PicoOS." target="_blank" rel="noopener noreferrer">Falar no WhatsApp</Btn>
       </Card>,
     );
@@ -104,11 +104,11 @@ export default function CriarBar() {
     <>
       <div style={{ fontSize: 'clamp(22px, 6vw, 28px)', fontWeight: 900, lineHeight: 1.2, marginBottom: 8 }}>{dias} dias grátis, sem cartão</div>
       <div style={{ fontSize: 14.5, color: C.muted, lineHeight: 1.6, marginBottom: 18 }}>
-        Cria o teu bar em um minuto. Depois do teste, <b>{reais(preco)} por mês</b>, e cancelas quando quiseres.
+        Cria o teu negócio em um minuto. Depois do teste, <b>{reais(preco)} por mês</b>, e cancelas quando quiseres.
       </div>
       <Card>
         <form onSubmit={criar} data-form-cadastro>
-          <Field label="Nome do bar"><TextInput value={f.nomeBar} onChange={muda('nomeBar')} placeholder="ex: Boteco da Ana" /></Field>
+          <Field label="Nome do negócio"><TextInput value={f.nomeBar} onChange={muda('nomeBar')} placeholder="ex: Boteco da Ana" /></Field>
           <Field label="Cidade"><TextInput value={f.cidade} onChange={muda('cidade')} placeholder="ex: Florianópolis" /></Field>
           <Field label="Teu nome"><TextInput value={f.dona} onChange={muda('dona')} placeholder="como queres ser chamado(a) no app" /></Field>
           <Field label="WhatsApp (com DDD)"><TextInput value={f.whatsapp} onChange={muda('whatsapp')} inputMode="tel" placeholder="48 99999-9999" /></Field>
@@ -124,7 +124,7 @@ export default function CriarBar() {
             <span>Entendi: são {dias} dias grátis e, se eu quiser continuar, pago {reais(preco)} por mês. Se não pagar, o app pausa, mas meus dados ficam guardados.</span>
           </label>
           {erro && <div data-erro-cadastro style={{ color: C.red, fontSize: 13.5, marginBottom: 12, lineHeight: 1.5 }}>{erro}</div>}
-          <Btn type="submit" disabled={indo} style={{ width: '100%' }}>{indo ? 'Criando…' : 'Criar meu bar'}</Btn>
+          <Btn type="submit" disabled={indo} style={{ width: '100%' }}>{indo ? 'Criando…' : 'Criar meu negócio'}</Btn>
         </form>
       </Card>
       <div style={{ fontSize: 13, color: C.faint, textAlign: 'center', marginTop: 16, lineHeight: 1.6 }}>

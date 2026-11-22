@@ -166,7 +166,7 @@ export default function Console() {
           <Card style={{ marginBottom: 18 }} data-config-venda>
             <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Cadastro sozinho e mensalidade</div>
             <div style={{ fontSize: 12.5, color: C.faint, marginBottom: 12, lineHeight: 1.5 }}>
-              Quem lê o QR code cria o bar em <b>/criar</b>, ganha {14} dias grátis e assina pelo app.
+              Quem lê o QR code cria o negócio em <b>/criar</b>, ganha {14} dias grátis e assina pelo app.
               O preço novo vale pra quem assinar daqui pra frente.
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>

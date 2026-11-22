@@ -67,9 +67,9 @@ export default function FlyerPagina() {
         {aviso && <div data-aviso style={{ marginTop: 12, fontSize: 14, fontWeight: 700, color: C.green, lineHeight: 1.5 }}>{aviso}</div>}
 
         <div style={{ marginTop: 26, borderTop: `1px solid ${C.hair}`, paddingTop: 18, fontSize: 14, color: C.muted, lineHeight: 1.65 }}>
-          O QR code do flyer abre <b style={{ color: C.text }}>pico-do-mane.vercel.app/conheca</b>, onde a pessoa cria o bar e testa <b style={{ color: C.text }}>14 dias grátis</b>, sem cartão.
+          O QR code do flyer abre <b style={{ color: C.text }}>pico-do-mane.vercel.app/conheca</b>, onde a pessoa cria o negócio e testa <b style={{ color: C.text }}>14 dias grátis</b>, sem cartão.
           <div style={{ marginTop: 14 }}>
-            <a data-criar href="/criar" style={{ color: C.accent, fontWeight: 800 }}>Quero criar o meu bar →</a>
+            <a data-criar href="/criar" style={{ color: C.accent, fontWeight: 800 }}>Quero criar o meu negócio →</a>
           </div>
         </div>
       </div>

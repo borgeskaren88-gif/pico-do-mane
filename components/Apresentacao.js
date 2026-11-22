@@ -90,7 +90,7 @@ export default function Apresentacao({ preco = 99.9 }) {
         {/* O BOTÃO QUE NÃO DEPENDE DA KAREN: quem leu o QR code cria o bar
             sozinho e já entra com 14 dias grátis. */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginTop: 24 }}>
-          <a href="/criar" data-criar-bar style={BOTAO_CRIAR}>Criar meu bar grátis</a>
+          <a href="/criar" data-criar-bar style={BOTAO_CRIAR}>Criar meu negócio grátis</a>
           <span style={{ fontSize: 13.5, color: 'var(--c-faint)' }}>14 dias grátis · depois {precoTxt}/mês · cancela quando quiser</span>
         </div>
       </div>
@@ -155,11 +155,11 @@ export default function Apresentacao({ preco = 99.9 }) {
 
       {/* CHAMADA */}
       <div style={{ ...S.secao, marginTop: 50, textAlign: 'center' }}>
-        <h2 style={S.h2}>Bora testar no teu bar?</h2>
+        <h2 style={S.h2}>Bora testar no teu negócio?</h2>
         <p style={{ ...S.p, maxWidth: 480, margin: '0 auto 20px' }}>
-          Cria o teu bar agora e usa tudo por 14 dias, sem cartão. Prefere conversar antes? Me chama.
+          Cria o teu negócio agora e usa tudo por 14 dias, sem cartão. Prefere conversar antes? Me chama.
         </p>
-        <div style={{ marginBottom: 14 }}><a href="/criar" style={BOTAO_CRIAR}>Criar meu bar grátis</a></div>
+        <div style={{ marginBottom: 14 }}><a href="/criar" style={BOTAO_CRIAR}>Criar meu negócio grátis</a></div>
         {contato ? (
           <a href={contato} style={{
             display: 'inline-block', textDecoration: 'none',

@@ -8,7 +8,7 @@
 //     completo (senão a prévia sai cinza).
 //   - OS BOTÕES: baixar a imagem, baixar o PDF, compartilhar e copiar o link
 //     estão lá e apontam pros arquivos certos.
-//   - O CAMINHO CONTINUA LIGADO: "Quero criar o meu bar" leva ao cadastro.
+//   - O CAMINHO CONTINUA LIGADO: "Quero criar o meu negócio" leva ao cadastro.
 //
 // LAB_ENV: ADMIN_PASSWORD=Admin@123
 import { chromium } from 'playwright';
@@ -55,7 +55,7 @@ const copiado = await pg.evaluate(() => navigator.clipboard.readText());
 cobra('sem a folha de compartilhar do aparelho, "Compartilhar" copia o link do flyer', copiado === 'https://pico-do-mane.vercel.app/flyer', copiado);
 await pg.click('[data-criar]');
 await pg.waitForURL(/\/criar$/);
-cobra('"Quero criar o meu bar" leva ao cadastro', await pg.locator('[data-form-cadastro]').count() === 1);
+cobra('"Quero criar o meu negócio" leva ao cadastro', await pg.locator('[data-form-cadastro]').count() === 1);
 
 await browser.close();
 console.log(ruim ? `\n${ruim} RUIM` : '\nTUDO OK');

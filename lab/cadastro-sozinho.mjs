@@ -107,11 +107,13 @@ const ctx = await browser.newContext({ ...iphone, extraHTTPHeaders: { 'x-forward
 const pg = await ctx.newPage();
 await pg.goto(`${BASE}/conheca`);
 const btn = pg.locator('[data-criar-bar]');
-cobra('a página de apresentação tem o botão "Criar meu bar grátis"', await btn.count() === 1 && /Criar meu bar/.test(await btn.innerText()));
+cobra('a página de apresentação tem o botão "Criar meu negócio grátis"', await btn.count() === 1 && /Criar meu negócio grátis/.test(await btn.innerText()));
 cobra('e mostra o preço da sala de máquinas (R$ 99,90)', /R\$\s?99,90\/mês/.test(await pg.locator('body').innerText()));
 await btn.click();
 await pg.waitForURL(/\/criar$/);
 await pg.waitForSelector('[data-form-cadastro]');
+const textoForm = await pg.locator('main').first().innerText();
+cobra('a tela de criar fala em "negócio" (e não mais em "bar")', /CRIAR MEU NEGÓCIO/.test(textoForm) && /Nome do negócio/i.test(textoForm) && /Criar meu negócio/.test(textoForm) && !/Nome do bar/i.test(textoForm), textoForm.slice(0, 120).replace(/\n/g, ' | '));
 const campos = pg.locator('[data-form-cadastro] input:visible');
 const preencher = async (vals) => { for (let i = 0; i < vals.length; i += 1) await campos.nth(i).fill(vals[i]); };
 await preencher(['Boteco da Ana', 'Palhoça', 'Ana Souza', '(48) 99123-4567', 'ana@boteco.com', 'Ana@2026', 'Ana@2026']);
