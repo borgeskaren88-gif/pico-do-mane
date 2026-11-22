@@ -156,7 +156,7 @@ export default function Console() {
             <div style={{ fontSize: 12.5, color: C.faint, marginTop: 10, lineHeight: 1.5 }}>
               Esta senha aparece <b>só agora</b> — guardada fica só a versão embaralhada, que
               nem eu nem tu conseguimos ler de volta. Se perder, tu pões uma nova aqui mesmo.
-              A equipe dela entra com <b>1234</b> e troca depois.
+              A equipe ela cadastra dentro do app, em Acessos (até 5 pessoas com nome e senha).
             </div>
             <div style={{ marginTop: 12 }}><Btn kind="ghost" onClick={() => setRecemCriado(null)}>Já mandei</Btn></div>
           </Card>

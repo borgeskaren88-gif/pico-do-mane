@@ -67,10 +67,16 @@ function Duvida({ pergunta, children }) {
 
 export default function Guia({
   onIr, nome = '', receitas = [], estoque = [], compras = [], fichas = [],
-  temMeta = false, senhasDeFabrica = [], temComandas = true,
+  temMeta = false, senhasDeFabrica = [], temComandas = true, loginsEquipe = null,
 }) {
   const passos = [
-    {
+    // Bar novo: a equipe é por pessoa — o passo é CRIAR os logins.
+    loginsEquipe != null ? {
+      titulo: 'Criar os logins da equipe',
+      porque: 'Até 5 pessoas, cada uma com nome e senha. Sem login, a equipe não entra no app.',
+      onde: 'Abrir Acessos', ir: () => onIr('acessos'),
+      pronto: loginsEquipe > 0,
+    } : {
       titulo: 'Trocar as senhas da equipe',
       porque: 'Enquanto estiverem na senha de fábrica (1234), quem souber o endereço do app entra. Dez segundos cada.',
       onde: 'Abrir Acessos', ir: () => onIr('acessos'),

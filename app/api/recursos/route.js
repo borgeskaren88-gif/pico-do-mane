@@ -23,6 +23,8 @@ export async function GET() {
   const liberado = darciLiberado(negocioDaSessao(v));
   return NextResponse.json({
     ok: true,
+    // O bar da casa (o Pico): Bar ao vivo e acessos por cargo. Os outros não.
+    casa: liberado,
     darci: liberado && !!(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY),
     voz: liberado && !!(process.env.ELEVENLABS_API_KEY || process.env.AZURE_SPEECH_KEY || process.env.OPENAI_API_KEY),
   });

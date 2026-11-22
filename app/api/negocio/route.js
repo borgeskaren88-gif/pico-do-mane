@@ -3,6 +3,7 @@ import { bancoDo, nomeDeNegocioValido } from '../../../lib/banco';
 import { lerNegocio, papeisParaLogin, PADRAO } from '../../../lib/negocio';
 import { lerNegocios } from '../../../lib/negocios';
 import { acessoFechado } from '../../../lib/senha';
+import { ehBarDaCasa } from '../../../lib/darciLiberado';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,10 +28,18 @@ export const dynamic = 'force-dynamic';
 // viesse, qualquer um na internet chutaria códigos até montar a lista de
 // clientes da Karen. O nome aparece depois de entrar, que é quando já se
 // provou ter o direito de vê-lo.
-export async function GET() {
+export async function GET(request) {
   try {
     const muitos = Object.keys(await lerNegocios()).length > 0;
     if (muitos) {
+      // Digitou o código: a tela pergunta COMO se entra nesse bar — por cargo
+      // (o bar da casa) ou por pessoa (os bares novos). A resposta sai da
+      // configuração, sem olhar o banco: um código inventado recebe "pessoas"
+      // igual a um de verdade, então isto não conta quem é cliente.
+      const cod = String(new URL(request.url).searchParams.get('codigo') || '').trim().toLowerCase();
+      if (cod && !ehBarDaCasa(cod)) {
+        return NextResponse.json({ ok: true, multi: true, modo: 'pessoas', nome: '', papeis: [['dona', 'Dono(a)'], ['equipe', 'Equipe']] });
+      }
       // No app de muitos o botão "Extra" aparece sempre: aqui não se sabe de
       // que negócio é a pessoa, e dizer "este tem extra, aquele não" seria
       // contar coisa de cliente pra quem ainda não provou nada.

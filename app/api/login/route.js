@@ -7,6 +7,8 @@ import { conferirSenhaDona, temSenhaDona, conferirSenhaPapel } from '../../../li
 import { lerGeracoes } from '../../../lib/acessos';
 import { bancoDoNegocioAtivo, lerNegocios } from '../../../lib/negocios';
 import { nomeDeNegocioValido } from '../../../lib/banco';
+import { ehBarDaCasa } from '../../../lib/darciLiberado';
+import { conferirLogin } from '../../../lib/loginsEquipe';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,12 +26,14 @@ export async function POST(request) {
   // o cookie é "de sessão" — some quando fecha o navegador, então pede a senha
   // de novo na próxima vez. Assim o computador não fica aberto pra qualquer um.
   let lembrar = false;
+  let nomeEquipe = '';
   try {
     const body = await request.json();
     senha = body?.senha ?? '';
     papelPedido = body?.papel ?? '';
     lembrar = body?.lembrar === true;
     codigo = String(body?.codigo ?? '').trim().toLowerCase();
+    nomeEquipe = String(body?.nome ?? '').slice(0, 40);
   } catch {
     return NextResponse.json({ ok: false, erro: 'Requisição inválida.' }, { status: 400 });
   }
@@ -101,6 +105,30 @@ export async function POST(request) {
   const op = { semEnv: !!negocio };
   let valorCookie = null;
   let papel = null;
+
+  // OS BARES NOVOS ENTRAM POR PESSOA, NÃO POR CARGO.
+  //
+  // Fora o bar da casa, a equipe entra com o NOME e a senha que a dona criou
+  // (lib/loginsEquipe.js). Os cargos de fábrica (Cozinha/Atendimento com
+  // 1234, Reservas, Extra, Gerente) simplesmente não abrem nesses bares —
+  // senão qualquer um que soubesse o código entraria com 1234.
+  if (negocio && !ehBarDaCasa(negocio)) {
+    if (papelPedido === 'equipe') {
+      const l = await conferirLogin(sb, nomeEquipe, senha);
+      if (l) {
+        const fazer = { garcom: valorSessaoGarcom, cozinha: valorSessaoCozinha, gerente: valorSessaoGerente }[l.tipo];
+        valorCookie = fazer(ger[l.tipo], negocio);
+        papel = l.tipo;
+      }
+    } else if ((papelPedido === 'dona' || !papelPedido) && senha && await conferirSenhaDona(sb, senha, op)) {
+      valorCookie = valorSessaoValida(negocio);
+      papel = 'dona';
+    }
+    if (!valorCookie) return recusa();
+    cookies().set(nomeCookie(), valorCookie, opcoesDoCracha(lembrar));
+    return NextResponse.json({ ok: true, papel, ...(papel !== 'dona' ? { nome: nomeEquipe.trim() } : {}) });
+  }
+
   // Com o papel escolhido no login, cozinha e garçom podem usar a mesma senha
   // (1234) sem ambiguidade: o papel é que decide qual acesso abrir.
   if (papelPedido === 'cozinha') {

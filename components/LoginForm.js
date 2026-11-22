@@ -21,6 +21,12 @@ export default function LoginForm() {
   // de um cliente só (como a do Pico do Mané) este campo nem aparece.
   const [multi, setMulti] = useState(false);
   const [codigo, setCodigo] = useState('');
+  // BAR NOVO: a equipe entra pelo NOME da pessoa (não por cargo). A lista de
+  // cargos fica guardada pra voltar se o código for o do bar da casa.
+  const [papeisCargo, setPapeisCargo] = useState(null);
+  const [porPessoa, setPorPessoa] = useState(false);
+  const [nomeEquipe, setNomeEquipe] = useState('');
+  useEffect(() => { try { setNomeEquipe(localStorage.getItem('picoos-nome-equipe') || ''); } catch { /* ignora */ } }, []);
   useEffect(() => {
     let vivo = true;
     (async () => {
@@ -30,6 +36,7 @@ export default function LoginForm() {
         if (!vivo || !j) return;
         if (Array.isArray(j.papeis) && j.papeis.length) {
           setPapeis(j.papeis);
+          setPapeisCargo(j.papeis);
           // Quem entrou por último neste aparelho já vem escolhido — se essa
           // porta ainda existir (um acesso fechado some da lista).
           try {
@@ -49,6 +56,35 @@ export default function LoginForm() {
     return () => { vivo = false; };
   }, []);
 
+  // Digitou o código: pergunta como se entra nesse bar. Um código inventado
+  // responde igual a um de verdade — a tela não vira lista de clientes.
+  useEffect(() => {
+    if (!multi) return undefined;
+    const cod = codigo.trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{1,30}$/.test(cod)) { setPorPessoa(false); if (papeisCargo) setPapeis(papeisCargo); return undefined; }
+    let vivo = true;
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/negocio?codigo=${encodeURIComponent(cod)}`, { cache: 'no-store' });
+        const j = await r.json();
+        if (!vivo || !j) return;
+        if (j.modo === 'pessoas') {
+          setPorPessoa(true);
+          setPapeis(j.papeis);
+          setPapel((p) => {
+            if (j.papeis.some(([v]) => v === p)) return p;
+            try { const u = localStorage.getItem('picoos-ultimo-papel'); if (u && j.papeis.some(([v]) => v === u)) return u; } catch { /* ignora */ }
+            return 'dona';
+          });
+        } else {
+          setPorPessoa(false);
+          if (papeisCargo) { setPapeis(papeisCargo); setPapel((p) => (papeisCargo.some(([v]) => v === p) ? p : 'dona')); }
+        }
+      } catch { /* fica como está */ }
+    }, 350);
+    return () => { vivo = false; clearTimeout(t); };
+  }, [codigo, multi, papeisCargo]);
+
   const entrar = async (e) => {
     e.preventDefault();
     setErro('');
@@ -63,7 +99,7 @@ export default function LoginForm() {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senha, papel, lembrar, ...(multi ? { codigo: codigo.trim().toLowerCase() } : {}) }),
+        body: JSON.stringify({ senha, papel, lembrar, ...(multi ? { codigo: codigo.trim().toLowerCase() } : {}), ...(papel === 'equipe' ? { nome: nomeEquipe.trim() } : {}) }),
       });
       const json = await res.json();
       if (json.ok) {
@@ -76,6 +112,7 @@ export default function LoginForm() {
         try { sessionStorage.setItem('pdm_sessaoAtiva', '1'); } catch { /* ignora */ }
         if (multi) { try { localStorage.setItem('picoos-codigo', codigo.trim().toLowerCase()); } catch { /* ignora */ } }
         try { localStorage.setItem('picoos-ultimo-papel', papel); } catch { /* ignora */ }
+        if (papel === 'equipe') { try { localStorage.setItem('picoos-nome-equipe', nomeEquipe.trim()); } catch { /* ignora */ } }
         router.refresh();
       } else {
         setErro(json.erro || 'Senha incorreta.');
@@ -133,6 +170,13 @@ export default function LoginForm() {
                 </svg>
               </div>
             </Field>
+            {porPessoa && papel === 'equipe' && (
+              <Field label="Teu nome">
+                <input data-nome-equipe value={nomeEquipe} placeholder="o nome que a dona cadastrou"
+                  onChange={(e) => { setNomeEquipe(e.target.value); setErro(''); }}
+                  autoCapitalize="words" autoCorrect="off" autoComplete="username" spellCheck="false" style={inputStyle} />
+              </Field>
+            )}
             <Field label="Senha">
               <div style={{ position: 'relative' }}>
                 <input

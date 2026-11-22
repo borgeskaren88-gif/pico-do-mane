@@ -52,6 +52,13 @@ export default function Gerente() {
   const router = useRouter();
   const g = useGerencia();
   const [tela, setTela] = useState('inicio');
+  // O "Acesso do Extra" só existe no bar da casa; nos bares novos a equipe é
+  // por pessoa e quem cria os logins é a dona.
+  const [casa, setCasa] = useState(true);
+  useEffect(() => {
+    fetch('/api/recursos', { cache: 'no-store' }).then((r) => r.json()).then((j) => { if (j && j.ok) setCasa(j.casa !== false); }).catch(() => {});
+  }, []);
+  const grupos = casa ? GRUPOS : GRUPOS.map((gr) => ({ ...gr, itens: gr.itens.filter(([id]) => id !== 'extra') }));
   const [sub, setSub] = useState('comandas');
   const [menuAberto, setMenuAberto] = useState(false);
   const [tema, setTema] = useState('escuro');
@@ -112,7 +119,7 @@ export default function Gerente() {
             </div>
           </div>
           <nav className="pos-nav">
-            {GRUPOS.map((gr) => (
+            {grupos.map((gr) => (
               <div key={gr.titulo} className="pos-group">
                 <div className="pos-group-title">{gr.titulo}</div>
                 {gr.itens.map(([id, nome]) => (
@@ -184,7 +191,7 @@ export default function Gerente() {
               <PageTitle sub="Quem bateu o ponto hoje">Equipe</PageTitle>
               <EquipeGerente g={g} />
             </>)}
-            {tela === 'extra' && (<>
+            {tela === 'extra' && casa && (<>
               <PageTitle sub="Pra quem vem trabalhar um dia só">Acesso do Extra</PageTitle>
               <ExtraGerente />
             </>)}

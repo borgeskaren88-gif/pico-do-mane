@@ -142,6 +142,10 @@ export async function middleware(req) {
   if (doCracha && req.nextUrl.pathname.startsWith('/api/darci') && !darciLiberado(doCracha)) {
     return NextResponse.json({ ok: false, erro: 'O Darci não está disponível neste bar.' }, { status: 403 });
   }
+  // O Bar ao vivo também é só do bar da casa.
+  if (doCracha && req.nextUrl.pathname.startsWith('/api/aovivo') && !darciLiberado(doCracha)) {
+    return NextResponse.json({ ok: false, erro: 'O Bar ao vivo não está disponível neste bar.' }, { status: 403 });
+  }
 
   if (doCracha && req.nextUrl.pathname.startsWith('/api/') && !LIVRES.some((l) => req.nextUrl.pathname === l || req.nextUrl.pathname.startsWith(l + '/'))) {
     const lista = await listaDeNegocios();

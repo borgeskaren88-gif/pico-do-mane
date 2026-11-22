@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { nomeCookie, papelDaSessao } from '../../../lib/auth';
+import { nomeCookie, papelDaSessao, negocioDaSessao } from '../../../lib/auth';
+import { ehBarDaCasa } from '../../../lib/darciLiberado';
+import { lerLogins, criarLogin, editarLogin, apagarLogin, publico, MAX_LOGINS, TIPOS } from '../../../lib/loginsEquipe';
 import { bancoDaSessao } from '../../../lib/negocioAtual';
 import { ACESSOS, lerGeracoes, subirGeracao } from '../../../lib/acessos';
 import { definirSenhaPapel, senhaFoiTrocada, ehSenhaDeFabrica, acessoFechado, apagarSenhaPapel, nasceFechado } from '../../../lib/senha';
@@ -25,9 +27,25 @@ function ehDona() {
 const ehGerente = () => papelDaSessao(cookies().get(nomeCookie())?.value) === 'gerente';
 const GERENTE_PODE = new Set(['extra']);
 
+// Bar novo (não é o da casa): a equipe é por PESSOA, até 5 logins com nome.
+const porPessoa = () => {
+  const n = negocioDaSessao(cookies().get(nomeCookie())?.value);
+  return !!n && !ehBarDaCasa(n);
+};
+
 export async function GET() {
   const gerente = ehGerente();
   if (!ehDona() && !gerente) return NextResponse.json({ ok: false, erro: 'Não autorizado.' }, { status: 401 });
+  if (porPessoa()) {
+    // Só a dona cria e mexe nos logins. A gerência daqui não tem Extra.
+    if (!ehDona()) return NextResponse.json({ ok: true, modo: 'pessoas', acessos: [], logins: [] });
+    try {
+      const logins = (await lerLogins(bancoDaSessao())).map(publico);
+      return NextResponse.json({ ok: true, modo: 'pessoas', acessos: [], logins, max: MAX_LOGINS, tipos: TIPOS });
+    } catch (e) {
+      return NextResponse.json({ ok: false, erro: e?.message || 'Erro ao ler os logins.' }, { status: 500 });
+    }
+  }
   try {
     const sb = bancoDaSessao();
     const ger = await lerGeracoes(sb);
@@ -57,6 +75,18 @@ export async function POST(request) {
   let body;
   try { body = await request.json(); } catch { return NextResponse.json({ ok: false, erro: 'Requisição inválida.' }, { status: 400 }); }
   const acao = String(body?.acao || '');
+  if (porPessoa()) {
+    if (!ehDona()) return NextResponse.json({ ok: false, erro: 'Só a dona mexe nos logins.' }, { status: 403 });
+    try {
+      const sb = bancoDaSessao();
+      if (acao === 'criarLogin') return NextResponse.json({ ok: true, login: await criarLogin(sb, body || {}) });
+      if (acao === 'editarLogin') return NextResponse.json({ ok: true, login: await editarLogin(sb, String(body?.id || ''), body || {}) });
+      if (acao === 'apagarLogin') { await apagarLogin(sb, String(body?.id || '')); return NextResponse.json({ ok: true }); }
+      return NextResponse.json({ ok: false, erro: 'Neste bar a equipe é por pessoa: cria, edita ou apaga um login.' }, { status: 400 });
+    } catch (e) {
+      return NextResponse.json({ ok: false, erro: e?.message || 'Não deu certo.' }, { status: 400 });
+    }
+  }
   const papel = String(body?.papel || '');
   if (!ACESSOS.some((a) => a.papel === papel)) {
     return NextResponse.json({ ok: false, erro: 'Esse acesso não existe.' }, { status: 400 });
