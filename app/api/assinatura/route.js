@@ -64,7 +64,7 @@ export async function POST(request) {
     if (acao === 'assinar') {
       if (a.asaasAssinatura && !a.cancelada) {
         const link = await linkEmAberto(a.asaasAssinatura);
-        return NextResponse.json({ ok: true, link: link && link.url, jaPago: !link });
+        return NextResponse.json({ ok: true, link: link && link.url, jaPago: !(link && link.url), proxima: link && link.proxima });
       }
       const doc = documentoValido(b.documento);
       if (!doc) return erro('Confere o CPF ou CNPJ: os números não batem.');
@@ -85,7 +85,7 @@ export async function POST(request) {
     if (acao === 'pagar') {
       if (!a.asaasAssinatura || a.cancelada) return erro('Ainda não tem assinatura. Toca em "Assinar".');
       const link = await linkEmAberto(a.asaasAssinatura);
-      if (!link) return NextResponse.json({ ok: true, jaPago: true });
+      if (!link || !link.url) return NextResponse.json({ ok: true, jaPago: true, proxima: link && link.proxima });
       return NextResponse.json({ ok: true, link: link.url, vence: link.vence });
     }
 

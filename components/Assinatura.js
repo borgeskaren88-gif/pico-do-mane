@@ -71,7 +71,7 @@ export default function Assinatura() {
       const j = await r.json().catch(() => ({}));
       if (!j.ok) { setErro(j.erro || 'Não deu certo. Tenta de novo.'); return; }
       if (j.link) setLink(j.link);
-      if (j.jaPago) setMsg('Não tem nenhuma mensalidade em aberto. Está tudo pago.');
+      if (j.jaPago) setMsg(j.proxima ? `Está tudo pago. A próxima mensalidade vence em ${dataBR(j.proxima + 'T12:00:00')}.` : 'Não tem nenhuma mensalidade em aberto. Está tudo pago.');
       if (corpo.acao === 'cancelar') setMsg(`Assinatura cancelada. O app continua aberto até ${dataBR(j.ate)}, e teus dados ficam guardados.`);
       recarregar();
     } catch { setErro('Sem conexão. Tenta de novo.'); } finally { setIndo(false); setConfirmarCancelar(false); }

@@ -57,7 +57,8 @@ cobra('teste vencido há 6 dias = bloqueado', lib.situacao({ assinatura: { plano
 }
 
 // ---------- O ASAAS DE MENTIRA ----------
-const asaas = { pedidos: [], assinaturas: {} };
+const asaas = { pedidos: [], assinaturas: {}, cobrancas: [] };
+const diaSP = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(ms));
 const srv = http.createServer((req, res) => {
   let corpo = '';
   req.on('data', (c) => { corpo += c; });
@@ -66,10 +67,15 @@ const srv = http.createServer((req, res) => {
     asaas.pedidos.push({ metodo: req.method, url: req.url, corpo: j, chave: req.headers.access_token });
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'POST' && req.url === '/customers') return res.end(JSON.stringify({ id: 'cus_lab1' }));
-    if (req.method === 'POST' && req.url === '/subscriptions') { asaas.assinaturas.sub_lab1 = j; return res.end(JSON.stringify({ id: 'sub_lab1' })); }
+    if (req.method === 'POST' && req.url === '/subscriptions') {
+      asaas.assinaturas.sub_lab1 = j;
+      asaas.cobrancas = [{ id: 'pay_lab1', status: 'PENDING', dueDate: j.nextDueDate, value: j.value, invoiceUrl: 'https://sandbox.asaas.com/i/pay_lab1' }];
+      return res.end(JSON.stringify({ id: 'sub_lab1' }));
+    }
     if (req.method === 'GET' && req.url.startsWith('/subscriptions/sub_lab1/payments')) {
-      const pend = req.url.includes('status=PENDING');
-      return res.end(JSON.stringify({ data: pend ? [{ id: 'pay_lab1', status: 'PENDING', dueDate: '2026-11-22', value: 99.9, invoiceUrl: 'https://sandbox.asaas.com/i/pay_lab1' }] : [] }));
+      // asaas.cobrancas: o que o Asaas tem em aberto pra esta assinatura.
+      const st = /status=(\w+)/.exec(req.url)[1];
+      return res.end(JSON.stringify({ data: asaas.cobrancas.filter((c) => c.status === st) }));
     }
     if (req.method === 'DELETE' && req.url === '/subscriptions/sub_lab1') return res.end(JSON.stringify({ deleted: true, id: 'sub_lab1' }));
     res.statusCode = 404; res.end(JSON.stringify({ errors: [{ description: 'não achei' }] }));
@@ -184,6 +190,22 @@ const r3 = await aviso('senha-do-aviso', { event: 'PAYMENT_RECEIVED', payment: {
 cobra('assinatura desconhecida é ignorada (não confia no nome escrito no aviso)', r3.status === 200 && !r3.j.creditou && (await linhaCrua('adm:negocios'))['boteco-da-ana'].assinatura.pagoAte === esperado);
 const r4 = await aviso('senha-do-aviso', { event: 'PAYMENT_CREATED', payment: { id: 'pay_y', subscription: 'sub_lab1' } });
 cobra('cobrança só CRIADA não libera nada', r4.status === 200 && !r4.j.creditou);
+
+console.log('\n— depois de pagar: a do mês que vem não é dívida —');
+// O Asaas já cria a cobrança do mês seguinte uns 40 dias antes. Logo depois de
+// pagar, ela aparece "em aberto" — e não pode ser mostrada como atrasada.
+asaas.cobrancas = [{ id: 'pay_lab2', status: 'PENDING', dueDate: diaSP(Date.now() + 33 * DIA), value: 99.9, invoiceUrl: 'https://sandbox.asaas.com/i/pay_lab2' }];
+const pg2 = await api('/api/assinatura', cookieAna, { acao: 'pagar' });
+cobra('"Pagar" logo depois de pagar: "está tudo pago", com a data da próxima', pg2.j.ok && pg2.j.jaPago === true && !pg2.j.link && pg2.j.proxima === diaSP(Date.now() + 33 * DIA), JSON.stringify(pg2.j));
+asaas.cobrancas = [{ id: 'pay_lab2', status: 'PENDING', dueDate: diaSP(Date.now() + 4 * DIA), value: 99.9, invoiceUrl: 'https://sandbox.asaas.com/i/pay_lab2' }];
+const pg3 = await api('/api/assinatura', cookieAna, { acao: 'pagar' });
+cobra('perto do vencimento (4 dias): aí sim mostra o link pra pagar', pg3.j.link === 'https://sandbox.asaas.com/i/pay_lab2', JSON.stringify(pg3.j));
+asaas.cobrancas = [
+  { id: 'pay_lab3', status: 'PENDING', dueDate: diaSP(Date.now() + 30 * DIA), value: 99.9, invoiceUrl: 'https://sandbox.asaas.com/i/pay_lab3' },
+  { id: 'pay_lab2', status: 'OVERDUE', dueDate: diaSP(Date.now() - 3 * DIA), value: 99.9, invoiceUrl: 'https://sandbox.asaas.com/i/pay_lab2' },
+];
+const pg4 = await api('/api/assinatura', cookieAna, { acao: 'pagar' });
+cobra('atrasada: o link é o da atrasada, não o da próxima', pg4.j.link === 'https://sandbox.asaas.com/i/pay_lab2', JSON.stringify(pg4.j));
 
 console.log('\n— venceu: a porta fecha, nada se apaga —');
 const mexer = async (codigo, mud) => { const l = await linhaCrua('adm:negocios'); l[codigo] = mud(l[codigo]); await gravarCrua('adm:negocios', l); };
