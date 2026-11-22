@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { situacao } from './lib/assinatura';
+import { darciLiberado } from './lib/darciLiberado';
 
 // O PORTEIRO: confere se o crachá ainda vale, antes de qualquer tela ou pedido.
 //
@@ -135,6 +136,12 @@ export async function middleware(req) {
   const doCracha = barra < 0 ? '' : cookie.slice(0, barra);
   const dosDados = doCracha || String(process.env.NEGOCIO_UNICO || '').trim().toLowerCase();
   const semNegocio = barra < 0 ? cookie : cookie.slice(barra + 1);
+
+  // O Darci é só do bar da casa (lib/darciLiberado.js): outro bar não chama a
+  // IA paga pela chave da Karen, nem digitando o endereço na mão.
+  if (doCracha && req.nextUrl.pathname.startsWith('/api/darci') && !darciLiberado(doCracha)) {
+    return NextResponse.json({ ok: false, erro: 'O Darci não está disponível neste bar.' }, { status: 403 });
+  }
 
   if (doCracha && req.nextUrl.pathname.startsWith('/api/') && !LIVRES.some((l) => req.nextUrl.pathname === l || req.nextUrl.pathname.startsWith(l + '/'))) {
     const lista = await listaDeNegocios();

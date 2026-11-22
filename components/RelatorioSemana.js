@@ -98,6 +98,10 @@ export default function RelatorioSemana() {
   const [aviso, setAviso] = useState('');
   // Fechado até ela tocar: abrir a tela do Darci não pode gastar IA sozinho.
   const [aberto, setAberto] = useState(false);
+  // Veio da notificação de segunda: já abre.
+  useEffect(() => {
+    try { if (sessionStorage.getItem('picoos-abrir-relatorio')) { sessionStorage.removeItem('picoos-abrir-relatorio'); setAberto(true); } } catch { /* ignora */ }
+  }, []);
 
   const carregar = useCallback(async (qual, refazer = false) => {
     setCarregando(true); setErro(''); setAviso('');
