@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { C, Card, Btn, KPI, Area, PageTitle, inputStyle } from './ui';
+import PacoteAnalista from './PacoteAnalista';
 import { ehBalcao, soMesas, totalCompra, todayISO, fmtDate, num, brl, ymOf, mesLabel, weekday, limparNome, DIAS, CUSTO_VARIAVEL, DESPESA_OPERACIONAL } from '../lib/util';
 import { horasDoTurno, fmtHoras, aPagarNoMes } from '../lib/ponto';
 import SEED_DATA from '../data/seed.json';
@@ -453,6 +454,8 @@ export default function Backup({ all, restore, negocio = '' }) {
   return (
     <div>
       <PageTitle sub="Salvar, restaurar e analisar seus dados">Backup</PageTitle>
+      {/* Uma planilha só, pronta pra mandar pro analista ou pro contador. */}
+      <PacoteAnalista />
       <Card style={{ marginBottom: 14, borderColor: C.accent }}>
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.accent, fontWeight: 700, marginBottom: 6 }}>Sobre os dados carregados</div>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
