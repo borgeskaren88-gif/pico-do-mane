@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { C, Card, Btn, Field, TextInput, NumInput, Select, Empty, Resumo, SecTitle, PageTitle, inputStyle, QtdInput } from './ui';
 import { brl, num, fmtDate, limparNome, todayISO, diaOperacional, CATEGORIAS_PRODUTO, numQtd } from '../lib/util';
 import { UNIDADES, UNIDADES_CONTEUDO, MOTIVOS_SAIDA, custoPelasCompras, igualNome, diasParaVencer, nivelValidade, textoValidade, itensVencendo, gruposDuplicados, fatorEntre, leituraDeReposicao, curvaABC, ordenarLotes, coberturaEmDias, insumosComUnidadeSolta, conteudoContradiz, comprasComCustoEstranho, conversaoDaReceita, ehPorcionado, linhaDe, salvaDe } from '../lib/estoque';
-import { painelDasPorcoes, consumoPorSaco, porcoesSemFicha, fichasComPacoteESaco } from '../lib/porcoes';
+import { painelDasPorcoes, consumoPorSaco, porcoesSemFicha, fichasComPacoteESaco, sacosAMais } from '../lib/porcoes';
 import { prazoDeEntregaDoProduto } from '../lib/cotacao';
 import EntradaPorVoz from './EntradaPorVoz';
 
@@ -475,10 +475,12 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   const [pQtd, setPQtd] = useState('');
   const [pQtd2, setPQtd2] = useState('');
   const [pErro, setPErro] = useState('');
+  const [pTirar, setPTirar] = useState(true);
 
   const abrirPorcao = (p, tipo) => {
     setPErro('');
     setPAcao({ id: p.id, tipo });
+    setPTirar(true);
     if (tipo === 'separar') setPQtd(String(p.precisaSeparar || ''));
     else if (tipo === 'abastecer') setPQtd(String(p.podeAbastecer || ''));
     else { setPQtd(fmtQtd(p.linha)); setPQtd2(fmtQtd(p.salva)); }
@@ -487,7 +489,7 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
   const confirmarPorcao = async () => {
     if (busy || !pAcao) return;
     const corpo = pAcao.tipo === 'contar'
-      ? { acao: 'porcaoContar', id: pAcao.id, linha: numQtd(pQtd), salva: numQtd(pQtd2) }
+      ? { acao: 'porcaoContar', id: pAcao.id, linha: numQtd(pQtd), salva: numQtd(pQtd2), tirarDoPacote: pTirar }
       : { acao: pAcao.tipo === 'separar' ? 'porcaoSeparar' : 'porcaoAbastecer', id: pAcao.id, sacos: numQtd(pQtd) };
     if (pAcao.tipo !== 'contar' && !(numQtd(pQtd) > 0)) return;
     setBusy(true); setPErro('');
@@ -954,6 +956,13 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
 
           {porcoes.lista.map((p) => {
             const cor = { vazio: C.red, critico: C.red, atencao: C.amber, ok: C.green }[p.nivel];
+            // Contagem com sacos a mais = saco que saiu do pacote fechado.
+            let aMaisP = { sacos: 0, gasto: 0 };
+            if (pAcao && pAcao.id === p.id && pAcao.tipo === 'contar') {
+              const itP = itens.find((x) => x.id === p.id);
+              const brP = itP && itens.find((x) => x.id === itP.separar?.brutoId);
+              aMaisP = sacosAMais(itP, brP, numQtd(pQtd), numQtd(pQtd2));
+            }
             return (
               <div key={p.id} style={{ borderTop: `1px solid ${C.hair}`, padding: '10px 0 2px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
@@ -1013,6 +1022,12 @@ export default function Estoque({ itens = [], carregado = true, onAcao, compras 
                         </div>
                       )}
                     </div>
+                    {pAcao.tipo === 'contar' && aMaisP.sacos > 0 && (
+                      <label data-tirar-pacote style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, lineHeight: 1.45, marginBottom: 8, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={pTirar} onChange={(e) => setPTirar(e.target.checked)} style={{ marginTop: 3 }} />
+                        <span>Esses <b>{fmtQtd(aMaisP.sacos)}</b> saco(s) a mais saíram do pacote fechado — <b>tirar {fmtQtd(aMaisP.gasto)} {p.brutoUnidade}</b> de {p.brutoNome}</span>
+                      </label>
+                    )}
                     {pErro && <div style={{ fontSize: 12, color: C.red, fontWeight: 700, marginBottom: 8, lineHeight: 1.45 }}>{pErro}</div>}
                     <div style={{ display: 'flex', gap: 8 }}>
                       <Btn small onClick={confirmarPorcao} disabled={busy}>{busy ? 'Salvando…' : 'Confirmar'}</Btn>

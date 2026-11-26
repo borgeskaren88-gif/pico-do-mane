@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { C, Card, Btn, QtdInput, Empty, PageTitle } from './ui';
 import { num, numQtd } from '../lib/util';
-import { painelDasPorcoes } from '../lib/porcoes';
+import { painelDasPorcoes, sacosAMais } from '../lib/porcoes';
 
 // PORÇÕES — a tela da cozinha.
 //
@@ -43,6 +43,7 @@ export default function PorcoesCozinha() {
   const [qtd2, setQtd2] = useState('');
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState('');
+  const [tirar, setTirar] = useState(true);
 
   const carregar = useCallback(async () => {
     try {
@@ -59,6 +60,7 @@ export default function PorcoesCozinha() {
   const abrir = (p, tipo) => {
     setErro('');
     setAcao({ id: p.id, tipo });
+    setTirar(true);
     // Já vem preenchido com o que o sistema acha que é pra fazer. Confirmar um
     // número certo é muito mais rápido — e menos errável — do que digitar um.
     if (tipo === 'separar') setQtd(String(p.precisaSeparar || ''));
@@ -70,7 +72,7 @@ export default function PorcoesCozinha() {
   const confirmar = async () => {
     if (busy || !acao) return;
     const corpo = acao.tipo === 'contar'
-      ? { acao: 'porcaoContar', id: acao.id, linha: numQtd(qtd), salva: numQtd(qtd2) }
+      ? { acao: 'porcaoContar', id: acao.id, linha: numQtd(qtd), salva: numQtd(qtd2), tirarDoPacote: tirar }
       : { acao: acao.tipo === 'separar' ? 'porcaoSeparar' : 'porcaoAbastecer', id: acao.id, sacos: numQtd(qtd) };
     if (acao.tipo !== 'contar' && !(numQtd(qtd) > 0)) return;
     setBusy(true); setErro('');
@@ -102,6 +104,13 @@ export default function PorcoesCozinha() {
       {painel.lista.map((p) => {
         const cor = CORES[p.nivel];
         const aberta = acao && acao.id === p.id;
+        // Contagem com sacos a mais = saco que saiu do pacote fechado.
+        let aMais = { sacos: 0, gasto: 0 };
+        if (aberta && acao.tipo === 'contar') {
+          const itP = itens.find((x) => x.id === p.id);
+          const brP = itP && itens.find((x) => x.id === itP.separar?.brutoId);
+          aMais = sacosAMais(itP, brP, numQtd(qtd), numQtd(qtd2));
+        }
         return (
           <Card key={p.id} style={{ marginBottom: 10, borderColor: p.nivel === 'ok' ? C.cardBorder : cor }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
@@ -181,6 +190,13 @@ export default function PorcoesCozinha() {
                     </div>
                   )}
                 </div>
+
+                {acao.tipo === 'contar' && aMais.sacos > 0 && (
+                  <label data-tirar-pacote style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.45, marginBottom: 10, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={tirar} onChange={(e) => setTirar(e.target.checked)} style={{ marginTop: 3 }} />
+                    <span>Esses <b>{fmtQtd(aMais.sacos)}</b> saco(s) a mais saíram do pacote fechado — <b>tirar {fmtQtd(aMais.gasto)} {p.brutoUnidade}</b> de {p.brutoNome}</span>
+                  </label>
+                )}
 
                 {erro && <div style={{ fontSize: 12.5, color: C.red, fontWeight: 700, marginBottom: 10, lineHeight: 1.45 }}>{erro}</div>}
 
