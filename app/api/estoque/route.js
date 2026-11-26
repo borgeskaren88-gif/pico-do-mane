@@ -218,7 +218,9 @@ export async function POST(request) {
         r = abastecerLinha(alvo, body?.sacos, quem);
         if (!r) return NextResponse.json({ ok: false, erro: 'O Salva-Vidas está vazio — não tem o que levar pra frente.' }, { status: 400 });
       } else {
-        r = contarPorcao(alvo, body?.linha, body?.salva, quem);
+        const brutoDe = itens.find((it) => it.id === alvo.separar.brutoId) || null;
+        r = contarPorcao(alvo, body?.linha, body?.salva, quem, brutoDe, body?.tirarDoPacote === true);
+        if (r && r.bruto) brutoNovo = r.bruto;
       }
       if (!r) return NextResponse.json({ ok: false, erro: 'Não consegui registrar. Confere a quantidade.' }, { status: 400 });
 
