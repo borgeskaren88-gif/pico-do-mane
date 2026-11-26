@@ -3,7 +3,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { C, Card, Btn, KPI, Empty } from './ui';
 import MetaMes from './MetaMes';
-import { brl, num, totalCompra, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_NAO_OPERACIONAL, DESPESA_NAO_OPERACIONAL } from '../lib/util';
+import { brl, num, totalCompra, todayISO, ymOf, weekday, fmtDate, mesLabel, addDays, agruparContasAbertas, FONTES_NAO_OPERACIONAL, DESPESA_NAO_OPERACIONAL, diaOperacional } from '../lib/util';
+import { saiuSemVender } from '../lib/fechamento';
 
 const TAB = { fontVariantNumeric: 'tabular-nums' };
 
@@ -83,6 +84,10 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
   }, [vendas, hoje]);
   const maxTop = topProdutos[0]?.qtd || 1;
 
+  // O PLACAR DO "SAIU SEM VENDER" NA TELA INICIAL.
+  // "Queria visualizar de forma simples o consumo da casa, a perda, o quebrado,
+  // o congelado." Era uma aba dentro do Estoque; agora bate o olho aqui.
+  const semVender = useMemo(() => saiuSemVender(estoque, { mes: ymOf(todayISO()), hoje: diaOperacional() }), [estoque]);
   const lbl = { fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: C.faint, margin: '0 2px 10px' };
 
   return (
@@ -246,6 +251,27 @@ export default function Hoje({ diario, receitas, despesas, compras, garrafas, ta
               <b style={{ flex: '0 0 34px', textAlign: 'right', fontSize: 15, fontWeight: 800, ...TAB }}>{p.qtd}</b>
             </div>
           ))}
+        </Card>
+      )}
+
+      {(estoque || []).length > 0 && (
+        <Card data-card="saiu-sem-vender" style={{ marginBottom: 14 }}>
+          <Leva onClick={() => setTab('saiu-sem-vender')}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.07em', color: C.faint, fontWeight: 800 }}>Saiu sem vender · {mesLabel(ymOf(todayISO()))}</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: semVender.mes.total > 0 ? C.red : C.green, marginTop: 4, ...TAB }}>{oculto(brl(semVender.mes.total))}</div>
+              <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>a preço de custo · hoje: <b style={{ color: semVender.hoje.total > 0 ? C.text : C.faint }}>{oculto(brl(semVender.hoje.total))}</b></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 8, marginTop: 10 }}>
+                {[['consumo', 'Consumo da casa', C.amber], ['quebra', 'Quebrou', C.red], ['congelou', 'Congelou', C.red], ['perdaSo', 'Perda', C.red], ['cortesia', 'Cortesia', C.amber]].map(([k, rot, cor]) => (
+                  <div key={k} data-balde={k} style={{ background: C.panel2, borderRadius: 10, padding: '8px 10px', minWidth: 0 }}>
+                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, lineHeight: 1.2 }}>{rot}</div>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: semVender.mes[k] > 0 ? cor : C.faint, ...TAB }}>{oculto(brl(semVender.mes[k]))}</div>
+                    <div style={{ fontSize: 10.5, color: C.faint }}>{semVender.mes.vezes[k]} {semVender.mes.vezes[k] === 1 ? 'vez' : 'vezes'}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Leva>
         </Card>
       )}
 

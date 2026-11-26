@@ -811,6 +811,8 @@ export default function Dashboard() {
     // A lista estava logo acima, fora do campo de visão.
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
     if (['estoque', 'lista', 'compras', 'cotacoes', 'margem', 'preco', 'fornecedores'].includes(destino)) { setSubAbast(destino); setTab('abastecimento'); return; }
+    // "Saiu sem vender" mora numa aba dentro do Estoque; o cartão do Dashboard leva direto pra ela.
+    if (destino === 'saiu-sem-vender') { setSubAbast('estoque'); setSubEstoque('cortesia'); setTab('abastecimento'); return; }
     if (['caixa', 'comandas', 'vendas', 'fiados', 'clientes', 'cardapio'].includes(destino)) { setSubSalao(destino); setTab('salao'); return; }
     if (['raiox', 'saldo', 'receitas', 'despesas', 'pagar', 'relatorios'].includes(destino)) { setSubFinancas(destino); setTab('financas'); return; }
     // DESTINO QUE NÃO EXISTE NÃO TROCA DE TELA.
